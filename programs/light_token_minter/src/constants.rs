@@ -244,8 +244,8 @@ pub const ORACLE_OPENING_ARCHIVE_URL_PREFIX: &str = "https://web.archive.org/web
 pub const ORACLE_OPENING_EVIDENCE_HASH_DOMAIN: &[u8] = b"amoeba-oracle-opening-evidence-v1";
 pub const ORACLE_OPENING_ARCHIVE_URL_HASH_DOMAIN: &[u8] = b"amoeba-oracle-opening-archive-url-v1";
 /// Evidence and dispute-resolution window after option expiry before the oracle month can finalize.
-/// This production value is intentionally identical under `test-sbf`: tests must exercise the
-/// exact signed settlement timing contract instead of a shortened test-only protocol.
+/// Tests exercise this exact production settlement timing contract instead of a shortened
+/// test-only protocol.
 pub const ORACLE_SETTLEMENT_GRACE_SECONDS: u64 = 7_200;
 /// Hard ceiling checked before any instruction payload is Borsh-decoded.
 pub const MAX_INSTRUCTION_DATA_BYTES: usize = 16_384;
@@ -269,8 +269,8 @@ pub const SETTLEMENT_SIGNER_REGISTRY_PDA_SEED: &[u8] = b"settlement_signer_regis
 pub const SETTLEMENT_SIGNER_SET_PDA_SEED: &[u8] = b"settlement_signer_set";
 /// Bounded storage capacity only. The active signer count and threshold are governed state.
 pub const MAX_SETTLEMENT_SIGNER_COUNT: usize = 8;
-/// Production governance delay. External SBF tests must serialize this value even though their
-/// host-side helper crate is compiled with `test-sbf`.
+/// Production governance delay. External SBF tests must serialize this value even when their
+/// host-side helper crate uses shortened test-only protocol constants.
 pub const PRODUCTION_MIN_SETTLEMENT_SIGNER_ROTATION_DELAY_SLOTS: u64 = 216_000;
 pub const MIN_SETTLEMENT_SIGNER_ROTATION_DELAY_SLOTS: u64 =
     PRODUCTION_MIN_SETTLEMENT_SIGNER_ROTATION_DELAY_SLOTS;

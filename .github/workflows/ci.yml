@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f PUBLIC_SOURCE_PROVENANCE.json
-          test "$(find . -type f -name '*.so' -print -quit)" = ""
+          test "$(git ls-files '*.so')" = ""
           test ! -e clients
           test ! -e scripts
           test ! -e programs/light_token_minter/tests
