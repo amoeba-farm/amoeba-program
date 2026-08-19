@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 2,
+  "environment": "devnet",
+  "status": "preproduction-blocked",
+  "productionEnabled": false,
+  "network": {
+    "cluster": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com",
+    "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+  },
+  "liquidityEngine": {
+    "type": "in-program-ameba-dlmm",
+    "version": 1,
+    "programId": "9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH",
+    "pairPolicy": "canonical-contract-vs-canonical-usdc",
+    "liquidityPolicy": "managed-only",
+    "storagePolicy": "light-hot-cold",
+    "contractUnit": "one-underlying-index-unit-per-contract",
+    "contractSizeScale": 6,
+    "contractSizeAtomic": 1000000,
+    "tickSizeQuoteAtomic": 50000,
+    "maximumPriceQuoteAtomic": 12000000,
+    "maximumBinId": 240,
+    "maximumBinCount": 240,
+    "binsPerPage": 32,
+    "theoreticalPageCount": 8,
+    "launchBinCount": 21,
+    "binsBelowActive": 10,
+    "binsAboveActive": 10,
+    "maximumBinsPerSwap": 8,
+    "premiumPolicy": "market-discovered"
+  },
+  "program": {
+    "name": "light_token_minter",
+    "programId": "9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH",
+    "crateVersion": "0.2.0",
+    "upgradeMode": "in-place-programdata",
+    "sourceCommit": null,
+    "sourceTag": null,
+    "artifactSha256": null,
+    "artifactSizeBytes": null,
+    "programDataSha256": null
+  },
+  "configuredMints": {
+    "collateralMint": "21Ft8EZpugvFofW9713vLnYDRfSqyVUGUo9wvvUGhTsZ",
+    "collateralDecimals": 6,
+    "majorTokenMint": null,
+    "majorTokenMintPolicy": "create-new-during-current-v2-bootstrap",
+    "majorTokenDecimals": 6
+  },
+  "currentState": {
+    "stateNamespaceVersion": 2,
+    "stateNamespaceSeedUtf8": "ameba-spread-v2",
+    "preserveCompatibleCurrentProgramOwnedAccounts": true,
+    "versionedPdaSeedsRequired": true,
+    "vaultConfigPda": null,
+    "settlementSignerRegistryPda": null,
+    "maturityLadderRegistryPda": null,
+     "bootstrapPolicyCanonicalSha256": "9ebe04ff1b8cfb616097a7716e11399315c4a95c4bbab8a0287d9bef43e021fa",
+    "initialRollingLadderReceiptSha256": null
+  },
+  "governancePolicy": {
+    "clientTrafficMustBeStoppedBeforeUpgrade": true,
+    "finalizedUpgradeCompatibilityRequired": true,
+    "programIdMustRemainUnchanged": true,
+    "programDataAuthorityMustMatchSignedPlan": true,
+    "explicitProgramDataExtensionOnly": true,
+    "zeroDeltaExtensionTransactionForbidden": true,
+    "programDataExtensionHeadroomBytes": 0,
+    "deployNoAutoExtendRequired": true,
+    "compatibleCurrentStatePreservedInPlace": true,
+    "postUpgradeCompatibleStateVerificationRequired": true
+  },
+  "productSkuGovernance": {
+    "ramx": {
+      "deploymentStatus": "planned-not-deployed-by-this-change",
+      "manifestSource": "governance/ramx_product_sku_manifest.v1.json",
+      "manifestVersion": 1,
+      "requiredSkuCount": 52,
+      "requiredSkuRootHex": "52a574e7fee12f9921b3b220b709be16c13a6f290abbdc2cc203ed1191ecf578",
+      "sourceSha256": "c89628e1656c82572b4f1b089388674aff0fae2aa3c3db1167da602a25b1cd3f",
+      "instructionTag": 190,
+      "chunkSkuCounts": [16, 16, 16, 4]
+    },
+    "nandx": {
+      "deploymentStatus": "planned-not-deployed-by-this-change",
+      "manifestSource": "governance/nandx_product_sku_manifest.v1.json",
+      "manifestVersion": 1,
+      "requiredSkuCount": 48,
+      "requiredSkuRootHex": "41bb5dc79bacabb3e0876b55e647b01084c7fe8b39846fd707ee0fd973d28c3d",
+      "sourceSha256": "14e31bd83e0c92c5b3894df5d68aec1091373c0ae48b53775d12640b92cb1be7",
+      "instructionTag": 190,
+      "chunkSkuCounts": [16, 16, 16],
+      "benchmarkSource": "governance/nandx_benchmark_basket.v1.json",
+      "benchmarkVersion": 1,
+      "benchmarkLayoutSha256": "fea5a56a2ed2d470a797639056e4a6b1aebe1f0174984683aeac26bf8d620fa7",
+      "benchmarkWeightTotal": "100.00",
+      "terminalIdentityWeightPct": null
+    }
+  },
+  "validationEvidence": {
+    "clientTrafficStopApprovalSha256": null,
+    "upgradeCompatibilityPrestateSha256": null,
+    "finalBuildReceiptSha256": null,
+    "finalArtifactSha256": null,
+    "liveProgramDataPrestateSha256": null,
+    "programDataExtensionPlanSha256": null,
+    "programDataCapacityEvidenceKind": null,
+    "programDataCapacityEvidenceSha256": null,
+    "programDataExtensionTransactionSignature": null,
+    "programUpgradeTransactionSignature": null,
+    "postUpgradeProgramDataSha256": null,
+    "postUpgradeCompatibilitySha256": null,
+    "devnetValidationApprovalSha256": null
+  },
+  "promotion": {
+    "eligible": false,
+    "missingEvidence": [
+      "sourceCommit",
+      "sourceTag",
+      "clientTrafficStopApprovalSha256",
+      "upgradeCompatibilityPrestateSha256",
+      "finalBuildReceiptSha256",
+      "finalArtifactSha256",
+      "liveProgramDataPrestateSha256",
+      "programDataExtensionPlanSha256",
+      "programDataCapacityEvidenceKind",
+      "programDataCapacityEvidenceSha256",
+      "programDataExtensionTransactionSignatureIfRequired",
+      "programUpgradeTransactionSignature",
+      "postUpgradeProgramDataSha256",
+      "postUpgradeCompatibilitySha256",
+      "devnetValidationApprovalSha256"
+    ]
+  }
+}

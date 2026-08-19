@@ -1,0 +1,27 @@
+[target.sbpf-solana-solana]
+rustflags = [
+    "-Z",
+    "fmt-debug=none",
+    "-Z",
+    "location-detail=none",
+    "-Z",
+    "mir-opt-level=1",
+    "-C",
+    "llvm-args=-ir-outliner -outliner-benefit-threshold=0 -min-region-size-ratio=0 -enable-global-merge-func -enable-merge-functions",
+    "-C",
+    "link-arg=--icf=all",
+]
+
+[target.sbpfv1-solana-solana]
+rustflags = [
+    "-Z",
+    "fmt-debug=none",
+    "-Z",
+    "location-detail=none",
+    "-Z",
+    "mir-opt-level=1",
+    "-C",
+    "llvm-args=-ir-outliner -outliner-benefit-threshold=0 -min-region-size-ratio=0 -enable-global-merge-func -enable-merge-functions",
+    "-C",
+    "link-arg=--icf=all",
+]

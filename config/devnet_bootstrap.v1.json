@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "policyKind": "ameba-spread-v2-devnet-bootstrap",
+  "network": {
+    "cluster": "devnet",
+    "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "programId": "9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH"
+  },
+  "authorities": {
+    "configAdmin": "99riHvpFvwfz2tbrWbanEMPz5iyhHHThBbM7eY35vMwL",
+    "oracleAuthority": "C8gpKjnPss4SKpjhBpFGNH7cbD26XCzSWhcjj6gF4dx7",
+    "recoveryAuthority": "5zkGhzjEXYWw15Jy534ZL3UDQ9N2nQ17jcSRZ2B5C28Y",
+    "settlementSignerSet": {
+      "version": 1,
+      "threshold": 2,
+      "rotationDelaySlots": 216000,
+      "signers": [
+        "6j94ACbKAfbNP8rhtMz6gL4Nws6ApXYLhkyAA3FWNCbq",
+        "GAZpobxMJm3rpiXPc6gVGvFrnLadpfFuqFQbKRicFfFX",
+        "GWnT4pPjkSYQCvgBbt48KLDFCNJX5kNEYUGBa7kdx9ME"
+      ]
+    }
+  },
+  "collateral": {
+    "mint": "21Ft8EZpugvFofW9713vLnYDRfSqyVUGUo9wvvUGhTsZ",
+    "decimals": 6,
+    "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "emergencyEconomics": {
+    "configVersion": 1,
+    "supermajorityBps": 6000,
+    "commitWindowSlots": 216000,
+    "revealWindowSlots": 216000,
+    "maximumVoters": 256,
+    "minimumVoteRule": "ceil(snapshotSambaSupply/256)",
+    "futureVersionsAffectOnlyNewMonths": true
+  },
+  "ambaGenesis": {
+    "managedMintAccount": {
+      "publicKey": "38j6HLJBpTHv1tF4ohYpheAAURowk8gNubFWR7UVYKCn",
+      "publicKeyRawEd25519Hex": "1fb208333c7ce75931fa9a079ffe3c20ba80f159e7e88e6b87a39019d923722b",
+      "kmsKeyVersion": "projects/amoeba-hm0q2k/locations/global/keyRings/ameba-spread-devnet/cryptoKeys/amba-mint-v1/cryptoKeyVersions/1",
+      "kmsServiceAccount": "ameba-spread-devnet-bootstrap@amoeba-hm0q2k.iam.gserviceaccount.com"
+    },
+    "decimals": 6,
+    "totalDisplaySupply": "256000.000000",
+    "totalAtomicSupply": 256000000000,
+    "mintAuthorityAtCreation": "configAdmin",
+    "freezeAuthority": null,
+    "retireMintAuthorityBeforeFinalReceipt": true,
+    "additionalMintingPermitted": false,
+    "allocation": {
+      "genesisTreasuryAtomic": 256000000000,
+      "programCustodyVaultAtomic": 0,
+      "rewardFunnelAtomic": 0,
+      "stakingActiveBackingAtomic": 0,
+      "stakingQueuedPrincipalAtomic": 0,
+      "sambaSupplyAtomic": 0,
+      "sambaVoteVaultAtomic": 0
+    }
+  },
+  "products": [
+    {
+      "symbol": "RAMX",
+      "underlyingId": "ram-standardized-baskets",
+      "requiredSkuCount": 52,
+      "requiredSkuRoot": "52a574e7fee12f9921b3b220b709be16c13a6f290abbdc2cc203ed1191ecf578",
+      "manifestPath": "governance/ramx_product_sku_manifest.v1.json",
+      "submissionPlan": [16, 16, 16, 4],
+      "settlementBaseOracleAtomic": 100000000
+    },
+    {
+      "symbol": "NANDX",
+      "underlyingId": "nand-standardized-baskets",
+      "requiredSkuCount": 48,
+      "requiredSkuRoot": "41bb5dc79bacabb3e0876b55e647b01084c7fe8b39846fd707ee0fd973d28c3d",
+      "manifestPath": "governance/nandx_product_sku_manifest.v1.json",
+      "submissionPlan": [16, 16, 16],
+      "settlementBaseOracleAtomic": 100000000
+    }
+  ],
+  "initialLeadingLadder": {
+    "maturityLabelRule": "last-live-utc-calendar-month",
+    "expiryRule": "first-utc-boundary-after-maturity-label",
+    "listingLeadCalendarMonths": 3,
+    "prelistingWindowSeconds": 691200,
+    "postCoverageReviewSeconds": 345600,
+    "bootstrapRungCount": 3,
+    "createFourthRungDuringBootstrap": false,
+    "lateStartPermitted": true,
+    "lateStartMayMoveOnlyEffectiveListing": true,
+    "rungs": [
+      {
+        "maturityLabel": "2026-11",
+        "scrambleStartTs": 1787529600,
+        "plannedListingTs": 1788220800,
+        "expiryTs": 1796083200
+      },
+      {
+        "maturityLabel": "2026-12",
+        "scrambleStartTs": 1790121600,
+        "plannedListingTs": 1790812800,
+        "expiryTs": 1798761600
+      },
+      {
+        "maturityLabel": "2027-01",
+        "scrambleStartTs": 1792800000,
+        "plannedListingTs": 1793491200,
+        "expiryTs": 1801440000
+      }
+    ]
+  },
+  "contractUnit": {
+    "description": "one underlying index unit per contract",
+    "contractSizeScale": 6,
+    "contractSizeAtomic": 1000000,
+    "lotSizeContracts": 1,
+    "minimumOrderQuantityContracts": 1,
+    "frontendDefaultLotContracts": 10,
+    "frontendDefaultLotIsUiOnly": true
+  },
+  "neutralPairGeometry": {
+    "anchorPriceAtomic": 100000000,
+    "participationBps": 10000,
+    "widthFractionBps": 1200,
+    "widthRounding": "nearest-shared-quote-bin-step-half-up",
+    "roundedWidthAtomic": 12000000,
+    "callStrikePriceAtomic": 100000000,
+    "callCapPriceAtomic": 112000000,
+    "putStrikePriceAtomic": 100000000,
+    "putFloorPriceAtomic": 88000000,
+    "maxPayoutPerContractAtomic": 12000000
+  },
+  "marketTemplates": [
+    {
+      "product": "RAMX",
+      "side": "CALL",
+      "series": 1,
+      "kind": "CallSpread",
+      "strikePriceAtomic": 100000000,
+      "capPriceAtomic": 112000000,
+      "contractSizeAtomic": 1000000,
+      "maxPayoutPerContractAtomic": 12000000
+    },
+    {
+      "product": "RAMX",
+      "side": "PUT",
+      "series": 1,
+      "kind": "PutSpread",
+      "strikePriceAtomic": 100000000,
+      "capPriceAtomic": 88000000,
+      "contractSizeAtomic": 1000000,
+      "maxPayoutPerContractAtomic": 12000000
+    },
+    {
+      "product": "NANDX",
+      "side": "CALL",
+      "series": 1,
+      "kind": "CallSpread",
+      "strikePriceAtomic": 100000000,
+      "capPriceAtomic": 112000000,
+      "contractSizeAtomic": 1000000,
+      "maxPayoutPerContractAtomic": 12000000
+    },
+    {
+      "product": "NANDX",
+      "side": "PUT",
+      "series": 1,
+      "kind": "PutSpread",
+      "strikePriceAtomic": 100000000,
+      "capPriceAtomic": 88000000,
+      "contractSizeAtomic": 1000000,
+      "maxPayoutPerContractAtomic": 12000000
+    }
+  ],
+  "marketParameters": {
+    "priceScale": 6,
+    "contractSizeScale": 6,
+    "payoutScale": 6,
+    "tickSizeAtomic": 50000,
+    "maximumPriceQuoteAtomic": 12000000,
+    "maximumBinId": 240,
+    "maximumBinCount": 240,
+    "binsPerPage": 32,
+    "theoreticalPageCount": 8,
+    "finalPageIndex": 7,
+    "finalPageFirstBinId": 225,
+    "finalPageLastBinId": 240,
+    "finalBinLocalIndex": 15,
+    "launchBinCount": 21,
+    "binsBelowActive": 10,
+    "binsAboveActive": 10,
+    "lotSizeContracts": 1,
+    "minimumOrderQuantityContracts": 1,
+    "makerFeeBps": 0,
+    "takerFeeBps": 20,
+    "cancelFeeBps": 0,
+    "minimumCancelSlots": 32,
+    "maximumFillsPerInstruction": 8
+  },
+  "light": {
+    "contractMintModel": "classic_spl_with_light_interface",
+    "createInstructionTag": 203,
+    "bootstrapProofsRequired": false,
+    "photonEndpointRequired": false
+  },
+  "activation": {
+    "automaticActivationPermitted": false,
+    "vaultRemainsPaused": true,
+    "allMarketsRemainPaused": true
+  }
+}

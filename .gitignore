@@ -1,0 +1,21 @@
+# Rust build artifacts
+**/target/
+
+# TypeScript build and dependency artifacts
+node_modules/
+.tracked-dist-check/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+
+# local artifacts
+output/
+tmp/
+wsl-artifacts/*keypair*.json
+
+# macOS
+.DS_Store

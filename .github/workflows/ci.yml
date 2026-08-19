@@ -1,0 +1,40 @@
+name: Public source CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-source-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: 1.90.0
+          components: rustfmt
+      - name: Verify the production-only public source
+        run: |
+          cargo fmt --manifest-path programs/light_token_minter/Cargo.toml --all -- --check
+          cargo check --manifest-path programs/light_token_minter/Cargo.toml --locked --lib
+      - name: Reject binaries and private development surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f PUBLIC_SOURCE_PROVENANCE.json
+          test "$(find . -type f -name '*.so' -print -quit)" = ""
+          test ! -e clients
+          test ! -e scripts
+          test ! -e programs/light_token_minter/tests
+          ! grep -R -n -E '#\[(cfg\()?test|developer-ops|test-sbf' programs/light_token_minter/src programs/light_token_minter/Cargo.toml

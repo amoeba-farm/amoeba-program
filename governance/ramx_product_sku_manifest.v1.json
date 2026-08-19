@@ -1,0 +1,194 @@
+{
+  "schema": "amoeba.oracle-product-sku-manifest",
+  "schemaVersion": 1,
+  "manifestVersion": 1,
+  "product": {
+    "marketId": "ramx",
+    "symbol": "RAMX",
+    "underlyingId": "ram-standardized-baskets"
+  },
+  "provenance": {
+    "sourceDescription": "matching thumb-drive/maintained RAMX module JSON",
+    "sourceSha256": "c89628e1656c82572b4f1b089388674aff0fae2aa3c3db1167da602a25b1cd3f"
+  },
+  "canonicalLabelEncoding": {
+    "name": "printable-ascii-utf8-right-zero-padded-bytes32-v1",
+    "minimumBytes": 1,
+    "maximumBytes": 32,
+    "sort": "ascending-encoded-bytes"
+  },
+  "tag190Plan": {
+    "instructionTag": 190,
+    "maximumChunkSkuIds": 16,
+    "chunkSkuCounts": [
+      16,
+      16,
+      16,
+      4
+    ]
+  },
+  "requiredSkuCount": 52,
+  "requiredSkuRootHex": "52a574e7fee12f9921b3b220b709be16c13a6f290abbdc2cc203ed1191ecf578",
+  "groups": [
+    {
+      "name": "DDR5 RDIMM",
+      "skuCount": 14,
+      "subgroups": [
+        {
+          "name": "32GB",
+          "skuCount": 5,
+          "skuLabels": [
+            "MTC20F2085S1RC48BR",
+            "M321R4GA3BB6-CQK",
+            "MTC20F2085S1RC56BR",
+            "HMCG84AGBRA191N",
+            "KSM64R52BD8-32HA"
+          ]
+        },
+        {
+          "name": "64GB",
+          "skuCount": 5,
+          "skuLabels": [
+            "MTC40F2046S1RC48BR",
+            "M321R8GA0BB0-CQK",
+            "MTC40F2046S1RC56BR",
+            "HMCG94AGBRA184N",
+            "KSM64R52BD4-64HA"
+          ]
+        },
+        {
+          "name": "96GB",
+          "skuCount": 4,
+          "skuLabels": [
+            "MTC40F204WS1RC48BR",
+            "M321RAGA0B20-CWK",
+            "MTC40F204WS1RC56BR",
+            "ST8G8RM5444-HB"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DDR4 RDIMM",
+      "skuCount": 12,
+      "subgroups": [
+        {
+          "name": "16GB",
+          "skuCount": 4,
+          "skuLabels": [
+            "M393A2K43DB3-CWE",
+            "MTA18ASF2G72PZ-3G2E2",
+            "HMA82GR7CJR4N-XN",
+            "KSM32RD8/16MRR"
+          ]
+        },
+        {
+          "name": "32GB",
+          "skuCount": 4,
+          "skuLabels": [
+            "M393A4K40DB3-CWE",
+            "MTA18ASF4G72PZ-3G2E1",
+            "HMA84GR7CJR4N-XN",
+            "KSM32RD4/32MRR"
+          ]
+        },
+        {
+          "name": "64GB",
+          "skuCount": 4,
+          "skuLabels": [
+            "M393A8G40AB2-CWE",
+            "MTA36ASF8G72PZ-3G2B2",
+            "HMAA8GR7AJR4N-XN",
+            "KSM32RD4/64MFR"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DDR5 UDIMM",
+      "skuCount": 6,
+      "subgroups": [
+        {
+          "name": "16GB 5600",
+          "skuCount": 3,
+          "skuLabels": [
+            "CT16G56C46U5",
+            "KVR56U46BS8-16",
+            "M323R2GA3BB0-CQK"
+          ]
+        },
+        {
+          "name": "32GB 5600",
+          "skuCount": 3,
+          "skuLabels": [
+            "CT32G56C46U5",
+            "KVR56U46BD8-32",
+            "M323R4GA3BB0-CQK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DDR4 UDIMM",
+      "skuCount": 12,
+      "subgroups": [
+        {
+          "name": "8GB 3200",
+          "skuCount": 4,
+          "skuLabels": [
+            "CT8G4DFRA32A",
+            "KVR32N22S8/8",
+            "M378A1K43EB2-CWE",
+            "MTA8ATF1G64AZ-3G2E1"
+          ]
+        },
+        {
+          "name": "16GB 3200",
+          "skuCount": 4,
+          "skuLabels": [
+            "CT16G4DFRA32A",
+            "KVR32N22D8/16",
+            "M378A2K43EB2-CWE",
+            "MTA16ATF2G64AZ-3G2E1"
+          ]
+        },
+        {
+          "name": "32GB 3200",
+          "skuCount": 4,
+          "skuLabels": [
+            "CT32G4DFD832A",
+            "KVR32N22D8/32",
+            "M378A4G43AB2-CWE",
+            "MTA16ATF4G64AZ-3G2E1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DDR4 SODIMM",
+      "skuCount": 8,
+      "subgroups": [
+        {
+          "name": "8GB 3200",
+          "skuCount": 4,
+          "skuLabels": [
+            "CT8G4SFRA32A",
+            "KVR32S22S8/8",
+            "M471A1K43DB1-CWE",
+            "MTA8ATF1G64HZ-3G2E1"
+          ]
+        },
+        {
+          "name": "16GB 3200",
+          "skuCount": 4,
+          "skuLabels": [
+            "CT16G4SFRA32A",
+            "KVR32S22D8/16",
+            "M471A2K43DB1-CWE",
+            "MTA16ATF2G64HZ-3G2E1"
+          ]
+        }
+      ]
+    }
+  ]
+}

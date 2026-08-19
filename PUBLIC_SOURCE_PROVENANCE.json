@@ -1,0 +1,12 @@
+{
+  "binaryIncluded": false,
+  "channel": "source-preview",
+  "exportedFileCount": 126,
+  "exportedTreeSha256": "d1115cc05589a62f8540a9ef6da9613fb3a6f7ca32f95eedcadacd81d918575d",
+  "policySha256": "3ee36e26ff9dc5cb0f7ac18c1d58a4fc019368ccb47773e9ffd4a8430e8a161a",
+  "schemaVersion": 1,
+  "sourceCommit": "88f12951b03da3a348aac0dfb9f58987e7626de5",
+  "sourceDirty": false,
+  "treeDigestExcludesThisProvenanceFile": true,
+  "treeDigestIncludesNormalizedModes": true
+}

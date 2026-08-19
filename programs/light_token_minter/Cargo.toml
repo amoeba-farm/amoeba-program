@@ -1,0 +1,36 @@
+[package]
+name = "light_token_minter"
+version = "0.2.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+test = false
+
+[features]
+no-entrypoint = []
+writer-math-benchmark = []
+
+[dependencies]
+borsh = "0.10.4"
+light-compressed-account = { version = "0.11.0", default-features = false, features = ["std"] }
+light-compressible = { version = "0.6.0", default-features = false }
+light-sdk = "=0.23.0"
+light-sdk-types = { version = "=0.23.0", default-features = false, features = ["std"] }
+solana-program = { version = "2.3", default-features = false }
+solana-sdk-ids = "2.2.1"
+thiserror = "2.0"
+
+[lints.rust.unexpected_cfgs]
+level = "allow"
+check-cfg = ['cfg(target_os, values("solana"))']
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+incremental = false
+debug = 0
+strip = "debuginfo"

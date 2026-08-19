@@ -1,0 +1,239 @@
+{
+  "schema": "amoeba.oracle-product-sku-manifest",
+  "schemaVersion": 1,
+  "manifestVersion": 1,
+  "product": {
+    "marketId": "nandx",
+    "symbol": "NANDX",
+    "underlyingId": "nand-standardized-baskets"
+  },
+  "provenance": {
+    "sourceDescription": "NANDX Manufacturer Item SKU Registry v0.1 (1 August 2026)",
+    "sourceSha256": "14e31bd83e0c92c5b3894df5d68aec1091373c0ae48b53775d12640b92cb1be7"
+  },
+  "canonicalLabelEncoding": {
+    "name": "printable-ascii-utf8-right-zero-padded-bytes32-v1",
+    "minimumBytes": 1,
+    "maximumBytes": 32,
+    "sort": "ascending-encoded-bytes"
+  },
+  "tag190Plan": {
+    "instructionTag": 190,
+    "maximumChunkSkuIds": 16,
+    "chunkSkuCounts": [
+      16,
+      16,
+      16
+    ]
+  },
+  "requiredSkuCount": 48,
+  "requiredSkuRootHex": "41bb5dc79bacabb3e0876b55e647b01084c7fe8b39846fd707ee0fd973d28c3d",
+  "groups": [
+    {
+      "name": "Channel-market SSD gauges",
+      "skuCount": 18,
+      "subgroups": [
+        {
+          "name": "256GB SSD PCIe 3.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "TS256GMTE110S",
+            "ASX8200PNP-256GT-C",
+            "TM8FP6256G0C101"
+          ]
+        },
+        {
+          "name": "512GB SSD PCIe 3.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "TS512GMTE110S",
+            "ASX8200PNP-512GT-C",
+            "TM8FP6512G0C101"
+          ]
+        },
+        {
+          "name": "1TB SSD PCIe 3.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "TS1TMTE110S",
+            "ASX8200PNP-1TT-C",
+            "TM8FP6001T0C101"
+          ]
+        },
+        {
+          "name": "512GB SSD PCIe 4.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "SLEG-900-512GCS",
+            "SKC3000S/512G",
+            "TM8FPW512G0C101"
+          ]
+        },
+        {
+          "name": "1TB SSD PCIe 4.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "SLEG-900-1TCS",
+            "SKC3000S/1024G",
+            "TM8FPW001T0C101"
+          ]
+        },
+        {
+          "name": "2TB SSD PCIe 4.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "SLEG-900-2TCS",
+            "SKC3000D/2048G",
+            "TM8FPW002T0C101"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Industry/OEM SSD gauges",
+      "skuCount": 18,
+      "subgroups": [
+        {
+          "name": "256GB SSD PCIe 3.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "KXG60ZNV256G",
+            "MTFDHBA256TDV-1AY1AABYY",
+            "SDBQNTY-256G"
+          ]
+        },
+        {
+          "name": "512GB SSD PCIe 3.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "KXG60ZNV512G",
+            "MTFDHBA512TDV-1AZ1AABYY",
+            "SDBQNTY-512G"
+          ]
+        },
+        {
+          "name": "1TB SSD PCIe 3.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "KXG60ZNV1T02",
+            "MTFDHBA1T0TDV-1AZ1AABYY",
+            "SDBQNTY-1T00"
+          ]
+        },
+        {
+          "name": "512GB SSD PCIe 4.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "KBG60ZNV512G",
+            "MTFDKBA512TGD-1BK1AABYY",
+            "SDDPNQD-512G"
+          ]
+        },
+        {
+          "name": "1TB SSD PCIe 4.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "KBG60ZNV1T02",
+            "MTFDKBA1T0TGD-1BK1AABYY",
+            "SDDPNQD-1T00"
+          ]
+        },
+        {
+          "name": "2TB SSD PCIe 4.0",
+          "skuCount": 3,
+          "skuLabels": [
+            "KBG60ZNV2T04",
+            "MTFDKBA2T0TGD-1BK1AABYY",
+            "SDDPNQE-2T00"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "eMMC 5.1 gauges",
+      "skuCount": 6,
+      "subgroups": [
+        {
+          "name": "eMMC 64GB 5.1",
+          "skuCount": 2,
+          "skuLabels": [
+            "MTFC64GBCAQTC-WT",
+            "EMMC64G-TY29"
+          ]
+        },
+        {
+          "name": "eMMC 128GB 5.1",
+          "skuCount": 2,
+          "skuLabels": [
+            "MTFC128GBCAQTC-WT",
+            "EMMC128-TY29"
+          ]
+        },
+        {
+          "name": "eMMC 256GB 5.1",
+          "skuCount": 2,
+          "skuLabels": [
+            "MTFC256GBCAQTC-WT",
+            "EMMC256-TY29"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UFS 2.2 gauges",
+      "skuCount": 6,
+      "subgroups": [
+        {
+          "name": "UFS 2.2 64GB",
+          "skuCount": 2,
+          "skuLabels": [
+            "MTFC64GAXAUEA-WT",
+            "FEUDNN064G-C2A46"
+          ]
+        },
+        {
+          "name": "UFS 2.2 128GB",
+          "skuCount": 2,
+          "skuLabels": [
+            "MTFC128GAXAUEA-WT",
+            "FEUDNN128G-C2A44"
+          ]
+        },
+        {
+          "name": "UFS 2.2 256GB",
+          "skuCount": 2,
+          "skuLabels": [
+            "MTFC256GAXAUEA-WT",
+            "FEUDNN256G-C2A44"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Raw NAND wafer gauges",
+      "skuCount": 0,
+      "subgroups": [
+        {
+          "name": "1Tb QLC wafer gauge",
+          "skuCount": 0,
+          "skuLabels": []
+        },
+        {
+          "name": "1Tb TLC wafer gauge",
+          "skuCount": 0,
+          "skuLabels": []
+        },
+        {
+          "name": "512Gb TLC wafer gauge",
+          "skuCount": 0,
+          "skuLabels": []
+        },
+        {
+          "name": "256Gb TLC wafer gauge",
+          "skuCount": 0,
+          "skuLabels": []
+        }
+      ]
+    }
+  ]
+}
