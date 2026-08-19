@@ -59,7 +59,7 @@ fn append_hash_bytes<const N: usize>(buffer: &mut [u8; N], len: &mut usize, valu
     *len = end;
 }
 
-#[inline(always)]
+#[inline(never)]
 fn decode_and_process<T: BorshDeserialize>(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -81,7 +81,7 @@ fn empty_and_process(
     handler(program_id, accounts)
 }
 
-#[inline(always)]
+#[inline(never)]
 pub(super) fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
