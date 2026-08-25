@@ -185,8 +185,22 @@ pub(super) fn process_begin_writer_close(
         &book,
         &snapshot,
         Some(group.security_cap_atoms),
-        true,
+        false,
     )?;
+    // A reconciled holder burn can lower W without changing A, B, or the live
+    // liabilities.  The current drawdown ratios may therefore be outside their
+    // admission bounds even though a proportional close would restore them.
+    // Beginning a close moves Flat only into cancelable escrow; finalization
+    // below still enforces the exact post-close solvency and drawdown gates
+    // before any settlement asset leaves the sleeve.
+    let current_required_assets = sleeve
+        .exact_reserve_atoms
+        .checked_add(snapshot.operational_buffer_atoms)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    if sleeve.writer_principal_atoms == 0 || sleeve.accounted_asset_atoms < current_required_assets
+    {
+        return Err(VaultError::WriterSolvencyViolation.into());
+    }
     let series = writer_book_math_series(&book)?;
     let preview = proportional_close_preview(
         sleeve.accounted_asset_atoms,

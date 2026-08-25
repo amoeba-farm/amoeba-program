@@ -843,6 +843,17 @@ pub(super) fn calculate_writer_metrics(
     Ok((reserve, exposure))
 }
 
+fn writer_activation_assets_are_sufficient(sleeve: &WriterSleeveV1) -> Result<bool, ProgramError> {
+    let principal_and_premium = sleeve
+        .writer_principal_atoms
+        .checked_add(sleeve.locked_primary_premium_atoms)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    // Before any direct Flat burn A == W + B. A holder-authorized burn decrements W and S but
+    // leaves the forfeited settlement assets locked as derived writer surplus. That surplus must
+    // not make an otherwise valid Funding sleeve impossible to activate.
+    Ok(sleeve.accounted_asset_atoms >= principal_and_premium)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn create_classic_token_pda<'a>(
     program_id: &Pubkey,
@@ -1791,6 +1802,7 @@ pub(super) fn process_activate_sleeve(
         .exact_reserve_atoms
         .checked_add(snapshot.operational_buffer_atoms)
         .ok_or(VaultError::ArithmeticOverflow)?;
+    let activation_assets_sufficient = writer_activation_assets_are_sufficient(&sleeve)?;
     if group.sleeve != *sleeve_info.key
         || group.anchor_market != *anchor_market_info.key
         || group.anchor_oracle_month != *month_info.key
@@ -1806,11 +1818,7 @@ pub(super) fn process_activate_sleeve(
         || !anchor_registered
         || sleeve.writer_principal_atoms == 0
         || sleeve.writer_principal_atoms != sleeve.flat_par_supply_atoms
-        || sleeve.accounted_asset_atoms
-            != sleeve
-                .writer_principal_atoms
-                .checked_add(sleeve.locked_primary_premium_atoms)
-                .ok_or(VaultError::ArithmeticOverflow)?
+        || !activation_assets_sufficient
         || sleeve.accounted_asset_atoms < required_assets
         || physical_assets < sleeve.accounted_asset_atoms
         || recipe.phase != OracleRecipeWeightPhase::Finalized

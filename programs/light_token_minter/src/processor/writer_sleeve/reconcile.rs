@@ -130,6 +130,53 @@ fn apply_flat_direct_burn(sleeve: &mut WriterSleeveV1, burned_atoms: u64) -> Pro
     Ok(())
 }
 
+fn reconciliation_allowed(sleeve: &WriterSleeveV1, target_kind: u8) -> bool {
+    match target_kind {
+        RECONCILE_TARGET_FLAT => match sleeve.status {
+            WriterSleeveStatus::Funding => {
+                sleeve.active_auction.is_none() && sleeve.active_close_request.is_none()
+            }
+            WriterSleeveStatus::Active => sleeve.active_close_request.is_none(),
+            WriterSleeveStatus::CloseStaging => {
+                sleeve.active_auction.is_none() && sleeve.active_close_request.is_some()
+            }
+            WriterSleeveStatus::Expired | WriterSleeveStatus::SettlementFinalized => {
+                sleeve.active_auction.is_none() && sleeve.active_close_request.is_none()
+            }
+            WriterSleeveStatus::Draft
+            | WriterSleeveStatus::PolicyFrozen
+            | WriterSleeveStatus::Closed => false,
+        },
+        RECONCILE_TARGET_SERIES => match sleeve.status {
+            WriterSleeveStatus::Active => sleeve.active_close_request.is_none(),
+            WriterSleeveStatus::Expired | WriterSleeveStatus::SettlementFinalized => {
+                sleeve.active_auction.is_none() && sleeve.active_close_request.is_none()
+            }
+            WriterSleeveStatus::Draft
+            | WriterSleeveStatus::PolicyFrozen
+            | WriterSleeveStatus::Funding
+            | WriterSleeveStatus::CloseStaging
+            | WriterSleeveStatus::Closed => false,
+        },
+        _ => false,
+    }
+}
+
+fn recompute_reconciled_writer_metrics(
+    sleeve: &mut WriterSleeveV1,
+    book: &WriterSeriesBookV1,
+    snapshot: &WriterPolicySnapshotV1,
+    security_cap_atoms: u64,
+) -> ProgramResult {
+    // Holder burns are irreversible. Series reconciliation can only reduce external liability;
+    // Flat reconciliation forfeits principal while A and every long liability remain unchanged.
+    // Reapplying admission-only solvency/drawdown gates here could reject the accounting update
+    // and permanently leave physical supply below its recorded value. Exact reserve, tails, and
+    // the aggregate security cap are still recomputed, while later issuance/close flows continue
+    // to enforce all admission gates against the reconciled state.
+    recompute_writer_metrics(sleeve, book, snapshot, Some(security_cap_atoms), false)
+}
+
 pub(super) fn process_reconcile_writer_supply(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -137,6 +184,12 @@ pub(super) fn process_reconcile_writer_supply(
 ) -> ProgramResult {
     if accounts.len() != RECONCILE_WRITER_SUPPLY_ACCOUNT_COUNT {
         return Err(VaultError::InvalidAccountList.into());
+    }
+    if !matches!(
+        params.target_kind,
+        RECONCILE_TARGET_SERIES | RECONCILE_TARGET_FLAT
+    ) {
+        return Err(VaultError::InvalidInstructionData.into());
     }
     let cranker_info = &accounts[0];
     let config_info = &accounts[1];
@@ -178,16 +231,7 @@ pub(super) fn process_reconcile_writer_supply(
     )?;
     if sleeve.vault_config != *config_info.key
         || sleeve.policy_snapshot != *snapshot_info.key
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
-        || matches!(
-            sleeve.status,
-            WriterSleeveStatus::Draft
-                | WriterSleeveStatus::PolicyFrozen
-                | WriterSleeveStatus::Funding
-                | WriterSleeveStatus::CloseStaging
-                | WriterSleeveStatus::Closed
-        )
+        || !reconciliation_allowed(&sleeve, params.target_kind)
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
@@ -365,12 +409,11 @@ pub(super) fn process_reconcile_writer_supply(
         sleeve.upper_tail_reserve_atoms = 0;
         sleeve.security_exposure_atoms = 0;
     } else {
-        recompute_writer_metrics(
+        recompute_reconciled_writer_metrics(
             &mut sleeve,
             &book,
             &snapshot,
-            Some(group.security_cap_atoms),
-            true,
+            group.security_cap_atoms,
         )?;
     }
     sleeve.last_updated_slot = book.last_updated_slot;

@@ -7,6 +7,8 @@ mod ameba_dlmm_light;
 mod bucket_medians;
 mod collateral_accounts;
 mod compressed_state;
+#[cfg(feature = "devnet-solo-backfill-2026")]
+mod devnet_solo_backfill_2026;
 mod instruction_adapters;
 mod instruction_dispatch;
 mod instruction_payloads;

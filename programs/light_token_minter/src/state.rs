@@ -72,6 +72,8 @@ macro_rules! stable_borsh_enum {
 }
 
 mod compressed;
+#[cfg(feature = "devnet-solo-backfill-2026")]
+mod devnet_solo_backfill_2026;
 mod emergency;
 mod manifests;
 mod market;
@@ -85,6 +87,8 @@ mod vault;
 mod writer_sleeve;
 
 pub use compressed::*;
+#[cfg(feature = "devnet-solo-backfill-2026")]
+pub use devnet_solo_backfill_2026::*;
 pub use emergency::*;
 pub use manifests::*;
 pub use market::*;
