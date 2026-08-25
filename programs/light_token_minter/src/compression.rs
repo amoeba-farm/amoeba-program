@@ -12,12 +12,13 @@ use light_sdk::{
         LightSystemProgramCpi,
     },
     instruction::account_meta::{CompressedAccountMeta, CompressedAccountMetaReadOnly},
-    light_hasher::{hash_to_field_size::hash_to_bn254_field_size_be, Hasher, Poseidon, Sha256},
+    light_hasher::{hash_to_field_size::hash_to_bn254_field_size_be, Hasher, Poseidon},
     proof::borsh_compat::ValidityProof,
     LightDiscriminator,
 };
 use solana_program::{
     account_info::AccountInfo,
+    hash::hash,
     instruction::{AccountMeta, Instruction},
     program::invoke_signed,
     program_error::ProgramError,
@@ -121,7 +122,12 @@ fn serialize_leaf<T: BorshSerialize>(leaf: &T) -> Result<Vec<u8>, ProgramError> 
 /// Light's canonical BN254-field-compatible data hash for compressed account
 /// bodies and decompressed-PDA placeholders.
 pub(crate) fn hash_leaf_data(data: &[u8]) -> Result<[u8; 32], ProgramError> {
-    let mut hash = Sha256::hash(data).map_err(|error| ProgramError::Custom(error.into()))?;
+    // `light_hasher::Sha256::hash` routes the Solana SHA-256 syscall through a
+    // function pointer.  SBF cannot relocate that syscall pointer, so otherwise
+    // valid instructions can compile to `callx 0` and abort at runtime.  Call
+    // Solana's canonical hash syscall directly and retain Light's SHA256BE
+    // field-size normalization below; the resulting bytes are identical.
+    let mut hash = hash(data).to_bytes();
     hash[0] = 0;
     Ok(hash)
 }

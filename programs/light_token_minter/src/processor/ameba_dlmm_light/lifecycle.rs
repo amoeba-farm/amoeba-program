@@ -473,7 +473,7 @@ pub(super) fn execute_compress(
             return Ok(());
         }
         let body = state.compressed_body();
-        let address = derive_address(
+        let address = derive_assigned_address(
             &account.key.to_bytes(),
             &address_tree,
             &program_id.to_bytes(),
@@ -752,7 +752,7 @@ pub(super) fn execute_decompress(
             continue;
         }
 
-        let address = derive_address(
+        let address = derive_assigned_address(
             &target.key.to_bytes(),
             &address_tree,
             &program_id.to_bytes(),

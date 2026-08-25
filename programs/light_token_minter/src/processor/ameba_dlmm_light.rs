@@ -8,7 +8,6 @@ use std::io::{Result as IoResult, Write};
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use light_compressed_account::{
-    address::derive_address,
     compressed_account::PackedMerkleContext,
     instruction_data::{compressed_proof::ValidityProof, data::NewAddressParamsAssignedPacked},
 };
@@ -26,11 +25,12 @@ use solana_program::{
     account_info::AccountInfo,
     clock::Clock,
     entrypoint::ProgramResult,
+    keccak::hashv as keccak_hashv,
     program_error::ProgramError,
     pubkey::Pubkey,
     sysvar::{rent::Rent, Sysvar},
 };
-use solana_sdk_ids::system_program;
+use solana_sdk_ids::{bpf_loader_upgradeable, system_program};
 
 use super::super::{
     ameba_dlmm_instruction::AmoebaDlmmInstructionTag,
@@ -59,10 +59,6 @@ const LIGHT_FIXED_ACCOUNTS: usize = 6;
 const LIGHT_CONFIG_DISCRIMINATOR: [u8; 8] = *b"LightCfg";
 const LIGHT_CONFIG_SEED: &[u8] = b"compressible_config";
 const LIGHT_CONFIG_LEN: usize = 156;
-const BPF_LOADER_UPGRADEABLE_ID: Pubkey = Pubkey::new_from_array([
-    2, 168, 246, 145, 78, 136, 161, 110, 57, 90, 225, 40, 148, 143, 144, 16, 207, 227, 47, 228,
-    248, 212, 16, 185, 221, 165, 30, 160, 42, 103, 43, 122,
-]);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct AmoebaLightConfig {
@@ -273,7 +269,7 @@ fn check_upgrade_authority(
     authority: &AccountInfo,
 ) -> ProgramResult {
     let (expected, _) =
-        Pubkey::find_program_address(&[program_id.as_ref()], &BPF_LOADER_UPGRADEABLE_ID);
+        Pubkey::find_program_address(&[program_id.as_ref()], &bpf_loader_upgradeable::id());
     if expected != *program_data.key || !authority.is_signer {
         return Err(invalid_light());
     }
@@ -390,6 +386,29 @@ mod lifecycle;
 use lifecycle::*;
 
 #[inline(never)]
+fn derive_assigned_address(
+    seed: &[u8; 32],
+    address_tree: &[u8; 32],
+    program_id: &[u8; 32],
+) -> [u8; 32] {
+    // Light's assigned-address derivation is Keccak256 over these three exact
+    // inputs plus the fixed 0xff hash-to-field seed, followed by clearing the
+    // high byte so the result fits the BN254 field. Calling the Solana Keccak
+    // primitive directly avoids the dependency's trait-based syscall thunk,
+    // which SBF can otherwise leave as a zero function pointer (`callx 0`).
+    let hash_to_field_seed = [u8::MAX];
+    let mut address = keccak_hashv(&[
+        seed.as_slice(),
+        address_tree.as_slice(),
+        program_id.as_slice(),
+        hash_to_field_seed.as_slice(),
+    ])
+    .to_bytes();
+    address[0] = 0;
+    address
+}
+
+#[inline(never)]
 pub fn process_lifecycle_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -469,7 +488,7 @@ pub fn register_initialized_pdas<'info>(
             assigned_account_index: index as u8,
         });
         account_infos.push(CompressedAccountInfo {
-            address: Some(derive_address(
+            address: Some(derive_assigned_address(
                 &key,
                 &address_tree_key,
                 &program_id.to_bytes(),

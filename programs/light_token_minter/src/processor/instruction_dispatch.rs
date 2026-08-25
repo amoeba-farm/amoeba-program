@@ -30,6 +30,15 @@ pub(super) fn process_instruction_with_context(
             return ameba_dlmm::process_instruction(program_id, accounts, tag, payload);
         }
     }
+    #[cfg(feature = "devnet-solo-backfill-2026")]
+    if devnet_solo_backfill_2026::is_instruction_tag(*tag_bytes) {
+        if compressed_state_transport {
+            return Err(VaultError::InvalidInstructionData.into());
+        }
+        return devnet_solo_backfill_2026::process_instruction(
+            program_id, accounts, *tag_bytes, payload,
+        );
+    }
     let tag =
         VaultInstructionTag::from_byte(*tag_bytes).ok_or(VaultError::InvalidInstructionData)?;
 
