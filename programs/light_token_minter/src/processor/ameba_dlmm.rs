@@ -55,6 +55,55 @@ const EVENT_FEES_COLLECTED: [u8; 8] = *b"ADFEEV1\0";
 const EVENT_POOL_SETTLED: [u8; 8] = *b"ADSEEV1\0";
 const EVENT_POOL_CLOSED: [u8; 8] = *b"ADCLEV1\0";
 
+/// Enforce the effective privileges emitted by the canonical DLMM builders for the three P0
+/// mutable account shapes covered by the auditor pack.
+///
+/// Solana unions privileges for duplicate keys before program entry. Exact positive and negative
+/// checks reject removed required privileges and effective escalation, except for the runtime's
+/// unavoidable writable promotion of a required signer used as the transaction fee payer. They
+/// cannot attribute an effective bit to a particular duplicate source meta, and a duplicate
+/// between two canonical read-only, non-signer roles remains subject to handler identity checks.
+fn validate_pack_dlmm_account_privileges(
+    tag: AmoebaDlmmInstructionTag,
+    accounts: &[AccountInfo],
+) -> ProgramResult {
+    let count = accounts.len();
+    let valid_count = match tag {
+        AmoebaDlmmInstructionTag::AddLiquidityV1 | AmoebaDlmmInstructionTag::RemoveLiquidityV1 => {
+            count >= 18 && (count - 16).is_multiple_of(2)
+        }
+        AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1 => {
+            (24..=23 + usize::from(MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP)).contains(&count)
+        }
+        _ => return Ok(()),
+    };
+    if !valid_count {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+
+    for (index, account) in accounts.iter().enumerate() {
+        let expected_signer = index == 0;
+        let expected_writable = match tag {
+            AmoebaDlmmInstructionTag::AddLiquidityV1
+            | AmoebaDlmmInstructionTag::RemoveLiquidityV1 => {
+                matches!(index, 0 | 1 | 2 | 6 | 7 | 8 | 9 | 12 | 13) || index >= 16
+            }
+            AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1 => {
+                matches!(index, 0 | 7 | 11 | 12 | 13 | 14 | 17 | 18 | 22) || index >= 23
+            }
+            _ => false,
+        };
+        // Preserve exact effective privileges except for the runtime's unavoidable promotion of
+        // a required signer when that signer is also the transaction fee payer.
+        let writable_matches = account.is_writable == expected_writable
+            || (expected_signer && !expected_writable && account.is_writable);
+        if account.is_signer != expected_signer || !writable_matches {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(test, derive(borsh::BorshSerialize))]
 struct PoolInitializedEvent {
     pool: Pubkey,
@@ -432,6 +481,7 @@ pub fn process_instruction(
     tag: AmoebaDlmmInstructionTag,
     payload: &[u8],
 ) -> ProgramResult {
+    validate_pack_dlmm_account_privileges(tag, accounts)?;
     match tag {
         AmoebaDlmmInstructionTag::InitializeBinPageV1 => {
             process_initialize_bin_page_payload(program_id, accounts, payload)

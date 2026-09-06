@@ -40,6 +40,7 @@ pub struct SettlementSignerRegistry {
     pub proposal_nonce: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for SettlementSignerRegistry {
     fn default() -> Self {
         Self {

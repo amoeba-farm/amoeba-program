@@ -1,0 +1,7 @@
+{
+  "schema": "ameba-spread-current-integration-v1",
+  "profile": "devnet-v3",
+  "manifest": "deployments/devnet-v3.json",
+  "deploymentEnabled": false,
+  "bootstrapEnabled": false
+}

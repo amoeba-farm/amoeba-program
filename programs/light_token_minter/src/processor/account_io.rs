@@ -1,5 +1,6 @@
 use super::*;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn invoke_light_token_account_transfer<'a>(
     amount: u64,
     decimals: u8,
@@ -401,8 +402,8 @@ pub(super) fn reserve_source_challenge_guard(
     challenge_id: &[u8; 32],
     slot: u64,
 ) -> ProgramResult {
-    if crate::pubkey_is_default(&*challenge)
-        || crate::bytes32_is_zero(&*challenge_id)
+    if crate::pubkey_is_default(challenge)
+        || crate::bytes32_is_zero(challenge_id)
         || !crate::pubkey_is_default(&guard.active_challenge)
         || !crate::bytes32_is_zero(&guard.active_challenge_id)
         || !crate::pubkey_is_default(&guard.active_dispute)
@@ -424,7 +425,7 @@ pub(super) fn bind_source_challenge_guard_dispute(
     dispute: &Pubkey,
     slot: u64,
 ) -> ProgramResult {
-    if crate::pubkey_is_default(&*dispute)
+    if crate::pubkey_is_default(dispute)
         || guard.active_challenge != *challenge
         || guard.active_challenge_id != *challenge_id
         || guard.active_dispute != *expected_dispute
@@ -680,7 +681,7 @@ pub(super) fn load_valid_oracle_update_claim_v2_from_account(
         || claim.claim.month != *month
         || crate::bytes32_is_zero(&claim.claim.claim_id)
         || crate::pubkey_is_default(&claim.claim.source)
-        || (!crate::pubkey_is_default(&*expected_source) && claim.claim.source != *expected_source)
+        || (!crate::pubkey_is_default(expected_source) && claim.claim.source != *expected_source)
         || crate::bytes32_is_zero(&claim.claim.source_id)
         || crate::pubkey_is_default(&claim.claim.claimant)
         || claim.claim.stake == 0

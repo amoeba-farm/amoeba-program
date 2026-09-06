@@ -87,6 +87,7 @@ pub(in crate::processor) fn derive_decision_v3(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn commitment_hash_v3(
     program_id: &Pubkey,
     dispute_key: &Pubkey,

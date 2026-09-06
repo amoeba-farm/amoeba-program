@@ -259,6 +259,7 @@ pub struct OracleEconomicsConfig {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleEconomicsConfig {
     fn default() -> Self {
         Self {
@@ -436,6 +437,7 @@ pub struct OracleMaturityLadderRegistry {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleMaturityLadderRegistry {
     fn default() -> Self {
         Self {

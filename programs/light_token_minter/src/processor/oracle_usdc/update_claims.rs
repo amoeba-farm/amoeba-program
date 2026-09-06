@@ -127,7 +127,19 @@ pub(in crate::processor) fn process_reveal_oracle_update_claim_v3(
     accounts: &[AccountInfo],
     params: RevealOracleUpdateClaimV3Params,
 ) -> ProgramResult {
-    if accounts.len() != 6 || !accounts[0].is_signer {
+    if accounts.len() != 6
+        || !accounts[0].is_signer
+        || accounts[1].is_signer
+        || accounts[1].is_writable
+        || accounts[2].is_signer
+        || accounts[2].is_writable
+        || accounts[3].is_signer
+        || accounts[3].is_writable
+        || accounts[4].is_signer
+        || accounts[4].is_writable
+        || accounts[5].is_signer
+        || !accounts[5].is_writable
+    {
         return Err(VaultError::InvalidAccountList.into());
     }
     let claimant_info = &accounts[0];

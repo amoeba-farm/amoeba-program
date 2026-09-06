@@ -36,7 +36,9 @@ impl<T: FixedStateEncode + ?Sized> FixedStateEncode for Box<T> {
 macro_rules! primitive_fixed_field {
     ($type:ty, $reader:ident, $writer:ident) => {
         impl FixedField for $type {
-            #[inline(always)]
+            // Keep the shared cursor read out of line in SBF builds. Inlining this
+            // shim into every generated state decoder materially duplicates code.
+            #[inline(never)]
             fn read(input: &mut FixedCursor<'_>) -> Self {
                 input.$reader()
             }
@@ -59,7 +61,7 @@ primitive_fixed_field!(u128, u128, u128);
 primitive_fixed_field!(i64, i64, i64);
 
 impl FixedField for Pubkey {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         input.pubkey()
     }
@@ -71,7 +73,7 @@ impl FixedField for Pubkey {
 }
 
 impl FixedField for Option<Pubkey> {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         input.optional_pubkey()
     }
@@ -83,7 +85,7 @@ impl FixedField for Option<Pubkey> {
 }
 
 impl<const LENGTH: usize> FixedField for [u8; LENGTH] {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         input.bytes()
     }
@@ -100,7 +102,7 @@ impl<const LENGTH: usize> FixedField for [u8; LENGTH] {
 }
 
 impl<const LENGTH: usize> FixedField for [Pubkey; LENGTH] {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         let mut value = [Pubkey::new_from_array([0; 32]); LENGTH];
         let byte_len = LENGTH * 32;
@@ -126,7 +128,7 @@ impl<const LENGTH: usize> FixedField for [Pubkey; LENGTH] {
 }
 
 impl<const LENGTH: usize> FixedField for [[u8; 32]; LENGTH] {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         let mut value = [[0; 32]; LENGTH];
         let byte_len = LENGTH * 32;
@@ -150,7 +152,7 @@ impl<const LENGTH: usize> FixedField for [[u8; 32]; LENGTH] {
 }
 
 impl<const LENGTH: usize> FixedField for [u64; LENGTH] {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         let mut value = [0; LENGTH];
         let byte_len = LENGTH * core::mem::size_of::<u64>();
@@ -176,7 +178,7 @@ impl<const LENGTH: usize> FixedField for [u64; LENGTH] {
 }
 
 impl<const LENGTH: usize> FixedField for [i64; LENGTH] {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         let mut value = [0; LENGTH];
         let byte_len = LENGTH * core::mem::size_of::<i64>();
@@ -202,7 +204,7 @@ impl<const LENGTH: usize> FixedField for [i64; LENGTH] {
 }
 
 impl<const LENGTH: usize> FixedField for [u128; LENGTH] {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         let mut value = [0; LENGTH];
         let byte_len = LENGTH * core::mem::size_of::<u128>();
@@ -226,7 +228,7 @@ impl<const LENGTH: usize> FixedField for [u128; LENGTH] {
 }
 
 impl FixedField for [u32; 3] {
-    #[inline(always)]
+    #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         [input.u32(), input.u32(), input.u32()]
     }
@@ -242,7 +244,7 @@ impl FixedField for [u32; 3] {
 macro_rules! fixed_enum_field {
     ($type:ty { $($value:expr => $variant:path),+ $(,)? }) => {
         impl FixedField for $type {
-            #[inline(always)]
+            #[inline(never)]
             fn read(input: &mut FixedCursor<'_>) -> Self {
                 match input.u8() {
                     $($value => $variant,)+

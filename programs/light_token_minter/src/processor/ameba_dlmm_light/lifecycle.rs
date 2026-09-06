@@ -506,7 +506,7 @@ pub(super) fn execute_compress(
         });
     }
 
-    let mut instruction = new_light_system_cpi(params.proof.clone());
+    let mut instruction = new_light_system_cpi(params.proof);
     instruction.account_infos = account_infos;
     invoke_light_cpi(
         instruction,
@@ -688,6 +688,7 @@ pub(super) fn validate_existing_hot(
         let actual = DecodedAmoebaDlmmState::decode(program_id, target)?;
         if !actual.has_layout_with_state(CompressionState::Decompressed)
             || !actual.same_identity(expected)
+            || actual.compressed_body() != expected.body
         {
             return Err(invalid_light());
         }
@@ -748,7 +749,7 @@ pub(super) fn execute_decompress(
             return Err(invalid_light());
         }
         state.validate_pda(program_id, target.key)?;
-        if validate_existing_hot(program_id, target, &state)? {
+        if validate_existing_hot(program_id, target, state)? {
             continue;
         }
 
@@ -797,7 +798,7 @@ pub(super) fn execute_decompress(
     if account_infos.is_empty() {
         return Ok(());
     }
-    let mut instruction = new_light_system_cpi(params.proof.clone());
+    let mut instruction = new_light_system_cpi(params.proof);
     instruction.account_infos = account_infos;
     invoke_light_cpi(instruction, &accounts[0], system_accounts).map_err(|_| invalid_light())
 }

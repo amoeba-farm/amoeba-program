@@ -1,6 +1,7 @@
 use super::*;
 
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 pub(super) fn invoke_token_transfer_checked<'a>(
     token_program_info: &AccountInfo<'a>,
     source_info: &AccountInfo<'a>,

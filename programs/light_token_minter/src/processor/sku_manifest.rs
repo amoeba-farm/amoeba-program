@@ -105,17 +105,17 @@ pub(super) fn append_oracle_sku_frontier_node(
     frontier_mask: &mut u16,
     mut node: [u8; 32],
 ) -> ProgramResult {
-    for level in 0..frontier.len() {
+    for (level, frontier_node) in frontier.iter_mut().enumerate() {
         let bit = 1u16
             .checked_shl(u32::try_from(level).map_err(|_| VaultError::ArithmeticOverflow)?)
             .ok_or(VaultError::ArithmeticOverflow)?;
         if *frontier_mask & bit == 0 {
-            frontier[level] = node;
+            *frontier_node = node;
             *frontier_mask |= bit;
             return Ok(());
         }
-        node = hashv(&[ORACLE_SKU_NODE_HASH_DOMAIN, &frontier[level], &node]).to_bytes();
-        frontier[level] = [0; 32];
+        node = hashv(&[ORACLE_SKU_NODE_HASH_DOMAIN, frontier_node, &node]).to_bytes();
+        *frontier_node = [0; 32];
         *frontier_mask &= !bit;
     }
     Err(VaultError::InvalidOracleProductSkuDraft.into())
@@ -181,9 +181,7 @@ pub(super) fn append_oracle_product_sku_chunk(
         || sku_id_chunk.is_empty()
         || sku_id_chunk.len() > MAX_ORACLE_PRODUCT_SKU_CHUNK_IDS
         || resulting_count > expected_count
-        || sku_id_chunk
-            .iter()
-            .any(|sku_id| crate::bytes32_is_zero(&*sku_id))
+        || sku_id_chunk.iter().any(crate::bytes32_is_zero)
         || sku_id_chunk.windows(2).any(|pair| pair[0] >= pair[1])
         || (stored_count > 0
             && draft.last_sku_id.ge(sku_id_chunk

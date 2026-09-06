@@ -880,13 +880,11 @@ pub(super) fn validate_settlement_signer_configuration(set: &SettlementSignerSet
         return Err(VaultError::InvalidSettlementSignerConfiguration.into());
     }
     let active = &set.signers[..signer_count];
-    if active
-        .iter()
-        .any(|signer| crate::pubkey_is_default(&*signer))
+    if active.iter().any(crate::pubkey_is_default)
         || active.windows(2).any(|pair| pair[0] >= pair[1])
         || set.signers[signer_count..]
             .iter()
-            .any(|signer| !crate::pubkey_is_default(&*signer))
+            .any(|signer| !crate::pubkey_is_default(signer))
         || set.compute_set_hash() != set.set_hash
     {
         return Err(VaultError::InvalidSettlementSignerConfiguration.into());

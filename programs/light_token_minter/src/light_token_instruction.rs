@@ -93,6 +93,7 @@ pub(crate) fn create_associated_token_account_idempotent(
 
 /// Byte-exact rent-free Light token-account creation for a program-derived
 /// vault. `signer_seeds` includes its one-byte bump as the final seed.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn create_token_account_rent_free(
     payer: &Pubkey,
     account: &Pubkey,

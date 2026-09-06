@@ -6,9 +6,145 @@ use crate::instruction::{
 const BEGIN_WRITER_CLOSE_ACCOUNT_COUNT: usize = 15;
 const DEPOSIT_WRITER_CLOSE_CLAIM_ACCOUNT_COUNT: usize = 13;
 const FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT: usize = 13;
+const FINALIZE_WRITER_CLOSE_ACCOUNTS_PER_SERIES: usize = 3;
 const CANCEL_WRITER_CLOSE_SERIES_ACCOUNT_COUNT: usize = 13;
 const CANCEL_WRITER_CLOSE_FLAT_ACCOUNT_COUNT: usize = 11;
 const WRITER_CLOSE_FLAT_SENTINEL: u8 = u8::MAX;
+const WRITER_CLOSE_BURN_ACCOUNT_META_COUNT: usize = 3;
+const WRITER_CLOSE_BURN_DATA_LEN: usize = 10;
+const SPL_TOKEN_BURN_CHECKED_TAG: u8 = 15;
+
+#[cfg(target_os = "solana")]
+type ReusableWriterCloseBurnInstruction =
+    solana_program::stable_layout::stable_instruction::StableInstruction;
+
+#[cfg(not(target_os = "solana"))]
+type ReusableWriterCloseBurnInstruction = Instruction;
+
+fn reusable_writer_close_burn_instruction(
+    token_program: &Pubkey,
+) -> Result<ReusableWriterCloseBurnInstruction, ProgramError> {
+    let instruction = token_instruction::burn_checked(
+        token_program,
+        &Pubkey::default(),
+        &Pubkey::default(),
+        &Pubkey::default(),
+        &[],
+        0,
+        MarketMintAccounting::CANONICAL_DECIMALS,
+    )?;
+    #[cfg(target_os = "solana")]
+    {
+        Ok(solana_program::stable_layout::stable_instruction::StableInstruction::from(instruction))
+    }
+    #[cfg(not(target_os = "solana"))]
+    {
+        Ok(instruction)
+    }
+}
+
+#[inline(always)]
+fn configure_writer_close_burn_instruction(
+    instruction: &mut ReusableWriterCloseBurnInstruction,
+    source: &Pubkey,
+    mint: &Pubkey,
+    authority: &Pubkey,
+    amount: u64,
+) -> ProgramResult {
+    if instruction.program_id != spl_token_program_id()
+        || instruction.accounts[..].len() != WRITER_CLOSE_BURN_ACCOUNT_META_COUNT
+        || instruction.data[..].len() != WRITER_CLOSE_BURN_DATA_LEN
+        || instruction.accounts[0].is_signer
+        || !instruction.accounts[0].is_writable
+        || instruction.accounts[1].is_signer
+        || !instruction.accounts[1].is_writable
+        || !instruction.accounts[2].is_signer
+        || instruction.accounts[2].is_writable
+    {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    instruction.accounts[0].pubkey = *source;
+    instruction.accounts[1].pubkey = *mint;
+    instruction.accounts[2].pubkey = *authority;
+    let mut data = [0; WRITER_CLOSE_BURN_DATA_LEN];
+    data[0] = SPL_TOKEN_BURN_CHECKED_TAG;
+    data[1..9].copy_from_slice(&amount.to_le_bytes());
+    data[9] = MarketMintAccounting::CANONICAL_DECIMALS;
+    instruction.data[..].copy_from_slice(&data);
+    Ok(())
+}
+
+#[cfg(target_os = "solana")]
+#[allow(deprecated)]
+#[inline(never)]
+fn invoke_reusable_writer_close_burn<'a>(
+    instruction: &ReusableWriterCloseBurnInstruction,
+    token_program_info: &AccountInfo<'a>,
+    source_info: &AccountInfo<'a>,
+    mint_info: &AccountInfo<'a>,
+    authority_info: &AccountInfo<'a>,
+    signer_seeds: &[&[&[u8]]],
+) -> ProgramResult {
+    // Match solana_cpi::invoke_signed's RefCell preflight exactly. The StableInstruction owns
+    // the only account/data vectors and is allocated once before the series loop; this stack
+    // account array and the signer slices contain no per-burn heap ownership.
+    let account_infos = [
+        source_info.clone(),
+        mint_info.clone(),
+        authority_info.clone(),
+        token_program_info.clone(),
+    ];
+    for account_meta in instruction.accounts.iter() {
+        for account_info in account_infos.iter() {
+            if account_meta.pubkey == *account_info.key {
+                if account_meta.is_writable {
+                    let _ = account_info.try_borrow_mut_lamports()?;
+                    let _ = account_info.try_borrow_mut_data()?;
+                } else {
+                    let _ = account_info.try_borrow_lamports()?;
+                    let _ = account_info.try_borrow_data()?;
+                }
+                break;
+            }
+        }
+    }
+    let result = unsafe {
+        solana_program::syscalls::sol_invoke_signed_rust(
+            instruction as *const _ as *const u8,
+            account_infos.as_ptr() as *const u8,
+            account_infos.len() as u64,
+            signer_seeds.as_ptr() as *const u8,
+            signer_seeds.len() as u64,
+        )
+    };
+    if result == solana_program::entrypoint::SUCCESS {
+        Ok(())
+    } else {
+        Err(result.into())
+    }
+}
+
+#[cfg(not(target_os = "solana"))]
+#[inline(never)]
+fn invoke_reusable_writer_close_burn<'a>(
+    instruction: &ReusableWriterCloseBurnInstruction,
+    token_program_info: &AccountInfo<'a>,
+    source_info: &AccountInfo<'a>,
+    mint_info: &AccountInfo<'a>,
+    authority_info: &AccountInfo<'a>,
+    signer_seeds: &[&[&[u8]]],
+) -> ProgramResult {
+    invoke_signed(
+        instruction,
+        &[
+            source_info.clone(),
+            mint_info.clone(),
+            authority_info.clone(),
+            token_program_info.clone(),
+        ],
+        signer_seeds,
+    )
+}
 
 fn advance_required_cursor(request: &WriterCloseRequestV1, mut cursor: u8) -> u8 {
     while cursor < request.series_count && request.required_claim_atoms[usize::from(cursor)] == 0 {
@@ -36,6 +172,26 @@ fn close_request_signer_seeds<'a>(
         nonce,
         bump,
     ]
+}
+
+#[inline]
+fn writer_close_begin_deadline_valid(now: u64, deadline: u64, expiry: u64) -> bool {
+    now < deadline && deadline < expiry
+}
+
+#[inline]
+fn writer_close_collection_window_open(now: u64, deadline: u64) -> bool {
+    now <= deadline
+}
+
+#[inline]
+fn writer_close_finalize_window_open(now: u64, deadline: u64, expiry: u64) -> bool {
+    writer_close_collection_window_open(now, deadline) && now < expiry
+}
+
+#[inline]
+fn writer_close_cancellation_requires_owner(now: u64, deadline: u64) -> bool {
+    writer_close_collection_window_open(now, deadline)
 }
 
 fn validate_close_snapshot(
@@ -74,7 +230,9 @@ fn authorize_cancellation(
     if !actor_info.is_signer || !actor_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if current_unix_timestamp()? <= request.deadline_ts && *actor_info.key != request.owner {
+    if writer_close_cancellation_requires_owner(current_unix_timestamp()?, request.deadline_ts)
+        && *actor_info.key != request.owner
+    {
         return Err(VaultError::Unauthorized.into());
     }
     if !matches!(
@@ -174,9 +332,7 @@ pub(super) fn process_begin_writer_close(
         || params.flat_amount_atoms == 0
         || params.flat_amount_atoms >= sleeve.flat_par_supply_atoms
         || params.flat_amount_atoms > snapshot.max_close_flat_atoms
-        || params.deadline_ts <= now
-        || params.deadline_ts >= sleeve.expiry_ts
-        || now >= sleeve.expiry_ts
+        || !writer_close_begin_deadline_valid(now, params.deadline_ts, sleeve.expiry_ts)
     {
         return Err(VaultError::InvalidWriterDeadline.into());
     }
@@ -392,7 +548,7 @@ pub(super) fn process_deposit_writer_close_claim(
         || sleeve.active_close_request != Some(*request_info.key)
         || request.owner != *owner_info.key
         || request.status != WriterCloseRequestStatus::Collecting
-        || current_unix_timestamp()? > request.deadline_ts
+        || !writer_close_collection_window_open(current_unix_timestamp()?, request.deadline_ts)
         || params.series_index != request.next_deposit_index
     {
         return Err(VaultError::InvalidWriterCloseRequest.into());
@@ -502,6 +658,19 @@ pub(super) fn process_finalize_writer_close(
     if !owner_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
+    // The central writer dispatcher has already required the exact effective signer/writable
+    // pattern for every role. These local checks retain defense in depth. The runtime cannot
+    // attribute an effective privilege to a source meta or observe a duplicated readonly alias.
+    if !sleeve_info.is_writable
+        || !book_info.is_writable
+        || !request_info.is_writable
+        || !sleeve_vault_info.is_writable
+        || !destination_info.is_writable
+        || !flat_mint_info.is_writable
+        || !flat_escrow_info.is_writable
+    {
+        return Err(VaultError::InvalidAccountList.into());
+    }
     if *token_program_info.key != spl_token_program_id() {
         return Err(VaultError::InvalidTokenProgram.into());
     }
@@ -511,9 +680,39 @@ pub(super) fn process_finalize_writer_close(
         mut sleeve,
         mut book,
     } = load_writer_book_context(program_id, sleeve_info, group_info, book_info)?;
-    if accounts.len() != FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT + usize::from(book.series_count)
+    if accounts.len()
+        != FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT
+            + usize::from(book.series_count) * FINALIZE_WRITER_CLOSE_ACCOUNTS_PER_SERIES
     {
         return Err(VaultError::InvalidAccountList.into());
+    }
+    // Freeze the complete dynamic account shape before the first burn. This prevents a later
+    // series' missing privilege, reorder, omission, or substitution from being discovered only
+    // after an earlier series has entered Tokenkeg.
+    for (index, series_accounts) in accounts[FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT..]
+        .chunks_exact(FINALIZE_WRITER_CLOSE_ACCOUNTS_PER_SERIES)
+        .enumerate()
+    {
+        let record = &book.records[index];
+        let market_info = &series_accounts[0];
+        let mint_info = &series_accounts[1];
+        let retirement_info = &series_accounts[2];
+        if !market_info.is_writable
+            || !mint_info.is_writable
+            || !retirement_info.is_writable
+            || *market_info.key != record.market
+            || *mint_info.key != record.contract_mint
+            || *retirement_info.key != record.retirement_custody
+            || *retirement_info.key
+                != derive_writer_retirement_custody_pda(
+                    program_id,
+                    sleeve_info.key,
+                    market_info.key,
+                )
+                .0
+        {
+            return Err(VaultError::InvalidAccountList.into());
+        }
     }
     let snapshot = load_writer_policy_snapshot(
         program_id,
@@ -528,6 +727,7 @@ pub(super) fn process_finalize_writer_close(
         sleeve_info.key,
         sleeve.close_nonce,
     )?;
+    let now = current_unix_timestamp()?;
     if config.paused
         || sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::CloseStaging
@@ -536,8 +736,7 @@ pub(super) fn process_finalize_writer_close(
         || request.owner != *owner_info.key
         || request.status != WriterCloseRequestStatus::Complete
         || request.next_deposit_index != request.series_count
-        || current_unix_timestamp()? > request.deadline_ts
-        || current_unix_timestamp()? >= sleeve.expiry_ts
+        || !writer_close_finalize_window_open(now, request.deadline_ts, sleeve.expiry_ts)
         || sleeve.policy_snapshot != *snapshot_info.key
         || sleeve.policy_hash != snapshot.policy_hash
         || request.flat_mint != *flat_mint_info.key
@@ -604,16 +803,20 @@ pub(super) fn process_finalize_writer_close(
         return Err(VaultError::WriterSolvencyViolation.into());
     }
 
+    let sleeve_bump = [sleeve.bump];
+    let settlement_group = sleeve.settlement_group;
+    let sleeve_signer = writer_sleeve_signer_seeds(&settlement_group, &sleeve_bump);
+    let mut burn_instruction = reusable_writer_close_burn_instruction(token_program_info.key)?;
     let mut markets = Vec::with_capacity(count);
-    for (index, market_info) in accounts[FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT..]
-        .iter()
+    for (index, series_accounts) in accounts[FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT..]
+        .chunks_exact(FINALIZE_WRITER_CLOSE_ACCOUNTS_PER_SERIES)
         .enumerate()
     {
-        if !market_info.is_writable || *market_info.key != book.records[index].market {
-            return Err(VaultError::InvalidAccountList.into());
-        }
-        let mut market = load_valid_market(program_id, market_info)?;
+        let market_info = &series_accounts[0];
+        let mint_info = &series_accounts[1];
+        let retirement_info = &series_accounts[2];
         let record = &mut book.records[index];
+        let mut market = load_valid_market(program_id, market_info)?;
         let required = request.required_claim_atoms[index];
         if market.market_id != record.series_id
             || market.long_contract_mint != Some(record.contract_mint)
@@ -623,24 +826,87 @@ pub(super) fn process_finalize_writer_close(
         {
             return Err(VaultError::InvalidWriterSeriesBook.into());
         }
-        market.mint_accounting.total_consumed = market
-            .mint_accounting
-            .total_consumed
-            .checked_add(required)
+        let mint_before = validate_canonical_market_mint(market_info, &mut market, mint_info, 0)?;
+        if mint_before.supply != record.total_physical_supply_atoms
+            || record
+                .issuer_controlled_atoms
+                .checked_add(record.external_open_interest_atoms)
+                != Some(record.total_physical_supply_atoms)
+        {
+            return Err(VaultError::WriterSupplyMismatch.into());
+        }
+        let custody_before = if retirement_info.owner == token_program_info.key {
+            validate_vault_token_account(retirement_info, mint_info.key, sleeve_info.key)?;
+            validate_token_account(retirement_info)?.amount
+        } else {
+            if required != 0 || record.issuer_controlled_atoms != 0 || !retirement_info.is_writable
+            {
+                return Err(VaultError::WriterSupplyMismatch.into());
+            }
+            validate_canonical_system_zero_pda_proof(retirement_info.key, retirement_info)?;
+            0
+        };
+        if custody_before
+            < record
+                .issuer_controlled_atoms
+                .checked_add(required)
+                .ok_or(VaultError::ArithmeticOverflow)?
+        {
+            return Err(VaultError::WriterSupplyMismatch.into());
+        }
+        if required != 0 {
+            configure_writer_close_burn_instruction(
+                &mut burn_instruction,
+                retirement_info.key,
+                mint_info.key,
+                sleeve_info.key,
+                required,
+            )?;
+            invoke_reusable_writer_close_burn(
+                &burn_instruction,
+                token_program_info,
+                retirement_info,
+                mint_info,
+                sleeve_info,
+                &[&sleeve_signer],
+            )?;
+            consume_market_contracts(&mut market, required, true)?;
+        }
+        let mint_after = validate_mint_account(mint_info, token_program_info.key)?;
+        let custody_after = if retirement_info.owner == token_program_info.key {
+            validate_token_account(retirement_info)?.amount
+        } else {
+            0
+        };
+        if mint_before.supply.checked_sub(mint_after.supply) != Some(required)
+            || custody_before.checked_sub(custody_after) != Some(required)
+        {
+            return Err(VaultError::WriterSupplyMismatch.into());
+        }
+        record.total_physical_supply_atoms = record
+            .total_physical_supply_atoms
+            .checked_sub(required)
             .ok_or(VaultError::ArithmeticOverflow)?;
         record.external_open_interest_atoms = record
             .external_open_interest_atoms
             .checked_sub(required)
             .ok_or(VaultError::ArithmeticOverflow)?;
         series[index].external_oi_atoms = record.external_open_interest_atoms;
-        record.issuer_controlled_atoms = record
-            .issuer_controlled_atoms
-            .checked_add(required)
-            .ok_or(VaultError::ArithmeticOverflow)?;
-        if record.issuer_controlled_atoms != 0 {
+        // Custody status tracks positive physical retirement custody, including any unreconciled
+        // surplus above the recorded issuer-controlled balance. Keeping that surplus Open blocks
+        // settlement cleanup until the permissionless reconciliation lane classifies it, while an
+        // initialized but exactly emptied retirement account is safely Absent.
+        if custody_after != 0 {
             record.custody_status = WriterSeriesCustodyStatus::Open;
+        } else {
+            record.custody_status = WriterSeriesCustodyStatus::Absent;
         }
         if market_outstanding_contract_amount(&market)? != record.external_open_interest_atoms
+            || market
+                .mint_accounting
+                .total_issued
+                .checked_sub(market.mint_accounting.total_burned)
+                != Some(record.total_physical_supply_atoms)
             || record
                 .issuer_controlled_atoms
                 .checked_add(record.external_open_interest_atoms)
@@ -727,8 +993,6 @@ pub(super) fn process_finalize_writer_close(
         MarketMintAccounting::CANONICAL_DECIMALS,
         &[&request_signer],
     )?;
-    let sleeve_bump = [sleeve.bump];
-    let sleeve_signer = writer_sleeve_signer_seeds(&sleeve.settlement_group, &sleeve_bump);
     invoke_token_transfer_checked(
         token_program_info,
         sleeve_vault_info,
@@ -764,11 +1028,11 @@ pub(super) fn process_finalize_writer_close(
     sleeve.active_close_request = None;
     sleeve.status = WriterSleeveStatus::Active;
     sleeve.last_updated_slot = slot;
-    for (market_info, market) in accounts[FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT..]
-        .iter()
+    for (series_accounts, market) in accounts[FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT..]
+        .chunks_exact(FINALIZE_WRITER_CLOSE_ACCOUNTS_PER_SERIES)
         .zip(markets.iter())
     {
-        store_state(market_info, market)?;
+        store_state(&series_accounts[0], market)?;
     }
     store_state(book_info, &book)?;
     store_state(request_info, &request)?;

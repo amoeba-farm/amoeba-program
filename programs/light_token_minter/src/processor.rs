@@ -280,27 +280,47 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    process_instruction_with_context(program_id, accounts, instruction_data, false)
+    process_top_level_instruction(program_id, accounts, instruction_data)
 }
 
 pub(super) fn process_compressed_inner_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
+    gate: &crate::governance_gate::GateValidated,
 ) -> ProgramResult {
-    process_instruction_with_context(program_id, accounts, instruction_data, true)
+    if crate::governance_gate::ends_with_valid_governance_tail(instruction_data) {
+        return Err(VaultError::InvalidGovernanceTail.into());
+    }
+    let context = ExecutionContext::compressed_inner(gate);
+    process_instruction_with_context(program_id, accounts, instruction_data, &context)
 }
 
 /// Native ProgramTest adapter for exercising the unchanged business handlers
 /// against their full account views. The production SBF artifact never exports
 /// this entrypoint; on chain, compressed families remain reachable only through
 /// the authenticated compressed-state transport.
-#[cfg(not(target_os = "solana"))]
+#[cfg(all(not(target_os = "solana"), not(feature = "governance-gate-v1")))]
+pub struct ClassicCompressionTestCapability {
+    _private: (),
+}
+
+#[cfg(all(not(target_os = "solana"), not(feature = "governance-gate-v1")))]
+impl ClassicCompressionTestCapability {
+    pub fn for_native_program_test() -> Self {
+        Self { _private: () }
+    }
+}
+
+#[cfg(all(not(target_os = "solana"), not(feature = "governance-gate-v1")))]
 #[doc(hidden)]
 pub fn process_instruction_with_classic_compression_views_for_tests(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
+    _capability: &ClassicCompressionTestCapability,
 ) -> ProgramResult {
-    process_instruction_with_context(program_id, accounts, instruction_data, true)
+    let gate = crate::governance_gate::disabled_build_capability();
+    let context = ExecutionContext::compressed_inner(&gate);
+    process_instruction_with_context(program_id, accounts, instruction_data, &context)
 }

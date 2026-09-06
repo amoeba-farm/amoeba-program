@@ -316,6 +316,7 @@ pub(super) fn oracle_opening_challenge_is_true_noop(
         && derive_oracle_opening_archive_url_hash(&params.archive_url) == claim.archive_url_hash
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn validate_oracle_opening_evidence_fields(
     market: &Market,
     capture_start: u64,
@@ -340,6 +341,7 @@ pub(super) fn validate_oracle_opening_evidence_fields(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn validate_oracle_opening_evidence_fields_at_time(
     market: &Market,
     capture_start: u64,
@@ -355,9 +357,9 @@ pub(super) fn validate_oracle_opening_evidence_fields_at_time(
         || source_time < capture_start
         || source_time > now
         || source_time > market.instrument.expiry_ts
-        || crate::bytes32_is_zero(&*canonical_locator_hash)
+        || crate::bytes32_is_zero(canonical_locator_hash)
         || *canonical_locator_hash != source.canonical_locator_hash
-        || crate::bytes32_is_zero(&*source_definition_hash)
+        || crate::bytes32_is_zero(source_definition_hash)
         || *source_definition_hash != source.source_definition_hash
     {
         return Err(VaultError::InvalidOracleOpeningEvidence.into());
@@ -446,7 +448,8 @@ pub(super) fn parse_wayback_utc_timestamp(timestamp: &[u8]) -> Option<u64> {
     {
         return None;
     }
-    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let leap_year =
+        year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
     let days_in_month = match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
@@ -530,6 +533,7 @@ pub(super) fn derive_oracle_update_evidence_hash(
     .to_bytes()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn validate_oracle_update_evidence(
     market: &Market,
     month_state: &OracleMonthState,

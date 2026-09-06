@@ -50,9 +50,11 @@ const WRITER_BOOK_HASH_MAX_BYTES: usize = WRITER_BOOK_HASH_DOMAIN.len()
     + 32
     + 4
     + crate::constants::WRITER_MAX_LIVE_SERIES * (32 + 32 + 7 * 8);
-const WRITER_GROUP_HASH_MAX_BYTES: usize = 512;
+const WRITER_MAX_PACK_ACCOUNTS: usize = 13 + 3 * crate::constants::WRITER_MAX_LIVE_SERIES;
 
-#[inline(always)]
+// This append path is shared by the bounded family/book encoders. Keeping it
+// out of line avoids duplicating the same checked copy at every SBF call site.
+#[inline(never)]
 fn append_hash_bytes<const N: usize>(buffer: &mut [u8; N], len: &mut usize, value: &[u8]) {
     let end = *len + value.len();
     buffer[*len..end].copy_from_slice(value);
@@ -81,6 +83,166 @@ fn empty_and_process(
     handler(program_id, accounts)
 }
 
+/// Enforce the effective account privileges and key separation emitted by the canonical writer
+/// builders.
+///
+/// Solana unions privileges for duplicate account keys before program entry. Requiring both the
+/// positive and negative privilege bits rejects cleared required privileges and effective
+/// escalation, except for the runtime's unavoidable writable promotion of a required signer used
+/// as the transaction fee payer. Raw account-key uniqueness closes the semantic-alias case that
+/// effective privileges alone cannot observe. The only protocol-defined alias is the canonical
+/// Flat reconcile shape, where the sleeve is also the target authority.
+fn validate_pack_writer_account_privileges(
+    tag: VaultInstructionTag,
+    accounts: &[AccountInfo],
+    payload: &[u8],
+) -> ProgramResult {
+    let count = accounts.len();
+    let fixed_count = match tag {
+        VaultInstructionTag::DepositWriterPrincipalV1 => Some(17),
+        VaultInstructionTag::WithdrawWriterPrincipalV1 => Some(14),
+        VaultInstructionTag::CommitWriterAuctionV1 => Some(14),
+        VaultInstructionTag::PlaceWriterBidV1 => Some(13),
+        VaultInstructionTag::CancelOrRefundWriterBidV1 => Some(9),
+        VaultInstructionTag::RevealWriterAuctionV1 => Some(6),
+        VaultInstructionTag::ExecuteWriterAuctionFillV1 => Some(26),
+        VaultInstructionTag::BeginWriterCloseV1 => Some(15),
+        VaultInstructionTag::DepositWriterCloseBasketV1 => Some(13),
+        VaultInstructionTag::ClaimCollectiveLongV1 => Some(20),
+        VaultInstructionTag::ClaimWriterFlatResidualV1 => Some(17),
+        VaultInstructionTag::ReconcileWriterSupplyV1 => Some(15),
+        _ => None,
+    };
+    if let Some(expected) = fixed_count {
+        if count != expected {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+    } else {
+        let valid_dynamic_count = match tag {
+            VaultInstructionTag::FinalizeWriterCloseV1 => {
+                (16..=13 + 3 * crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
+                    && (count - 13).is_multiple_of(3)
+            }
+            VaultInstructionTag::ProcessWriterCloseCancellationV1 => {
+                matches!(count, 11 | 13)
+            }
+            VaultInstructionTag::FinalizeWriterSleeveSettlementV1 => {
+                (9..=8 + crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
+            }
+            _ => return Ok(()),
+        };
+        if !valid_dynamic_count {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+    }
+
+    for (index, account) in accounts.iter().enumerate() {
+        let expected_signer = match tag {
+            VaultInstructionTag::DepositWriterPrincipalV1
+            | VaultInstructionTag::WithdrawWriterPrincipalV1
+            | VaultInstructionTag::CommitWriterAuctionV1
+            | VaultInstructionTag::PlaceWriterBidV1
+            | VaultInstructionTag::CancelOrRefundWriterBidV1
+            | VaultInstructionTag::RevealWriterAuctionV1
+            | VaultInstructionTag::ExecuteWriterAuctionFillV1
+            | VaultInstructionTag::BeginWriterCloseV1
+            | VaultInstructionTag::DepositWriterCloseBasketV1
+            | VaultInstructionTag::FinalizeWriterCloseV1
+            | VaultInstructionTag::ProcessWriterCloseCancellationV1
+            | VaultInstructionTag::FinalizeWriterSleeveSettlementV1
+            | VaultInstructionTag::ClaimCollectiveLongV1
+            | VaultInstructionTag::ClaimWriterFlatResidualV1
+            | VaultInstructionTag::ReconcileWriterSupplyV1 => index == 0,
+            _ => false,
+        };
+        let expected_writable = match tag {
+            VaultInstructionTag::DepositWriterPrincipalV1 => {
+                matches!(index, 0 | 2 | 4 | 5 | 7 | 8 | 9 | 12 | 16)
+            }
+            VaultInstructionTag::WithdrawWriterPrincipalV1 => {
+                matches!(index, 0 | 2 | 3 | 4 | 6 | 7 | 8 | 9)
+            }
+            VaultInstructionTag::CommitWriterAuctionV1 => matches!(index, 0 | 3 | 7 | 8 | 9),
+            VaultInstructionTag::PlaceWriterBidV1 => matches!(index, 0 | 2 | 3 | 4 | 7 | 8),
+            VaultInstructionTag::CancelOrRefundWriterBidV1 => {
+                matches!(index, 2..=6)
+            }
+            VaultInstructionTag::RevealWriterAuctionV1 => matches!(index, 3 | 4),
+            VaultInstructionTag::ExecuteWriterAuctionFillV1 => matches!(
+                index,
+                0 | 2 | 4 | 6 | 7 | 8 | 9 | 10 | 11 | 13 | 14 | 15 | 16 | 17 | 20 | 24
+            ),
+            VaultInstructionTag::BeginWriterCloseV1 => {
+                matches!(index, 0 | 2 | 6 | 7 | 8 | 9 | 10)
+            }
+            VaultInstructionTag::DepositWriterCloseBasketV1 => {
+                matches!(index, 0 | 3 | 6 | 7 | 8)
+            }
+            VaultInstructionTag::FinalizeWriterCloseV1 => {
+                matches!(index, 2 | 4 | 6 | 7 | 8 | 10 | 11) || index >= 13
+            }
+            VaultInstructionTag::ProcessWriterCloseCancellationV1 if count == 13 => {
+                matches!(index, 0 | 1 | 3 | 6 | 7 | 8)
+            }
+            VaultInstructionTag::ProcessWriterCloseCancellationV1 => {
+                matches!(index, 0 | 1 | 2 | 4 | 5 | 6)
+            }
+            VaultInstructionTag::FinalizeWriterSleeveSettlementV1 => matches!(index, 2 | 4),
+            VaultInstructionTag::ClaimCollectiveLongV1 => {
+                matches!(index, 0 | 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 13 | 19)
+            }
+            VaultInstructionTag::ClaimWriterFlatResidualV1 => {
+                matches!(index, 0 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 10 | 16)
+            }
+            VaultInstructionTag::ReconcileWriterSupplyV1 => {
+                matches!(index, 2 | 4 | 6 | 7 | 8 | 9 | 10)
+            }
+            _ => false,
+        };
+        // The transaction fee payer is always promoted to writable by the runtime. Accept that
+        // one unavoidable promotion when this role is already the required signer; every other
+        // missing or additional effective privilege remains invalid.
+        let writable_matches = account.is_writable == expected_writable
+            || (expected_signer && !expected_writable && account.is_writable);
+        if account.is_signer != expected_signer || !writable_matches {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+    }
+    if count > WRITER_MAX_PACK_ACCOUNTS {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    // A full Pubkey comparison lowers to an expensive 32-byte memory comparison on SBF. Most
+    // canonical packs contain dozens of distinct keys, so first reject unequal eight-byte
+    // prefixes with integer comparisons. A matching prefix still performs the full comparison,
+    // preserving exact uniqueness semantics (prefix collisions are never treated as aliases).
+    let mut key_prefixes = [0u64; WRITER_MAX_PACK_ACCOUNTS];
+    for (index, account) in accounts.iter().enumerate() {
+        let bytes = account.key.as_ref();
+        // SAFETY: every Pubkey exposes 32 initialized bytes, and `read_unaligned` imposes no
+        // alignment requirement. Byte order is irrelevant because this value is compared only
+        // with prefixes loaded by this exact operation.
+        key_prefixes[index] = unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<u64>()) };
+    }
+    for left in 0..accounts.len() {
+        for right in left + 1..accounts.len() {
+            if key_prefixes[left] != key_prefixes[right]
+                || accounts[left].key != accounts[right].key
+            {
+                continue;
+            }
+            let canonical_flat_reconcile_alias = tag
+                == VaultInstructionTag::ReconcileWriterSupplyV1
+                && payload == [0, 1]
+                && left == 2
+                && right == 6;
+            if !canonical_flat_reconcile_alias {
+                return Err(VaultError::InvalidAccountList.into());
+            }
+        }
+    }
+    Ok(())
+}
+
 #[inline(never)]
 pub(super) fn process_instruction(
     program_id: &Pubkey,
@@ -92,6 +254,7 @@ pub(super) fn process_instruction(
     if compressed_state_transport {
         return Err(VaultError::InvalidInstructionData.into());
     }
+    validate_pack_writer_account_privileges(tag, accounts, payload)?;
     match tag {
         VaultInstructionTag::InitializeWriterPolicyRegistryV1 => {
             decode_and_process::<InitializeWriterPolicyRegistryV1Params>(
@@ -389,40 +552,31 @@ pub(super) fn writer_group_commitment(
     group_key: &Pubkey,
     group: &WriterSettlementGroupV1,
 ) -> [u8; 32] {
-    let mut bytes = [0u8; WRITER_GROUP_HASH_MAX_BYTES];
-    let mut len = 0usize;
-    append_hash_bytes(&mut bytes, &mut len, b"ameba-writer-settlement-group-v1");
-    append_hash_bytes(&mut bytes, &mut len, group_key.as_ref());
-    append_hash_bytes(&mut bytes, &mut len, &group.underlying_id);
-    append_hash_bytes(&mut bytes, &mut len, &group.expiry_ts.to_le_bytes());
-    append_hash_bytes(&mut bytes, &mut len, group.settlement_mint.as_ref());
-    append_hash_bytes(&mut bytes, &mut len, group.anchor_market.as_ref());
-    append_hash_bytes(&mut bytes, &mut len, group.anchor_oracle_month.as_ref());
-    append_hash_bytes(
-        &mut bytes,
-        &mut len,
+    // Solana's hashv feeds these slices into one SHA-256 state in order, exactly
+    // matching a hash of their concatenation without a 512-byte stack buffer.
+    // The byte-contract regression below pins that equivalence.
+    hashv(&[
+        b"ameba-writer-settlement-group-v1",
+        group_key.as_ref(),
+        &group.underlying_id,
+        &group.expiry_ts.to_le_bytes(),
+        group.settlement_mint.as_ref(),
+        group.anchor_market.as_ref(),
+        group.anchor_oracle_month.as_ref(),
         &group.oracle_methodology_version.to_le_bytes(),
-    );
-    append_hash_bytes(&mut bytes, &mut len, &group.product_manifest_root);
-    append_hash_bytes(&mut bytes, &mut len, &group.coverage_manifest_hash);
-    append_hash_bytes(&mut bytes, &mut len, &group.recipe_hash);
-    append_hash_bytes(&mut bytes, &mut len, &group.settlement_source_digest);
-    append_hash_bytes(&mut bytes, &mut len, &group.active_weight_manifest_hash);
-    append_hash_bytes(
-        &mut bytes,
-        &mut len,
+        &group.product_manifest_root,
+        &group.coverage_manifest_hash,
+        &group.recipe_hash,
+        &group.settlement_source_digest,
+        &group.active_weight_manifest_hash,
         &group.security_cap_atoms.to_le_bytes(),
-    );
-    append_hash_bytes(&mut bytes, &mut len, group.signer_registry.as_ref());
-    append_hash_bytes(&mut bytes, &mut len, group.signer_set.as_ref());
-    append_hash_bytes(
-        &mut bytes,
-        &mut len,
+        group.signer_registry.as_ref(),
+        group.signer_set.as_ref(),
         &group.signer_set_version.to_le_bytes(),
-    );
-    append_hash_bytes(&mut bytes, &mut len, &group.signer_set_hash);
-    append_hash_bytes(&mut bytes, &mut len, &group.settlement_ts.to_le_bytes());
-    hashv(&[&bytes[..len]]).to_bytes()
+        &group.signer_set_hash,
+        &group.settlement_ts.to_le_bytes(),
+    ])
+    .to_bytes()
 }
 
 pub(super) struct CollectiveDlmmContext {
@@ -536,7 +690,10 @@ fn load_collective_market_binding(
         || market.collateral_mint != binding.settlement_mint
         || market.params.tick_size == 0
         || market.instrument.max_payout_per_contract == 0
-        || market.instrument.max_payout_per_contract % market.params.tick_size != 0
+        || !market
+            .instrument
+            .max_payout_per_contract
+            .is_multiple_of(market.params.tick_size)
         || maximum_bin_id == 0
         || maximum_bin_id > MAX_AMOEBA_DLMM_BIN_COUNT
         || maximum_bins_per_swap == 0
@@ -1496,6 +1653,27 @@ pub(super) fn process_register_series(
             contract_mint_info.key,
         ),
     };
+    let candidate_series = WriterSeries {
+        kind: record.option_kind,
+        strike_price_atomic: record.strike_price_atomic,
+        cap_price_atomic: record.cap_or_floor_price_atomic,
+        contract_size_atoms: record.contract_size_atoms,
+        max_payout_per_contract_atoms: record.max_payout_per_contract_atoms,
+        external_oi_atoms: 0,
+    };
+    for existing in &book.records[..index] {
+        let existing_series = WriterSeries {
+            kind: existing.option_kind,
+            strike_price_atomic: existing.strike_price_atomic,
+            cap_price_atomic: existing.cap_or_floor_price_atomic,
+            contract_size_atoms: existing.contract_size_atoms,
+            max_payout_per_contract_atoms: existing.max_payout_per_contract_atoms,
+            external_oi_atoms: 0,
+        };
+        if candidate_series.same_instrument(&existing_series) {
+            return Err(VaultError::InvalidWriterSeriesBook.into());
+        }
+    }
     book.records[index] = record;
     book.series_count = book
         .series_count

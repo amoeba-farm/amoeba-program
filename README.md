@@ -27,14 +27,16 @@ not include an official `light_token_minter.so` binary.
 - private runbooks, point-in-time audits, operator procedures, and deploy helpers
 - keypairs, credentials, build receipts, `.so` files, and generated bundles
 
-The compiled program id is
-`9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH`. The generated
-`deployments/devnet.json` manifest pins that id, Solana DevNet, its genesis
-hash, the external collateral mint, and the create-once current-v2 bootstrap
-policy for an absent namespace. Its binary, ProgramData, extension, upgrade, and
-current-state compatibility evidence remain empty until an exact release
-candidate passes every private gate; while they are empty, promotion is
-explicitly blocked.
+The selected Devnet V3 integration is `release/current-integration.json`, whose
+manifest is `deployments/devnet-v3.json`. Build with
+`--features devnet-v3-governance-controller` to select program
+`2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw` and its V3 council/gate.
+Account seeds remain `ameba-spread-v2`. The older `deployments/devnet.json`
+and bootstrap policy are historical release inputs; they cannot bootstrap V3.
+The recorded finalized observation was EmergencyFrozen at epoch 1 with zero
+business accounts. It is historical evidence, not current write permission.
+Independent clean release attestation and a fresh mint/bootstrap policy remain
+outstanding. This export contains Spread source, not the controller source.
 
 The public RAMX manifest is an audit source, not evidence of deployment. Version
 1 preserves exactly 52 labels, encodes exact-case printable ASCII/UTF-8 labels as
@@ -57,7 +59,7 @@ by publishing this source preview.
 ```bash
 cargo check \
   --manifest-path programs/light_token_minter/Cargo.toml \
-  --locked \
+  --locked --features devnet-v3-governance-controller \
   --lib
 ```
 

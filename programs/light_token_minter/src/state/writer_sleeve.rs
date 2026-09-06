@@ -198,6 +198,7 @@ pub struct WriterPolicyRegistryV1 {
     pub reserved: [u8; 32],
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for WriterPolicyRegistryV1 {
     fn default() -> Self {
         Self {
@@ -353,6 +354,7 @@ pub struct WriterSettlementGroupV1 {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for WriterSettlementGroupV1 {
     fn default() -> Self {
         Self {
@@ -454,6 +456,7 @@ pub struct WriterSleeveV1 {
     pub reserved: [u8; 32],
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for WriterSleeveV1 {
     fn default() -> Self {
         Self {
@@ -656,6 +659,8 @@ pub struct WriterAuctionV1 {
     pub policy_version: u64,
     pub scenario_set_hash: [u8; 32],
     pub risk_limit_hash: [u8; 32],
+    /// For auctions created by this implementation, the actual-slot-bound reserve
+    /// commitment stored by the program at commit time.
     pub reserve_vector_commitment: [u8; 32],
     pub reveal_hash: [u8; 32],
     pub revealed_nonce: [u8; 32],
@@ -781,6 +786,20 @@ impl WriterBidIndexRecordV1 {
         bidder: Pubkey::new_from_array([0; 32]),
         order_id: 0,
     };
+
+    pub fn has_current_layout(&self) -> bool {
+        self.occupied
+            && self.status != WriterBidStatus::Empty
+            && usize::from(self.series_index) < WRITER_LIVE_SERIES_LIMIT
+            && self.reserved == 0
+            && self.bid_price_per_contract_atoms != 0
+            && self.requested_contract_atoms != 0
+            && self.accepted_contract_atoms <= self.requested_contract_atoms
+            && self.executed_contract_atoms <= self.accepted_contract_atoms
+            && self.escrowed_atoms != 0
+            && !crate::pubkey_is_default(&self.bid)
+            && !crate::pubkey_is_default(&self.bidder)
+    }
 }
 
 impl Default for WriterBidIndexRecordV1 {
@@ -842,6 +861,9 @@ impl WriterBidIndexV1 {
             && self.executed_bid_count <= self.planned_bid_count
             && self.refunded_bid_count <= self.bid_count
             && self.planning_cursor <= self.bid_count
+            && self.records[..usize::from(self.bid_count)]
+                .iter()
+                .all(WriterBidIndexRecordV1::has_current_layout)
             && self.records[usize::from(self.bid_count)..]
                 .iter()
                 .all(|record| record == &WriterBidIndexRecordV1::EMPTY)
@@ -875,6 +897,7 @@ pub struct WriterBidV1 {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for WriterBidV1 {
     fn default() -> Self {
         Self {

@@ -63,7 +63,7 @@ impl WriterSeries {
     };
 
     #[inline]
-    fn same_instrument(&self, other: &Self) -> bool {
+    pub(crate) fn same_instrument(&self, other: &Self) -> bool {
         self.kind == other.kind
             && self.strike_price_atomic == other.strike_price_atomic
             && self.cap_price_atomic == other.cap_price_atomic
@@ -223,7 +223,7 @@ fn checked_ceil_div(numerator: u128, denominator: u128) -> WriterMathResult<u128
     }
     let quotient = numerator / denominator;
     quotient
-        .checked_add(u128::from(numerator % denominator != 0))
+        .checked_add(u128::from(!numerator.is_multiple_of(denominator)))
         .ok_or(WriterMathError::ArithmeticOverflow)
 }
 
@@ -266,8 +266,14 @@ fn validate_series_book(series: &[WriterSeries]) -> WriterMathResult<()> {
     if series.len() > WRITER_MAX_SERIES {
         return Err(WriterMathError::TooManySeries);
     }
-    for item in series {
+    for (index, item) in series.iter().enumerate() {
         validate_series(item)?;
+        if series[..index]
+            .iter()
+            .any(|previous| item.same_instrument(previous))
+        {
+            return Err(WriterMathError::InvalidSeries);
+        }
     }
     Ok(())
 }
@@ -500,7 +506,7 @@ pub fn maximum_safe_issue_quantity(
 ) -> WriterMathResult<u64> {
     validate_series_book(series)?;
     if series_index >= series.len()
-        || maximum_quantity_atoms % WRITER_CONTRACT_ATOMIC_SCALE != 0
+        || !maximum_quantity_atoms.is_multiple_of(WRITER_CONTRACT_ATOMIC_SCALE)
         || limits.writer_principal_atoms == 0
     {
         return Err(WriterMathError::InvalidSeries);
@@ -633,9 +639,6 @@ pub fn drawdown_checks(
     lower_limit_ppm: u64,
     upper_limit_ppm: u64,
 ) -> WriterMathResult<WriterDrawdownChecks> {
-    if writer_principal_atoms == 0 {
-        return Err(WriterMathError::InvalidFlatSupply);
-    }
     Ok(WriterDrawdownChecks {
         full_book_passes: drawdown_gate(
             reserves.reserve_atoms,
@@ -1026,7 +1029,7 @@ pub fn process_sbf_benchmark(series_count: u8) -> solana_program::entrypoint::Pr
             .checked_add(1)
             .and_then(|value| value.checked_mul(WRITER_CONTRACT_ATOMIC_SCALE))
             .ok_or(solana_program::program_error::ProgramError::InvalidArgument)?;
-        *item = if index % 2 == 0 {
+        *item = if index.is_multiple_of(2) {
             let local_index = index_u64 / 2;
             let strike = 50_000_000u64
                 .checked_add(

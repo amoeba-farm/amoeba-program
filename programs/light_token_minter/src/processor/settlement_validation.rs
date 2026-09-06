@@ -412,7 +412,7 @@ pub(super) fn validate_market_parameters(
         .checked_div(tick)
         .ok_or(VaultError::InvalidMarketConfig)?;
     if params.tick_size != tick
-        || max_payout_per_contract % tick != 0
+        || !max_payout_per_contract.is_multiple_of(tick)
         || maximum_bin_id == 0
         || maximum_bin_id > crate::constants::MAX_AMOEBA_DLMM_BIN_COUNT as u64
         || params.lot_size != 1
@@ -500,6 +500,29 @@ pub(super) fn validate_light_associated_token_address(
     account_info: &AccountInfo,
 ) -> ProgramResult {
     if *account_info.key != light_token_instruction::get_associated_token_address(owner, mint) {
+        return Err(VaultError::InvalidLightTokenAccount.into());
+    }
+    Ok(())
+}
+
+/// Validate the immutable delivery destination recorded when a bid is placed.
+///
+/// The canonical Light ATA may already exist, or it may still be the system-owned empty address
+/// that the later execution path creates. No other owner or data-bearing squat is admissible.
+pub(super) fn validate_light_associated_token_destination(
+    owner: &Pubkey,
+    mint: &Pubkey,
+    account_info: &AccountInfo,
+) -> ProgramResult {
+    validate_light_associated_token_address(owner, mint, account_info)?;
+    if account_info.owner == &light_token_program_id() {
+        let _ = load_canonical_light_token_account(account_info, owner, mint)?;
+        return Ok(());
+    }
+    if account_info.owner != &system_program::id()
+        || account_info.executable
+        || account_info.data_len() != 0
+    {
         return Err(VaultError::InvalidLightTokenAccount.into());
     }
     Ok(())

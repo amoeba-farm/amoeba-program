@@ -9,6 +9,7 @@ use core::cmp::min;
 pub const AMOEBA_DLMM_PRICE_SCALE: u64 = 1_000_000;
 pub const AMOEBA_DLMM_BPS_SCALE: u64 = 10_000;
 pub const AMOEBA_DLMM_BINS_PER_PAGE: u16 = 32;
+pub use crate::constants::MAX_AMOEBA_DLMM_BINS_PER_SWAP as AMOEBA_DLMM_MAXIMUM_BINS_PER_SWAP;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AmoebaDlmmMathError {
@@ -261,6 +262,9 @@ pub fn quote_exact_in(
 ) -> MathResult<AmoebaDlmmSwapQuote> {
     if minimum_amount_out == 0 || maximum_bins == 0 || bins.is_empty() {
         return Err(AmoebaDlmmMathError::InvalidAmount);
+    }
+    if maximum_bins > AMOEBA_DLMM_MAXIMUM_BINS_PER_SWAP {
+        return Err(AmoebaDlmmMathError::TooManyBins);
     }
     if bins.len() > maximum_bins as usize {
         return Err(AmoebaDlmmMathError::TooManyBins);

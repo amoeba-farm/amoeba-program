@@ -127,6 +127,7 @@ crate::fixed_codec::fixed_instruction_deserialize!(CleanupWriterCustodyV1Params,
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
 pub struct CommitWriterAuctionV1Params {
     pub auction_nonce: u64,
+    /// Reveal-input precommitment; the program stores its actual-slot-bound digest.
     pub reserve_vector_commitment: [u8; 32],
     pub bid_deadline_ts: u64,
     pub reveal_deadline_ts: u64,

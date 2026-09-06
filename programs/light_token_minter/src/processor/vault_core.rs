@@ -535,9 +535,7 @@ pub(super) fn process_collateral_withdrawal(
     let mint_info = &accounts[5 + offset];
     let token_program_info = &accounts[6 + offset];
 
-    if (assisted && (!admin_info.is_signer || !owner_info.is_signer))
-        || (!assisted && !owner_info.is_signer)
-    {
+    if !owner_info.is_signer || (assisted && !admin_info.is_signer) {
         return Err(ProgramError::MissingRequiredSignature);
     }
     if *token_program_info.key != spl_token_program_id() {

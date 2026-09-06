@@ -196,7 +196,7 @@ pub(in crate::processor) fn build_required_access_contract(
                 let trailing_length = core_account_count
                     .checked_sub(13)
                     .ok_or(VaultError::InvalidCompressionWitness)?;
-                if trailing_length < 4 || (trailing_length - 4) % 2 != 0 {
+                if trailing_length < 4 || !(trailing_length - 4).is_multiple_of(2) {
                     return Err(VaultError::InvalidCompressionWitness.into());
                 }
                 accesses.push(spec(

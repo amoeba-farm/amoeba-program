@@ -13,6 +13,9 @@ const EXECUTE_WRITER_AUCTION_FILL_ACCOUNT_COUNT: usize = 26;
 const FINALIZE_WRITER_AUCTION_ACCOUNT_COUNT: usize = 5;
 const MAX_PLAN_RECORDS_PER_CALL: u16 = 8;
 const WRITER_AUCTION_RESERVE_DOMAIN: &[u8] = b"ameba-writer-auction-reserve-v1";
+const WRITER_AUCTION_RESERVE_SLOT_DOMAIN: &[u8] = b"ameba-writer-auction-reserve-slot-v1";
+const WRITER_AUCTION_RESERVE_PREIMAGE_LEN: usize =
+    WRITER_AUCTION_RESERVE_DOMAIN.len() + 8 * 32 + 5 * 8 + 64 * 8;
 const WRITER_BID_INDEX_DIGEST_DOMAIN: &[u8] = b"ameba-writer-bid-index-v1";
 const WRITER_PLAN_DIGEST_DOMAIN: &[u8] = b"ameba-writer-auction-plan-v1";
 
@@ -20,7 +23,7 @@ fn checked_premium(
     quantity_atoms: u64,
     price_per_contract_atoms: u64,
 ) -> Result<u64, ProgramError> {
-    if quantity_atoms % MarketMintAccounting::CANONICAL_ATOMIC_SCALE != 0 {
+    if !quantity_atoms.is_multiple_of(MarketMintAccounting::CANONICAL_ATOMIC_SCALE) {
         return Err(VaultError::InvalidWriterBid.into());
     }
     let contracts = quantity_atoms / MarketMintAccounting::CANONICAL_ATOMIC_SCALE;
@@ -40,7 +43,85 @@ fn checked_fee(premium_atoms: u64, fee_bps: u16) -> Result<u64, ProgramError> {
     u64::try_from(fee).map_err(|_| VaultError::ArithmeticOverflow.into())
 }
 
-fn reserve_reveal_hash(
+fn is_current_active_writer_auction(
+    sleeve: &WriterSleeveV1,
+    auction_key: &Pubkey,
+    auction: &WriterAuctionV1,
+) -> bool {
+    sleeve.auction_nonce == auction.auction_nonce && sleeve.active_auction == Some(*auction_key)
+}
+
+#[inline]
+fn writer_auction_commit_window_open(now: u64, bid_deadline: u64) -> bool {
+    now < bid_deadline
+}
+
+#[inline]
+fn writer_auction_bid_window_open(now: u64, bid_deadline: u64) -> bool {
+    now <= bid_deadline
+}
+
+#[inline]
+fn writer_auction_reveal_window_open(now: u64, bid_deadline: u64, reveal_deadline: u64) -> bool {
+    now > bid_deadline && now < reveal_deadline
+}
+
+#[inline]
+fn writer_auction_planning_window_open(
+    now: u64,
+    reveal_deadline: u64,
+    execute_deadline: u64,
+) -> bool {
+    now >= reveal_deadline && now <= execute_deadline
+}
+
+#[inline]
+fn writer_auction_execute_deadline_open(now: u64, execute_deadline: u64) -> bool {
+    now <= execute_deadline
+}
+
+#[inline]
+fn writer_auction_deadline_sequence_valid(
+    bid_deadline: u64,
+    reveal_deadline: u64,
+    execute_deadline: u64,
+    expiry: u64,
+) -> bool {
+    match bid_deadline.checked_add(1) {
+        Some(first_reveal_timestamp) => {
+            first_reveal_timestamp < reveal_deadline
+                && reveal_deadline < execute_deadline
+                && execute_deadline < expiry
+        }
+        None => false,
+    }
+}
+
+#[inline]
+fn writer_auction_abortable(
+    status: WriterAuctionStatus,
+    now: u64,
+    reveal_deadline: u64,
+    execute_deadline: u64,
+) -> bool {
+    (status == WriterAuctionStatus::Bidding && now >= reveal_deadline)
+        || (matches!(
+            status,
+            WriterAuctionStatus::Planning | WriterAuctionStatus::Executing
+        ) && now > execute_deadline)
+}
+
+#[inline]
+fn writer_auction_policy_inputs_match(
+    auction: &WriterAuctionV1,
+    snapshot: &WriterPolicySnapshotV1,
+) -> bool {
+    auction.policy_version == snapshot.policy_version
+        && auction.scenario_set_hash == snapshot.scenario_set_hash
+        && auction.risk_limit_hash == snapshot.risk_limit_hash
+}
+
+fn reserve_reveal_precommitment_hash(
     program_id: &Pubkey,
     sleeve: &Pubkey,
     auction: &Pubkey,
@@ -48,15 +129,17 @@ fn reserve_reveal_hash(
     snapshot: &WriterPolicySnapshotV1,
     params: &RevealWriterAuctionV1Params,
 ) -> [u8; 32] {
-    let mut bytes = Vec::with_capacity(768);
+    let mut bytes = Vec::with_capacity(WRITER_AUCTION_RESERVE_PREIMAGE_LEN);
     bytes.extend_from_slice(WRITER_AUCTION_RESERVE_DOMAIN);
     bytes.extend_from_slice(program_id.as_ref());
     bytes.extend_from_slice(sleeve.as_ref());
     bytes.extend_from_slice(auction.as_ref());
     bytes.extend_from_slice(&auction_state.auction_nonce.to_le_bytes());
+    bytes.extend_from_slice(&snapshot.policy_version.to_le_bytes());
     bytes.extend_from_slice(&snapshot.policy_hash);
     bytes.extend_from_slice(&auction_state.scenario_set_hash);
     bytes.extend_from_slice(&auction_state.risk_limit_hash);
+    bytes.extend_from_slice(&snapshot.series_family_hash);
     for value in params.reserve_prices_atoms {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
@@ -67,7 +150,41 @@ fn reserve_reveal_hash(
     bytes.extend_from_slice(&auction_state.bid_deadline_ts.to_le_bytes());
     bytes.extend_from_slice(&auction_state.reveal_deadline_ts.to_le_bytes());
     bytes.extend_from_slice(&auction_state.execute_deadline_ts.to_le_bytes());
+    debug_assert_eq!(bytes.len(), WRITER_AUCTION_RESERVE_PREIMAGE_LEN);
     hashv(&[bytes.as_slice()]).to_bytes()
+}
+
+#[inline]
+fn slot_bound_reserve_commitment(precommitment: &[u8; 32], commit_slot: u64) -> [u8; 32] {
+    hashv(&[
+        WRITER_AUCTION_RESERVE_SLOT_DOMAIN,
+        precommitment,
+        &commit_slot.to_le_bytes(),
+    ])
+    .to_bytes()
+}
+
+#[inline]
+fn writer_auction_reveal_binding_matches(
+    program_id: &Pubkey,
+    sleeve: &Pubkey,
+    auction: &Pubkey,
+    auction_state: &WriterAuctionV1,
+    snapshot: &WriterPolicySnapshotV1,
+    params: &RevealWriterAuctionV1Params,
+) -> bool {
+    writer_auction_policy_inputs_match(auction_state, snapshot)
+        && slot_bound_reserve_commitment(
+            &reserve_reveal_precommitment_hash(
+                program_id,
+                sleeve,
+                auction,
+                auction_state,
+                snapshot,
+                params,
+            ),
+            auction_state.commit_slot,
+        ) == auction_state.reserve_vector_commitment
 }
 
 fn bid_index_digest(previous: &[u8; 32], record: &WriterBidIndexRecordV1) -> [u8; 32] {
@@ -118,6 +235,20 @@ fn bid_precedes(
         return candidate.order_id < existing.order_id;
     }
     candidate.bid.to_bytes() < existing.bid.to_bytes()
+}
+
+#[inline(never)]
+fn validate_bid_index_series_bindings(
+    index: &WriterBidIndexV1,
+    book: &WriterSeriesBookV1,
+) -> ProgramResult {
+    if index.records[..usize::from(index.bid_count)]
+        .iter()
+        .any(|record| usize::from(record.series_index) >= usize::from(book.series_count))
+    {
+        return Err(VaultError::InvalidWriterSeriesBook.into());
+    }
+    Ok(())
 }
 
 pub(super) fn process_commit_writer_auction(
@@ -182,10 +313,13 @@ pub(super) fn process_commit_writer_auction(
         || sleeve.policy_hash != snapshot.policy_hash
         || params.auction_nonce != expected_nonce
         || now >= sleeve.expiry_ts
-        || now >= params.bid_deadline_ts
-        || params.bid_deadline_ts >= params.reveal_deadline_ts
-        || params.reveal_deadline_ts >= params.execute_deadline_ts
-        || params.execute_deadline_ts >= sleeve.expiry_ts
+        || !writer_auction_commit_window_open(now, params.bid_deadline_ts)
+        || !writer_auction_deadline_sequence_valid(
+            params.bid_deadline_ts,
+            params.reveal_deadline_ts,
+            params.execute_deadline_ts,
+            sleeve.expiry_ts,
+        )
     {
         return Err(VaultError::InvalidWriterDeadline.into());
     }
@@ -266,7 +400,13 @@ pub(super) fn process_commit_writer_auction(
         policy_version: snapshot.policy_version,
         scenario_set_hash: snapshot.scenario_set_hash,
         risk_limit_hash: snapshot.risk_limit_hash,
-        reserve_vector_commitment: params.reserve_vector_commitment,
+        // The caller supplies the reveal-input precommitment. Store only the commitment bound to
+        // the actual execution slot so a client never has to predict that slot and any later slot
+        // mutation invalidates reveal. This preserves the V1 instruction and account layouts.
+        reserve_vector_commitment: slot_bound_reserve_commitment(
+            &params.reserve_vector_commitment,
+            slot,
+        ),
         reveal_hash: [0; 32],
         revealed_nonce: [0; 32],
         commit_slot: slot,
@@ -364,6 +504,7 @@ pub(super) fn process_place_writer_bid(
         sleeve_info.key,
         &sleeve.settlement_group,
     )?;
+    validate_bid_index_series_bindings(&index, &book)?;
     let snapshot = load_writer_policy_snapshot(
         program_id,
         snapshot_info,
@@ -377,20 +518,23 @@ pub(super) fn process_place_writer_bid(
         || auction.status != WriterAuctionStatus::Bidding
         || auction.series_book != *book_info.key
         || auction.policy_snapshot != *snapshot_info.key
+        || !writer_auction_policy_inputs_match(&auction, &snapshot)
         || auction.bid_index != *bid_index_info.key
         || auction.escrow != *escrow_info.key
         || sleeve.settlement_mint != *settlement_mint_info.key
         || series_index >= usize::from(book.series_count)
         || usize::from(index.bid_count) >= crate::constants::WRITER_MAX_FUNDED_BIDS
-        || current_unix_timestamp()? > auction.bid_deadline_ts
-        || params.requested_contract_atoms % book.records[series_index].contract_size_atoms != 0
+        || !writer_auction_bid_window_open(current_unix_timestamp()?, auction.bid_deadline_ts)
+        || !params
+            .requested_contract_atoms
+            .is_multiple_of(book.records[series_index].contract_size_atoms)
     {
         return Err(VaultError::InvalidWriterBid.into());
     }
     let record = &book.records[series_index];
     match params.delivery_mode {
         crate::state::WriterBidDeliveryMode::LightToken => {
-            validate_light_associated_token_address(
+            validate_light_associated_token_destination(
                 bidder_info.key,
                 &record.contract_mint,
                 claim_destination_info,
@@ -575,8 +719,19 @@ pub(super) fn process_reveal_writer_auction(
         || auction.bid_index != *bid_index_info.key
         || auction.status != WriterAuctionStatus::Bidding
         || auction.bid_count != index.bid_count
-        || now <= auction.bid_deadline_ts
-        || now > auction.reveal_deadline_ts
+        || !writer_auction_reveal_window_open(
+            now,
+            auction.bid_deadline_ts,
+            auction.reveal_deadline_ts,
+        )
+        || !writer_auction_reveal_binding_matches(
+            program_id,
+            sleeve_info.key,
+            auction_info.key,
+            &auction,
+            &snapshot,
+            &params,
+        )
         || crate::bytes32_is_zero(&params.nonce)
     {
         return Err(VaultError::InvalidWriterAuction.into());
@@ -587,7 +742,7 @@ pub(super) fn process_reveal_writer_auction(
         let reserve = params.reserve_prices_atoms[index];
         let cap = params.issue_caps_atoms[index];
         if index < series_count {
-            if reserve == 0 || cap % MarketMintAccounting::CANONICAL_ATOMIC_SCALE != 0 {
+            if reserve == 0 || !cap.is_multiple_of(MarketMintAccounting::CANONICAL_ATOMIC_SCALE) {
                 return Err(VaultError::InvalidWriterAuction.into());
             }
             total_cap = total_cap
@@ -600,19 +755,8 @@ pub(super) fn process_reveal_writer_auction(
     if total_cap > snapshot.max_auction_issue_atoms {
         return Err(VaultError::InvalidWriterAuction.into());
     }
-    let reveal_hash = reserve_reveal_hash(
-        program_id,
-        sleeve_info.key,
-        auction_info.key,
-        &auction,
-        &snapshot,
-        &params,
-    );
-    if reveal_hash != auction.reserve_vector_commitment {
-        return Err(VaultError::InvalidWriterAuction.into());
-    }
     let slot = Clock::get()?.slot;
-    auction.reveal_hash = reveal_hash;
+    auction.reveal_hash = auction.reserve_vector_commitment;
     auction.revealed_nonce = params.nonce;
     auction.reserve_prices_atoms = params.reserve_prices_atoms;
     auction.issue_caps_atoms = params.issue_caps_atoms;
@@ -659,7 +803,7 @@ fn maximum_safe_group_atoms(
     maximum_atoms: u64,
 ) -> Result<u64, ProgramError> {
     let lot = book.records[series_index].contract_size_atoms;
-    if maximum_atoms % lot != 0 || lot != MarketMintAccounting::CANONICAL_ATOMIC_SCALE {
+    if lot != MarketMintAccounting::CANONICAL_ATOMIC_SCALE || !maximum_atoms.is_multiple_of(lot) {
         return Err(VaultError::InvalidWriterBid.into());
     }
     let mut series = [WriterSeries::EMPTY; crate::constants::WRITER_SERIES_STORAGE_CAPACITY];
@@ -825,6 +969,7 @@ pub(super) fn process_plan_writer_auction_chunk(
         sleeve.auction_nonce,
     )?;
     let mut index = load_writer_bid_index(program_id, bid_index_info, auction_info.key)?;
+    validate_bid_index_series_bindings(&index, &book)?;
     let active = load_valid_oracle_active_weight_manifest(
         program_id,
         &group.anchor_oracle_month,
@@ -841,8 +986,11 @@ pub(super) fn process_plan_writer_auction_chunk(
         || auction.bid_index != *bid_index_info.key
         || auction.bid_count != index.bid_count
         || auction.planning_cursor != index.planning_cursor
-        || now <= auction.reveal_deadline_ts
-        || now > auction.execute_deadline_ts
+        || !writer_auction_planning_window_open(
+            now,
+            auction.reveal_deadline_ts,
+            auction.execute_deadline_ts,
+        )
         || active.rolling_manifest_hash != group.active_weight_manifest_hash
         || active.max_open_interest_payout != group.security_cap_atoms
     {
@@ -1042,6 +1190,46 @@ fn load_or_create_market_staging<'a>(
     validate_token_account(staging_info)
 }
 
+fn observe_market_staging_amount(
+    program_id: &Pubkey,
+    market_info: &AccountInfo,
+    staging_info: &AccountInfo,
+    mint_info: &AccountInfo,
+    token_program_info: &AccountInfo,
+) -> Result<u64, ProgramError> {
+    let expected = derive_contract_mint_staging_pda(program_id, market_info.key).0;
+    if *staging_info.key != expected {
+        return Err(VaultError::InvalidPda.into());
+    }
+    if staging_info.owner == token_program_info.key {
+        validate_vault_token_account(staging_info, mint_info.key, market_info.key)?;
+        return Ok(validate_token_account(staging_info)?.amount);
+    }
+    validate_create_only_program_account_target(program_id, staging_info)?;
+    Ok(0)
+}
+
+fn observe_writer_retirement_custody_amount(
+    program_id: &Pubkey,
+    sleeve_info: &AccountInfo,
+    market_info: &AccountInfo,
+    custody_info: &AccountInfo,
+    mint_info: &AccountInfo,
+    token_program_info: &AccountInfo,
+) -> Result<u64, ProgramError> {
+    let expected =
+        derive_writer_retirement_custody_pda(program_id, sleeve_info.key, market_info.key).0;
+    if *custody_info.key != expected {
+        return Err(VaultError::InvalidPda.into());
+    }
+    if custody_info.owner == token_program_info.key {
+        validate_vault_token_account(custody_info, mint_info.key, sleeve_info.key)?;
+        return Ok(validate_token_account(custody_info)?.amount);
+    }
+    validate_create_only_program_account_target(program_id, custody_info)?;
+    Ok(0)
+}
+
 fn market_signer_seeds<'a>(market: &'a Market, bump: &'a [u8; 1]) -> [&'a [u8]; 4] {
     [
         CURRENT_STATE_NAMESPACE_SEED,
@@ -1116,6 +1304,7 @@ pub(super) fn process_execute_writer_auction_fill(
         sleeve.auction_nonce,
     )?;
     let mut index = load_writer_bid_index(program_id, bid_index_info, auction_info.key)?;
+    validate_bid_index_series_bindings(&index, &book)?;
     let mut bid = load_writer_bid(program_id, bid_info, auction_info.key)?;
     let active = load_valid_oracle_active_weight_manifest(
         program_id,
@@ -1136,7 +1325,10 @@ pub(super) fn process_execute_writer_auction_fill(
         || auction.bid_index != *bid_index_info.key
         || auction.escrow != *escrow_info.key
         || auction.fee_vault != *fee_vault_info.key
-        || current_unix_timestamp()? > auction.execute_deadline_ts
+        || !writer_auction_execute_deadline_open(
+            current_unix_timestamp()?,
+            auction.execute_deadline_ts,
+        )
         || active.rolling_manifest_hash != group.active_weight_manifest_hash
         || active.max_open_interest_payout != group.security_cap_atoms
     {
@@ -1199,31 +1391,24 @@ pub(super) fn process_execute_writer_auction_fill(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    let staging_before = load_or_create_market_staging(
+    // Observe every custody input without creating an account or invoking a token program. The
+    // complete resulting book is admitted below before the first external mutation.
+    let staging_before = observe_market_staging_amount(
         program_id,
-        cranker_info,
         market_info,
-        &market,
         staging_info,
         contract_mint_info,
         token_program_info,
-        system_program_info,
     )?;
-    let retirement_before = if retirement_info.owner == token_program_info.key {
-        validate_vault_token_account(retirement_info, contract_mint_info.key, sleeve_info.key)?;
-        validate_token_account(retirement_info)?.amount
-    } else {
-        if *retirement_info.key != stored.retirement_custody
-            || retirement_info.owner != &system_program::id()
-            || retirement_info.executable
-            || retirement_info.data_len() != 0
-        {
-            return Err(VaultError::InvalidPda.into());
-        }
-        0
-    };
+    let retirement_before = observe_writer_retirement_custody_amount(
+        program_id,
+        sleeve_info,
+        market_info,
+        retirement_info,
+        contract_mint_info,
+        token_program_info,
+    )?;
     let observed_issuer = staging_before
-        .amount
         .checked_add(retirement_before)
         .ok_or(VaultError::ArithmeticOverflow)?;
     if observed_issuer < stored.issuer_controlled_atoms || observed_issuer > mint_before.supply {
@@ -1233,33 +1418,6 @@ pub(super) fn process_execute_writer_auction_fill(
         .checked_sub(stored.issuer_controlled_atoms)
         .ok_or(VaultError::ArithmeticOverflow)?;
     if custody_increase > stored.external_open_interest_atoms {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
-    if staging_before.amount != 0 {
-        let _ = load_or_create_writer_retirement_custody(
-            program_id,
-            cranker_info,
-            sleeve_info,
-            market_info,
-            retirement_info,
-            contract_mint_info,
-            token_program_info,
-            system_program_info,
-        )?;
-        let market_bump = [market.bump];
-        let signer = market_signer_seeds(&market, &market_bump);
-        invoke_token_transfer_checked(
-            token_program_info,
-            staging_info,
-            contract_mint_info,
-            retirement_info,
-            market_info,
-            staging_before.amount,
-            MarketMintAccounting::CANONICAL_DECIMALS,
-            &[&signer],
-        )?;
-    }
-    if validate_token_account(staging_info)?.amount != 0 {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
     book.records[series_index].external_open_interest_atoms = stored
@@ -1306,8 +1464,8 @@ pub(super) fn process_execute_writer_auction_fill(
         .checked_add(premium)
         .ok_or(VaultError::ArithmeticOverflow)?;
     // Custody reconciliation and newly accepted external OI are one atomic economic transition.
-    // Validate the combined final book once before any premium leaves escrow. A failure rolls
-    // back the earlier staging CPI together with every state change.
+    // Validate reserve, drawdown, security, and exact supply deltas from canonical prestate before
+    // creating an account, invoking a token program, or storing any state.
     recompute_writer_metrics(
         &mut sleeve,
         &book,
@@ -1354,8 +1512,56 @@ pub(super) fn process_execute_writer_auction_fill(
     {
         return Err(VaultError::InvalidSplInterfaceAccount.into());
     }
+    let realized_staging = load_or_create_market_staging(
+        program_id,
+        cranker_info,
+        market_info,
+        &market,
+        staging_info,
+        contract_mint_info,
+        token_program_info,
+        system_program_info,
+    )?;
+    if realized_staging.amount != staging_before {
+        return Err(VaultError::WriterSupplyMismatch.into());
+    }
     let market_bump = [market.bump];
     let market_signer = market_signer_seeds(&market, &market_bump);
+    if staging_before != 0 {
+        let realized_retirement = load_or_create_writer_retirement_custody(
+            program_id,
+            cranker_info,
+            sleeve_info,
+            market_info,
+            retirement_info,
+            contract_mint_info,
+            token_program_info,
+            system_program_info,
+        )?;
+        if realized_retirement.amount != retirement_before {
+            return Err(VaultError::WriterSupplyMismatch.into());
+        }
+        invoke_token_transfer_checked(
+            token_program_info,
+            staging_info,
+            contract_mint_info,
+            retirement_info,
+            market_info,
+            staging_before,
+            MarketMintAccounting::CANONICAL_DECIMALS,
+            &[&market_signer],
+        )?;
+        if validate_token_account(retirement_info)?
+            .amount
+            .checked_sub(retirement_before)
+            != Some(staging_before)
+        {
+            return Err(VaultError::WriterSupplyMismatch.into());
+        }
+    }
+    if validate_token_account(staging_info)?.amount != 0 {
+        return Err(VaultError::WriterSupplyMismatch.into());
+    }
     invoke_token_mint_to_checked(
         token_program_info,
         contract_mint_info,
@@ -1541,13 +1747,12 @@ pub(super) fn process_finalize_or_abort_writer_auction(
     }
     let now = current_unix_timestamp()?;
     if params.abort {
-        let abortable = (auction.status == WriterAuctionStatus::Bidding
-            && now > auction.reveal_deadline_ts)
-            || (matches!(
-                auction.status,
-                WriterAuctionStatus::Planning | WriterAuctionStatus::Executing
-            ) && now > auction.execute_deadline_ts);
-        if !abortable {
+        if !writer_auction_abortable(
+            auction.status,
+            now,
+            auction.reveal_deadline_ts,
+            auction.execute_deadline_ts,
+        ) {
             return Err(VaultError::InvalidWriterDeadline.into());
         }
         for record in index.records.iter_mut().take(usize::from(index.bid_count)) {
@@ -1614,7 +1819,7 @@ pub(super) fn process_cancel_or_refund_writer_bid(
         return Err(VaultError::InvalidTokenProgram.into());
     }
     let sleeve = load_writer_sleeve_without_group_meta(program_id, sleeve_info)?;
-    let mut auction = load_writer_auction(
+    let mut auction = load_writer_auction_for_refund(
         program_id,
         auction_info,
         sleeve_info.key,
@@ -1646,7 +1851,8 @@ pub(super) fn process_cancel_or_refund_writer_bid(
     let now = current_unix_timestamp()?;
     let early_cancel = summary.status == WriterBidStatus::Funded
         && auction.status == WriterAuctionStatus::Bidding
-        && now <= auction.bid_deadline_ts;
+        && writer_auction_bid_window_open(now, auction.bid_deadline_ts)
+        && is_current_active_writer_auction(&sleeve, auction_info.key, &auction);
     if early_cancel && *actor_info.key != bid.bidder {
         return Err(VaultError::Unauthorized.into());
     }

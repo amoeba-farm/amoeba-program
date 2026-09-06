@@ -177,6 +177,30 @@ fn recompute_reconciled_writer_metrics(
     recompute_writer_metrics(sleeve, book, snapshot, Some(security_cap_atoms), false)
 }
 
+#[inline(never)]
+fn reconcile_series_settlement_status(
+    sleeve_status: WriterSleeveStatus,
+    record: &mut WriterSeriesRecordV1,
+) -> ProgramResult {
+    if sleeve_status != WriterSleeveStatus::SettlementFinalized {
+        return Ok(());
+    }
+    if !matches!(
+        record.settlement_status,
+        WriterSeriesSettlementStatus::Frozen | WriterSeriesSettlementStatus::Exhausted
+    ) || (record.settlement_status == WriterSeriesSettlementStatus::Exhausted
+        && record.external_open_interest_atoms != 0)
+    {
+        return Err(VaultError::InvalidWriterSeriesBook.into());
+    }
+    record.settlement_status = if record.external_open_interest_atoms == 0 {
+        WriterSeriesSettlementStatus::Exhausted
+    } else {
+        WriterSeriesSettlementStatus::Frozen
+    };
+    Ok(())
+}
+
 pub(super) fn process_reconcile_writer_supply(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -334,6 +358,7 @@ pub(super) fn process_reconcile_writer_supply(
             record.total_physical_supply_atoms = mint.supply;
             record.issuer_controlled_atoms = observed_issuer;
             record.external_open_interest_atoms = new_external;
+            reconcile_series_settlement_status(sleeve.status, record)?;
             record.custody_status = if observed_issuer == 0 {
                 WriterSeriesCustodyStatus::Absent
             } else {

@@ -12,6 +12,11 @@ test = false
 no-entrypoint = []
 writer-math-benchmark = []
 devnet-solo-backfill-2026 = []
+governance-gate-v1 = []
+phase3-synthetic-governance-controller = ["governance-gate-v1"]
+reviewed-governance-controller = ["governance-gate-v1"]
+devnet-v3-governance-controller = ["governance-gate-v1"]
+local-ceremony-governance-controller = ["reviewed-governance-controller"]
 
 [dependencies]
 borsh = "0.10.4"

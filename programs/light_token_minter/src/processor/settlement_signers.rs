@@ -22,6 +22,7 @@ pub(super) fn load_dual_settlement_governance(
     Ok(config)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn build_settlement_signer_set(
     registry: Pubkey,
     bump: u8,
@@ -208,6 +209,7 @@ pub(super) fn settlement_signer_rotation_digest(
     .to_vec()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn verify_settlement_signer_rotation_attestations(
     program_id: &Pubkey,
     registry_key: &Pubkey,

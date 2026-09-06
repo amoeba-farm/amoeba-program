@@ -96,7 +96,7 @@ pub fn oracle_emergency_v3_minimum_vote_amount(snapshot_samba_supply: u64) -> Op
     let denominator = u64::from(crate::constants::ORACLE_MAX_V3_VOTERS);
     Some(
         snapshot_samba_supply / denominator
-            + if snapshot_samba_supply % denominator == 0 {
+            + if snapshot_samba_supply.is_multiple_of(denominator) {
                 0
             } else {
                 1

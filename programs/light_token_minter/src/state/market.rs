@@ -131,6 +131,7 @@ pub struct UserCollateral {
     pub last_action_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for UserCollateral {
     fn default() -> Self {
         Self {
@@ -163,6 +164,7 @@ pub struct PositionRecord {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for PositionRecord {
     fn default() -> Self {
         Self {
@@ -202,6 +204,7 @@ pub struct SettlementRecordV2 {
     pub signer_set_version: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for SettlementRecordV2 {
     fn default() -> Self {
         Self {

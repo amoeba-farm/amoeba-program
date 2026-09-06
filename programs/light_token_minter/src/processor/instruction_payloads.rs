@@ -250,10 +250,12 @@ pub(super) fn decode_update_config_payload(
     }
 }
 
+pub(super) type EmergencyDisputePayload = (u8, [u8; 32], Option<[u8; 32]>);
+
 #[inline(always)]
 pub(super) fn decode_emergency_dispute_payload(
     payload: &[u8],
-) -> Result<(u8, [u8; 32], Option<[u8; 32]>), ProgramError> {
+) -> Result<EmergencyDisputePayload, ProgramError> {
     if payload.len() < 34 {
         return Err(VaultError::InvalidInstructionData.into());
     }

@@ -580,6 +580,7 @@ fn apply_display_leaf_mutations<'a>(
     invoke_light_cpi(instruction, fee_payer, remaining_accounts)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_compressed_state_leaf_mutations<'a>(
     program_id: &Pubkey,
     fee_payer: &AccountInfo<'a>,
@@ -598,7 +599,7 @@ pub(crate) fn apply_compressed_state_leaf_mutations<'a>(
     let mut instruction = new_light_system_cpi((*proof).into());
 
     for witness in read_only {
-        validate_compressed_state_leaf(&witness.leaf)?;
+        validate_compressed_state_leaf(witness.leaf)?;
         let expected = derive_compressed_state_leaf_address(
             program_id,
             &LIGHT_DEFAULT_ADDRESS_TREE_V2,

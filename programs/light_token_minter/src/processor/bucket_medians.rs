@@ -19,8 +19,23 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
     let expected_accounts = 6 + usize::from(grace) * 3;
     if accounts.len() != expected_accounts
         || !accounts[0].is_signer
+        || accounts[1].is_signer
+        || accounts[1].is_writable
+        || accounts[2].is_signer
         || !accounts[2].is_writable
+        || accounts[3].is_signer
         || !accounts[3].is_writable
+        || accounts[4].is_signer
+        || accounts[4].is_writable
+        || accounts[5].is_signer
+        || accounts[5].is_writable
+        || (grace
+            && (accounts[6].is_signer
+                || accounts[6].is_writable
+                || accounts[7].is_signer
+                || !accounts[7].is_writable
+                || accounts[8].is_signer
+                || accounts[8].is_writable))
         || crate::bytes32_is_zero(&params.bucket_id)
     {
         return Err(VaultError::InvalidAccountList.into());

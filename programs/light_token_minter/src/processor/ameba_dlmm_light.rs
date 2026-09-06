@@ -434,6 +434,7 @@ pub fn process_lifecycle_instruction(
 
 /// Register newly-created hot PDAs as Light-address placeholders and reimburse
 /// their payer from the program's configured rent sponsor.
+#[allow(clippy::too_many_arguments)]
 pub fn register_initialized_pdas<'info>(
     program_id: &Pubkey,
     payer: &AccountInfo<'info>,
@@ -504,7 +505,7 @@ pub fn register_initialized_pdas<'info>(
         });
     }
 
-    let mut instruction = new_light_system_cpi(proof.proof.clone());
+    let mut instruction = new_light_system_cpi(proof.proof);
     instruction.new_address_params = new_address_params;
     instruction.account_infos = account_infos;
     invoke_light_cpi(instruction, payer, system_accounts).map_err(|_| invalid_light())?;

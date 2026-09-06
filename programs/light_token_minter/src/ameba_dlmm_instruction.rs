@@ -123,6 +123,9 @@ pub struct CollectAmoebaDlmmProtocolFeesV1Params {
     pub quote_amount: u64,
 }
 
+// Runtime decode failures intentionally collapse to one opaque value so callers cannot depend on
+// field-specific failure precedence.
+#[allow(clippy::result_unit_err)]
 pub trait AmoebaDlmmDecode: Sized {
     fn decode_exact(payload: &[u8]) -> Result<Self, ()>;
 }
@@ -188,7 +191,7 @@ impl<'a> PayloadReader<'a> {
     }
 }
 
-#[inline(always)]
+#[inline(never)]
 fn read_create_accounts_proof(reader: &mut PayloadReader<'_>) -> Result<CreateAccountsProof, ()> {
     let proof = match reader.u8()? {
         0 => ValidityProof(None),
@@ -458,6 +461,7 @@ impl BorshSerialize for RemoveAmoebaDlmmLiquidityV1Params {
     }
 }
 
+#[allow(clippy::result_unit_err)]
 pub fn decode_exact<T: AmoebaDlmmDecode>(payload: &[u8]) -> Result<T, ()> {
     T::decode_exact(payload)
 }

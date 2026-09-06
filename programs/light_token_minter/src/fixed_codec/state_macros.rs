@@ -172,10 +172,11 @@ macro_rules! variable_state_codec {
             #[inline(never)]
             fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
                 let mut encoded = [0u8; $maximum_len];
-                let mut output = FixedWriter::new(&mut encoded);
-                <Self as FixedField>::write(self, &mut output);
-                let encoded_len = output.offset;
-                drop(output);
+                let encoded_len = {
+                    let mut output = FixedWriter::new(&mut encoded);
+                    <Self as FixedField>::write(self, &mut output);
+                    output.offset
+                };
                 writer.write_all(&encoded[..encoded_len])
             }
         }

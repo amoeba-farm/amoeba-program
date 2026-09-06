@@ -69,7 +69,7 @@ pub(super) fn process_initialize_collective_pool_core(
     let tick = market.params.tick_size;
     if tick == 0
         || maximum_price == 0
-        || maximum_price % tick != 0
+        || !maximum_price.is_multiple_of(tick)
         || maximum_price / tick > MAX_AMOEBA_DLMM_BIN_COUNT as u64
         || market.params.taker_fee_bps > MAX_AMOEBA_DLMM_SWAP_FEE_BPS
         || params.protocol_fee_share_bps > 10_000
@@ -171,7 +171,7 @@ pub(super) fn process_initialize_collective_pool_core(
         state_config_info,
         state_rent_sponsor_info,
         pool_info.lamports().saturating_sub(pool_prefunded_lamports),
-        &[pool_info.clone()],
+        std::slice::from_ref(pool_info),
         light_tail,
         &params.create_accounts_proof,
     )?;
@@ -225,8 +225,7 @@ pub(super) fn process_initialize_bin_page(
     ) {
         return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
     }
-    let page_count =
-        (pool.maximum_bin_id as usize + AMOEBA_DLMM_BINS_PER_PAGE - 1) / AMOEBA_DLMM_BINS_PER_PAGE;
+    let page_count = (pool.maximum_bin_id as usize).div_ceil(AMOEBA_DLMM_BINS_PER_PAGE);
     if params.page_index as usize >= page_count
         || params.page_index >= MAX_AMOEBA_DLMM_PAGE_COUNT
         || page_bit(&pool.initialized_page_bitmap, params.page_index)
@@ -415,7 +414,7 @@ pub(super) fn process_initialize_position(
         position_info
             .lamports()
             .saturating_sub(position_prefunded_lamports),
-        &[position_info.clone()],
+        std::slice::from_ref(position_info),
         light_tail,
         &params.create_accounts_proof,
     )?;

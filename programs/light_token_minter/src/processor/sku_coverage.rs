@@ -24,7 +24,7 @@ pub(super) fn verify_oracle_sku_membership(
     sku_index: u16,
     proof: &[[u8; 32]],
 ) -> ProgramResult {
-    if crate::bytes32_is_zero(&*sku_id)
+    if crate::bytes32_is_zero(sku_id)
         || sku_index >= coverage.required_sku_count
         || proof.len() != oracle_sku_merkle_proof_depth(coverage.required_sku_count)?
     {
@@ -290,6 +290,7 @@ pub(super) fn oracle_unlistable_source_cleanup_ready(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn cancel_stale_oracle_source_challenge_state(
     month: &mut OracleMonthState,
     coverage: &mut OracleSkuCoverageManifest,

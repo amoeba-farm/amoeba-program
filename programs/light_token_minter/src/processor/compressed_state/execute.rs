@@ -5,6 +5,7 @@ pub(in crate::processor) fn process_execute_compressed_state_v1(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     mut params: ExecuteCompressedStateParams,
+    gate: &crate::governance_gate::GateValidated,
 ) -> ProgramResult {
     validate_session_shape(accounts, &params)?;
     validate_compressed_initializer_contract(&params)?;
@@ -67,6 +68,7 @@ pub(in crate::processor) fn process_execute_compressed_state_v1(
         program_id,
         core_accounts,
         &params.inner_instruction,
+        gate,
     )?;
 
     capture_apply_and_close(

@@ -1,6 +1,7 @@
 use super::*;
 
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn validate_claim_custody(
     config: &VaultConfig,
     config_info: &AccountInfo,
@@ -86,7 +87,7 @@ pub(in crate::processor) fn compute_source_family_reward(
         OracleUsdcRewardKind::SourceSupport => {
             trailing.len() >= 4
                 && trailing.len() <= 4 + 2 * usize::from(MAX_ORACLE_USDC_MERGE_DEPTH)
-                && (trailing.len() - 4) % 2 == 0
+                && (trailing.len() - 4).is_multiple_of(2)
         }
         OracleUsdcRewardKind::Opening => trailing.len() == 4,
         OracleUsdcRewardKind::Update => false,

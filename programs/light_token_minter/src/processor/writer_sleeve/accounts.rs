@@ -332,11 +332,10 @@ pub(super) fn validate_writer_flat_mint(
     Ok(mint)
 }
 
-pub(super) fn load_writer_auction(
+fn load_writer_auction_at_stored_nonce(
     program_id: &Pubkey,
     info: &AccountInfo,
     expected_sleeve: &Pubkey,
-    expected_nonce: u64,
 ) -> Result<Box<WriterAuctionV1>, ProgramError> {
     let value = Box::new(load_exact_zero_padded_state::<WriterAuctionV1>(
         info,
@@ -344,16 +343,47 @@ pub(super) fn load_writer_auction(
         WriterAuctionV1::LEN,
         VaultError::InvalidWriterAuction,
     )?);
-    let (expected, bump) = derive_writer_auction_pda(program_id, expected_sleeve, expected_nonce);
+    let (expected, bump) =
+        derive_writer_auction_pda(program_id, expected_sleeve, value.auction_nonce);
     if *info.key != expected
         || !value.is_initialized
         || value.bump != bump
         || !value.has_current_layout()
         || value.sleeve != *expected_sleeve
-        || value.auction_nonce != expected_nonce
         || value.bid_index != derive_writer_bid_index_pda(program_id, info.key).0
         || value.escrow != derive_writer_auction_escrow_pda(program_id, info.key).0
     {
+        return Err(VaultError::InvalidWriterAuction.into());
+    }
+    Ok(value)
+}
+
+pub(super) fn load_writer_auction(
+    program_id: &Pubkey,
+    info: &AccountInfo,
+    expected_sleeve: &Pubkey,
+    expected_nonce: u64,
+) -> Result<Box<WriterAuctionV1>, ProgramError> {
+    let value = load_writer_auction_at_stored_nonce(program_id, info, expected_sleeve)?;
+    if value.auction_nonce != expected_nonce {
+        return Err(VaultError::InvalidWriterAuction.into());
+    }
+    Ok(value)
+}
+
+/// Refunds remain reachable after the sleeve advances to a later auction.
+///
+/// The auction's own program-owned nonce remains the PDA authority input. The sleeve nonce is an
+/// upper bound only: a future auction account is never admissible, while a finalized historical
+/// auction can continue returning its escrow to the immutable stored refund destinations.
+pub(super) fn load_writer_auction_for_refund(
+    program_id: &Pubkey,
+    info: &AccountInfo,
+    expected_sleeve: &Pubkey,
+    current_nonce: u64,
+) -> Result<Box<WriterAuctionV1>, ProgramError> {
+    let value = load_writer_auction_at_stored_nonce(program_id, info, expected_sleeve)?;
+    if value.auction_nonce > current_nonce {
         return Err(VaultError::InvalidWriterAuction.into());
     }
     Ok(value)

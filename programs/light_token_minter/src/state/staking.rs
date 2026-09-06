@@ -11,6 +11,7 @@ pub struct OraclePlayerLedger {
     pub last_balance_change_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OraclePlayerLedger {
     fn default() -> Self {
         Self {
@@ -141,6 +142,7 @@ pub struct OracleMajorTokenConfig {
     pub vault_token_account: Pubkey,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleMajorTokenConfig {
     fn default() -> Self {
         Self {
@@ -168,6 +170,7 @@ pub struct OracleTreasuryState {
     pub last_balance_change_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleTreasuryState {
     fn default() -> Self {
         Self {

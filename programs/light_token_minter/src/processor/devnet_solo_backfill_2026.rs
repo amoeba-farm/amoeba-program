@@ -4,6 +4,21 @@
 //! writes a maturity-ladder registry. Every market and authority is derived or pinned here.
 
 use super::*;
+use crate::governance_manifest::{
+    is_devnet_solo_backfill_2026_instruction_tag,
+    DEVNET_SOLO_BACKFILL_ACCUMULATE_ACTIVE_WEIGHT_TAG as ACCUMULATE_ACTIVE_WEIGHT_TAG,
+    DEVNET_SOLO_BACKFILL_ACCUMULATE_RECIPE_TAG as ACCUMULATE_RECIPE_TAG,
+    DEVNET_SOLO_BACKFILL_BEGIN_ACTIVE_WEIGHTS_TAG as BEGIN_ACTIVE_WEIGHTS_TAG,
+    DEVNET_SOLO_BACKFILL_CREATE_SUPPORTED_SOURCE_TAG as CREATE_SUPPORTED_SOURCE_TAG,
+    DEVNET_SOLO_BACKFILL_FINALIZE_ACTIVE_WEIGHTS_TAG as FINALIZE_ACTIVE_WEIGHTS_TAG,
+    DEVNET_SOLO_BACKFILL_FINALIZE_COVERAGE_TAG as FINALIZE_COVERAGE_TAG,
+    DEVNET_SOLO_BACKFILL_FINALIZE_GAME_TAG as FINALIZE_GAME_TAG,
+    DEVNET_SOLO_BACKFILL_FINALIZE_OPENING_TAG as FINALIZE_OPENING_TAG,
+    DEVNET_SOLO_BACKFILL_FINALIZE_RECIPE_TAG as FINALIZE_RECIPE_TAG,
+    DEVNET_SOLO_BACKFILL_INITIALIZE_COHORT_TAG as INITIALIZE_COHORT_TAG,
+    DEVNET_SOLO_BACKFILL_INITIALIZE_SIDECAR_TAG as INITIALIZE_SIDECAR_TAG,
+    DEVNET_SOLO_BACKFILL_SUBMIT_OPENING_TAG as SUBMIT_OPENING_TAG,
+};
 use crate::state::{
     derive_devnet_solo_backfill_2026_v1_pda, derive_oracle_active_weight_manifest_pda,
     derive_oracle_bucket_median_pda, derive_oracle_product_sku_manifest_pda,
@@ -20,19 +35,6 @@ use crate::state::{
     DEVNET_SOLO_BACKFILL_2026_V1_PDA_SEED,
 };
 use borsh::BorshDeserialize;
-
-pub(super) const INITIALIZE_SIDECAR_TAG: u8 = 29;
-pub(super) const INITIALIZE_COHORT_TAG: u8 = 31;
-pub(super) const CREATE_SUPPORTED_SOURCE_TAG: u8 = 34;
-pub(super) const FINALIZE_COVERAGE_TAG: u8 = 35;
-pub(super) const ACCUMULATE_RECIPE_TAG: u8 = 69;
-pub(super) const FINALIZE_RECIPE_TAG: u8 = 97;
-pub(super) const SUBMIT_OPENING_TAG: u8 = 189;
-pub(super) const FINALIZE_OPENING_TAG: u8 = 204;
-pub(super) const BEGIN_ACTIVE_WEIGHTS_TAG: u8 = 206;
-pub(super) const ACCUMULATE_ACTIVE_WEIGHT_TAG: u8 = 211;
-pub(super) const FINALIZE_ACTIVE_WEIGHTS_TAG: u8 = 212;
-pub(super) const FINALIZE_GAME_TAG: u8 = 214;
 
 const EXPECTED_PROGRAM_ID: Pubkey =
     solana_program::pubkey!("9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH");
@@ -168,21 +170,7 @@ const fn fixed_text_32(value: &[u8]) -> [u8; 32] {
 }
 
 pub(super) fn is_instruction_tag(tag: u8) -> bool {
-    matches!(
-        tag,
-        INITIALIZE_SIDECAR_TAG
-            | INITIALIZE_COHORT_TAG
-            | CREATE_SUPPORTED_SOURCE_TAG
-            | FINALIZE_COVERAGE_TAG
-            | ACCUMULATE_RECIPE_TAG
-            | FINALIZE_RECIPE_TAG
-            | SUBMIT_OPENING_TAG
-            | FINALIZE_OPENING_TAG
-            | BEGIN_ACTIVE_WEIGHTS_TAG
-            | ACCUMULATE_ACTIVE_WEIGHT_TAG
-            | FINALIZE_ACTIVE_WEIGHTS_TAG
-            | FINALIZE_GAME_TAG
-    )
+    is_devnet_solo_backfill_2026_instruction_tag(tag)
 }
 
 pub(super) fn process_instruction(

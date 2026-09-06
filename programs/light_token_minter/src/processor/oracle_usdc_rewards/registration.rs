@@ -127,6 +127,7 @@ pub(in crate::processor) fn load_reward_registration(
     Ok(registration)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn create_reward_registration<'a>(
     program_id: &Pubkey,
     payer_info: &AccountInfo<'a>,

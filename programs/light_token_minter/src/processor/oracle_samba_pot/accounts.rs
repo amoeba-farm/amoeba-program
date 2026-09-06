@@ -251,6 +251,7 @@ pub(in crate::processor) fn validate_pot_token_account(
     Ok(token)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn validate_cash_emergency_target(
     program_id: &Pubkey,
     month_key: &Pubkey,
@@ -535,6 +536,7 @@ pub(in crate::processor) fn validate_cash_emergency_target(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn set_cash_emergency_guard_dispute_binding(
     program_id: &Pubkey,
     kind: OracleEmergencyDisputeKind,
@@ -604,6 +606,7 @@ pub(in crate::processor) fn set_cash_emergency_guard_dispute_binding(
 }
 
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 fn transition_source_challenge_guard_dispute(
     program_id: &Pubkey,
     month: &Pubkey,

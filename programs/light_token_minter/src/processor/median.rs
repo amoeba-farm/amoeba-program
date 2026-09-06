@@ -36,7 +36,7 @@ pub fn deterministic_bucket_median(values: &mut [i64]) -> Result<i64, ProgramErr
     }
     insertion_sort_bucket_values(values);
     let upper = values.len() / 2;
-    if values.len() % 2 == 1 {
+    if !values.len().is_multiple_of(2) {
         return Ok(values[upper]);
     }
     let lower = values[upper - 1];
@@ -52,7 +52,7 @@ pub fn deterministic_temporal_median(values: &mut [u64]) -> Result<u64, ProgramE
     }
     insertion_sort_u64(values);
     let upper = values.len() / 2;
-    if values.len() % 2 == 1 {
+    if !values.len().is_multiple_of(2) {
         return Ok(values[upper]);
     }
     let lower = values[upper - 1];
@@ -205,6 +205,7 @@ pub(super) fn validate_oracle_observation_shape(
     if count == 0
         || count > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
         || observations.states[0] != source.baseline_state
+        || observations.states[count - 1] != source.current_state
         || crate::bytes32_is_zero(&source.rolling_observation_hash)
     {
         return Err(VaultError::InvalidOracleObservation.into());
@@ -247,13 +248,19 @@ pub fn oracle_temporal_median_state(
             value_count += 1;
         }
     }
-    if value_count == 0 {
-        Ok(None)
-    } else {
-        Ok(Some(deterministic_temporal_median(
+    if value_count > 0 {
+        return Ok(Some(deterministic_temporal_median(
             &mut values[..value_count],
-        )?))
+        )?));
     }
+
+    // An unchanged source remains economically present without manufacturing a paid update.
+    // This fallback does not add an equal-weight sample to an already-populated window, so every
+    // source that was settleable under the existing temporal-median rule keeps the same result.
+    Ok((0..usize::from(source.observation_count))
+        .rev()
+        .find(|index| observations.source_times[*index] <= window_start_ts)
+        .map(|index| observations.states[index]))
 }
 
 pub(super) fn initial_oracle_bucket_source_snapshot(

@@ -357,6 +357,28 @@ pub enum VaultError {
     WriterFullExitNotAllowed = 6253,
     #[error("writer arithmetic input is outside the admitted checked-u128 domain")]
     WriterArithmeticAdmissionFailed = 6254,
+    #[error("missing signed governance instruction tail")]
+    MissingGovernanceTail = 6255,
+    #[error("invalid signed governance instruction tail")]
+    InvalidGovernanceTail = 6256,
+    #[error("missing canonical governance gate account")]
+    MissingGovernanceGate = 6257,
+    #[error("duplicate canonical governance gate account")]
+    DuplicateGovernanceGate = 6258,
+    #[error("invalid governance gate account privileges")]
+    InvalidGovernanceGatePrivileges = 6259,
+    #[error("invalid governance gate account owner")]
+    InvalidGovernanceGateOwner = 6260,
+    #[error("invalid canonical governance gate PDA")]
+    InvalidGovernanceGatePda = 6261,
+    #[error("invalid governance gate account data")]
+    InvalidGovernanceGateData = 6262,
+    #[error("governance gate is frozen")]
+    GovernanceGateFrozen = 6263,
+    #[error("signed governance epoch does not match the gate")]
+    GovernanceGateEpochMismatch = 6264,
+    #[error("reviewed governance bridge controller identity is unavailable")]
+    GovernanceBridgeIdentityUnavailable = 6265,
 }
 
 impl From<VaultError> for ProgramError {

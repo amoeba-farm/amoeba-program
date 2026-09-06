@@ -32,15 +32,16 @@ pub(in crate::processor) fn materialize_leaf<'a>(
             let (_, bump) =
                 derive_oracle_sku_coverage_record_pda(program_id, month_info.key, &sku_id);
             let mut data = vec![0; OracleSkuCoverageRecord::LEN];
-            let mut output = FixedWriter::new(&mut data);
-            true.write(&mut output);
-            bump.write(&mut output);
-            OracleSkuCoverageRecord::ACCOUNT_DISCRIMINATOR.write(&mut output);
-            OracleSkuCoverageRecord::ACCOUNT_VERSION.write(&mut output);
-            month_info.key.write(&mut output);
-            output.raw(&leaf.data);
-            debug_assert!(output.offset <= OracleSkuCoverageRecord::LEN);
-            drop(output);
+            {
+                let mut output = FixedWriter::new(&mut data);
+                true.write(&mut output);
+                bump.write(&mut output);
+                OracleSkuCoverageRecord::ACCOUNT_DISCRIMINATOR.write(&mut output);
+                OracleSkuCoverageRecord::ACCOUNT_VERSION.write(&mut output);
+                month_info.key.write(&mut output);
+                output.raw(&leaf.data);
+                debug_assert!(output.offset <= OracleSkuCoverageRecord::LEN);
+            }
             validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
             let bump_seed = [bump];
             super::super::create_program_account(
@@ -72,16 +73,17 @@ pub(in crate::processor) fn materialize_leaf<'a>(
                 .ok_or(VaultError::InvalidOracleUsdcSkuPool)?;
             let (_, bump) = derive_oracle_usdc_sku_pool_pda(program_id, &schedule, &bucket_id);
             let mut data = vec![0; OracleUsdcSkuPool::LEN];
-            let mut output = FixedWriter::new(&mut data);
-            true.write(&mut output);
-            bump.write(&mut output);
-            OracleUsdcSkuPool::ACCOUNT_DISCRIMINATOR.write(&mut output);
-            OracleUsdcSkuPool::ACCOUNT_VERSION.write(&mut output);
-            schedule.write(&mut output);
-            month.write(&mut output);
-            output.raw(&leaf.data);
-            debug_assert!(output.offset <= OracleUsdcSkuPool::LEN);
-            drop(output);
+            {
+                let mut output = FixedWriter::new(&mut data);
+                true.write(&mut output);
+                bump.write(&mut output);
+                OracleUsdcSkuPool::ACCOUNT_DISCRIMINATOR.write(&mut output);
+                OracleUsdcSkuPool::ACCOUNT_VERSION.write(&mut output);
+                schedule.write(&mut output);
+                month.write(&mut output);
+                output.raw(&leaf.data);
+                debug_assert!(output.offset <= OracleUsdcSkuPool::LEN);
+            }
             validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
             let bump_seed = [bump];
             super::super::create_program_account(
@@ -119,20 +121,21 @@ pub(in crate::processor) fn materialize_leaf<'a>(
             let sku_pool =
                 derive_oracle_usdc_sku_pool_pda(program_id, &schedule, &source.bucket_id).0;
             let mut data = vec![0; OracleUsdcSourceReward::LEN];
-            let mut output = FixedWriter::new(&mut data);
-            true.write(&mut output);
-            bump.write(&mut output);
-            OracleUsdcSourceReward::ACCOUNT_DISCRIMINATOR.write(&mut output);
-            OracleUsdcSourceReward::ACCOUNT_VERSION.write(&mut output);
-            source.month.write(&mut output);
-            schedule.write(&mut output);
-            sku_pool.write(&mut output);
-            output.raw(&leaf.data[..32]);
-            source.source_id.write(&mut output);
-            source.proposer.write(&mut output);
-            output.raw(&leaf.data[32..]);
-            debug_assert!(output.offset <= OracleUsdcSourceReward::LEN);
-            drop(output);
+            {
+                let mut output = FixedWriter::new(&mut data);
+                true.write(&mut output);
+                bump.write(&mut output);
+                OracleUsdcSourceReward::ACCOUNT_DISCRIMINATOR.write(&mut output);
+                OracleUsdcSourceReward::ACCOUNT_VERSION.write(&mut output);
+                source.month.write(&mut output);
+                schedule.write(&mut output);
+                sku_pool.write(&mut output);
+                output.raw(&leaf.data[..32]);
+                source.source_id.write(&mut output);
+                source.proposer.write(&mut output);
+                output.raw(&leaf.data[32..]);
+                debug_assert!(output.offset <= OracleUsdcSourceReward::LEN);
+            }
             validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
             let bump_seed = [bump];
             super::super::create_program_account(
@@ -167,16 +170,17 @@ pub(in crate::processor) fn materialize_leaf<'a>(
                 })
                 .ok_or(VaultError::InvalidOracleState)?;
             let mut data = vec![0; OracleSupportPosition::LEN];
-            let mut output = FixedWriter::new(&mut data);
-            true.write(&mut output);
-            bump.write(&mut output);
-            month.write(&mut output);
-            output.raw(&leaf.data[32..64]);
-            output.raw(&leaf.data[..32]);
-            output.raw(&leaf.data[75..]);
-            output.raw(&leaf.data[64..75]);
-            debug_assert!(output.offset <= OracleSupportPosition::LEN);
-            drop(output);
+            {
+                let mut output = FixedWriter::new(&mut data);
+                true.write(&mut output);
+                bump.write(&mut output);
+                month.write(&mut output);
+                output.raw(&leaf.data[32..64]);
+                output.raw(&leaf.data[..32]);
+                output.raw(&leaf.data[75..]);
+                output.raw(&leaf.data[64..75]);
+                debug_assert!(output.offset <= OracleSupportPosition::LEN);
+            }
             validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
             let bump_seed = [bump];
             super::super::create_program_account(
@@ -208,15 +212,16 @@ pub(in crate::processor) fn materialize_leaf<'a>(
             let (_, bump) =
                 super::super::derive_oracle_source_pda(program_id, month_info.key, &source_id);
             let mut data = vec![0; OracleSourceState::LEN];
-            let mut output = FixedWriter::new(&mut data);
-            true.write(&mut output);
-            bump.write(&mut output);
-            month_info.key.write(&mut output);
-            output.raw(&leaf.data[..64]);
-            output.offset += 96;
-            output.raw(&leaf.data[64..]);
-            debug_assert!(output.offset <= OracleSourceState::LEN);
-            drop(output);
+            {
+                let mut output = FixedWriter::new(&mut data);
+                true.write(&mut output);
+                bump.write(&mut output);
+                month_info.key.write(&mut output);
+                output.raw(&leaf.data[..64]);
+                output.offset += 96;
+                output.raw(&leaf.data[64..]);
+                debug_assert!(output.offset <= OracleSourceState::LEN);
+            }
             validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
             let bump_seed = [bump];
             super::super::create_program_account(
@@ -263,18 +268,19 @@ pub(in crate::processor) fn materialize_leaf<'a>(
             let (schedule_info, schedule, bump) =
                 identity.ok_or(VaultError::InvalidOracleUsdcRewardRegistration)?;
             let mut data = vec![0; OracleUsdcRewardRegistration::LEN];
-            let mut output = FixedWriter::new(&mut data);
-            true.write(&mut output);
-            bump.write(&mut output);
-            OracleUsdcRewardRegistration::ACCOUNT_DISCRIMINATOR.write(&mut output);
-            OracleUsdcRewardRegistration::ACCOUNT_VERSION.write(&mut output);
-            schedule.month.write(&mut output);
-            schedule_info.key.write(&mut output);
-            output.raw(&leaf.data[..32]);
-            OracleUsdcRewardKind::Update.write(&mut output);
-            output.raw(&leaf.data[32..]);
-            debug_assert!(output.offset <= OracleUsdcRewardRegistration::LEN);
-            drop(output);
+            {
+                let mut output = FixedWriter::new(&mut data);
+                true.write(&mut output);
+                bump.write(&mut output);
+                OracleUsdcRewardRegistration::ACCOUNT_DISCRIMINATOR.write(&mut output);
+                OracleUsdcRewardRegistration::ACCOUNT_VERSION.write(&mut output);
+                schedule.month.write(&mut output);
+                schedule_info.key.write(&mut output);
+                output.raw(&leaf.data[..32]);
+                OracleUsdcRewardKind::Update.write(&mut output);
+                output.raw(&leaf.data[32..]);
+                debug_assert!(output.offset <= OracleUsdcRewardRegistration::LEN);
+            }
             validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
             let bump_seed = [bump];
             let kind_seed = [OracleUsdcRewardKind::Update as u8];
@@ -325,19 +331,20 @@ pub(in crate::processor) fn materialize_leaf<'a>(
                 return Err(VaultError::InvalidOracleEmergencyDispute.into());
             }
             let mut data = vec![0; OracleSambaWinningVote::LEN];
-            let mut output = FixedWriter::new(&mut data);
-            true.write(&mut output);
-            bump.write(&mut output);
-            OracleSambaWinningVote::ACCOUNT_DISCRIMINATOR.write(&mut output);
-            OracleSambaWinningVote::ACCOUNT_VERSION.write(&mut output);
-            pot_info.key.write(&mut output);
-            dispute_info.key.write(&mut output);
-            vote_info.key.write(&mut output);
-            vote.voter.write(&mut output);
-            vote.voting_power.write(&mut output);
-            output.raw(&leaf.data);
-            debug_assert!(output.offset <= OracleSambaWinningVote::LEN);
-            drop(output);
+            {
+                let mut output = FixedWriter::new(&mut data);
+                true.write(&mut output);
+                bump.write(&mut output);
+                OracleSambaWinningVote::ACCOUNT_DISCRIMINATOR.write(&mut output);
+                OracleSambaWinningVote::ACCOUNT_VERSION.write(&mut output);
+                pot_info.key.write(&mut output);
+                dispute_info.key.write(&mut output);
+                vote_info.key.write(&mut output);
+                vote.voter.write(&mut output);
+                vote.voting_power.write(&mut output);
+                output.raw(&leaf.data);
+                debug_assert!(output.offset <= OracleSambaWinningVote::LEN);
+            }
             validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
             let bump_seed = [bump];
             super::super::create_program_account(

@@ -67,7 +67,7 @@ impl OracleProductSkuDraft {
             .iter()
             .enumerate()
             .all(|(level, node)| {
-                self.frontier_mask & (1u16 << level) != 0 || crate::bytes32_is_zero(&*node)
+                self.frontier_mask & (1u16 << level) != 0 || crate::bytes32_is_zero(node)
             })
     }
 }
@@ -107,6 +107,7 @@ pub struct OracleProductSkuManifest {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleProductSkuManifest {
     fn default() -> Self {
         Self {
@@ -172,6 +173,7 @@ pub struct OracleSkuCoverageManifest {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleSkuCoverageManifest {
     fn default() -> Self {
         Self {
@@ -231,6 +233,7 @@ pub struct OracleSkuCoverageRecord {
     pub last_updated_slot: u64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleSkuCoverageRecord {
     fn default() -> Self {
         Self {

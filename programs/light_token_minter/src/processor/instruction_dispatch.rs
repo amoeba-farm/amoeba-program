@@ -1,18 +1,122 @@
 use super::*;
+use crate::{
+    governance_gate::{self, GateValidated},
+    governance_manifest::{classify_active_instruction_tag, InstructionGovernanceClass},
+};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::processor) enum DispatchTransport {
+    TopLevel,
+    CompressedInner,
+}
+
+/// Internal routing context. In a governance-enabled artifact there is no business-routing call
+/// site that can construct this value without first receiving the private gate capability.
+pub(in crate::processor) struct ExecutionContext<'a> {
+    gate: &'a GateValidated,
+    transport: DispatchTransport,
+}
+
+impl<'a> ExecutionContext<'a> {
+    fn top_level(gate: &'a GateValidated) -> Self {
+        Self {
+            gate,
+            transport: DispatchTransport::TopLevel,
+        }
+    }
+
+    pub(in crate::processor) fn compressed_inner(gate: &'a GateValidated) -> Self {
+        Self {
+            gate,
+            transport: DispatchTransport::CompressedInner,
+        }
+    }
+
+    pub(in crate::processor) fn gate(&self) -> &GateValidated {
+        self.gate
+    }
+
+    fn is_compressed_inner(&self) -> bool {
+        self.transport == DispatchTransport::CompressedInner
+    }
+}
+
+#[cfg(feature = "governance-gate-v1")]
+#[inline(always)]
+fn require_transaction_level_stack_height(stack_height: usize) -> ProgramResult {
+    if stack_height != solana_program::instruction::TRANSACTION_LEVEL_STACK_HEIGHT {
+        return Err(VaultError::InvalidInstructionData.into());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "governance-gate-v1")]
+#[inline(always)]
+fn current_invocation_stack_height() -> usize {
+    solana_program::instruction::get_stack_height()
+}
+
+#[cfg(feature = "governance-gate-v1")]
+#[inline(always)]
+fn require_transaction_level_invocation() -> ProgramResult {
+    require_transaction_level_stack_height(current_invocation_stack_height())
+}
+
+pub(super) fn process_top_level_instruction(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    if instruction_data.len() > MAX_INSTRUCTION_DATA_BYTES {
+        return Err(VaultError::InvalidInstructionData.into());
+    }
+    let tag = *instruction_data
+        .first()
+        .ok_or(VaultError::InvalidInstructionData)?;
+    match classify_active_instruction_tag(tag) {
+        InstructionGovernanceClass::Unknown | InstructionGovernanceClass::Reserved => {
+            return Err(VaultError::InvalidInstructionData.into());
+        }
+        // The exhaustive Phase 3 manifest has no ordinary read-only entries. Keeping this arm
+        // explicit ensures a future classification cannot silently acquire a mutating route.
+        InstructionGovernanceClass::RecognizedReadOnly => {
+            return Err(VaultError::InvalidInstructionData.into());
+        }
+        InstructionGovernanceClass::RecognizedMutating
+        | InstructionGovernanceClass::FeatureGatedMutating => {}
+    }
+
+    #[cfg(feature = "governance-gate-v1")]
+    {
+        require_transaction_level_invocation()?;
+        let (legacy_accounts, legacy_data, gate) =
+            governance_gate::validate_top_level_envelope(program_id, accounts, instruction_data)?;
+        let context = ExecutionContext::top_level(&gate);
+        process_instruction_with_context(program_id, legacy_accounts, legacy_data, &context)
+    }
+
+    #[cfg(not(feature = "governance-gate-v1"))]
+    {
+        let gate = governance_gate::disabled_build_capability();
+        let context = ExecutionContext::top_level(&gate);
+        process_instruction_with_context(program_id, accounts, instruction_data, &context)
+    }
+}
 
 pub(super) fn process_instruction_with_context(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
-    compressed_state_transport: bool,
+    context: &ExecutionContext<'_>,
 ) -> ProgramResult {
+    let _validated_epoch = context.gate().expected_epoch();
     if instruction_data.len() > MAX_INSTRUCTION_DATA_BYTES {
         return Err(VaultError::InvalidInstructionData.into());
     }
     let (tag_bytes, payload) = instruction_data
         .split_first()
         .ok_or(VaultError::InvalidInstructionData)?;
-    if !compressed_state_transport {
+    if !context.is_compressed_inner() {
         if let Some(tag) =
             crate::ameba_dlmm_instruction::AmoebaDlmmInstructionTag::from_byte(*tag_bytes)
         {
@@ -32,7 +136,7 @@ pub(super) fn process_instruction_with_context(
     }
     #[cfg(feature = "devnet-solo-backfill-2026")]
     if devnet_solo_backfill_2026::is_instruction_tag(*tag_bytes) {
-        if compressed_state_transport {
+        if context.is_compressed_inner() {
             return Err(VaultError::InvalidInstructionData.into());
         }
         return devnet_solo_backfill_2026::process_instruction(
@@ -41,42 +145,21 @@ pub(super) fn process_instruction_with_context(
     }
     let tag =
         VaultInstructionTag::from_byte(*tag_bytes).ok_or(VaultError::InvalidInstructionData)?;
+    if context.is_compressed_inner() && tag == VaultInstructionTag::ExecuteCompressedStateV1 {
+        return Err(VaultError::InvalidInstructionData.into());
+    }
 
     match tag as u8 {
-        0..=63 => dispatch_0_63(
-            program_id,
-            accounts,
-            tag,
-            payload,
-            compressed_state_transport,
-        ),
-        64..=124 => dispatch_64_124(
-            program_id,
-            accounts,
-            tag,
-            payload,
-            compressed_state_transport,
-        ),
-        128..=158 => dispatch_128_158(
-            program_id,
-            accounts,
-            tag,
-            payload,
-            compressed_state_transport,
-        ),
-        161..=205 => dispatch_161_205(
-            program_id,
-            accounts,
-            tag,
-            payload,
-            compressed_state_transport,
-        ),
+        0..=63 => dispatch_0_63(program_id, accounts, tag, payload, context),
+        64..=124 => dispatch_64_124(program_id, accounts, tag, payload, context),
+        128..=158 => dispatch_128_158(program_id, accounts, tag, payload, context),
+        161..=205 => dispatch_161_205(program_id, accounts, tag, payload, context),
         220..=248 => writer_sleeve::process_instruction(
             program_id,
             accounts,
             tag,
             payload,
-            compressed_state_transport,
+            context.is_compressed_inner(),
         ),
         _ => Err(VaultError::InvalidInstructionData.into()),
     }
@@ -88,9 +171,8 @@ pub(super) fn dispatch_0_63(
     accounts: &[AccountInfo],
     tag: VaultInstructionTag,
     payload: &[u8],
-    compressed_state_transport: bool,
+    context: &ExecutionContext<'_>,
 ) -> ProgramResult {
-    let _ = compressed_state_transport;
     let handler: fn(&Pubkey, &[AccountInfo], &[u8]) -> ProgramResult = match tag {
         VaultInstructionTag::Initialize => process_initialize_instruction,
         VaultInstructionTag::UpdateConfig => process_update_config_instruction,
@@ -104,6 +186,7 @@ pub(super) fn dispatch_0_63(
         VaultInstructionTag::CloseOracleMonth => process_close_oracle_month_instruction,
         _ => return Err(VaultError::InvalidInstructionData.into()),
     };
+    let _ = context;
     handler(program_id, accounts, payload)
 }
 
@@ -113,9 +196,9 @@ pub(super) fn dispatch_64_124(
     accounts: &[AccountInfo],
     tag: VaultInstructionTag,
     payload: &[u8],
-    compressed_state_transport: bool,
+    context: &ExecutionContext<'_>,
 ) -> ProgramResult {
-    let _ = compressed_state_transport;
+    let compressed_state_transport = context.is_compressed_inner();
     match tag {
         VaultInstructionTag::RotateVaultAuthoritiesV2 => {
             let params: RotateVaultAuthoritiesV2Params = decode_instruction_payload(payload)?;
@@ -207,9 +290,9 @@ pub(super) fn dispatch_128_158(
     accounts: &[AccountInfo],
     tag: VaultInstructionTag,
     payload: &[u8],
-    compressed_state_transport: bool,
+    context: &ExecutionContext<'_>,
 ) -> ProgramResult {
-    let _ = compressed_state_transport;
+    let compressed_state_transport = context.is_compressed_inner();
     match tag {
         VaultInstructionTag::BootstrapVaultGovernanceV2 => {
             let params = BootstrapVaultGovernanceV2Params {
@@ -289,9 +372,9 @@ pub(super) fn dispatch_161_205(
     accounts: &[AccountInfo],
     tag: VaultInstructionTag,
     payload: &[u8],
-    compressed_state_transport: bool,
+    context: &ExecutionContext<'_>,
 ) -> ProgramResult {
-    let _ = compressed_state_transport;
+    let compressed_state_transport = context.is_compressed_inner();
     match tag {
         VaultInstructionTag::CreateMarketContractMintV3 => {
             process_create_market_contract_mint_v3_instruction(program_id, accounts, payload)
@@ -307,7 +390,12 @@ pub(super) fn dispatch_161_205(
         }
         VaultInstructionTag::ExecuteCompressedStateV1 => {
             let params: ExecuteCompressedStateParams = decode_instruction_payload(payload)?;
-            compressed_state::process_execute_compressed_state_v1(program_id, accounts, params)
+            compressed_state::process_execute_compressed_state_v1(
+                program_id,
+                accounts,
+                params,
+                context.gate(),
+            )
         }
         VaultInstructionTag::ExpireUnlistableOracleSourceV2 => {
             expect_empty_payload(payload)?;

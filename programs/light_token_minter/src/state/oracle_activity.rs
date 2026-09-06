@@ -385,6 +385,7 @@ pub struct OracleUpdateClaimV2 {
     pub freshness_reward_multiplier: u8,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for OracleUpdateClaimV2 {
     fn default() -> Self {
         Self {

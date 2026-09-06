@@ -64,6 +64,7 @@ pub(super) fn oracle_opening_start_ts(month: &OracleMonthState) -> Result<u64, P
     Ok(rulebook_schedule_boundaries(month)?.2)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn oracle_update_claim_v2_commitment_hash(
     program_id: &Pubkey,
     month: &Pubkey,
@@ -97,6 +98,7 @@ pub fn oracle_update_claim_v2_commitment_hash(
     .to_bytes()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn validate_oracle_update_claim_v2_reveal(
     program_id: &Pubkey,
     month: &Pubkey,

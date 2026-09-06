@@ -1,5 +1,22 @@
 use super::*;
 
+#[inline]
+/// Tighten by economically active (nonzero-weight) buckets only.
+///
+/// Current terminal-source validation rejects zero bucket weight before this fold, so the zero
+/// branch defines the audit mutation without admitting a new manifest shape.
+pub(super) fn fold_economically_active_bucket_security_cap(
+    current_cap: u64,
+    bucket_weight_bps: u16,
+    bucket_cap: u64,
+) -> u64 {
+    if bucket_weight_bps == 0 {
+        current_cap
+    } else {
+        current_cap.min(bucket_cap)
+    }
+}
+
 pub(super) fn initial_oracle_active_weight_hash(
     month: &Pubkey,
     recipe_hash: &[u8; 32],
@@ -36,6 +53,7 @@ pub(super) fn advance_oracle_active_manifest_hash(
 }
 
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 pub(super) fn create_oracle_manifest_account<'a>(
     payer_info: &AccountInfo<'a>,
     manifest_info: &AccountInfo<'a>,
@@ -314,12 +332,10 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
             let delta_index = usize::from(manifest.current_group_active_count - 1);
             bucket.opening_source_deltas_bps[delta_index] =
                 source_delta_bps(source.baseline_state, source.current_state)?;
-        } else {
-            if source.observation_count != 0
-                || !crate::bytes32_is_zero(&source.rolling_observation_hash)
-            {
-                return Err(VaultError::InvalidOracleObservation.into());
-            }
+        } else if source.observation_count != 0
+            || !crate::bytes32_is_zero(&source.rolling_observation_hash)
+        {
+            return Err(VaultError::InvalidOracleObservation.into());
         }
         if let Some(bucket) = bucket.as_mut() {
             bucket.frozen_source_count = manifest.current_group_source_count;
@@ -351,9 +367,11 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
         {
             return Err(VaultError::OracleWeightManifestHashMismatch.into());
         }
-        manifest.max_open_interest_payout = manifest
-            .max_open_interest_payout
-            .min(max_open_interest_payout.ok_or(VaultError::InvalidOracleMedian)?);
+        manifest.max_open_interest_payout = fold_economically_active_bucket_security_cap(
+            manifest.max_open_interest_payout,
+            bucket.bucket_weight_bps,
+            max_open_interest_payout.ok_or(VaultError::InvalidOracleMedian)?,
+        );
         let active_count = usize::from(bucket.active_source_count);
         let mut values = bucket.opening_source_deltas_bps;
         bucket.bucket_delta_bps = deterministic_bucket_median(&mut values[..active_count])?;

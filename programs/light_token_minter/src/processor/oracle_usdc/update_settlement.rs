@@ -6,7 +6,50 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     accounts: &[AccountInfo],
     params: FinalizeOracleUpdateClaimV2Params,
 ) -> ProgramResult {
-    if accounts.len() < 9 {
+    if accounts.len() < 9
+        || !accounts[0].is_signer
+        || accounts[1].is_signer
+        || accounts[1].is_writable
+        || accounts[2].is_signer
+        || accounts[2].is_writable
+        || accounts[3].is_signer
+        || !accounts[3].is_writable
+        || accounts[4].is_signer
+        || !accounts[4].is_writable
+        || accounts[5].is_signer
+        || !accounts[5].is_writable
+        || accounts[6].is_signer
+        || accounts[6].is_writable
+        || accounts[7].is_signer
+        || !accounts[7].is_writable
+        || accounts[8].is_signer
+        || !accounts[8].is_writable
+    {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    let trailing = &accounts[9..];
+    let trailing_privileges_valid = match params.outcome {
+        OracleUpdateClaimOutcome::RuleReviewUnresolved => {
+            trailing.len() == 4
+                && !trailing[0].is_signer
+                && trailing[0].is_writable
+                && !trailing[1].is_signer
+                && trailing[1].is_writable
+                && !trailing[2].is_signer
+                && !trailing[2].is_writable
+                && !trailing[3].is_signer
+                && trailing[3].is_writable
+        }
+        OracleUpdateClaimOutcome::AcceptClaim | OracleUpdateClaimOutcome::RejectClaim => {
+            (trailing.len() == 1 && !trailing[0].is_signer && !trailing[0].is_writable)
+                || (trailing.len() == 2
+                    && !trailing[0].is_signer
+                    && trailing[0].is_writable
+                    && !trailing[1].is_signer
+                    && !trailing[1].is_writable)
+        }
+    };
+    if !trailing_privileges_valid {
         return Err(VaultError::InvalidAccountList.into());
     }
     let authority_info = &accounts[0];
@@ -19,10 +62,6 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     let claim_info = &accounts[7];
     let bucket_info = &accounts[8];
     validate_oracle_authority(program_id, authority_info, config_info)?;
-    if !source_info.is_writable || !observations_info.is_writable || !bucket_info.is_writable {
-        return Err(VaultError::InvalidAccountList.into());
-    }
-    let trailing = &accounts[9..];
 
     let (market, mut month) =
         load_valid_market_and_oracle_month(program_id, market_info, month_info)?;

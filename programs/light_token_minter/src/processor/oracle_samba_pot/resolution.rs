@@ -1,6 +1,7 @@
 use super::*;
 
 #[inline(never)]
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn apply_cash_emergency_resolution(
     program_id: &Pubkey,
     remaining_accounts: &[AccountInfo],

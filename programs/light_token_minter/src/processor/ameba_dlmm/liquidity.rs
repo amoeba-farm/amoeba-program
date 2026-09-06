@@ -31,7 +31,7 @@ pub(super) fn load_page_pairs(
     let tail = accounts
         .get(first_account_index..)
         .ok_or(VaultError::InvalidAccountList)?;
-    if tail.is_empty() || tail.len() % 2 != 0 {
+    if tail.is_empty() || !tail.len().is_multiple_of(2) {
         return Err(VaultError::InvalidAccountList.into());
     }
     let mut result = Vec::with_capacity(tail.len() / 2);
