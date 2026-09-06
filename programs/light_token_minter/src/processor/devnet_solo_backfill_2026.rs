@@ -37,9 +37,7 @@ use crate::state::{
 use borsh::BorshDeserialize;
 
 const EXPECTED_PROGRAM_ID: Pubkey =
-    solana_program::pubkey!("9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH");
-const EXPECTED_VAULT_CONFIG: Pubkey =
-    solana_program::pubkey!("AcAz5A42nc2V8RYhhgY6AbMDqysPUtSKBXJ2wt9Awdxd");
+    solana_program::pubkey!("2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw");
 const EXPECTED_ADMIN: Pubkey =
     solana_program::pubkey!("99riHvpFvwfz2tbrWbanEMPz5iyhHHThBbM7eY35vMwL");
 const EXPECTED_ORACLE_AUTHORITY: Pubkey =
@@ -47,8 +45,9 @@ const EXPECTED_ORACLE_AUTHORITY: Pubkey =
 const EXPECTED_COLLATERAL_MINT: Pubkey =
     solana_program::pubkey!("21Ft8EZpugvFofW9713vLnYDRfSqyVUGUo9wvvUGhTsZ");
 
-/// 2026-09-01T00:00:00Z. Consumed bits prevent replay even before this fixed terminal bound.
-pub(super) const SUNSET_TS: u64 = 1_788_220_800;
+/// V3 Devnet preparation ends at the first cohort expiry, 2026-10-01T00:00:00Z.
+/// Consumed bits prevent replay before this fixed terminal bound.
+pub(super) const SUNSET_TS: u64 = 1_790_812_800;
 pub(super) const PLACEMENT_SECONDS: u64 = 4 * 60 * 60;
 pub(super) const CHALLENGE_SECONDS: u64 = 2 * 60 * 60;
 pub(super) const RESOLUTION_SECONDS: u64 = 60 * 60;
@@ -329,7 +328,7 @@ fn load_sidecar(
     if !sidecar.is_initialized
         || sidecar.bump != bump
         || !sidecar.has_canonical_layout()
-        || sidecar.vault_config != EXPECTED_VAULT_CONFIG
+        || sidecar.vault_config != derive_vault_config_pda(program_id).0
         || sidecar.admin != EXPECTED_ADMIN
         || sidecar.oracle_authority != EXPECTED_ORACLE_AUTHORITY
         || sidecar.sunset_ts != SUNSET_TS
@@ -356,7 +355,7 @@ fn exact_config(
     program_id: &Pubkey,
     config_info: &AccountInfo,
 ) -> Result<VaultConfig, ProgramError> {
-    if *config_info.key != EXPECTED_VAULT_CONFIG {
+    if *config_info.key != derive_vault_config_pda(program_id).0 {
         return Err(VaultError::InvalidConfigAccount.into());
     }
     let config = load_current_canonical_vault_config(program_id, config_info)?;

@@ -29,14 +29,17 @@ not include an official `light_token_minter.so` binary.
 
 The selected Devnet V3 integration is `release/current-integration.json`, whose
 manifest is `deployments/devnet-v3.json`. Build with
-`--features devnet-v3-governance-controller` to select program
+`--features devnet-v3-governance-controller,devnet-solo-backfill-2026` to select program
 `2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw` and its V3 council/gate.
 Account seeds remain `ameba-spread-v2`. The older `deployments/devnet.json`
 and bootstrap policy are historical release inputs; they cannot bootstrap V3.
-The recorded finalized observation was EmergencyFrozen at epoch 1 with zero
-business accounts. It is historical evidence, not current write permission.
-Independent clean release attestation and a fresh mint/bootstrap policy remain
-outstanding. This export contains Spread source, not the controller source.
+The September 6 checkpoint records Active at epoch 3, 13 paused markets with
+zero contract supply, and 400 sources across eight finalized coverage manifests.
+September/October timed activation remains pending; November/December remain
+paused. Light/DLMM initialization has a separate controller-PDA authorization
+blocker. These dated observations are not current write permission.
+The final market-preparation receipt and full release attestation remain
+outstanding; market preparation does not establish funding or trade readiness. This export contains Spread source, not the controller source.
 
 The public RAMX manifest is an audit source, not evidence of deployment. Version
 1 preserves exactly 52 labels, encodes exact-case printable ASCII/UTF-8 labels as
@@ -59,7 +62,7 @@ by publishing this source preview.
 ```bash
 cargo check \
   --manifest-path programs/light_token_minter/Cargo.toml \
-  --locked --features devnet-v3-governance-controller \
+  --locked --features devnet-v3-governance-controller,devnet-solo-backfill-2026 \
   --lib
 ```
 
