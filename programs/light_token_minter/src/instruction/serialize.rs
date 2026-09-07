@@ -502,6 +502,11 @@ impl BorshSerialize for VaultInstruction {
                 VaultInstructionTag::ClaimWriterFlatResidualV1,
                 params,
             ),
+            Self::PrepareWriterBidIndexV1 { params } => serialize_tagged_payload(
+                writer,
+                VaultInstructionTag::PrepareWriterBidIndexV1,
+                params,
+            ),
             Self::CloseWriterSleeveV1 => {
                 serialize_tag(writer, VaultInstructionTag::CloseWriterSleeveV1)
             }

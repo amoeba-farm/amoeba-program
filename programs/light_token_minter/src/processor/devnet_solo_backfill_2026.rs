@@ -745,6 +745,18 @@ const LISTING_BOND: u64 = 12_000_000;
 const SUPPORT_BOND: u64 = 12_000_000;
 const OPENING_BOND: u64 = 1_000_000;
 
+// Preserve the observed, already-repaired old Devnet demo profile. Its writer
+// groups anchor to the call month (one call plus one put, $24 gross exposure).
+// The put-month manifests retained their original $1 cap. These fixed fixture
+// values apply only to this exact Devnet cohort allowlist, before finalization;
+// ordinary oracle security-budget calculation and writer risk rules are unchanged.
+fn demo_exposure_cap(kind: OptionKind) -> u64 {
+    match kind {
+        OptionKind::CallSpread => 24_000_000,
+        OptionKind::PutSpread => 1_000_000,
+    }
+}
+
 #[derive(Clone, Copy)]
 struct AcceleratedBoundaries {
     start: u64,
@@ -1902,12 +1914,16 @@ fn process_accumulate_active_weight(
         ],
     )?;
     let delta_bps = source_delta_bps(source.baseline_state, source.current_state)?;
-    let (_, security_cap) = oracle_bucket_security_cap(
+    let (_, funded_security_cap) = oracle_bucket_security_cap(
         1,
         LISTING_BOND,
         SUPPORT_BOND,
         crate::constants::ORACLE_OI_CAP_KAPPA_BPS,
     )?;
+    if funded_security_cap != LISTING_BOND {
+        return Err(VaultError::InvalidOracleSecurityBudget.into());
+    }
+    let security_cap = demo_exposure_cap(params.kind);
     let bucket = OracleBucketMedianState {
         is_initialized: true,
         bump: bucket_bump,
@@ -2011,7 +2027,7 @@ fn process_finalize_active_weights(
     validate_oracle_active_manifest_completion(&month, &recipe, &manifest)?;
     if manifest.expected_source_count != cohort.required_sku_count
         || manifest.expected_group_count != cohort.required_sku_count
-        || manifest.max_open_interest_payout != 12_000_000
+        || manifest.max_open_interest_payout != demo_exposure_cap(kind)
     {
         return Err(VaultError::OracleWeightManifestIncomplete.into());
     }

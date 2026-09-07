@@ -664,6 +664,9 @@ pub enum VaultInstruction {
     },
     /// Close a fully exhausted collective sleeve and its terminal companion state.
     CloseWriterSleeveV1,
+    PrepareWriterBidIndexV1 {
+        params: PrepareWriterBidIndexV1Params,
+    },
 
     /// Run one current instruction against transient native views of bounded Light-compressed
     /// typed state. The exact inner accounts come first, followed by one system-program account

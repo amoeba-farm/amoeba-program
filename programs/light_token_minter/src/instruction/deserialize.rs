@@ -397,6 +397,9 @@ impl BorshDeserialize for VaultInstruction {
                 params: ClaimWriterFlatResidualV1Params::deserialize_reader(reader)?,
             }),
             VaultInstructionTag::CloseWriterSleeveV1 => Ok(Self::CloseWriterSleeveV1),
+            VaultInstructionTag::PrepareWriterBidIndexV1 => Ok(Self::PrepareWriterBidIndexV1 {
+                params: PrepareWriterBidIndexV1Params::deserialize_reader(reader)?,
+            }),
             VaultInstructionTag::ExecuteCompressedStateV1 => Ok(Self::ExecuteCompressedStateV1 {
                 params: ExecuteCompressedStateParams::deserialize_reader(reader)?,
             }),

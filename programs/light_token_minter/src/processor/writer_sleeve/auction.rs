@@ -341,7 +341,7 @@ pub(super) fn process_commit_writer_auction(
         return Err(VaultError::InvalidPda.into());
     }
     validate_create_only_program_account_target(program_id, auction_info)?;
-    validate_create_only_program_account_target(program_id, bid_index_info)?;
+    super::bid_index_preparation::validate_ready_bid_index(program_id, bid_index_info)?;
     create_program_account(
         authority_info,
         auction_info,
@@ -353,18 +353,6 @@ pub(super) fn process_commit_writer_auction(
             sleeve_info.key.as_ref(),
             &params.auction_nonce.to_le_bytes(),
             &[auction_bump],
-        ],
-    )?;
-    create_program_account(
-        authority_info,
-        bid_index_info,
-        system_program_info,
-        program_id,
-        WriterBidIndexV1::LEN,
-        &[
-            crate::constants::WRITER_BID_INDEX_PDA_SEED,
-            auction_info.key.as_ref(),
-            &[index_bump],
         ],
     )?;
     create_classic_token_pda(

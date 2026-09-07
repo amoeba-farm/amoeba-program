@@ -71,6 +71,9 @@ pub(super) fn process_publish_writer_group_settlement(
         || group.anchor_oracle_month != *month_info.key
         || group.signer_registry != *signer_registry_info.key
         || group.signer_set != *signer_set_info.key
+        || !crate::bytes32_is_zero(&group.settlement_source_digest)
+        || !crate::bytes32_is_zero(&group.final_settlement_commitment)
+        || group.finalized_slot != 0
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
@@ -82,6 +85,8 @@ pub(super) fn process_publish_writer_group_settlement(
         return Err(VaultError::InvalidWriterSettlementGroup.into());
     }
     let month = load_valid_oracle_month(program_id, anchor_market_info, month_info, &market)?;
+    ensure_settlement_finalization_ready(&market)?;
+    ensure_oracle_month_ready_for_settlement(&month)?;
     let settlement = load_valid_settlement_record_v2(
         program_id,
         anchor_market_info.key,
@@ -104,7 +109,10 @@ pub(super) fn process_publish_writer_group_settlement(
         signer_registry_info.key,
         signer_set_info,
     )?;
+    ensure_finalized_oracle_active_weight_manifest(&month, &active)?;
+    ensure_finalized_oracle_issue_sku_coverage(&month, &coverage, &active)?;
     if month.phase != OraclePhase::Settled
+        || month.finalized_at_ts == 0
         || month.settlement_record != Some(*settlement_info.key)
         || settlement.settlement_ts != group.settlement_ts
         || settlement.signer_set_version != group.signer_set_version
@@ -113,14 +121,30 @@ pub(super) fn process_publish_writer_group_settlement(
         || writer_coverage_manifest_hash(&coverage) != group.coverage_manifest_hash
         || recipe.phase != OracleRecipeWeightPhase::Finalized
         || recipe.recipe_hash != group.recipe_hash
+        || recipe.recipe_hash != month.recipe_hash
+        || recipe.rolling_manifest_hash != month.weight_manifest_hash
+        || canonical_recipe_digest(month_info.key, &recipe.rolling_manifest_hash)
+            != month.recipe_hash
+        || recipe.expected_source_count != month.frozen_source_count
+        || recipe.expected_bucket_count != month.active_weight_group_count
+        || recipe.processed_source_count != recipe.expected_source_count
+        || recipe.processed_bucket_count != recipe.expected_bucket_count
+        || recipe.declared_weight_total_bps != 10_000
         || settlement_sources.phase != OracleRecipeWeightPhase::Finalized
-        || settlement_sources.rolling_source_digest != group.settlement_source_digest
+        || settlement_sources.expected_source_count != month.frozen_source_count
+        || settlement_sources.expected_bucket_count != month.active_weight_group_count
+        || settlement_sources.processed_source_count != settlement_sources.expected_source_count
+        || settlement_sources.processed_bucket_count != settlement_sources.expected_bucket_count
+        || settlement_sources.declared_weight_total_bps != 10_000
+        || crate::bytes32_is_zero(&settlement_sources.rolling_source_digest)
         || active.rolling_manifest_hash != group.active_weight_manifest_hash
         || active.max_open_interest_payout != group.security_cap_atoms
     {
         return Err(VaultError::InvalidWriterSettlementGroup.into());
     }
     let slot = Clock::get()?.slot;
+    // Bind terminal evidence exactly once, before hashing the final group state.
+    group.settlement_source_digest = settlement_sources.rolling_source_digest;
     group.settlement_price_atomic = settlement.settlement_price_atomic;
     group.final_settlement_commitment =
         final_settlement_commitment(program_id, group_info, &group, settlement_info, &settlement);

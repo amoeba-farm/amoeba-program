@@ -8,7 +8,7 @@ use crate::{
         CleanupWriterCustodyV1Params, CommitWriterAuctionV1Params,
         FinalizeOrAbortWriterAuctionV1Params, InitializeWriterPolicyRegistryV1Params,
         ManageWriterPolicyAuthorityActionV1, ManageWriterPolicyAuthorityV1Params,
-        PlaceWriterBidV1Params, PlanWriterAuctionChunkV1Params,
+        PlaceWriterBidV1Params, PlanWriterAuctionChunkV1Params, PrepareWriterBidIndexV1Params,
         ProcessWriterCloseCancellationV1Params, ReconcileWriterSupplyV1Params,
         RevealWriterAuctionV1Params, SealWriterPolicyV1Params, SetCollectiveMarketPausedV1Params,
         WriterAmountV1Params, WriterSeriesIndexV1Params,
@@ -30,6 +30,7 @@ use crate::{
 
 mod accounts;
 mod auction;
+mod bid_index_preparation;
 mod close;
 mod funding;
 mod reconcile;
@@ -102,6 +103,7 @@ fn validate_pack_writer_account_privileges(
         VaultInstructionTag::DepositWriterPrincipalV1 => Some(17),
         VaultInstructionTag::WithdrawWriterPrincipalV1 => Some(14),
         VaultInstructionTag::CommitWriterAuctionV1 => Some(14),
+        VaultInstructionTag::PrepareWriterBidIndexV1 => Some(10),
         VaultInstructionTag::PlaceWriterBidV1 => Some(13),
         VaultInstructionTag::CancelOrRefundWriterBidV1 => Some(9),
         VaultInstructionTag::RevealWriterAuctionV1 => Some(6),
@@ -141,6 +143,7 @@ fn validate_pack_writer_account_privileges(
             VaultInstructionTag::DepositWriterPrincipalV1
             | VaultInstructionTag::WithdrawWriterPrincipalV1
             | VaultInstructionTag::CommitWriterAuctionV1
+            | VaultInstructionTag::PrepareWriterBidIndexV1
             | VaultInstructionTag::PlaceWriterBidV1
             | VaultInstructionTag::CancelOrRefundWriterBidV1
             | VaultInstructionTag::RevealWriterAuctionV1
@@ -163,6 +166,7 @@ fn validate_pack_writer_account_privileges(
                 matches!(index, 0 | 2 | 3 | 4 | 6 | 7 | 8 | 9)
             }
             VaultInstructionTag::CommitWriterAuctionV1 => matches!(index, 0 | 3 | 7 | 8 | 9),
+            VaultInstructionTag::PrepareWriterBidIndexV1 => matches!(index, 0 | 8),
             VaultInstructionTag::PlaceWriterBidV1 => matches!(index, 0 | 2 | 3 | 4 | 7 | 8),
             VaultInstructionTag::CancelOrRefundWriterBidV1 => {
                 matches!(index, 2..=6)
@@ -339,6 +343,14 @@ pub(super) fn process_instruction(
                 series_index: decode_u8_payload(payload)?,
             },
         ),
+        VaultInstructionTag::PrepareWriterBidIndexV1 => {
+            decode_and_process::<PrepareWriterBidIndexV1Params>(
+                program_id,
+                accounts,
+                payload,
+                bid_index_preparation::process_prepare_writer_bid_index,
+            )
+        }
         VaultInstructionTag::CommitWriterAuctionV1 => {
             decode_and_process::<CommitWriterAuctionV1Params>(
                 program_id,
@@ -1949,11 +1961,18 @@ pub(super) fn process_activate_sleeve(
     ensure_finalized_oracle_active_weight_manifest(&month, &active)?;
     ensure_finalized_oracle_issue_sku_coverage(&month, &coverage, &active)?;
     let recipe = load_valid_oracle_recipe_weight_manifest(program_id, month_info.key, recipe_info)?;
-    let settlement_sources = load_valid_oracle_settlement_source_manifest(
-        program_id,
-        month_info.key,
-        settlement_source_info,
-    )?;
+    // Terminal evidence does not exist until expiry + the settlement grace period.
+    // Retain its canonical future address in the ABI without creating a placeholder.
+    if *settlement_source_info.key
+        != crate::state::derive_oracle_settlement_source_manifest_pda(program_id, month_info.key).0
+        || settlement_source_info.owner != &system_program::id()
+        || !settlement_source_info.data_is_empty()
+        || settlement_source_info.executable
+        || settlement_source_info.is_signer
+        || settlement_source_info.is_writable
+    {
+        return Err(VaultError::InvalidOracleWeightManifest.into());
+    }
     let signer_registry =
         load_canonical_settlement_signer_registry(program_id, signer_registry_info)?;
     let signer_set = load_canonical_settlement_signer_set(
@@ -2001,11 +2020,17 @@ pub(super) fn process_activate_sleeve(
         || physical_assets < sleeve.accounted_asset_atoms
         || recipe.phase != OracleRecipeWeightPhase::Finalized
         || recipe.recipe_hash != month.recipe_hash
+        || recipe.rolling_manifest_hash != month.weight_manifest_hash
+        || canonical_recipe_digest(month_info.key, &recipe.rolling_manifest_hash)
+            != month.recipe_hash
+        || recipe.expected_source_count != month.frozen_source_count
+        || recipe.expected_bucket_count != month.active_weight_group_count
         || recipe.processed_source_count != recipe.expected_source_count
         || recipe.processed_bucket_count != recipe.expected_bucket_count
-        || settlement_sources.phase != OracleRecipeWeightPhase::Finalized
-        || settlement_sources.processed_source_count != settlement_sources.expected_source_count
-        || settlement_sources.processed_bucket_count != settlement_sources.expected_bucket_count
+        || recipe.declared_weight_total_bps != 10_000
+        || !crate::bytes32_is_zero(&group.settlement_source_digest)
+        || !crate::bytes32_is_zero(&group.final_settlement_commitment)
+        || group.finalized_slot != 0
         || active.max_open_interest_payout == 0
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
@@ -2014,7 +2039,8 @@ pub(super) fn process_activate_sleeve(
     group.product_manifest_root = coverage.required_sku_root;
     group.coverage_manifest_hash = writer_coverage_manifest_hash(&coverage);
     group.recipe_hash = recipe.recipe_hash;
-    group.settlement_source_digest = settlement_sources.rolling_source_digest;
+    // Source identities are frozen by recipe/coverage/active hashes. The actual
+    // terminal digest remains zero until normal settlement publication binds it.
     group.active_weight_manifest_hash = active.rolling_manifest_hash;
     group.security_cap_atoms = active.max_open_interest_payout;
     group.signer_set = *signer_set_info.key;

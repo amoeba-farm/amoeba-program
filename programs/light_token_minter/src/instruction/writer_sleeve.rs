@@ -239,3 +239,14 @@ pub struct ClaimWriterFlatResidualV1Params {
 crate::fixed_codec::fixed_instruction_deserialize!(ClaimWriterFlatResidualV1Params, 8, {
     flat_atoms: u64,
 });
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+pub struct PrepareWriterBidIndexV1Params {
+    pub auction_nonce: u64,
+    pub phase: u8,
+}
+
+crate::fixed_codec::fixed_instruction_deserialize!(PrepareWriterBidIndexV1Params, 9, {
+    auction_nonce: u64,
+    phase: u8,
+});

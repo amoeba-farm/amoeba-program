@@ -1,6 +1,6 @@
 {
   "schema": "ameba-spread-devnet-v3-integration-v1",
-  "releaseId": "spread-devnet-v3-backfill-20260906",
+  "releaseId": "spread-devnet-v3-writer-terminal-lifecycle-20260906",
   "network": {
     "cluster": "devnet",
     "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
@@ -9,19 +9,25 @@
     "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
     "programData": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
     "authority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
-    "deployedSlot": "494031585",
-    "artifactBytes": 1231264,
-    "artifactSha256": "bf05c3c19a5c1f7d3c3c4db157106d2b868fcb507b1171728645c40b57936e0a",
-    "sourceCommit": "e57473cea72f387e5d877d70e9495f07bebfcdaa"
+    "deployedSlot": "494288143",
+    "artifactBytes": 1237696,
+    "artifactSha256": "6977f9258ceb6f818ba5dd4b7aaef114de44160cec34867a798b0f1867edda5b",
+    "sourceCommit": "737b7cd6dafbcdbee08a367fe6b1d83fc82810b9",
+    "programDataPayloadBytes": 1241504,
+    "programDataPayloadSha256": "106dd7e174da6172b701e96b7bdbbc6450932dc6f24bdae39ae7cb8a2b3fbb6c",
+    "mandatoryZeroPaddingBytes": 3808
   },
   "controller": {
     "programId": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
     "programData": "7eW9UXcCDrpEAQ93fP7o2zgGMKhAKi3zJLihELjR8xYd",
     "authority": "Frc28QFQxqUxF9HPgzcmm5VkqorqUb2LeLPE5uKU6Ycp",
-    "deployedSlot": "493850815",
-    "artifactBytes": 190736,
-    "artifactSha256": "ccde2782b50301290d52387662c4979cc19e186ce0e7461305d4b71598c75e77",
-    "sourceCommit": "4e9ae8b897f867fe0b4b689226feb34696772581"
+    "deployedSlot": "494196733",
+    "artifactBytes": 202616,
+    "artifactSha256": "50d409bceaebef4ce3edcee9e757b4f995e0405a482ad32f3272e13aa94dca47",
+    "sourceCommit": "590e3cd65d429338757aca1ca7f21e9bcd012b94",
+    "programDataPayloadBytes": 202616,
+    "programDataPayloadSha256": "50d409bceaebef4ce3edcee9e757b4f995e0405a482ad32f3272e13aa94dca47",
+    "mandatoryZeroPaddingBytes": 0
   },
   "councilConfig": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
   "gateAddress": "Cdym9p7FvtxEAjF8XuCqSrishB7LmBDXaZGDMMgWczu",
@@ -34,21 +40,22 @@
     "gateBytes": 192,
     "epochTailBytes": 16,
     "instructionManifest": "docs/governance/generated/phase-3-instruction-manifest-v1.json",
-    "instructionManifestSha256": "fd55b2b2e7cb2669144c68917604552836b552cb31e79f4f6504a9e1684d91a3",
-    "readProfile": "ameba-spread-v2-deployed-e57473ce",
-    "businessSourceCommit": "e57473cea72f387e5d877d70e9495f07bebfcdaa",
+    "instructionManifestSha256": "54c121382e3cc28d15ad049f63e737814d8845d9739510fedcba28c9dec5bfb3",
+    "readProfile": "ameba-spread-v2-deployed-737b7cd6",
+    "businessSourceCommit": "737b7cd6dafbcdbee08a367fe6b1d83fc82810b9",
     "semanticReaderBaselineCommit": "1b2230d96e51f6582155d8284900fbfc11ff1f18",
     "writerAuctionVersion": 1
   },
-  "deploymentReceipt": "docs/governance/devnet-v3-market-preparation-20260906.json",
+  "deploymentReceipt": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/metadata-receipt.json",
   "observedState": {
-    "verifiedAt": "2026-09-06T12:47:52.051Z",
-    "finalizedSlot": null,
-    "minimumContextSlot": 494031585,
+    "verifiedAt": "2026-09-06T23:17:03.694Z",
+    "finalizedSlot": 494297168,
+    "minimumContextSlot": 494294359,
+    "scope": "program-identity-only",
     "gate": {
       "address": "Cdym9p7FvtxEAjF8XuCqSrishB7LmBDXaZGDMMgWczu",
       "status": "Active",
-      "epoch": "3",
+      "epoch": "9",
       "freezeSlot": "0",
       "reason": 0
     },
@@ -58,22 +65,14 @@
       "expirySlots": "7000000"
     },
     "marketPreparation": {
-      "status": "awaiting-recipe-resolution",
+      "status": "final-parity-evidence-pending",
       "complete": false,
-      "marketCount": 13,
-      "sourceCount": 400,
-      "coverageManifestCount": 8,
-      "contractSupply": "0",
-      "allMarketsPaused": true,
-      "marketObservationSlot": 494048406,
-      "sourceCoverageObservationSlot": 494067150,
-      "earliestLifecycleUtc": {
-        "recipe": "2026-09-06T18:03:38.0000000Z",
-        "opening": "2026-09-06T19:03:38.0000000Z",
-        "game": "2026-09-06T20:03:38.0000000Z"
-      },
       "tradeReady": false,
-      "lightDlmmInitialization": "blocked-controller-PDA-authorization",
+      "marketObservationSlot": null,
+      "sourceCoverageObservationSlot": null,
+      "contractSupply": null,
+      "allMarketsPaused": null,
+      "lightDlmmInitialization": "council-configuration-finalized-market-replay-incomplete",
       "oldPositionsImported": false
     }
   },
@@ -83,44 +82,134 @@
     "productionEnabled": false
   },
   "bootstrap": {
-    "status": "market-preparation-in-progress-final-receipt-absent",
+    "status": "identity-observed-final-market-parity-pending",
     "historicalPolicy": "config/devnet_bootstrap.v1.json",
     "historicalPolicyReplayPermitted": false,
     "freshAmbaMint": "63qhg3zF3vmPpPF5y5Yb1cvG9UmWjP5Z5r9S7weG65hQ"
   },
   "provenance": {
-    "spreadDeploymentCommit": "26a6a341c43e33375e669373626ff33dbba88dc9",
-    "controllerDeploymentCommit": "715feb9b9e3b3b43e26e7219acd345d873fbe57b",
-    "independentCleanBuildsAttested": false
+    "spreadArtifactSourceCommit": "737b7cd6dafbcdbee08a367fe6b1d83fc82810b9",
+    "controllerArtifactSourceCommit": "590e3cd65d429338757aca1ca7f21e9bcd012b94",
+    "independentCleanBuildsAttested": false,
+    "twoBuildsMatch": true,
+    "buildInputInventorySha256": {
+      "spread": "00d290f80aa153bf7c1450f2d40b2b375699a541ad308079454c4055f4be6bf6",
+      "controller": "1ac9514846f610c3498501767f97a69f40a4649962aa4fb20ab00486a251769b"
+    },
+    "buildAttestationReceipt": "docs/governance/evidence/v3-spread-writer-bid-index-20260906/receipt.json",
+    "previousDescriptor": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/predecessor-devnet-v3.json",
+    "artifactBuilds": {
+      "spread": {
+        "sourceCommit": "737b7cd6dafbcdbee08a367fe6b1d83fc82810b9",
+        "independentCleanBuildsAttested": true,
+        "twoBuildsMatch": true,
+        "receipt": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/local-build-attestation.json",
+        "receiptSha256": "ed02ff8a7f4df81dd407465ac6230186c9b540bf47ab97695278719fcc790d2b"
+      },
+      "controller": {
+        "sourceCommit": "590e3cd65d429338757aca1ca7f21e9bcd012b94",
+        "independentCleanBuildsAttested": false,
+        "newBuildPerformed": false,
+        "priorProvenance": {
+          "spreadArtifactSourceCommit": "d739bcd15068fb79e0b32d0c4eda02703c6417d4",
+          "controllerArtifactSourceCommit": "590e3cd65d429338757aca1ca7f21e9bcd012b94",
+          "independentCleanBuildsAttested": false,
+          "twoBuildsMatch": true,
+          "buildInputInventorySha256": {
+            "spread": "edf214041af796af71bdc513ebe81370269a134267a53f91ce2dd20b66fb3afd",
+            "controller": "1ac9514846f610c3498501767f97a69f40a4649962aa4fb20ab00486a251769b"
+          },
+          "buildAttestationReceipt": "docs/governance/evidence/v3-spread-writer-bid-index-20260906/receipt.json",
+          "previousDescriptor": "docs/governance/evidence/v3-pre-writer-bid-index-20260906/devnet-v3.json"
+        }
+      }
+    }
   },
   "accountEvidence": {
     "spreadProgram": {
       "address": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
       "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
       "executable": true,
+      "lamports": 833120,
       "bytes": 36,
       "sha256": "83be84ac424d864aacf03e489ff8fe3f0a6957e8726c8f9c48f572df6b522e75",
-      "dataBase64Path": "docs/governance/evidence/v3-spread-devnet-20260905/spreadProgram.base64",
-      "finalizedSlot": 493855641,
-      "observationKind": "historical-unchanged-program-link"
+      "finalizedSlot": 494297168,
+      "observationKind": "finalized-rpc-account",
+      "dataBase64Path": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/spreadProgram.base64",
+      "finalizedObservationSlot": 494297168
     },
     "spreadProgramData": {
       "address": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
       "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
       "executable": false,
-      "bytes": 1231309,
-      "sha256": "e820bd332c7238fd2d270e17ae18fac30c2189530d1427ba8c7f8ee595c104a2",
-      "observationKind": "deterministically-reconstructed-from-committed-checkpoint-and-hash-verified-artifact",
-      "headerBase64": "AwAAAOFSch0AAAAAATcLFo/lq5Rap3D5t5tjgcmcrZzDUG0llVcY/e1Ym0t3",
-      "payloadSha256": "bf05c3c19a5c1f7d3c3c4db157106d2b868fcb507b1171728645c40b57936e0a",
-      "checkpointPath": "docs/governance/devnet-v3-market-preparation-20260906.json",
-      "minimumContextSlot": 494031585,
-      "finalizedObservationSlot": null
+      "lamports": 6307719160,
+      "bytes": 1241549,
+      "sha256": "5e8c3ee65724dabb027f946d88b96a1ace1f6000891b10f007f474844134841b",
+      "finalizedSlot": 494297168,
+      "observationKind": "finalized-rpc-account",
+      "deployedSlot": "494288143",
+      "headerBase64": "AwAAAA89dh0AAAAAATcLFo/lq5Rap3D5t5tjgcmcrZzDUG0llVcY/e1Ym0t3",
+      "payloadBytes": 1241504,
+      "payloadSha256": "106dd7e174da6172b701e96b7bdbbc6450932dc6f24bdae39ae7cb8a2b3fbb6c",
+      "dataBase64Path": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/spreadProgramData.base64",
+      "finalizedObservationSlot": 494297168
+    },
+    "controllerProgram": {
+      "address": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "executable": true,
+      "lamports": 833120,
+      "bytes": 36,
+      "sha256": "03976f8d382d44b62e3c53959fedefe7e1b9c0f30c90921553194ebb8159310d",
+      "finalizedSlot": 494297168,
+      "observationKind": "finalized-rpc-account",
+      "dataBase64Path": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/controllerProgram.base64",
+      "finalizedObservationSlot": 494297168
+    },
+    "controllerProgramData": {
+      "address": "7eW9UXcCDrpEAQ93fP7o2zgGMKhAKi3zJLihELjR8xYd",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "executable": false,
+      "lamports": 1030168120,
+      "bytes": 202661,
+      "sha256": "15baa3040bf20d1b0909ca43195c0f47cb6ab3ec0a710d1e007d962c2e577b8a",
+      "finalizedSlot": 494297168,
+      "observationKind": "finalized-rpc-account",
+      "deployedSlot": "494196733",
+      "headerBase64": "AwAAAP3XdB0AAAAAAdy4rFhKtAVB0N6KuYw5NkG28tPML72IP2oy0EyNZ2Qx",
+      "payloadBytes": 202616,
+      "payloadSha256": "50d409bceaebef4ce3edcee9e757b4f995e0405a482ad32f3272e13aa94dca47",
+      "dataBase64Path": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/controllerProgramData.base64",
+      "finalizedObservationSlot": 494297168
+    },
+    "council": {
+      "address": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+      "owner": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+      "executable": false,
+      "lamports": 2600960,
+      "bytes": 384,
+      "sha256": "75708e4f4d19d2609b916c2bcbc376c2c1299c1f8798b8783c6255d1bc311fb1",
+      "finalizedSlot": 494297168,
+      "observationKind": "finalized-rpc-account",
+      "dataBase64Path": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/council.base64",
+      "finalizedObservationSlot": 494297168
+    },
+    "gate": {
+      "address": "Cdym9p7FvtxEAjF8XuCqSrishB7LmBDXaZGDMMgWczu",
+      "owner": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+      "executable": false,
+      "lamports": 1625600,
+      "bytes": 192,
+      "sha256": "589bac537d11d31197a29324b89765f79cddb459a8e0b2f9a8a433b9555fa90f",
+      "finalizedSlot": 494297168,
+      "observationKind": "finalized-rpc-account",
+      "dataBase64Path": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/gate.base64",
+      "finalizedObservationSlot": 494297168
     }
   },
   "governanceIdentity": {
     "canonical": {
-      "releaseId": "spread-devnet-v3-backfill-20260906",
+      "releaseId": "spread-devnet-v3-writer-terminal-lifecycle-20260906",
       "network": {
         "cluster": "devnet",
         "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
@@ -137,7 +226,7 @@
       "gateBytes": 192,
       "tailBytes": 16
     },
-    "sha256": "77ebc16d5c60712306322b25b2800f3cb0873be57e279dc72e8052a5e98d9e0f",
+    "sha256": "ef84939176cf68e39b21787f7b384bb95e6db2d47abc75794a6733b25574ac62",
     "hashEncoding": "sorted-key compact UTF-8 JSON"
   },
   "historicalDeploymentReceipt": "docs/governance/evidence/v3-spread-devnet-20260905/receipt.json",
@@ -196,5 +285,202 @@
       "dataBase64Path": "docs/governance/evidence/v3-spread-devnet-20260905/gate.base64",
       "finalizedSlot": 493855641
     }
+  },
+  "lifecyclePreservation": {
+    "receipt": "docs/governance/evidence/v3-writer-terminal-lifecycle-20260906/preservation.json",
+    "boundaryRawSha256": "be4c80b6590db5d6c28687d6e31b33a0493f082b926b20c69e7e6aef445bcc64",
+    "invariantSha256": "584f8dc99e50b2b45fbbeb8c2b04a5dc6dd85fc90503a9422a1301479ffc38dd",
+    "oldArtifactSha256": "0dd6a6def09a8fc690572bf5a430157644b9b1e5ebac60a2f07c481a3bf0d22d",
+    "newArtifactSha256": "6977f9258ceb6f818ba5dd4b7aaef114de44160cec34867a798b0f1867edda5b",
+    "preservedOperations": 31,
+    "businessParityComplete": false
+  },
+  "businessParity": {
+    "schema": "ameba-v3-dated-business-parity-v1",
+    "verifiedAt": "2026-09-07T03:23:42.152Z",
+    "scope": "issuance + writers + DLMM final-state parity with user-approved oracle differences; terminal settlement evidence remains pending expiry; not transaction-history equality",
+    "status": "audited-final-state-with-approved-oracle-differences",
+    "observationSlots": {
+      "market": 494386396,
+      "retainedMarkets": 494386404,
+      "oracles": {
+        "NANDX-202609-CALL-01": {
+          "manifest": 494386584,
+          "sources": 494386602,
+          "economics": 494386605
+        },
+        "NANDX-202609-PUT-01": {
+          "manifest": 494386613,
+          "sources": 494386623,
+          "economics": 494386632
+        },
+        "NANDX-202610-CALL-01": {
+          "manifest": 494387242,
+          "sources": 494387252,
+          "economics": 494387260
+        },
+        "NANDX-202610-PUT-01": {
+          "manifest": 494387268,
+          "sources": 494387278,
+          "economics": 494387287
+        },
+        "RAMX-202609-CALL-01": {
+          "manifest": 494387056,
+          "sources": 494387064,
+          "economics": 494387073
+        },
+        "RAMX-202609-PUT-01": {
+          "manifest": 494387082,
+          "sources": 494387092,
+          "economics": 494387100
+        },
+        "RAMX-202610-CALL-01": {
+          "manifest": 494386777,
+          "sources": 494386786,
+          "economics": 494386796
+        },
+        "RAMX-202610-PUT-01": {
+          "manifest": 494386804,
+          "sources": 494386813,
+          "economics": 494386822
+        }
+      },
+      "pools": {
+        "NANDX-202609-CALL-01": 494387350,
+        "NANDX-202609-PUT-01": 494387423,
+        "NANDX-202610-CALL-01": 494387332,
+        "NANDX-202610-PUT-01": 494387405,
+        "RAMX-202609-CALL-01": 494387388,
+        "RAMX-202609-PUT-01": 494387321,
+        "RAMX-202610-CALL-01": 494387372,
+        "RAMX-202610-PUT-01": 494387441
+      },
+      "minimum": 494386396,
+      "maximum": 494387441
+    },
+    "counts": {
+      "markets": 13,
+      "gameMarkets": 8,
+      "sources": 400,
+      "sleeves": 6,
+      "pools": 8,
+      "finalizedReplayTransactions": 185,
+      "allocationObservations": 10,
+      "writerFinancialRecords": 24,
+      "dlmmVerifiedRecords": 88,
+      "baseLogicalOperations": 185,
+      "auxiliaryInstructions": 48,
+      "totalBusinessInstructions": 233,
+      "wrappedTransactions": 40
+    },
+    "expectedDifferences": [
+      "Fresh program, PDAs, option/Flat mints, oracle months and compressed addresses replace the old deployment identities; the old ledger is not migrated.",
+      "ELF source737b7cd/SHA6977f925... remains distinct from retained ProgramData capacity1241504/SHA106dd7e1...;3808 zero bytes are storage. Original oracle setup and31 initial writer steps used D739, proven through exact state-preserving upgrade receipts.",
+      "Governance uses current V3 controller and fresh Active epoch9; source and Opening clocks are rebased through the preserved cohort journal, while immutable option terms/expiry match retained old evidence.",
+      "RAMX September nonce1 is an intentional funded nonreveal timeout with two full refunds. Its cause differs from the old cap failure; the new auction remains Refundable after refunds, followed by successful nonce2.",
+      "Source identifiers and evidence hashes include new month identities and therefore differ; the user accepted the measured six SKU bond-setting differences, source bond differences, and399 identity-derived opening/current pairs under receipt280ee4b4.... Weights and all other checked economics remain exact; oracle economic or future payoff equality is not claimed. Any unlisted difference fails.",
+      "Fresh owner funding, issuance, trades and withdrawals have new transaction signatures, timestamps and balance histories. This audit verifies final economic state and recorded replay deltas, not identical historical transactions or wallet-wide balances.",
+      "Position0 remains empty and position1 holds bins19/21; one old typed position bitmap was inconsistent with its shares. Current bitmap10 is required by the canonical decoder. The replay uses48 auxiliary ordinary instructions inside40 atomic maintenance/trade batches; its temporary1-atom supporting bid is fully removed, preserving the185 base logical operations and final economic targets.",
+      "The old demo used a sidecar marker for pre-expiry writer activation. The fresh path uses an absent canonical future terminal-evidence address and zero group terminal digest; ordinary settlement binds actual evidence once after expiry. Terminal settlement parity is not claimed.",
+      "November oracle/market/mint state is compared byte-for-byte with the fresh pre-upgrade census; two new November writer sleeves are intentionally Draft with no financial activity."
+    ],
+    "historyEqualityClaim": false,
+    "walletWideBalanceEqualityClaim": false,
+    "auditReceipt": "docs/governance/evidence/v3-business-parity-20260907T032342Z/audit.json",
+    "metadataReceipt": "docs/governance/evidence/v3-business-parity-20260907T032342Z/metadata-receipt.json",
+    "tradeReady": false,
+    "qualificationComplete": false,
+    "applicationRolloutPerformed": false,
+    "pending": [
+      "explicit readiness review",
+      "final tools package and SDK qualification"
+    ],
+    "executionEra": {
+      "priorArtifactSha256": "0dd6a6def09a8fc690572bf5a430157644b9b1e5ebac60a2f07c481a3bf0d22d",
+      "priorOperationCount": 31,
+      "currentArtifactSha256": "6977f9258ceb6f818ba5dd4b7aaef114de44160cec34867a798b0f1867edda5b",
+      "upgradeSignature": "2ceUWBBKbM5FoBtviPRGa3DzoiJLUKM39mn9wiXegGarAL1xq4VM7eRRUkoVctSiTip5Y4CXpJjbCGq6TjXhJRnL",
+      "activationSignature": "2pP1pskQbwcqiurkaDBpWYzCjQ9eQW99BoQuLjfaWWouPQFCMqRW1jpCdAvPPnyHYnKJka5BXxKqrtfv1ZTnYCxS",
+      "preservationSha256": "584f8dc99e50b2b45fbbeb8c2b04a5dc6dd85fc90503a9422a1301479ffc38dd"
+    },
+    "approvedOracleDifferences": {
+      "receiptSha256": "280ee4b44a0e92ebe483179a263e23aabfc937d8e795595208744c607c42d998",
+      "decision": "retain-current-deployment-with-listed-oracle-differences",
+      "sourcePairs": 400,
+      "skuEconomicRecords": 400,
+      "changedOpeningAndCurrentPairs": 399,
+      "sourceWeightDifferences": 0,
+      "exactOracleEconomicEqualityClaimed": false,
+      "futurePayoffEqualityClaimed": false,
+      "receipt": "docs/governance/evidence/v3-business-parity-20260907T032342Z/approved-oracle-differences.json",
+      "profile": {
+        "sources": 400,
+        "skuEconomicRecords": 400,
+        "changedOpeningAndCurrentPairs": 399,
+        "sourceWeightDifferences": 0,
+        "sourceBonds": {
+          "listingBondLocked": {
+            "old": "1000000",
+            "current": "12000000"
+          },
+          "supportStakeTotal": {
+            "old": "1000000",
+            "current": "12000000"
+          }
+        },
+        "skuEconomics": {
+          "listingBond": {
+            "old": "1000000",
+            "current": "12000000"
+          },
+          "supportBond": {
+            "old": "1000000",
+            "current": "12000000"
+          },
+          "openingBond": {
+            "old": "100000",
+            "current": "1000000"
+          },
+          "updateMinBond": {
+            "old": "100000",
+            "current": "1000000"
+          },
+          "challengeMinBond": {
+            "old": "100000",
+            "current": "1000000"
+          },
+          "challengeMaxBond": {
+            "old": "1000000",
+            "current": "12000000"
+          }
+        },
+        "unchangedSkuEconomics": {
+          "challengeBondBps": "5000",
+          "proposerRewardBps": "5000",
+          "sourceRewardBudget": "0",
+          "openingRewardBudget": "0",
+          "updateRewardBudget": "0",
+          "remainingSourceRewardBudget": "0",
+          "remainingOpeningRewardBudget": "0",
+          "remainingUpdateRewardBudget": "0",
+          "registeredUpdateRewardUnits": "0"
+        },
+        "openingFormula": "100000000 + (sourceId[0] - 128) * 10000",
+        "baselineEqualsCurrentRequiredInBothSnapshots": true,
+        "changedOpeningPairsByMarket": {
+          "NANDX-202609-CALL-01": 48,
+          "NANDX-202609-PUT-01": 48,
+          "RAMX-202610-CALL-01": 52,
+          "RAMX-202610-PUT-01": 52,
+          "RAMX-202609-CALL-01": 52,
+          "RAMX-202609-PUT-01": 51,
+          "NANDX-202610-CALL-01": 48,
+          "NANDX-202610-PUT-01": 48
+        }
+      }
+    },
+    "exactOracleEconomicEqualityClaimed": false,
+    "futurePayoffEqualityClaimed": false,
+    "lifecyclePreservationReceipt": "docs/governance/evidence/v3-business-parity-20260907T032342Z/lifecycle-preservation.json"
   }
 }

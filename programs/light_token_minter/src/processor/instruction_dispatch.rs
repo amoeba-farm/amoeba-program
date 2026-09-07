@@ -58,8 +58,37 @@ fn current_invocation_stack_height() -> usize {
 
 #[cfg(feature = "governance-gate-v1")]
 #[inline(always)]
-fn require_transaction_level_invocation() -> ProgramResult {
-    require_transaction_level_stack_height(current_invocation_stack_height())
+fn require_governed_invocation(tag: u8, accounts: &[AccountInfo]) -> ProgramResult {
+    let height = current_invocation_stack_height();
+    #[cfg(feature = "devnet-v3-governance-controller")]
+    if height == solana_program::instruction::TRANSACTION_LEVEL_STACK_HEIGHT + 1
+        && tag
+            == crate::ameba_dlmm_instruction::AmoebaDlmmInstructionTag::InitializeLightConfig as u8
+        && accounts.len() == 6
+    {
+        // Only the pinned council can furnish this off-curve PDA signature.
+        // Its typed action fixes the payload and accounts; normal gate admission
+        // and the existing Loader-authority/create-only handler still run below.
+        let authority = &accounts[3];
+        let expected = Pubkey::find_program_address(
+            &[
+                b"ameba-governance-v3",
+                b"target-authority",
+                crate::id().as_ref(),
+            ],
+            &governance_gate::PINNED_CONTROLLER_PROGRAM_ID,
+        )
+        .0;
+        if authority.key == &expected
+            && authority.is_signer
+            && !authority.is_writable
+            && !authority.executable
+        {
+            return Ok(());
+        }
+    }
+    let _ = (tag, accounts);
+    require_transaction_level_stack_height(height)
 }
 
 pub(super) fn process_top_level_instruction(
@@ -88,7 +117,7 @@ pub(super) fn process_top_level_instruction(
 
     #[cfg(feature = "governance-gate-v1")]
     {
-        require_transaction_level_invocation()?;
+        require_governed_invocation(tag, accounts)?;
         let (legacy_accounts, legacy_data, gate) =
             governance_gate::validate_top_level_envelope(program_id, accounts, instruction_data)?;
         let context = ExecutionContext::top_level(&gate);
@@ -154,7 +183,7 @@ pub(super) fn process_instruction_with_context(
         64..=124 => dispatch_64_124(program_id, accounts, tag, payload, context),
         128..=158 => dispatch_128_158(program_id, accounts, tag, payload, context),
         161..=205 => dispatch_161_205(program_id, accounts, tag, payload, context),
-        220..=248 => writer_sleeve::process_instruction(
+        220..=249 => writer_sleeve::process_instruction(
             program_id,
             accounts,
             tag,
