@@ -580,8 +580,12 @@ pub(super) fn process_deposit_writer_close_claim(
         return Err(VaultError::WriterSupplyMismatch.into());
     }
     validate_light_associated_token_account(owner_info.key, mint_info.key, source_info)?;
-    let source_before =
-        load_canonical_light_token_account(source_info, owner_info.key, mint_info.key)?;
+    let source_before = super::super::scoped_settlement::load_scoped_holder_token_account(
+        program_id,
+        source_info,
+        owner_info.key,
+        mint_info.key,
+    )?;
     if source_before.amount < amount {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
@@ -611,8 +615,12 @@ pub(super) fn process_deposit_writer_close_claim(
         token_program_info,
         system_program_info,
     )?;
-    let source_after =
-        load_canonical_light_token_account(source_info, owner_info.key, mint_info.key)?;
+    let source_after = super::super::scoped_settlement::load_scoped_holder_token_account(
+        program_id,
+        source_info,
+        owner_info.key,
+        mint_info.key,
+    )?;
     let retirement_after = validate_token_account(retirement_info)?.amount;
     if source_before.amount.checked_sub(source_after.amount) != Some(amount)
         || retirement_after.checked_sub(retirement_before) != Some(amount)
@@ -1122,8 +1130,12 @@ fn process_series_cancellation(
     let mint = validate_canonical_market_mint(market_info, &mut market, mint_info, 0)?;
     validate_vault_token_account(retirement_info, mint_info.key, sleeve_info.key)?;
     validate_light_associated_token_account(&request.owner, mint_info.key, destination_info)?;
-    let destination_before =
-        load_canonical_light_token_account(destination_info, &request.owner, mint_info.key)?;
+    let destination_before = super::super::scoped_settlement::load_scoped_holder_token_account(
+        program_id,
+        destination_info,
+        &request.owner,
+        mint_info.key,
+    )?;
     let retirement_before = validate_token_account(retirement_info)?.amount;
     if retirement_before < amount {
         return Err(VaultError::WriterSupplyMismatch.into());
@@ -1146,8 +1158,12 @@ fn process_series_cancellation(
         system_program_info,
         &[&signer],
     )?;
-    let destination_after =
-        load_canonical_light_token_account(destination_info, &request.owner, mint_info.key)?;
+    let destination_after = super::super::scoped_settlement::load_scoped_holder_token_account(
+        program_id,
+        destination_info,
+        &request.owner,
+        mint_info.key,
+    )?;
     if retirement_before.checked_sub(validate_token_account(retirement_info)?.amount)
         != Some(amount)
         || destination_after

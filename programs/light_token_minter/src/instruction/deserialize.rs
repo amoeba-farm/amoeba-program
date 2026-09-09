@@ -397,6 +397,16 @@ impl BorshDeserialize for VaultInstruction {
                 params: ClaimWriterFlatResidualV1Params::deserialize_reader(reader)?,
             }),
             VaultInstructionTag::CloseWriterSleeveV1 => Ok(Self::CloseWriterSleeveV1),
+            VaultInstructionTag::ScopedCollectiveSettlementV1 => {
+                Ok(Self::ScopedCollectiveSettlementV1 {
+                    action: ScopedSettlementActionV1::deserialize_reader(reader)?,
+                })
+            }
+            VaultInstructionTag::ScopedPositionSettlementV1 => {
+                Ok(Self::ScopedPositionSettlementV1 {
+                    action: ScopedSettlementActionV1::deserialize_reader(reader)?,
+                })
+            }
             VaultInstructionTag::PrepareWriterBidIndexV1 => Ok(Self::PrepareWriterBidIndexV1 {
                 params: PrepareWriterBidIndexV1Params::deserialize_reader(reader)?,
             }),

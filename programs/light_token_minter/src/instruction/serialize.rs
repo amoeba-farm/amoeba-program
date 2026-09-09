@@ -510,6 +510,16 @@ impl BorshSerialize for VaultInstruction {
             Self::CloseWriterSleeveV1 => {
                 serialize_tag(writer, VaultInstructionTag::CloseWriterSleeveV1)
             }
+            Self::ScopedCollectiveSettlementV1 { action } => serialize_tagged_payload(
+                writer,
+                VaultInstructionTag::ScopedCollectiveSettlementV1,
+                action,
+            ),
+            Self::ScopedPositionSettlementV1 { action } => serialize_tagged_payload(
+                writer,
+                VaultInstructionTag::ScopedPositionSettlementV1,
+                action,
+            ),
             Self::ExecuteCompressedStateV1 { params } => serialize_tagged_payload(
                 writer,
                 VaultInstructionTag::ExecuteCompressedStateV1,

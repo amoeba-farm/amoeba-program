@@ -104,7 +104,7 @@ fn validate_pack_writer_account_privileges(
         VaultInstructionTag::WithdrawWriterPrincipalV1 => Some(14),
         VaultInstructionTag::CommitWriterAuctionV1 => Some(14),
         VaultInstructionTag::PrepareWriterBidIndexV1 => Some(10),
-        VaultInstructionTag::PlaceWriterBidV1 => Some(13),
+        VaultInstructionTag::PlaceWriterBidV1 => Some(19),
         VaultInstructionTag::CancelOrRefundWriterBidV1 => Some(9),
         VaultInstructionTag::RevealWriterAuctionV1 => Some(6),
         VaultInstructionTag::ExecuteWriterAuctionFillV1 => Some(26),
@@ -167,7 +167,9 @@ fn validate_pack_writer_account_privileges(
             }
             VaultInstructionTag::CommitWriterAuctionV1 => matches!(index, 0 | 3 | 7 | 8 | 9),
             VaultInstructionTag::PrepareWriterBidIndexV1 => matches!(index, 0 | 8),
-            VaultInstructionTag::PlaceWriterBidV1 => matches!(index, 0 | 2 | 3 | 4 | 7 | 8),
+            VaultInstructionTag::PlaceWriterBidV1 => {
+                matches!(index, 0 | 2 | 3 | 4 | 7 | 8 | 10 | 18)
+            }
             VaultInstructionTag::CancelOrRefundWriterBidV1 => {
                 matches!(index, 2..=6)
             }
@@ -259,6 +261,20 @@ pub(super) fn process_instruction(
         return Err(VaultError::InvalidInstructionData.into());
     }
     validate_pack_writer_account_privileges(tag, accounts, payload)?;
+    if matches!(
+        tag,
+        VaultInstructionTag::ScopedCollectiveSettlementV1
+            | VaultInstructionTag::ScopedPositionSettlementV1
+    ) {
+        if payload.len() != 1 || payload[0] > 2 {
+            return Err(VaultError::InvalidInstructionData.into());
+        }
+        return if tag == VaultInstructionTag::ScopedCollectiveSettlementV1 {
+            settlement::process_scoped_collective_settlement(program_id, accounts, payload[0])
+        } else {
+            super::ameba_dlmm::process_scoped_position_settlement(program_id, accounts, payload[0])
+        };
+    }
     match tag {
         VaultInstructionTag::InitializeWriterPolicyRegistryV1 => {
             decode_and_process::<InitializeWriterPolicyRegistryV1Params>(

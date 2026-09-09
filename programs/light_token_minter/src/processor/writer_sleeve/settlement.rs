@@ -296,6 +296,54 @@ pub(super) fn process_claim_collective_long(
     accounts: &[AccountInfo],
     params: ClaimCollectiveLongV1Params,
 ) -> ProgramResult {
+    claim_collective_long(program_id, accounts, params, None)
+}
+
+pub(super) fn process_scoped_collective_settlement(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    action: u8,
+) -> ProgramResult {
+    if action == 0 || action == 2 {
+        return super::super::scoped_settlement::authorize_collective_settlement(
+            program_id,
+            accounts,
+            action == 2,
+        );
+    }
+    if action != 1 || accounts.len() != CLAIM_COLLECTIVE_LONG_ACCOUNT_COUNT + 2 {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    let keeper = &accounts[20];
+    let delegate = &accounts[21];
+    if !keeper.is_signer || !keeper.is_writable {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    let source = super::super::scoped_settlement::load_scoped_holder_token_account(
+        program_id,
+        &accounts[7],
+        accounts[0].key,
+        accounts[6].key,
+    )?;
+    if source.delegate != COption::Some(*delegate.key) || source.delegated_amount < source.amount {
+        return Err(VaultError::InvalidLightTokenAccount.into());
+    }
+    claim_collective_long(
+        program_id,
+        &accounts[..20],
+        ClaimCollectiveLongV1Params {
+            claim_atoms: source.amount,
+        },
+        Some((keeper, delegate)),
+    )
+}
+
+fn claim_collective_long<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    params: ClaimCollectiveLongV1Params,
+    scoped: Option<(&AccountInfo<'a>, &AccountInfo<'a>)>,
+) -> ProgramResult {
     if accounts.len() != CLAIM_COLLECTIVE_LONG_ACCOUNT_COUNT {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -322,8 +370,18 @@ pub(super) fn process_claim_collective_long(
     let system_program_info = &accounts[17];
     let compressible_config_info = &accounts[18];
     let rent_sponsor_info = &accounts[19];
-    if !holder_info.is_signer || !holder_info.is_writable {
+    if (scoped.is_none() && !holder_info.is_signer) || !holder_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
+    }
+    let payer_info = scoped.map_or(holder_info, |(keeper, _)| keeper);
+    let (expected_delegate, delegate_bump) =
+        crate::scoped_settlement::derive_collective_settlement_delegate(
+            program_id,
+            holder_info.key,
+            contract_mint_info.key,
+        );
+    if scoped.is_some_and(|(_, delegate)| *delegate.key != expected_delegate) {
+        return Err(VaultError::InvalidAccountList.into());
     }
     validate_writer_compression_accounts(
         light_program_info,
@@ -379,7 +437,8 @@ pub(super) fn process_claim_collective_long(
         contract_mint_info.key,
         claim_source_info,
     )?;
-    let source_before = load_canonical_light_token_account(
+    let source_before = super::super::scoped_settlement::load_scoped_holder_token_account(
+        program_id,
         claim_source_info,
         holder_info.key,
         contract_mint_info.key,
@@ -390,7 +449,7 @@ pub(super) fn process_claim_collective_long(
     validate_spl_interface_account(contract_mint_info.key, contract_interface_info)?;
     let retirement_before = load_or_create_writer_retirement_custody(
         program_id,
-        holder_info,
+        payer_info,
         sleeve_info,
         market_info,
         retirement_info,
@@ -420,7 +479,7 @@ pub(super) fn process_claim_collective_long(
     validate_collateral_mint_account(settlement_mint_info, token_program_info.key)?;
     validate_spl_interface_account(settlement_mint_info.key, usdc_interface_info)?;
     let destination_before = load_or_create_light_associated_token_account(
-        holder_info,
+        payer_info,
         holder_info,
         settlement_mint_info,
         payout_destination_info,
@@ -430,19 +489,33 @@ pub(super) fn process_claim_collective_long(
         system_program_info,
     )?;
 
-    invoke_light_token_account_transfer(
+    let bump = [delegate_bump];
+    let delegate_seeds: &[&[u8]] = &[
+        CURRENT_STATE_NAMESPACE_SEED,
+        crate::scoped_settlement::COLLECTIVE_SETTLEMENT_DELEGATE_SEED,
+        holder_info.key.as_ref(),
+        contract_mint_info.key.as_ref(),
+        &bump,
+    ];
+    let scoped_signers: &[&[&[u8]]] = &[delegate_seeds];
+    invoke_light_token_account_transfer_with_signer_seeds(
         params.claim_atoms,
         MarketMintAccounting::CANONICAL_DECIMALS,
         light_program_info,
         cpi_authority_info,
-        holder_info,
+        payer_info,
         claim_source_info,
         retirement_info,
-        holder_info,
+        scoped.map_or(holder_info, |(_, delegate)| delegate),
         contract_mint_info,
         contract_interface_info,
         token_program_info,
         system_program_info,
+        if scoped.is_some() {
+            scoped_signers
+        } else {
+            &[]
+        },
     )?;
     if payout != 0 {
         let bump = [sleeve.bump];
@@ -452,7 +525,7 @@ pub(super) fn process_claim_collective_long(
             MarketMintAccounting::CANONICAL_DECIMALS,
             light_program_info,
             cpi_authority_info,
-            holder_info,
+            payer_info,
             sleeve_vault_info,
             payout_destination_info,
             sleeve_info,
@@ -463,7 +536,8 @@ pub(super) fn process_claim_collective_long(
             &[&signer],
         )?;
     }
-    let source_after = load_canonical_light_token_account(
+    let source_after = super::super::scoped_settlement::load_scoped_holder_token_account(
+        program_id,
         claim_source_info,
         holder_info.key,
         contract_mint_info.key,

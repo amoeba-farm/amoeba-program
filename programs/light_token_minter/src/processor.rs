@@ -24,6 +24,7 @@ mod oracle_usdc;
 mod oracle_usdc_rewards;
 mod oracle_validation;
 mod recipe_weights;
+mod scoped_settlement;
 mod settlement_signers;
 mod settlement_sources;
 mod settlement_validation;

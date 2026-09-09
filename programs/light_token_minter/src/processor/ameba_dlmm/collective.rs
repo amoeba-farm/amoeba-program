@@ -3,7 +3,7 @@ use crate::state::{WriterSettlementGroupStatus, WriterSleeveStatus};
 
 const INITIALIZE_COLLECTIVE_PREFIX_ACCOUNTS: usize = 20;
 const SET_COLLECTIVE_STATUS_ACCOUNTS: usize = 13;
-const COLLECTIVE_SWAP_FIXED_ACCOUNTS: usize = 23;
+const COLLECTIVE_SWAP_FIXED_ACCOUNTS: usize = 24;
 const SETTLE_COLLECTIVE_POOL_ACCOUNTS: usize = 17;
 
 fn normalized_accounts<'a>(
@@ -136,8 +136,29 @@ pub(super) fn process_collective_swap_exact_in(
     {
         return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
     }
-    let normalized = normalized_accounts(accounts, 4, 7);
-    process_collective_swap_exact_in_core(program_id, &normalized, params)
+    let normalized: Vec<_> = accounts[..4]
+        .iter()
+        .chain(accounts[7..23].iter())
+        .chain(accounts[24..].iter())
+        .cloned()
+        .collect();
+    process_collective_swap_exact_in_core(program_id, &normalized, params)?;
+    // The original trade signature also grants the exact owner/mint settlement capability.
+    super::super::scoped_settlement::authorize_collective_settlement(
+        program_id,
+        &[
+            accounts[0].clone(),
+            accounts[2].clone(),
+            accounts[9].clone(),
+            accounts[13].clone(),
+            accounts[23].clone(),
+            accounts[15].clone(),
+            accounts[21].clone(),
+            accounts[22].clone(),
+            accounts[20].clone(),
+        ],
+        false,
+    )
 }
 
 #[inline(never)]

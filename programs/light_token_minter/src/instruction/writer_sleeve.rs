@@ -3,6 +3,14 @@ use crate::state::{
     WriterAuctionPriorityRule, WriterBidDeliveryMode, WriterReserveRoundingMode, WriterSecurityMode,
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[repr(u8)]
+pub enum ScopedSettlementActionV1 {
+    Authorize = 0,
+    Execute = 1,
+    Revoke = 2,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
 pub struct InitializeWriterPolicyRegistryV1Params {
     pub policy_authority: Pubkey,

@@ -26,6 +26,37 @@ const CREATE_ASSOCIATED_TOKEN_ACCOUNT_IDEMPOTENT: u8 = 102;
 const TRANSFER2: u8 = 101;
 const LIGHT_CANNOT_DETERMINE_ACCOUNT_TYPE: u32 = 17_503;
 
+/// Byte-exact Light Token 0.23 Approve; the scoped program PDA is the only delegate.
+pub(crate) fn approve(
+    source: &Pubkey,
+    delegate: &Pubkey,
+    owner: &Pubkey,
+    amount: u64,
+) -> Instruction {
+    let mut data = vec![4];
+    data.extend_from_slice(&amount.to_le_bytes());
+    Instruction {
+        program_id: light_token_program_id(),
+        data,
+        accounts: vec![
+            AccountMeta::new(*source, false),
+            AccountMeta::new_readonly(*delegate, false),
+            AccountMeta::new_readonly(*owner, true),
+        ],
+    }
+}
+
+pub(crate) fn revoke(source: &Pubkey, owner: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: light_token_program_id(),
+        data: vec![5],
+        accounts: vec![
+            AccountMeta::new(*source, false),
+            AccountMeta::new_readonly(*owner, true),
+        ],
+    }
+}
+
 pub(crate) const fn light_token_program_id() -> Pubkey {
     LIGHT_TOKEN_PROGRAM_ID
 }

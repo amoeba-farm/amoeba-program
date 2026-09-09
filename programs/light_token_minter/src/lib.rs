@@ -11,6 +11,7 @@ pub mod governance_manifest;
 pub mod instruction;
 mod light_token_instruction;
 pub mod processor;
+pub mod scoped_settlement;
 pub mod state;
 mod system_instruction;
 mod token_instruction;

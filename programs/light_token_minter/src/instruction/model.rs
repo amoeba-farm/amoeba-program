@@ -667,6 +667,14 @@ pub enum VaultInstruction {
     PrepareWriterBidIndexV1 {
         params: PrepareWriterBidIndexV1Params,
     },
+    /// Exact wallet/contract-mint authority; execution reads the final holder balance.
+    ScopedCollectiveSettlementV1 {
+        action: ScopedSettlementActionV1,
+    },
+    /// Exact owner/LP-position authority; execution removes its final full share balance.
+    ScopedPositionSettlementV1 {
+        action: ScopedSettlementActionV1,
+    },
 
     /// Run one current instruction against transient native views of bounded Light-compressed
     /// typed state. The exact inner accounts come first, followed by one system-program account

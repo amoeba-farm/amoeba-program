@@ -254,11 +254,13 @@ pub(super) fn validate_liquidity_fixed_accounts(
     validate_spl_interface_account(option_mint_info.key, option_interface_info)?;
     validate_spl_interface_account(quote_mint_info.key, quote_interface_info)?;
     let _ = load_user_transfer_account(
+        program_id,
         owner_option_info,
         &pool.liquidity_manager,
         option_mint_info.key,
     )?;
     let _ = load_user_transfer_account(
+        program_id,
         owner_quote_info,
         &pool.liquidity_manager,
         quote_mint_info.key,
@@ -315,11 +317,12 @@ pub(super) fn transfer_owner_to_pool(
     Ok(())
 }
 
-pub(super) fn transfer_pool_to_owner(
+pub(super) fn transfer_pool_to_owner<'a>(
     program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    accounts: &[AccountInfo<'a>],
     option_amount: u64,
     quote_amount: u64,
+    payer: &AccountInfo<'a>,
 ) -> ProgramResult {
     let (_, authority_bump) = derive_ameba_dlmm_authority_pda(program_id, accounts[1].key);
     let authority_bump_bytes = [authority_bump];
@@ -336,7 +339,7 @@ pub(super) fn transfer_pool_to_owner(
             MarketMintAccounting::CANONICAL_DECIMALS,
             &accounts[10],
             &accounts[11],
-            &accounts[0],
+            payer,
             &accounts[6],
             &accounts[8],
             &accounts[3],
@@ -353,7 +356,7 @@ pub(super) fn transfer_pool_to_owner(
             MarketMintAccounting::CANONICAL_DECIMALS,
             &accounts[10],
             &accounts[11],
-            &accounts[0],
+            payer,
             &accounts[7],
             &accounts[9],
             &accounts[3],
@@ -389,6 +392,52 @@ pub(super) fn process_liquidity_change(
     accounts: &[AccountInfo],
     change: LiquidityChange,
 ) -> ProgramResult {
+    if matches!(&change, LiquidityChange::Add(_)) {
+        if accounts.len() < 19 {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        let normalized: Vec<_> = accounts[..16]
+            .iter()
+            .chain(accounts[17..].iter())
+            .cloned()
+            .collect();
+        process_liquidity_change_core(program_id, &normalized, change, None)?;
+        super::scoped_position::process_scoped_position_settlement(
+            program_id,
+            &[
+                accounts[0].clone(),
+                accounts[1].clone(),
+                accounts[2].clone(),
+                accounts[16].clone(),
+                accounts[15].clone(),
+            ],
+            0,
+        )
+    } else {
+        process_liquidity_change_core(program_id, accounts, change, None)
+    }
+}
+
+pub(super) fn process_scoped_liquidity_cleanup<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    params: RemoveAmoebaDlmmLiquidityV1Params,
+    permit: &super::scoped_position::ScopedCleanup<'_, 'a>,
+) -> ProgramResult {
+    process_liquidity_change_core(
+        program_id,
+        accounts,
+        LiquidityChange::Remove(params),
+        Some(permit),
+    )
+}
+
+fn process_liquidity_change_core<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    change: LiquidityChange,
+    permit: Option<&super::scoped_position::ScopedCleanup<'_, 'a>>,
+) -> ProgramResult {
     if accounts.len() < 18 {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -404,7 +453,19 @@ pub(super) fn process_liquidity_change(
         LiquidityChange::Add(params) => (params.position_nonce, params.entries.len(), true),
         LiquidityChange::Remove(params) => (params.position_nonce, params.entries.len(), false),
     };
-    validate_position_owner_and_nonce(owner_info, &pool, &position, position_nonce)?;
+    if let Some(permit) = permit {
+        permit.require_binding(owner_info.key, pool_info.key, position_info.key)?;
+        if is_add
+            || position.owner != *owner_info.key
+            || pool.liquidity_manager != *owner_info.key
+            || position.position_nonce != position_nonce
+            || pool.status != AmoebaDlmmPoolStatus::Settled
+        {
+            return Err(VaultError::UnauthorizedAmoebaDlmmManager.into());
+        }
+    } else {
+        validate_position_owner_and_nonce(owner_info, &pool, &position, position_nonce)?;
+    }
     if (is_add && !pool.status.allows_liquidity_add())
         || (!is_add && !pool.status.allows_liquidity_remove())
     {
@@ -607,7 +668,13 @@ pub(super) fn process_liquidity_change(
     if is_add {
         transfer_owner_to_pool(accounts, total_option, total_quote)?;
     } else {
-        transfer_pool_to_owner(program_id, accounts, total_option, total_quote)?;
+        transfer_pool_to_owner(
+            program_id,
+            accounts,
+            total_option,
+            total_quote,
+            permit.map_or(owner_info, |permit| permit.payer()),
+        )?;
     }
     let after_vaults = validate_pool_vaults(
         program_id,

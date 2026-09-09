@@ -333,7 +333,7 @@ pub(super) fn process_initialize_position(
     accounts: &[AccountInfo],
     params: InitializeAmoebaDlmmPositionV1Params,
 ) -> ProgramResult {
-    if accounts.len() < 6 {
+    if accounts.len() < 7 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let owner_info = &accounts[0];
@@ -342,7 +342,7 @@ pub(super) fn process_initialize_position(
     let state_config_info = &accounts[3];
     let state_rent_sponsor_info = &accounts[4];
     let system_program_info = &accounts[5];
-    let light_tail = &accounts[6..];
+    let light_tail = &accounts[7..];
     if !owner_info.is_signer || !owner_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
@@ -424,6 +424,17 @@ pub(super) fn process_initialize_position(
         .ok_or(VaultError::ArithmeticOverflow)?;
     pool.last_updated_slot = slot;
     store_light_state(pool_info, &pool)?;
+    super::scoped_position::process_scoped_position_settlement(
+        program_id,
+        &[
+            owner_info.clone(),
+            pool_info.clone(),
+            position_info.clone(),
+            accounts[6].clone(),
+            system_program_info.clone(),
+        ],
+        0,
+    )?;
     emit_event(
         &EVENT_POSITION_INITIALIZED,
         AmoebaDlmmEvent::PositionInitialized(PositionInitializedEvent {

@@ -175,7 +175,12 @@ pub(super) fn process_collective_swap_exact_in_core(
             quote_mint_info,
         ),
     };
-    let _ = load_user_transfer_account(input_user_info, trader_info.key, input_mint_info.key)?;
+    let _ = load_user_transfer_account(
+        program_id,
+        input_user_info,
+        trader_info.key,
+        input_mint_info.key,
+    )?;
     if output_user_info.owner == &system_program::id() {
         if output_user_info.executable || output_user_info.data_len() != 0 {
             return Err(VaultError::InvalidLightTokenAccount.into());
@@ -186,8 +191,12 @@ pub(super) fn process_collective_swap_exact_in_core(
             output_user_info,
         )?;
     } else {
-        let _ =
-            load_user_transfer_account(output_user_info, trader_info.key, output_mint_info.key)?;
+        let _ = load_user_transfer_account(
+            program_id,
+            output_user_info,
+            trader_info.key,
+            output_mint_info.key,
+        )?;
     }
     let before_vault_amounts = validate_pool_vault_amounts(
         program_id,

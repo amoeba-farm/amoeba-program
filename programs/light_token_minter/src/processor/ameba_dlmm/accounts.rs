@@ -270,6 +270,7 @@ pub(super) fn assert_program_accounts(
 }
 
 pub(super) fn load_user_transfer_account(
+    program_id: &Pubkey,
     account_info: &AccountInfo,
     owner: &Pubkey,
     mint: &Pubkey,
@@ -277,7 +278,12 @@ pub(super) fn load_user_transfer_account(
     if account_info.owner == &spl_token_program_id() {
         validate_vault_token_account(account_info, mint, owner)
     } else {
-        load_canonical_light_token_account(account_info, owner, mint)
+        super::super::scoped_settlement::load_scoped_holder_token_account(
+            program_id,
+            account_info,
+            owner,
+            mint,
+        )
     }
 }
 

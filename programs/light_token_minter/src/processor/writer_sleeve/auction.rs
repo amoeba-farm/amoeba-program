@@ -5,7 +5,7 @@ use crate::instruction::{
 };
 
 const COMMIT_WRITER_AUCTION_ACCOUNT_COUNT: usize = 14;
-const PLACE_WRITER_BID_ACCOUNT_COUNT: usize = 13;
+const PLACE_WRITER_BID_ACCOUNT_COUNT: usize = 19;
 const CANCEL_OR_REFUND_WRITER_BID_ACCOUNT_COUNT: usize = 9;
 const REVEAL_WRITER_AUCTION_ACCOUNT_COUNT: usize = 6;
 const PLAN_WRITER_AUCTION_ACCOUNT_COUNT: usize = 9;
@@ -520,13 +520,25 @@ pub(super) fn process_place_writer_bid(
         return Err(VaultError::InvalidWriterBid.into());
     }
     let record = &book.records[series_index];
+    if record.market != *accounts[13].key || record.contract_mint != *accounts[14].key {
+        return Err(VaultError::InvalidAccountList.into());
+    }
     match params.delivery_mode {
         crate::state::WriterBidDeliveryMode::LightToken => {
-            validate_light_associated_token_destination(
-                bidder_info.key,
-                &record.contract_mint,
-                claim_destination_info,
-            )?;
+            if claim_destination_info.owner == &light_token_program_id() {
+                let _ = super::super::scoped_settlement::load_scoped_holder_token_account(
+                    program_id,
+                    claim_destination_info,
+                    bidder_info.key,
+                    &record.contract_mint,
+                )?;
+            } else {
+                validate_light_associated_token_destination(
+                    bidder_info.key,
+                    &record.contract_mint,
+                    claim_destination_info,
+                )?;
+            }
         }
         crate::state::WriterBidDeliveryMode::ClassicSpl => {
             let destination = validate_token_account(claim_destination_info)?;
@@ -664,7 +676,25 @@ pub(super) fn process_place_writer_bid(
     index.last_updated_slot = slot;
     store_state(bid_info, &bid)?;
     store_state(bid_index_info, &index)?;
-    store_state(auction_info, &auction)
+    store_state(auction_info, &auction)?;
+    if params.delivery_mode == crate::state::WriterBidDeliveryMode::LightToken {
+        super::super::scoped_settlement::authorize_collective_settlement(
+            program_id,
+            &[
+                accounts[0].clone(),
+                accounts[13].clone(),
+                accounts[14].clone(),
+                accounts[10].clone(),
+                accounts[15].clone(),
+                accounts[16].clone(),
+                accounts[17].clone(),
+                accounts[18].clone(),
+                accounts[12].clone(),
+            ],
+            false,
+        )?;
+    }
+    Ok(())
 }
 
 pub(super) fn process_reveal_writer_auction(
@@ -1477,13 +1507,14 @@ pub(super) fn process_execute_writer_auction_fill(
         return Err(VaultError::WriterSolvencyViolation.into());
     }
     let destination_before = match bid.delivery_mode {
-        crate::state::WriterBidDeliveryMode::LightToken => {
-            Some(load_canonical_light_token_account(
+        crate::state::WriterBidDeliveryMode::LightToken => Some(
+            super::super::scoped_settlement::load_scoped_holder_token_account(
+                program_id,
                 destination_info,
                 &bid.bidder,
                 contract_mint_info.key,
-            )?)
-        }
+            )?,
+        ),
         crate::state::WriterBidDeliveryMode::ClassicSpl => {
             let destination = validate_token_account(destination_info)?;
             if destination.owner != bid.bidder
@@ -1608,11 +1639,14 @@ pub(super) fn process_execute_writer_auction_fill(
     }
     let mint_after = validate_mint_account(contract_mint_info, token_program_info.key)?;
     let destination_after = match bid.delivery_mode {
-        crate::state::WriterBidDeliveryMode::LightToken => load_canonical_light_token_account(
-            destination_info,
-            &bid.bidder,
-            contract_mint_info.key,
-        )?,
+        crate::state::WriterBidDeliveryMode::LightToken => {
+            super::super::scoped_settlement::load_scoped_holder_token_account(
+                program_id,
+                destination_info,
+                &bid.bidder,
+                contract_mint_info.key,
+            )?
+        }
         crate::state::WriterBidDeliveryMode::ClassicSpl => {
             validate_token_account(destination_info)?
         }

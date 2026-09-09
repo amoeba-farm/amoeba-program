@@ -522,6 +522,7 @@ mod collective;
 mod initialization;
 mod lifecycle;
 mod liquidity;
+mod scoped_position;
 mod swap;
 
 use accounts::*;
@@ -529,4 +530,5 @@ use collective::*;
 use initialization::*;
 use lifecycle::*;
 use liquidity::*;
+pub(super) use scoped_position::process_scoped_position_settlement;
 use swap::*;
