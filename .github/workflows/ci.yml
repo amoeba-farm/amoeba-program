@@ -26,7 +26,7 @@ jobs:
           components: rustfmt
       - name: Verify the production-only public source
         run: |
-          cargo fmt --manifest-path programs/light_token_minter/Cargo.toml --all -- --check
+          cargo fmt --manifest-path programs/light_token_minter/Cargo.toml --all -- --check --config reorder_modules=false
           cargo check --manifest-path programs/light_token_minter/Cargo.toml --locked --lib --features devnet-v3-governance-controller,devnet-solo-backfill-2026
       - name: Reject binaries and private development surfaces
         shell: bash
