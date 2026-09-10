@@ -83,13 +83,15 @@ pub(super) fn load_swap_pool(
 }
 
 #[inline(never)]
-pub(super) fn process_collective_swap_exact_in_core(
+pub(super) fn process_collective_swap_exact_in_core_with_writer(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     params: SwapAmoebaDlmmExactInV1Params,
+    writer: &mut Option<super::super::writer_sleeve::dlmm::WriterSwapState>,
+    writer_accounts: &[AccountInfo],
 ) -> ProgramResult {
     const FIXED_ACCOUNTS: usize = 20;
-    if accounts.len() <= FIXED_ACCOUNTS {
+    if accounts.len() < FIXED_ACCOUNTS {
         return Err(VaultError::InvalidAccountList.into());
     }
     let trader_info = &accounts[0];
@@ -215,8 +217,7 @@ pub(super) fn process_collective_swap_exact_in_core(
         first_set_page(&route_bitmap)
     } else {
         last_set_page(&route_bitmap)
-    }
-    .ok_or(VaultError::InsufficientAmoebaDlmmLiquidity)?;
+    };
     if accounts.len() - FIXED_ACCOUNTS > MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP as usize {
         return Err(VaultError::AmoebaDlmmRouteTooLarge.into());
     }
@@ -228,7 +229,7 @@ pub(super) fn process_collective_swap_exact_in_core(
         }
         let page = load_bin_page(program_id, pool_info.key, page_info)?;
         if !page_bit(&pool.initialized_page_bitmap, page.page_index)
-            || page.page_index != expected_page
+            || Some(page.page_index) != expected_page
             || pages
                 .iter()
                 .any(|existing: &LoadedSwapPage| existing.page.page_index == page.page_index)
@@ -252,43 +253,65 @@ pub(super) fn process_collective_swap_exact_in_core(
             if bin_id > pool.maximum_bin_id {
                 return Err(VaultError::InvalidAmoebaDlmmGrid.into());
             }
-            if bins.len() < pool.maximum_bins_per_swap as usize {
-                bins.push(AmoebaDlmmBinLiquidity {
-                    bin_id,
-                    option_reserve: page.option_reserve[local_index],
-                    quote_reserve: page.quote_reserve[local_index],
-                });
-            }
+            bins.push(AmoebaDlmmBinLiquidity {
+                bin_id,
+                option_reserve: page.option_reserve[local_index],
+                quote_reserve: page.quote_reserve[local_index],
+            });
         }
         pages.push(LoadedSwapPage {
             account_index: FIXED_ACCOUNTS + offset,
             page,
         });
-        expected_page = match next_set_page(&route_bitmap, expected_page, ascending) {
-            Some(next) => next,
-            None => {
-                if offset + 1 != accounts.len() - FIXED_ACCOUNTS {
-                    return Err(VaultError::InvalidAmoebaDlmmRoute.into());
-                }
-                expected_page
-            }
-        };
+        expected_page = next_set_page(
+            &route_bitmap,
+            expected_page.ok_or(VaultError::InvalidAmoebaDlmmRoute)?,
+            ascending,
+        );
     }
-    let quote = quote_exact_in(
-        direction,
-        params.amount_in,
-        params.minimum_amount_out,
-        params.limit_bin_id,
-        pool.tick_size_quote_atomic,
-        pool.maximum_bin_id,
-        pool.swap_fee_bps,
-        pool.protocol_fee_share_bps,
-        pool.maximum_bins_per_swap,
+    let unloaded_ordinary_boundary = if pages.is_empty() {
+        let best = if ascending {
+            pool.best_ask_bin_id
+        } else {
+            pool.best_bid_bin_id
+        };
+        (best != AMOEBA_DLMM_EMPTY_BIN_ID).then_some(best)
+    } else {
+        expected_page
+            .map(|page| {
+                let first = page_first_bin(page).map_err(math_error)?;
+                Ok::<u16, ProgramError>(if ascending {
+                    first
+                } else {
+                    first.saturating_add(31).min(pool.maximum_bin_id)
+                })
+            })
+            .transpose()?
+    };
+    let writer_policy = writer
+        .as_ref()
+        .map(|state| state.quote_policy(pool.tick_size_quote_atomic));
+    let route = crate::writer_dlmm_quote::quote_writer_dlmm_exact_in(
+        crate::writer_dlmm_quote::WriterDlmmRouteConfig {
+            direction,
+            amount_in: params.amount_in,
+            minimum_amount_out: params.minimum_amount_out,
+            limit_bin_id: params.limit_bin_id,
+            tick_size_quote_atomic: pool.tick_size_quote_atomic,
+            maximum_bin_id: pool.maximum_bin_id,
+            swap_fee_bps: pool.swap_fee_bps,
+            protocol_fee_share_bps: pool.protocol_fee_share_bps,
+            maximum_bins: pool.maximum_bins_per_swap,
+            unloaded_ordinary_boundary,
+        },
         &bins,
+        writer.as_ref().map_or(&[], |state| state.bins()),
+        writer_policy.as_ref(),
     )
     .map_err(math_error)?;
+    let quote = &route.quote;
 
-    for fill in &quote.fills {
+    for fill in &route.ordinary_fills {
         let (page_index, local_index) = bin_to_page(fill.bin_id).map_err(math_error)?;
         let loaded_index =
             find_swap_page(&pages, page_index).ok_or(VaultError::InvalidAmoebaDlmmRoute)?;
@@ -311,32 +334,38 @@ pub(super) fn process_collective_swap_exact_in_core(
         )?;
         loaded.page.last_updated_slot = slot;
     }
-    let (last_fill_page_index, _) = bin_to_page(quote.last_bin_id).map_err(math_error)?;
-    let last_fill_page_offset =
-        find_swap_page(&pages, last_fill_page_index).ok_or(VaultError::InvalidAmoebaDlmmRoute)?;
-    let last_fill_has_output_liquidity = if ascending {
-        pages[last_fill_page_offset].page.ask_bitmap != 0
+    let required_page_count = if let Some(last_ordinary_fill) = route.ordinary_fills.last() {
+        let (last_fill_page_index, _) =
+            bin_to_page(last_ordinary_fill.bin_id).map_err(math_error)?;
+        let last_fill_page_offset = find_swap_page(&pages, last_fill_page_index)
+            .ok_or(VaultError::InvalidAmoebaDlmmRoute)?;
+        let last_fill_has_output_liquidity = if ascending {
+            pages[last_fill_page_offset].page.ask_bitmap != 0
+        } else {
+            pages[last_fill_page_offset].page.bid_bitmap != 0
+        };
+        let next_output_page = next_set_page(&route_bitmap, last_fill_page_index, ascending);
+        let required = last_fill_page_offset
+            .checked_add(1)
+            .and_then(|count| {
+                count.checked_add(usize::from(
+                    !last_fill_has_output_liquidity && next_output_page.is_some(),
+                ))
+            })
+            .ok_or(VaultError::ArithmeticOverflow)?;
+        if pages.len() < required
+            || (!last_fill_has_output_liquidity
+                && next_output_page.is_some()
+                && pages
+                    .get(last_fill_page_offset + 1)
+                    .is_none_or(|loaded| Some(loaded.page.page_index) != next_output_page))
+        {
+            return Err(VaultError::InvalidAmoebaDlmmRoute.into());
+        }
+        required
     } else {
-        pages[last_fill_page_offset].page.bid_bitmap != 0
+        0
     };
-    let next_output_page = next_set_page(&route_bitmap, last_fill_page_index, ascending);
-    let required_page_count = last_fill_page_offset
-        .checked_add(1)
-        .and_then(|count| {
-            count.checked_add(usize::from(
-                !last_fill_has_output_liquidity && next_output_page.is_some(),
-            ))
-        })
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    if pages.len() < required_page_count
-        || (!last_fill_has_output_liquidity
-            && next_output_page.is_some()
-            && pages
-                .get(last_fill_page_offset + 1)
-                .is_none_or(|loaded| Some(loaded.page.page_index) != next_output_page))
-    {
-        return Err(VaultError::InvalidAmoebaDlmmRoute.into());
-    }
     if pages.len() > required_page_count {
         return Err(VaultError::UnexpectedAmoebaDlmmWritableAccount.into());
     }
@@ -460,6 +489,16 @@ pub(super) fn process_collective_swap_exact_in_core(
         system_program_info,
         signers,
     )?;
+    if let Some(state) = writer.as_mut() {
+        super::super::writer_sleeve::dlmm::finish_swap(
+            program_id,
+            writer_accounts,
+            state,
+            &route,
+            direction,
+            pool.as_mut(),
+        )?;
+    }
     let after_vault_amounts = validate_pool_vault_amounts(
         program_id,
         pool_info,
@@ -485,6 +524,15 @@ pub(super) fn process_collective_swap_exact_in_core(
     let physical_delta_ok = after_input
         == before_input
             .checked_add(quote.amount_in)
+            .and_then(|value| {
+                value.checked_sub(match direction {
+                    AmoebaDlmmSwapDirection::QuoteForOption => route
+                        .writer
+                        .gross_premium_atoms
+                        .checked_add(route.writer.lp_fee_atoms)?,
+                    AmoebaDlmmSwapDirection::OptionForQuote => route.writer.retired_option_atoms,
+                })
+            })
             .ok_or(VaultError::ArithmeticOverflow)?
         && before_output
             == after_output

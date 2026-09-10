@@ -17,6 +17,9 @@ mod system_instruction;
 mod token_instruction;
 mod token_state;
 pub mod writer_sleeve_math;
+pub mod writer_dlmm_math;
+pub mod writer_dlmm_instruction;
+pub mod writer_dlmm_quote;
 
 use light_sdk::{derive_light_cpi_signer, CpiSigner};
 use solana_program::{entrypoint::ProgramResult, pubkey::Pubkey};

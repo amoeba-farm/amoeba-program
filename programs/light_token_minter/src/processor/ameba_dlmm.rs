@@ -69,11 +69,18 @@ fn validate_pack_dlmm_account_privileges(
 ) -> ProgramResult {
     let count = accounts.len();
     let valid_count = match tag {
-        AmoebaDlmmInstructionTag::AddLiquidityV1 | AmoebaDlmmInstructionTag::RemoveLiquidityV1 => {
+        AmoebaDlmmInstructionTag::AddLiquidityV1 => {
+            // The writable position-settlement marker precedes the reserve/share page pairs.
+            count >= 19 && (count - 17).is_multiple_of(2)
+        }
+        AmoebaDlmmInstructionTag::RemoveLiquidityV1 => {
             count >= 18 && (count - 16).is_multiple_of(2)
         }
         AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1 => {
-            (24..=23 + usize::from(MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP)).contains(&count)
+            (collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
+                ..=collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
+                    + usize::from(MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP))
+                .contains(&count)
         }
         _ => return Ok(()),
     };
@@ -89,7 +96,28 @@ fn validate_pack_dlmm_account_privileges(
                 matches!(index, 0 | 1 | 2 | 6 | 7 | 8 | 9 | 12 | 13) || index >= 16
             }
             AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1 => {
-                matches!(index, 0 | 7 | 11 | 12 | 13 | 14 | 17 | 18 | 22) || index >= 23
+                // Slot 23 remains the settlement delegate; writer companions precede pages.
+                matches!(
+                    index,
+                    0 | 2
+                        | 4
+                        | 6
+                        | 7
+                        | 9
+                        | 11
+                        | 12
+                        | 13
+                        | 14
+                        | 17
+                        | 18
+                        | 22
+                        | 24
+                        | 26
+                        | 27
+                        | 28
+                        | 29
+                        | 31
+                ) || index >= collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
             }
             _ => false,
         };
@@ -532,3 +560,36 @@ use lifecycle::*;
 use liquidity::*;
 pub(super) use scoped_position::process_scoped_position_settlement;
 use swap::*;
+
+// Narrow custody access for the writer lane; ordinary share/page loaders stay private.
+pub(super) fn load_writer_dlmm_pool(
+    program_id: &Pubkey,
+    info: &AccountInfo,
+) -> Result<AmoebaDlmmPoolV1, ProgramError> {
+    load_pool(program_id, info)
+}
+
+pub(super) fn store_writer_dlmm_pool(info: &AccountInfo, pool: &AmoebaDlmmPoolV1) -> ProgramResult {
+    store_light_state(info, pool)
+}
+
+pub(super) fn writer_dlmm_vault_amounts(
+    program_id: &Pubkey,
+    pool_info: &AccountInfo,
+    pool: &AmoebaDlmmPoolV1,
+    authority: &AccountInfo,
+    option: &AccountInfo,
+    quote: &AccountInfo,
+) -> Result<(u64, u64), ProgramError> {
+    validate_pool_vault_amounts(program_id, pool_info, pool, authority, option, quote)
+}
+
+pub(super) fn validate_writer_dlmm_pool_binding(
+    config: &VaultConfig,
+    market: &AccountInfo,
+    month: &AccountInfo,
+    context: &super::writer_sleeve::CollectiveDlmmContext,
+    pool: &AmoebaDlmmPoolV1,
+) -> ProgramResult {
+    validate_collective_pool_binding(config, market, month, context, pool)
+}

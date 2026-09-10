@@ -1,8 +1,8 @@
 use super::*;
 use crate::instruction::{CleanupWriterCustodyV1Params, ReconcileWriterSupplyV1Params};
 
-const RECONCILE_WRITER_SUPPLY_ACCOUNT_COUNT: usize = 15;
-const CLEANUP_WRITER_CUSTODY_ACCOUNT_COUNT: usize = 8;
+const RECONCILE_WRITER_SUPPLY_ACCOUNT_COUNT: usize = 16;
+const CLEANUP_WRITER_CUSTODY_ACCOUNT_COUNT: usize = 9;
 const RECONCILE_TARGET_SERIES: u8 = 0;
 const RECONCILE_TARGET_FLAT: u8 = 1;
 
@@ -260,6 +260,7 @@ pub(super) fn process_reconcile_writer_supply(
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
 
+    let lp_policy = dlmm::load_optional_policy(program_id, &accounts[15], sleeve_info, &sleeve)?;
     match params.target_kind {
         RECONCILE_TARGET_SERIES => {
             let index = usize::from(params.series_index);
@@ -303,6 +304,11 @@ pub(super) fn process_reconcile_writer_supply(
             )?;
             let observed_issuer = staging_atoms
                 .checked_add(retirement_atoms)
+                .and_then(|amount| {
+                    amount.checked_add(lp_policy.as_ref().map_or(0, |policy| {
+                        policy.series_pool_inventory_atoms[usize::from(params.series_index)]
+                    }))
+                })
                 .ok_or(VaultError::ArithmeticOverflow)?;
             if mint.supply > record.total_physical_supply_atoms
                 || observed_issuer < record.issuer_controlled_atoms
@@ -333,7 +339,12 @@ pub(super) fn process_reconcile_writer_supply(
                     .checked_add(custody_increase)
                     .ok_or(VaultError::ArithmeticOverflow)?
                 || market_outstanding_contract_amount(&market)?
-                    != record.external_open_interest_atoms
+                    != record
+                        .external_open_interest_atoms
+                        .checked_add(lp_policy.as_ref().map_or(0, |policy| {
+                            policy.series_pool_inventory_atoms[usize::from(params.series_index)]
+                        }))
+                        .ok_or(VaultError::ArithmeticOverflow)?
                 || market
                     .mint_accounting
                     .total_issued
@@ -433,6 +444,8 @@ pub(super) fn process_reconcile_writer_supply(
         sleeve.lower_tail_reserve_atoms = 0;
         sleeve.upper_tail_reserve_atoms = 0;
         sleeve.security_exposure_atoms = 0;
+    } else if let Some(policy) = lp_policy.as_ref() {
+        dlmm::update_cash_metrics(&mut sleeve, &group, &book, &snapshot, policy, false)?;
     } else {
         recompute_reconciled_writer_metrics(
             &mut sleeve,
@@ -474,6 +487,7 @@ pub(super) fn process_cleanup_writer_custody(
         return Err(VaultError::InvalidAccountList.into());
     }
     let mut sleeve = load_writer_sleeve_without_group_meta(program_id, sleeve_info)?;
+    let lp_policy = dlmm::load_optional_policy(program_id, &accounts[8], sleeve_info, &sleeve)?;
     let mut book = load_writer_series_book(
         program_id,
         book_info,
@@ -537,7 +551,15 @@ pub(super) fn process_cleanup_writer_custody(
     }
     let mint_after = validate_mint_account(mint_info, token_program_info.key)?;
     if mint_before.supply.checked_sub(mint_after.supply) != Some(amount)
-        || market_outstanding_contract_amount(&market)? != record.external_open_interest_atoms
+        || market_outstanding_contract_amount(&market)?
+            != record
+                .external_open_interest_atoms
+                .checked_add(
+                    lp_policy
+                        .as_ref()
+                        .map_or(0, |policy| policy.series_pool_inventory_atoms[index]),
+                )
+                .ok_or(VaultError::ArithmeticOverflow)?
         || market
             .mint_accounting
             .total_issued

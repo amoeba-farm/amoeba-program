@@ -488,6 +488,12 @@ pub enum VaultInstruction {
         params: AccumulateOracleActiveWeightGroupParams,
     },
     FinalizeOracleActiveWeights,
+    /// Permissionlessly authenticate one frozen source in reverse recipe order.
+    /// Accounts: payer (signer, writable), market, month, finalized recipe manifest,
+    /// recipe source index (writable), bucket source index (writable), system program.
+    IndexOracleRecipeSourceV1 {
+        params: IndexOracleRecipeSourceV1Params,
+    },
     RecomputeOracleBucketMedianV1 {
         params: RecomputeOracleBucketMedianV1Params,
     },
@@ -674,6 +680,10 @@ pub enum VaultInstruction {
     /// Exact owner/LP-position authority; execution removes its final full share balance.
     ScopedPositionSettlementV1 {
         action: ScopedSettlementActionV1,
+    },
+    /// Frozen-policy writer-owned lane in each existing canonical native DLMM pool.
+    ManageWriterDlmmV1 {
+        params: ManageWriterDlmmV1Params,
     },
 
     /// Run one current instruction against transient native views of bounded Light-compressed

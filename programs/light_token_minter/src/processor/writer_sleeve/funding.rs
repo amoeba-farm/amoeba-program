@@ -1,7 +1,7 @@
 use super::*;
 use crate::instruction::WriterAmountV1Params;
 
-const DEPOSIT_WRITER_PRINCIPAL_ACCOUNT_COUNT: usize = 17;
+const DEPOSIT_WRITER_PRINCIPAL_ACCOUNT_COUNT: usize = 18;
 const WITHDRAW_WRITER_PRINCIPAL_ACCOUNT_COUNT: usize = 14;
 
 #[allow(clippy::too_many_arguments)]
@@ -102,8 +102,8 @@ pub(super) fn process_deposit_writer_principal(
         system_program_info,
     )?;
     let config = load_canonical_vault_config(program_id, config_info)?;
-    if config.paused || config.usdc_mint != *settlement_mint_info.key {
-        return Err(VaultError::ContractPaused.into());
+    if config.usdc_mint != *settlement_mint_info.key {
+        return Err(VaultError::InvalidConfigAccount.into());
     }
     let mut sleeve = load_writer_sleeve_without_group_meta(program_id, sleeve_info)?;
     let snapshot = load_writer_policy_snapshot(
@@ -113,6 +113,8 @@ pub(super) fn process_deposit_writer_principal(
         &sleeve.policy_registry,
         sleeve.policy_version,
     )?;
+    let _writer_liquidity_policy =
+        dlmm::load_funding_policy(program_id, &accounts[17], sleeve_info, &sleeve, &snapshot)?;
     if sleeve.status != WriterSleeveStatus::Funding
         || sleeve.policy_snapshot != *snapshot_info.key
         || sleeve.usdc_vault != *sleeve_vault_info.key
@@ -290,8 +292,8 @@ pub(super) fn process_withdraw_writer_principal(
         system_program_info,
     )?;
     let config = load_canonical_vault_config(program_id, config_info)?;
-    if config.paused || config.usdc_mint != *settlement_mint_info.key {
-        return Err(VaultError::ContractPaused.into());
+    if config.usdc_mint != *settlement_mint_info.key {
+        return Err(VaultError::InvalidConfigAccount.into());
     }
     let mut sleeve = load_writer_sleeve_without_group_meta(program_id, sleeve_info)?;
     if sleeve.status != WriterSleeveStatus::Funding

@@ -219,10 +219,7 @@ pub(super) fn process_initialize_bin_page(
     if pool.liquidity_manager != *manager_info.key {
         return Err(VaultError::UnauthorizedAmoebaDlmmManager.into());
     }
-    if !matches!(
-        pool.status,
-        AmoebaDlmmPoolStatus::Pending | AmoebaDlmmPoolStatus::Paused
-    ) {
+    if !pool.status.allows_liquidity_add() {
         return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
     }
     let page_count = (pool.maximum_bin_id as usize).div_ceil(AMOEBA_DLMM_BINS_PER_PAGE);
@@ -350,10 +347,8 @@ pub(super) fn process_initialize_position(
     if pool.liquidity_manager != *owner_info.key {
         return Err(VaultError::UnauthorizedAmoebaDlmmManager.into());
     }
-    if !matches!(
-        pool.status,
-        AmoebaDlmmPoolStatus::Pending | AmoebaDlmmPoolStatus::Paused
-    ) || !(1..=32).contains(&params.bin_count)
+    if !pool.status.allows_liquidity_add()
+        || !(1..=32).contains(&params.bin_count)
         || params.lower_bin_id == 0
     {
         return Err(VaultError::InvalidAmoebaDlmmPosition.into());

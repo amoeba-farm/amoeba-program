@@ -5,7 +5,7 @@ use crate::instruction::{
 
 const BEGIN_WRITER_CLOSE_ACCOUNT_COUNT: usize = 15;
 const DEPOSIT_WRITER_CLOSE_CLAIM_ACCOUNT_COUNT: usize = 13;
-const FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT: usize = 13;
+const FINALIZE_WRITER_CLOSE_FIXED_ACCOUNT_COUNT: usize = 14;
 const FINALIZE_WRITER_CLOSE_ACCOUNTS_PER_SERIES: usize = 3;
 const CANCEL_WRITER_CLOSE_SERIES_ACCOUNT_COUNT: usize = 13;
 const CANCEL_WRITER_CLOSE_FLAT_ACCOUNT_COUNT: usize = 11;
@@ -210,8 +210,9 @@ fn validate_close_snapshot(
         || request.snapshot_security_exposure_atoms != sleeve.security_exposure_atoms
         || request.snapshot_policy_version != sleeve.policy_version
         || request.snapshot_group_commitment != writer_group_commitment(group_info.key, group)
-        || request.snapshot_book_digest != writer_book_digest(book)
-        || request.snapshot_book_digest != book.book_digest
+        || book.book_digest != writer_book_digest(book)
+        || (request.snapshot_book_digest != writer_book_digest(book)
+            && request.snapshot_book_digest != writer_close_book_digest(book))
         || request.series_count != book.series_count
         || request.snapshot_external_oi_atoms[..count]
             .iter()
@@ -300,7 +301,7 @@ pub(super) fn process_begin_writer_close(
         token_program_info,
         system_program_info,
     )?;
-    let config = load_canonical_vault_config(program_id, config_info)?;
+    load_canonical_vault_config(program_id, config_info)?;
     let WriterPolicyContext {
         group,
         mut sleeve,
@@ -319,8 +320,7 @@ pub(super) fn process_begin_writer_close(
         .close_nonce
         .checked_add(1)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    if config.paused
-        || sleeve.vault_config != *config_info.key
+    if sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::Active
         || group.status != WriterSettlementGroupStatus::Active
         || group.sleeve != *sleeve_info.key
@@ -475,7 +475,7 @@ pub(super) fn process_begin_writer_close(
         snapshot_security_exposure_atoms: sleeve.security_exposure_atoms,
         snapshot_policy_version: sleeve.policy_version,
         snapshot_group_commitment: writer_group_commitment(group_info.key, &group),
-        snapshot_book_digest: writer_book_digest(&book),
+        snapshot_book_digest: writer_close_book_digest(&book),
         deadline_ts: params.deadline_ts,
         status: WriterCloseRequestStatus::Collecting,
         series_count: book.series_count,
@@ -694,6 +694,8 @@ pub(super) fn process_finalize_writer_close(
     {
         return Err(VaultError::InvalidAccountList.into());
     }
+    let lp_policy = dlmm::load_optional_policy(program_id, &accounts[13], sleeve_info, &sleeve)?;
+    dlmm::require_unwound_policy(lp_policy.as_deref())?;
     // Freeze the complete dynamic account shape before the first burn. This prevents a later
     // series' missing privilege, reorder, omission, or substitution from being discovered only
     // after an earlier series has entered Tokenkeg.
@@ -736,8 +738,7 @@ pub(super) fn process_finalize_writer_close(
         sleeve.close_nonce,
     )?;
     let now = current_unix_timestamp()?;
-    if config.paused
-        || sleeve.vault_config != *config_info.key
+    if sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::CloseStaging
         || sleeve.active_close_request != Some(*request_info.key)
         || group.status != WriterSettlementGroupStatus::Active
@@ -976,7 +977,7 @@ pub(super) fn process_finalize_writer_close(
     .map_err(writer_math_error)?;
     if sleeve.accounted_asset_atoms < required_assets
         || sleeve.writer_principal_atoms == 0
-        || !post_drawdown.all_pass()
+        || (lp_policy.is_none() && !post_drawdown.all_pass())
     {
         return Err(VaultError::WriterSolvencyViolation.into());
     }
@@ -984,6 +985,9 @@ pub(super) fn process_finalize_writer_close(
     sleeve.lower_tail_reserve_atoms = post_reserve.lower_tail_reserve_atoms;
     sleeve.upper_tail_reserve_atoms = post_reserve.upper_tail_reserve_atoms;
     sleeve.security_exposure_atoms = post_security;
+    if let Some(policy) = lp_policy.as_ref() {
+        dlmm::update_cash_metrics(&mut sleeve, &group, &book, &snapshot, policy, true)?;
+    }
 
     drop(series);
     drop(snapshot);

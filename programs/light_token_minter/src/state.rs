@@ -80,11 +80,13 @@ mod market;
 mod median;
 mod oracle_activity;
 mod oracle_common;
+mod oracle_membership;
 mod rewards;
 mod sku;
 mod staking;
 mod vault;
 mod writer_sleeve;
+mod writer_dlmm;
 
 pub use compressed::*;
 #[cfg(feature = "devnet-solo-backfill-2026")]
@@ -95,8 +97,10 @@ pub use market::*;
 pub use median::*;
 pub use oracle_activity::*;
 pub use oracle_common::*;
+pub use oracle_membership::*;
 pub use rewards::*;
 pub use sku::*;
 pub use staking::*;
 pub use vault::*;
+pub use writer_dlmm::*;
 pub use writer_sleeve::*;

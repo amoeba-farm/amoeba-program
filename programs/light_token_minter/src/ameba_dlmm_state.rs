@@ -39,11 +39,14 @@ pub enum AmoebaDlmmPoolStatus {
 
 impl AmoebaDlmmPoolStatus {
     pub fn allows_liquidity_add(self) -> bool {
-        matches!(self, Self::Pending | Self::Paused)
+        matches!(self, Self::Pending | Self::Active | Self::Paused)
     }
 
     pub fn allows_liquidity_remove(self) -> bool {
-        matches!(self, Self::Pending | Self::Paused | Self::Settled)
+        matches!(
+            self,
+            Self::Pending | Self::Active | Self::Paused | Self::Settled
+        )
     }
 
     pub fn allows_protocol_fee_collection(self) -> bool {

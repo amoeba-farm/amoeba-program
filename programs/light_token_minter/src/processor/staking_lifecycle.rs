@@ -22,7 +22,7 @@ pub(super) fn process_queue_stake_amba_for_samba(
         return Err(ProgramError::MissingRequiredSignature);
     }
     validate_system_program(system_program_info)?;
-    let config = load_active_oracle_vault_config(program_id, config_info)?;
+    let config = load_current_canonical_vault_config(program_id, config_info)?;
     load_separated_oracle_major_token_config(program_id, major_config_info, &config)?;
     let mut ledger = load_canonical_oracle_player_ledger(program_id, ledger_info, owner_info.key)?;
     load_canonical_oracle_staking_pool(program_id, staking_pool_info, major_config_info.key)?;
@@ -75,7 +75,7 @@ pub(super) fn process_activate_queued_stake_amba_for_samba(
         return Err(VaultError::InvalidTokenProgram.into());
     }
 
-    let config = load_active_oracle_vault_config(program_id, config_info)?;
+    let config = load_current_canonical_vault_config(program_id, config_info)?;
     let major_config =
         load_separated_oracle_major_token_config(program_id, major_config_info, &config)?;
     let mut pool =
@@ -214,7 +214,7 @@ pub(super) fn process_request_unstake_samba(
         return Err(VaultError::InvalidTokenProgram.into());
     }
     validate_system_program(system_program_info)?;
-    let config = load_active_oracle_vault_config(program_id, config_info)?;
+    let config = load_current_canonical_vault_config(program_id, config_info)?;
     load_separated_oracle_major_token_config(program_id, major_config_info, &config)?;
     let mut pool =
         load_canonical_oracle_staking_pool(program_id, staking_pool_info, major_config_info.key)?;
@@ -302,7 +302,7 @@ pub(super) fn process_complete_unstake_samba(
         return Err(ProgramError::MissingRequiredSignature);
     }
     validate_system_program(system_program_info)?;
-    load_active_oracle_vault_config(program_id, config_info)?;
+    load_current_canonical_vault_config(program_id, config_info)?;
     let major_config_key = derive_oracle_major_token_config_pda(program_id).0;
     let mut ledger = load_or_create_oracle_player_ledger(
         program_id,

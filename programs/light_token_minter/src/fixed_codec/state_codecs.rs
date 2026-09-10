@@ -1,6 +1,40 @@
 use super::fixed_state_deserialize;
 use super::*;
 
+fixed_state_deserialize!(OracleRecipeSourceIndex, OracleRecipeSourceIndex::LEN, {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    month: Pubkey,
+    recipe_hash: [u8; 32],
+    manifest_hash: [u8; 32],
+    remaining_hash: [u8; 32],
+    expected_source_count: u16,
+    expected_bucket_count: u16,
+    remaining_source_count: u16,
+    indexed_bucket_count: u16,
+    indexed_bucket_weight_bps: u16,
+    last_bucket_id: [u8; 32],
+    last_source_id: [u8; 32],
+    complete: bool,
+});
+
+fixed_state_deserialize!(OracleBucketSourceIndex, OracleBucketSourceIndex::LEN, {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    month: Pubkey,
+    recipe_hash: [u8; 32],
+    bucket_id: [u8; 32],
+    group_index: u16,
+    first_source_index: u16,
+    bucket_weight_bps: u16,
+    source_count: u16,
+    source_ids: [[u8; 32]; crate::constants::MAX_ORACLE_BUCKET_SOURCES],
+});
+
 fixed_state_deserialize!(VaultConfig, 135, {
     is_initialized: bool,
     bump: u8,

@@ -245,6 +245,65 @@ fn validate_route_bin(
     Ok(())
 }
 
+/// Shared per-bin arithmetic after the one swap-level fee has been removed.
+/// The caller allocates LP fees once across the final executed route.
+pub fn fill_bin_exact_input_without_fee(
+    direction: AmoebaDlmmSwapDirection,
+    remaining: u64,
+    price: u64,
+    bin: &AmoebaDlmmBinLiquidity,
+) -> MathResult<AmoebaDlmmBinFill> {
+    if remaining == 0 || price == 0 {
+        return Err(AmoebaDlmmMathError::InvalidAmount);
+    }
+    let (input, output, options, quote) = match direction {
+        AmoebaDlmmSwapDirection::QuoteForOption => {
+            if bin.option_reserve == 0 {
+                return Err(AmoebaDlmmMathError::InvalidRoute);
+            }
+            let full = ceil_mul_div(bin.option_reserve, price, AMOEBA_DLMM_PRICE_SCALE)?;
+            let input = min(remaining, full);
+            let output = if remaining >= full {
+                bin.option_reserve
+            } else {
+                floor_mul_div(remaining, AMOEBA_DLMM_PRICE_SCALE, price)?
+            };
+            (
+                input,
+                output,
+                bin.option_reserve.checked_sub(output),
+                bin.quote_reserve.checked_add(input),
+            )
+        }
+        AmoebaDlmmSwapDirection::OptionForQuote => {
+            if bin.quote_reserve == 0 {
+                return Err(AmoebaDlmmMathError::InvalidRoute);
+            }
+            let full = ceil_mul_div(bin.quote_reserve, AMOEBA_DLMM_PRICE_SCALE, price)?;
+            let input = min(remaining, full);
+            let output = if remaining >= full {
+                bin.quote_reserve
+            } else {
+                floor_mul_div(remaining, price, AMOEBA_DLMM_PRICE_SCALE)?
+            };
+            (
+                input,
+                output,
+                bin.option_reserve.checked_add(input),
+                bin.quote_reserve.checked_sub(output),
+            )
+        }
+    };
+    Ok(AmoebaDlmmBinFill {
+        bin_id: bin.bin_id,
+        trade_input: input,
+        amount_out: output,
+        lp_fee: 0,
+        option_reserve_after: options.ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?,
+        quote_reserve_after: quote.ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?,
+    })
+}
+
 /// Quote a complete exact-input swap over the canonical nonempty bins supplied
 /// in traversal order.  Failure never returns a partial quote.
 #[allow(clippy::too_many_arguments)]

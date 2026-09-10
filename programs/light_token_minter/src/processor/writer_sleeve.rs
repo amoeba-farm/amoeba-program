@@ -33,6 +33,7 @@ mod auction;
 mod bid_index_preparation;
 mod close;
 mod funding;
+pub(super) mod dlmm;
 mod reconcile;
 mod settlement;
 
@@ -51,7 +52,7 @@ const WRITER_BOOK_HASH_MAX_BYTES: usize = WRITER_BOOK_HASH_DOMAIN.len()
     + 32
     + 4
     + crate::constants::WRITER_MAX_LIVE_SERIES * (32 + 32 + 7 * 8);
-const WRITER_MAX_PACK_ACCOUNTS: usize = 13 + 3 * crate::constants::WRITER_MAX_LIVE_SERIES;
+const WRITER_MAX_PACK_ACCOUNTS: usize = 14 + 3 * crate::constants::WRITER_MAX_LIVE_SERIES;
 
 // This append path is shared by the bounded family/book encoders. Keeping it
 // out of line avoids duplicating the same checked copy at every SBF call site.
@@ -100,7 +101,7 @@ fn validate_pack_writer_account_privileges(
 ) -> ProgramResult {
     let count = accounts.len();
     let fixed_count = match tag {
-        VaultInstructionTag::DepositWriterPrincipalV1 => Some(17),
+        VaultInstructionTag::DepositWriterPrincipalV1 => Some(18),
         VaultInstructionTag::WithdrawWriterPrincipalV1 => Some(14),
         VaultInstructionTag::CommitWriterAuctionV1 => Some(14),
         VaultInstructionTag::PrepareWriterBidIndexV1 => Some(10),
@@ -112,7 +113,7 @@ fn validate_pack_writer_account_privileges(
         VaultInstructionTag::DepositWriterCloseBasketV1 => Some(13),
         VaultInstructionTag::ClaimCollectiveLongV1 => Some(20),
         VaultInstructionTag::ClaimWriterFlatResidualV1 => Some(17),
-        VaultInstructionTag::ReconcileWriterSupplyV1 => Some(15),
+        VaultInstructionTag::ReconcileWriterSupplyV1 => Some(16),
         _ => None,
     };
     if let Some(expected) = fixed_count {
@@ -122,14 +123,14 @@ fn validate_pack_writer_account_privileges(
     } else {
         let valid_dynamic_count = match tag {
             VaultInstructionTag::FinalizeWriterCloseV1 => {
-                (16..=13 + 3 * crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
-                    && (count - 13).is_multiple_of(3)
+                (17..=14 + 3 * crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
+                    && (count - 14).is_multiple_of(3)
             }
             VaultInstructionTag::ProcessWriterCloseCancellationV1 => {
                 matches!(count, 11 | 13)
             }
             VaultInstructionTag::FinalizeWriterSleeveSettlementV1 => {
-                (9..=8 + crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
+                (10..=9 + crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
             }
             _ => return Ok(()),
         };
@@ -185,7 +186,7 @@ fn validate_pack_writer_account_privileges(
                 matches!(index, 0 | 3 | 6 | 7 | 8)
             }
             VaultInstructionTag::FinalizeWriterCloseV1 => {
-                matches!(index, 2 | 4 | 6 | 7 | 8 | 10 | 11) || index >= 13
+                matches!(index, 2 | 4 | 6 | 7 | 8 | 10 | 11) || index >= 14
             }
             VaultInstructionTag::ProcessWriterCloseCancellationV1 if count == 13 => {
                 matches!(index, 0 | 1 | 3 | 6 | 7 | 8)
@@ -284,6 +285,24 @@ pub(super) fn process_instruction(
                 process_initialize_policy_registry,
             )
         }
+        VaultInstructionTag::ManageWriterDlmmV1 => {
+            let action =
+                crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::decode_exact(payload)
+                    .map_err(|_| VaultError::InvalidInstructionData)?;
+            match action {
+                crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::BeginPolicy(_)
+                | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::AppendPolicySeries {
+                    ..
+                }
+                | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::SealPolicy => {
+                    dlmm::process_policy_action(program_id, accounts, action)
+                }
+                crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::InitializePosition {
+                    series_index,
+                } => dlmm::process_initialize_position(program_id, accounts, series_index),
+                _ => dlmm::process_liquidity_action(program_id, accounts, action),
+            }
+        }
         VaultInstructionTag::ManageWriterPolicyAuthorityV1 => {
             decode_and_process::<ManageWriterPolicyAuthorityV1Params>(
                 program_id,
@@ -368,12 +387,10 @@ pub(super) fn process_instruction(
             )
         }
         VaultInstructionTag::CommitWriterAuctionV1 => {
-            decode_and_process::<CommitWriterAuctionV1Params>(
-                program_id,
-                accounts,
-                payload,
-                auction::process_commit_writer_auction,
-            )
+            // Historical wire decoding remains available, but new auction creation is
+            // permanently retired by writer-owned native DLMM primary distribution.
+            // Existing auction fills, finalization and refunds retain their handlers.
+            Err(VaultError::InvalidInstructionData.into())
         }
         VaultInstructionTag::PlaceWriterBidV1 => decode_and_process::<PlaceWriterBidV1Params>(
             program_id,
@@ -523,6 +540,14 @@ pub(super) fn writer_series_family_hash(book: &WriterSeriesBookV1) -> [u8; 32] {
 }
 
 pub(super) fn writer_book_digest(book: &WriterSeriesBookV1) -> [u8; 32] {
+    writer_book_digest_inner(book, false)
+}
+
+pub(super) fn writer_close_book_digest(book: &WriterSeriesBookV1) -> [u8; 32] {
+    writer_book_digest_inner(book, true)
+}
+
+fn writer_book_digest_inner(book: &WriterSeriesBookV1, economic_only: bool) -> [u8; 32] {
     let count = usize::from(book.series_count);
     let mut bytes = [0u8; WRITER_BOOK_HASH_MAX_BYTES];
     let mut len = 0usize;
@@ -540,12 +565,22 @@ pub(super) fn writer_book_digest(book: &WriterSeriesBookV1) -> [u8; 32] {
         append_hash_bytes(
             &mut bytes,
             &mut len,
-            &record.total_physical_supply_atoms.to_le_bytes(),
+            &if economic_only {
+                record.external_open_interest_atoms
+            } else {
+                record.total_physical_supply_atoms
+            }
+            .to_le_bytes(),
         );
         append_hash_bytes(
             &mut bytes,
             &mut len,
-            &record.issuer_controlled_atoms.to_le_bytes(),
+            &if economic_only {
+                0u64
+            } else {
+                record.issuer_controlled_atoms
+            }
+            .to_le_bytes(),
         );
         append_hash_bytes(
             &mut bytes,
@@ -1873,7 +1908,7 @@ pub(super) fn process_seal_policy(
 }
 
 pub(super) fn process_open_funding(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
-    if accounts.len() != 8 {
+    if accounts.len() != 9 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let admin_info = &accounts[0];
@@ -1906,6 +1941,8 @@ pub(super) fn process_open_funding(program_id: &Pubkey, accounts: &[AccountInfo]
     )?;
     validate_vault_token_account(sleeve_vault_info, &sleeve.settlement_mint, sleeve_info.key)?;
     validate_writer_flat_mint(sleeve_info, &sleeve, flat_mint_info)?;
+    let _writer_liquidity_policy =
+        dlmm::load_funding_policy(program_id, &accounts[8], sleeve_info, &sleeve, &snapshot)?;
     if group.sleeve != *sleeve_info.key
         || sleeve.usdc_vault != *sleeve_vault_info.key
         || sleeve.flat_mint != *flat_mint_info.key

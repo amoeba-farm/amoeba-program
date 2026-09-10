@@ -183,7 +183,7 @@ pub(super) fn process_instruction_with_context(
         64..=124 => dispatch_64_124(program_id, accounts, tag, payload, context),
         128..=158 => dispatch_128_158(program_id, accounts, tag, payload, context),
         161..=205 => dispatch_161_205(program_id, accounts, tag, payload, context),
-        220..=251 => writer_sleeve::process_instruction(
+        159 | 220..=251 => writer_sleeve::process_instruction(
             program_id,
             accounts,
             tag,
@@ -478,6 +478,11 @@ pub(super) fn dispatch_161_205(
             let params: RecomputeOracleBucketMedianV1Params = decode_instruction_payload(payload)?;
             require_compressed_state_transport(compressed_state_transport)?;
             process_recompute_oracle_bucket_median_v1(program_id, accounts, params)
+        }
+        VaultInstructionTag::IndexOracleRecipeSourceV1 => {
+            let params: crate::instruction::IndexOracleRecipeSourceV1Params =
+                decode_instruction_payload(payload)?;
+            oracle_membership::process_index_oracle_recipe_source(program_id, accounts, params)
         }
         VaultInstructionTag::RevealOracleUpdateClaimV3 => {
             let params: RevealOracleUpdateClaimV3Params = decode_instruction_payload(payload)?;

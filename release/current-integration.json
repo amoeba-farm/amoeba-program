@@ -2,6 +2,7 @@
   "schema": "ameba-spread-current-integration-v1",
   "profile": "devnet-v3",
   "manifest": "deployments/devnet-v3.json",
+  "candidateManifest": "release/candidates/writer-dlmm-20260909/candidate.json",
   "deploymentEnabled": false,
   "bootstrapEnabled": false
 }

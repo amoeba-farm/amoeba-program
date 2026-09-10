@@ -5,6 +5,7 @@ pub(super) fn process_set_collective_pool_status_core(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     params: SetAmoebaDlmmPoolStatusV1Params,
+    writer_sides: (bool, bool),
 ) -> ProgramResult {
     if accounts.len() != 10 {
         return Err(VaultError::InvalidAccountList.into());
@@ -58,10 +59,12 @@ pub(super) fn process_set_collective_pool_status_core(
             || coverage.covered_sku_count != coverage.required_sku_count
             || active.phase != OracleRecipeWeightPhase::Finalized
             || active.rolling_manifest_hash != month.active_weight_manifest_hash
-            || pool.best_bid_bin_id == AMOEBA_DLMM_EMPTY_BIN_ID
-            || pool.best_ask_bin_id == AMOEBA_DLMM_EMPTY_BIN_ID
-            || first_set_page(&pool.bid_page_bitmap).is_none()
-            || first_set_page(&pool.ask_page_bitmap).is_none()
+            || (!writer_sides.0
+                && (pool.best_bid_bin_id == AMOEBA_DLMM_EMPTY_BIN_ID
+                    || first_set_page(&pool.bid_page_bitmap).is_none()))
+            || (!writer_sides.1
+                && (pool.best_ask_bin_id == AMOEBA_DLMM_EMPTY_BIN_ID
+                    || first_set_page(&pool.ask_page_bitmap).is_none()))
         {
             return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
         }

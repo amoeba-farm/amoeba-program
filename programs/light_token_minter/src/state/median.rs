@@ -43,6 +43,7 @@ pub struct OracleBucketMedianState {
     pub bucket_delta_bps: i64,
     pub last_recomputed_ts: u64,
     pub source_snapshot_hash: [u8; 32],
+    /// Number of frozen sources visited in authenticated order, including inactive sources.
     pub recompute_processed_source_count: u16,
     pub last_recompute_source_id: [u8; 32],
     pub emergency_snapshot_slot: u64,

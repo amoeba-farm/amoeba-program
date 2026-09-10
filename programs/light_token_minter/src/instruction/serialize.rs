@@ -20,6 +20,9 @@ where
 impl BorshSerialize for VaultInstruction {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         match self {
+            Self::ManageWriterDlmmV1 { params } => {
+                serialize_tagged_payload(writer, VaultInstructionTag::ManageWriterDlmmV1, params)
+            }
             Self::Initialize => serialize_tag(writer, VaultInstructionTag::Initialize),
             Self::UpdateConfig {
                 new_admin,
@@ -353,6 +356,11 @@ impl BorshSerialize for VaultInstruction {
             Self::RecomputeOracleBucketMedianV1 { params } => serialize_tagged_payload(
                 writer,
                 VaultInstructionTag::RecomputeOracleBucketMedianV1,
+                params,
+            ),
+            Self::IndexOracleRecipeSourceV1 { params } => serialize_tagged_payload(
+                writer,
+                VaultInstructionTag::IndexOracleRecipeSourceV1,
                 params,
             ),
             Self::FinalizeOracleOpeningPhase => {

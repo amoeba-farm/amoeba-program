@@ -5,7 +5,7 @@ use crate::{
 };
 
 const PUBLISH_WRITER_GROUP_SETTLEMENT_ACCOUNT_COUNT: usize = 13;
-const FINALIZE_WRITER_SETTLEMENT_FIXED_ACCOUNT_COUNT: usize = 8;
+const FINALIZE_WRITER_SETTLEMENT_FIXED_ACCOUNT_COUNT: usize = 9;
 const CLAIM_COLLECTIVE_LONG_ACCOUNT_COUNT: usize = 20;
 const CLAIM_WRITER_FLAT_ACCOUNT_COUNT: usize = 17;
 const CLOSE_WRITER_SLEEVE_ACCOUNT_COUNT: usize = 10;
@@ -173,6 +173,7 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
     let snapshot_info = &accounts[5];
     let sleeve_vault_info = &accounts[6];
     let flat_mint_info = &accounts[7];
+    let lp_policy_info = &accounts[8];
     if !cranker_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
@@ -194,6 +195,8 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
         &sleeve.policy_registry,
         sleeve.policy_version,
     )?;
+    let lp_policy = dlmm::load_optional_policy(program_id, lp_policy_info, sleeve_info, &sleeve)?;
+    dlmm::require_unwound_policy(lp_policy.as_deref())?;
     if config.paused
         || sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::Expired
@@ -397,8 +400,7 @@ fn claim_collective_long<'a>(
         mut sleeve,
         mut book,
     } = load_writer_book_context(program_id, sleeve_info, group_info, book_info)?;
-    if config.paused
-        || sleeve.vault_config != *config_info.key
+    if sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::SettlementFinalized
         || group.status != WriterSettlementGroupStatus::Settled
         || sleeve.active_auction.is_some()
@@ -652,8 +654,7 @@ pub(super) fn process_claim_writer_flat_residual(
     )?;
     let config = load_canonical_vault_config(program_id, config_info)?;
     let mut sleeve = load_writer_sleeve_without_group_meta(program_id, sleeve_info)?;
-    if config.paused
-        || sleeve.vault_config != *config_info.key
+    if sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::SettlementFinalized
         || sleeve.active_auction.is_some()
         || sleeve.active_close_request.is_some()

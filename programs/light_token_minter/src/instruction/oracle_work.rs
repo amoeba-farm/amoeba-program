@@ -190,6 +190,29 @@ pub struct BeginOracleActiveWeightsParams {
     pub expected_group_count: u16,
 }
 
+/// One reverse hash-chain step from the finalized recipe. `previous_hash` is authenticated
+/// by hashing it with these frozen fields and comparing with the on-chain remaining hash.
+#[derive(BorshSerialize, Clone, Debug, Eq, PartialEq)]
+pub struct IndexOracleRecipeSourceV1Params {
+    pub previous_hash: [u8; 32],
+    pub bucket_id: [u8; 32],
+    pub source_id: [u8; 32],
+    pub source_type_hash: [u8; 32],
+    pub canonical_locator_hash: [u8; 32],
+    pub source_definition_hash: [u8; 32],
+    pub bucket_weight_bps: u16,
+}
+
+crate::fixed_codec::fixed_instruction_deserialize!(IndexOracleRecipeSourceV1Params, 194, {
+    previous_hash: [u8; 32],
+    bucket_id: [u8; 32],
+    source_id: [u8; 32],
+    source_type_hash: [u8; 32],
+    canonical_locator_hash: [u8; 32],
+    source_definition_hash: [u8; 32],
+    bucket_weight_bps: u16,
+});
+
 #[derive(BorshSerialize, Clone, Debug, Eq, PartialEq)]
 pub struct AccumulateOracleActiveWeightGroupParams {
     pub group_id: [u8; 32],

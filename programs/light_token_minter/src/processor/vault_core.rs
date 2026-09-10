@@ -453,6 +453,24 @@ pub(super) fn process_activate_vault_v2(
     store_state(config_info, &config)
 }
 
+/// Public owner collateral movement is bound to current custody and balances.
+/// It does not depend on the pause flag used by protocol-admin value flows.
+fn load_user_collateral_vault_config(
+    program_id: &Pubkey,
+    config_info: &AccountInfo,
+    mint_info: &AccountInfo,
+    vault_token_info: &AccountInfo,
+) -> Result<VaultConfig, ProgramError> {
+    let config = load_current_canonical_vault_config(program_id, config_info)?;
+    if *mint_info.key != config.usdc_mint {
+        return Err(VaultError::InvalidMint.into());
+    }
+    if *vault_token_info.key != config.vault_token_account {
+        return Err(VaultError::InvalidTokenAccount.into());
+    }
+    Ok(config)
+}
+
 pub(super) fn process_deposit(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -480,7 +498,11 @@ pub(super) fn process_deposit(
         return Err(VaultError::InvalidTokenProgram.into());
     }
 
-    let config = load_active_vault_config(program_id, config_info, mint_info, vault_token_info)?;
+    let config = if require_current_admin {
+        load_active_vault_config(program_id, config_info, mint_info, vault_token_info)?
+    } else {
+        load_user_collateral_vault_config(program_id, config_info, mint_info, vault_token_info)?
+    };
     if require_current_admin && *user_info.key != config.admin {
         return Err(VaultError::Unauthorized.into());
     }
@@ -542,7 +564,11 @@ pub(super) fn process_collateral_withdrawal(
         return Err(VaultError::InvalidTokenProgram.into());
     }
 
-    let config = load_active_vault_config(program_id, config_info, mint_info, vault_token_info)?;
+    let config = if assisted {
+        load_active_vault_config(program_id, config_info, mint_info, vault_token_info)?
+    } else {
+        load_user_collateral_vault_config(program_id, config_info, mint_info, vault_token_info)?
+    };
     if assisted && *admin_info.key != config.admin {
         return Err(VaultError::Unauthorized.into());
     }

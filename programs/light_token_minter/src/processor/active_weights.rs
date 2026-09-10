@@ -186,15 +186,20 @@ pub(super) fn process_begin_oracle_active_weights(
     store_oracle_month_state(month_info, &month)
 }
 
+/// The two trailing read-only accounts are the completed recipe source index and this
+/// bucket's authenticated source index. Sources retain their original indices starting at 7.
 #[inline(never)]
 pub(super) fn process_accumulate_oracle_active_weight_group(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     params: AccumulateOracleActiveWeightGroupParams,
 ) -> ProgramResult {
-    if accounts.len() < 8
-        || accounts.len() - 7 > crate::constants::MAX_COMPRESSED_STATE_SESSION_RECORDS / 2
+    if accounts.len() < 10
+        || accounts.len() - 9 > crate::constants::MAX_COMPRESSED_STATE_SESSION_RECORDS / 2
         || !accounts[0].is_signer
+        || !accounts[0].is_writable
+        || !accounts[2].is_writable
+        || !accounts[3].is_writable
         || crate::bytes32_is_zero(&params.group_id)
     {
         return Err(VaultError::InvalidAccountList.into());
@@ -206,6 +211,7 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
     let system_program_info = &accounts[4];
     let sku_info = &accounts[5];
     let bucket_info = &accounts[6];
+    let source_end = accounts.len() - 2;
     validate_system_program(system_program_info)?;
     let (_market, mut month) =
         load_valid_market_and_oracle_month(program_id, market_info, month_info)?;
@@ -219,6 +225,28 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
         || (manifest.current_group_source_count > 0 && params.group_id != manifest.current_group_id)
     {
         return Err(VaultError::InvalidOracleActiveWeightManifest.into());
+    }
+    let membership = oracle_membership::load_complete_bucket_source_index(
+        program_id,
+        month_info.key,
+        &month,
+        &params.group_id,
+        &accounts[source_end],
+        &accounts[source_end + 1],
+    )?;
+    let next_count = usize::from(manifest.current_group_source_count) + source_end - 7;
+    if membership.group_index != manifest.processed_group_count
+        || membership.first_source_index != manifest.processed_source_count
+        || next_count > usize::from(membership.source_count)
+        // Reaching the exact group end must finalize in this call. Otherwise there would
+        // be no next source with which a permissionless caller could complete the group.
+        || params.finalize_collection != (next_count == usize::from(membership.source_count))
+        || (manifest.current_group_source_count > 0
+            && (manifest.current_group_bucket_weight_bps != membership.bucket_weight_bps
+                || manifest.last_collected_source_id
+                    != membership.source_ids[usize::from(manifest.current_group_source_count - 1)]))
+    {
+        return Err(VaultError::InvalidOracleWeightOrder.into());
     }
     let sku = oracle_usdc::load_oracle_usdc_sku_for_month(program_id, month_info.key, sku_info)?;
     if sku.bucket_id != params.group_id {
@@ -245,9 +273,15 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
         Some(current)
     };
 
-    for source_info in &accounts[7..] {
+    for source_info in &accounts[7..source_end] {
         let source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
         validate_oracle_terminal_source(&source)?;
+        if source.source_id
+            != membership.source_ids[usize::from(manifest.current_group_source_count)]
+            || source.bucket_weight_bps != membership.bucket_weight_bps
+        {
+            return Err(VaultError::InvalidOracleWeightOrder.into());
+        }
         if manifest.current_group_source_count == 0 {
             if manifest.processed_group_count >= manifest.expected_group_count
                 || (manifest.processed_group_count > 0

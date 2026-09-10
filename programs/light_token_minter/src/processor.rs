@@ -16,6 +16,7 @@ mod market_admin;
 mod market_settlement;
 mod median;
 mod oracle_economics;
+mod oracle_membership;
 mod oracle_rules;
 mod oracle_samba_pot;
 mod oracle_schedule_validation;

@@ -1,3 +1,4 @@
+pub use crate::writer_dlmm_instruction::{BeginWriterDlmmPolicyV1Params, ManageWriterDlmmV1Params};
 use std::io;
 
 use borsh::{BorshDeserialize, BorshSerialize};

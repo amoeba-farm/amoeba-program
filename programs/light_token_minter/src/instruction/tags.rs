@@ -48,6 +48,7 @@ pub enum VaultInstructionTag {
     BeginOracleUsdcRewardSchedule = 156,
     AddOracleUsdcSkuBudget = 157,
     FinalizeOracleUsdcRewardSchedule = 158,
+    ManageWriterDlmmV1 = 159,
     ChallengeOracleSourceV2 = 161,
     SubmitOracleOpeningClaimV2 = 162,
     ChallengeOracleOpeningClaimV2 = 163,
@@ -84,6 +85,7 @@ pub enum VaultInstructionTag {
     RecomputeOracleBucketMedianV1 = 197,
     RevealOracleUpdateClaimV3 = 198,
     FinalizeOracleUpdateClaimV2 = 199,
+    IndexOracleRecipeSourceV1 = 200,
     CancelStaleOracleUpdateClaimV2 = 201,
     AbortStaleOracleUpdateEmergencyDisputeV2 = 202,
     ExecuteCompressedStateV1 = 205,
@@ -126,8 +128,8 @@ impl VaultInstructionTag {
         const VALID_TAGS: [u64; 4] = [
             0x8800_0000_0000_0e0d,
             0x1612_6001_7ed3_0803,
-            0xcfff_effe_7c00_3fab,
-            0x0fff_ffff_f000_2eff,
+            0xcfff_effe_fc00_3fab,
+            0x0fff_ffff_f000_2fff,
         ];
         let bit = 1u64 << (tag & 63);
         if VALID_TAGS[usize::from(tag >> 6)] & bit == 0 {

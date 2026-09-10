@@ -251,201 +251,7 @@ fn validate_bid_index_series_bindings(
     Ok(())
 }
 
-pub(super) fn process_commit_writer_auction(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    params: CommitWriterAuctionV1Params,
-) -> ProgramResult {
-    if accounts.len() != COMMIT_WRITER_AUCTION_ACCOUNT_COUNT {
-        return Err(VaultError::InvalidAccountList.into());
-    }
-    let authority_info = &accounts[0];
-    let config_info = &accounts[1];
-    let registry_info = &accounts[2];
-    let sleeve_info = &accounts[3];
-    let group_info = &accounts[4];
-    let book_info = &accounts[5];
-    let snapshot_info = &accounts[6];
-    let auction_info = &accounts[7];
-    let bid_index_info = &accounts[8];
-    let escrow_info = &accounts[9];
-    let fee_vault_info = &accounts[10];
-    let settlement_mint_info = &accounts[11];
-    let token_program_info = &accounts[12];
-    let system_program_info = &accounts[13];
-    if !authority_info.is_signer || !authority_info.is_writable {
-        return Err(ProgramError::MissingRequiredSignature);
-    }
-    if *token_program_info.key != spl_token_program_id()
-        || *system_program_info.key != system_program::id()
-        || crate::bytes32_is_zero(&params.reserve_vector_commitment)
-    {
-        return Err(VaultError::InvalidInstructionData.into());
-    }
-    let config = load_canonical_vault_config(program_id, config_info)?;
-    let registry = load_writer_policy_registry(program_id, registry_info, config_info.key)?;
-    let WriterPolicyContext {
-        group,
-        mut sleeve,
-        book: _,
-        snapshot,
-    } = load_writer_policy_context(
-        program_id,
-        sleeve_info,
-        group_info,
-        book_info,
-        snapshot_info,
-        Some(registry_info.key),
-    )?;
-    let now = current_unix_timestamp()?;
-    let expected_nonce = sleeve
-        .auction_nonce
-        .checked_add(1)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    if config.paused
-        || registry.policy_authority != *authority_info.key
-        || registry.protocol_fee_vault != *fee_vault_info.key
-        || sleeve.status != WriterSleeveStatus::Active
-        || group.status != WriterSettlementGroupStatus::Active
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
-        || sleeve.policy_snapshot != *snapshot_info.key
-        || sleeve.policy_hash != snapshot.policy_hash
-        || params.auction_nonce != expected_nonce
-        || now >= sleeve.expiry_ts
-        || !writer_auction_commit_window_open(now, params.bid_deadline_ts)
-        || !writer_auction_deadline_sequence_valid(
-            params.bid_deadline_ts,
-            params.reveal_deadline_ts,
-            params.execute_deadline_ts,
-            sleeve.expiry_ts,
-        )
-    {
-        return Err(VaultError::InvalidWriterDeadline.into());
-    }
-    validate_vault_token_account(fee_vault_info, settlement_mint_info.key, registry_info.key)?;
-    if config.usdc_mint != *settlement_mint_info.key
-        || sleeve.settlement_mint != *settlement_mint_info.key
-    {
-        return Err(VaultError::InvalidMint.into());
-    }
-    let (expected_auction, auction_bump) =
-        derive_writer_auction_pda(program_id, sleeve_info.key, params.auction_nonce);
-    let (expected_index, index_bump) = derive_writer_bid_index_pda(program_id, auction_info.key);
-    let (expected_escrow, escrow_bump) =
-        derive_writer_auction_escrow_pda(program_id, auction_info.key);
-    if *auction_info.key != expected_auction
-        || *bid_index_info.key != expected_index
-        || *escrow_info.key != expected_escrow
-    {
-        return Err(VaultError::InvalidPda.into());
-    }
-    validate_create_only_program_account_target(program_id, auction_info)?;
-    super::bid_index_preparation::validate_ready_bid_index(program_id, bid_index_info)?;
-    create_program_account(
-        authority_info,
-        auction_info,
-        system_program_info,
-        program_id,
-        WriterAuctionV1::LEN,
-        &[
-            crate::constants::WRITER_AUCTION_PDA_SEED,
-            sleeve_info.key.as_ref(),
-            &params.auction_nonce.to_le_bytes(),
-            &[auction_bump],
-        ],
-    )?;
-    create_classic_token_pda(
-        program_id,
-        authority_info,
-        escrow_info,
-        settlement_mint_info,
-        auction_info.key,
-        token_program_info,
-        system_program_info,
-        &[
-            crate::constants::WRITER_AUCTION_ESCROW_PDA_SEED,
-            auction_info.key.as_ref(),
-            &[escrow_bump],
-        ],
-    )?;
-    if validate_token_account(escrow_info)?.amount != 0 {
-        return Err(VaultError::InvalidWriterAuction.into());
-    }
-    let slot = Clock::get()?.slot;
-    let auction = WriterAuctionV1 {
-        is_initialized: true,
-        bump: auction_bump,
-        account_discriminator: WriterAuctionV1::ACCOUNT_DISCRIMINATOR,
-        account_version: WriterAuctionV1::ACCOUNT_VERSION,
-        sleeve: *sleeve_info.key,
-        series_book: *book_info.key,
-        policy_snapshot: *snapshot_info.key,
-        auction_nonce: params.auction_nonce,
-        escrow: *escrow_info.key,
-        bid_index: *bid_index_info.key,
-        fee_vault: *fee_vault_info.key,
-        policy_version: snapshot.policy_version,
-        scenario_set_hash: snapshot.scenario_set_hash,
-        risk_limit_hash: snapshot.risk_limit_hash,
-        // The caller supplies the reveal-input precommitment. Store only the commitment bound to
-        // the actual execution slot so a client never has to predict that slot and any later slot
-        // mutation invalidates reveal. This preserves the V1 instruction and account layouts.
-        reserve_vector_commitment: slot_bound_reserve_commitment(
-            &params.reserve_vector_commitment,
-            slot,
-        ),
-        reveal_hash: [0; 32],
-        revealed_nonce: [0; 32],
-        commit_slot: slot,
-        bid_deadline_ts: params.bid_deadline_ts,
-        reveal_deadline_ts: params.reveal_deadline_ts,
-        execute_deadline_ts: params.execute_deadline_ts,
-        bid_count: 0,
-        planned_bid_count: 0,
-        executed_bid_count: 0,
-        refunded_bid_count: 0,
-        planning_cursor: 0,
-        reserved_0: [0; 6],
-        total_escrow_atoms: 0,
-        accepted_premium_atoms: 0,
-        accepted_fee_atoms: 0,
-        accepted_contract_atoms: 0,
-        refundable_atoms: 0,
-        plan_digest: [0; 32],
-        status: WriterAuctionStatus::Bidding,
-        reserved_1: [0; 7],
-        last_updated_slot: slot,
-        reserve_prices_atoms: [0; crate::constants::WRITER_SERIES_STORAGE_CAPACITY],
-        issue_caps_atoms: [0; crate::constants::WRITER_SERIES_STORAGE_CAPACITY],
-        planned_issue_atoms: [0; crate::constants::WRITER_SERIES_STORAGE_CAPACITY],
-        executed_issue_atoms: [0; crate::constants::WRITER_SERIES_STORAGE_CAPACITY],
-    };
-    let index = WriterBidIndexV1 {
-        is_initialized: true,
-        bump: index_bump,
-        account_discriminator: WriterBidIndexV1::ACCOUNT_DISCRIMINATOR,
-        account_version: WriterBidIndexV1::ACCOUNT_VERSION,
-        auction: *auction_info.key,
-        bid_count: 0,
-        planned_bid_count: 0,
-        executed_bid_count: 0,
-        refunded_bid_count: 0,
-        planning_cursor: 0,
-        rolling_digest: [0; 32],
-        last_updated_slot: slot,
-        records: vec![WriterBidIndexRecordV1::EMPTY; crate::constants::WRITER_MAX_FUNDED_BIDS]
-            .into_boxed_slice()
-            .try_into()
-            .map_err(|_| VaultError::ArithmeticOverflow)?,
-    };
-    sleeve.auction_nonce = params.auction_nonce;
-    sleeve.active_auction = Some(*auction_info.key);
-    sleeve.last_updated_slot = slot;
-    store_state(auction_info, &auction)?;
-    store_state(bid_index_info, &index)?;
-    store_state(sleeve_info, &sleeve)
-}
+// Historical fixture construction only; tag 233 cannot invoke this in the program.
 
 pub(super) fn process_place_writer_bid(
     program_id: &Pubkey,
@@ -1171,7 +977,7 @@ pub(super) fn process_plan_writer_auction_chunk(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn load_or_create_market_staging<'a>(
+pub(super) fn load_or_create_market_staging<'a>(
     program_id: &Pubkey,
     payer_info: &AccountInfo<'a>,
     market_info: &AccountInfo<'a>,
@@ -1208,7 +1014,7 @@ fn load_or_create_market_staging<'a>(
     validate_token_account(staging_info)
 }
 
-fn observe_market_staging_amount(
+pub(super) fn observe_market_staging_amount(
     program_id: &Pubkey,
     market_info: &AccountInfo,
     staging_info: &AccountInfo,
@@ -1227,7 +1033,7 @@ fn observe_market_staging_amount(
     Ok(0)
 }
 
-fn observe_writer_retirement_custody_amount(
+pub(super) fn observe_writer_retirement_custody_amount(
     program_id: &Pubkey,
     sleeve_info: &AccountInfo,
     market_info: &AccountInfo,
@@ -1248,7 +1054,7 @@ fn observe_writer_retirement_custody_amount(
     Ok(0)
 }
 
-fn market_signer_seeds<'a>(market: &'a Market, bump: &'a [u8; 1]) -> [&'a [u8]; 4] {
+pub(super) fn market_signer_seeds<'a>(market: &'a Market, bump: &'a [u8; 1]) -> [&'a [u8]; 4] {
     [
         CURRENT_STATE_NAMESPACE_SEED,
         MARKET_PDA_SEED,

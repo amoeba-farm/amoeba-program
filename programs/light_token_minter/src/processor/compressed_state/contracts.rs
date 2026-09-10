@@ -264,21 +264,26 @@ pub(in crate::processor) fn build_required_access_contract(
             source_pair_walk(5, core_account_count, 1, mutable)?
         }
         VaultInstructionTag::AccumulateOracleActiveWeightGroup => {
-            if !(8..=11).contains(&core_account_count) {
+            if !(10..=13).contains(&core_account_count) {
                 return Err(VaultError::InvalidCompressionWitness.into());
             }
-            source_pair_walk(7, core_account_count, 1, read)?
+            // The completed recipe/bucket source indexes are ordinary read-only tail accounts.
+            source_pair_walk(7, core_account_count - 2, 1, read)?
         }
         VaultInstructionTag::RecomputeOracleBucketMedianV1 => {
             if payload.len() != 33 {
                 return Err(VaultError::InvalidCompressionWitness.into());
             }
-            match payload[32] {
-                0 if core_account_count == 7 => {}
-                1 if core_account_count == 10 => {}
-                _ => return Err(VaultError::InvalidCompressionWitness.into()),
+            if super::super::bucket_medians::recompute_core_account_count(payload[32])
+                != Some(core_account_count)
+            {
+                return Err(VaultError::InvalidCompressionWitness.into());
             }
-            required_accesses![spec(5, source, read)]
+            required_accesses![spec(
+                super::super::bucket_medians::RECOMPUTE_SOURCE_ACCOUNT_INDEX,
+                source,
+                read,
+            )]
         }
         VaultInstructionTag::TryOpenOracleEmergencyDisputeV2 => {
             let kind = payload

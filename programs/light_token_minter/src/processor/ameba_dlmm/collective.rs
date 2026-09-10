@@ -2,8 +2,8 @@ use super::*;
 use crate::state::{WriterSettlementGroupStatus, WriterSleeveStatus};
 
 const INITIALIZE_COLLECTIVE_PREFIX_ACCOUNTS: usize = 20;
-const SET_COLLECTIVE_STATUS_ACCOUNTS: usize = 13;
-const COLLECTIVE_SWAP_FIXED_ACCOUNTS: usize = 24;
+const SET_COLLECTIVE_STATUS_ACCOUNTS: usize = 16;
+pub(super) const COLLECTIVE_SWAP_FIXED_ACCOUNTS: usize = 32;
 const SETTLE_COLLECTIVE_POOL_ACCOUNTS: usize = 17;
 
 fn normalized_accounts<'a>(
@@ -18,7 +18,7 @@ fn normalized_accounts<'a>(
         .collect()
 }
 
-fn validate_collective_pool_binding(
+pub(super) fn validate_collective_pool_binding(
     config: &VaultConfig,
     market_info: &AccountInfo,
     anchor_month_info: &AccountInfo,
@@ -105,8 +105,10 @@ pub(super) fn process_set_collective_pool_status(
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    let normalized = normalized_accounts(accounts, 6, 9);
-    process_set_collective_pool_status_core(program_id, &normalized, params)
+    let writer_sides =
+        super::super::writer_sleeve::dlmm::activation_sides(program_id, accounts, &pool)?;
+    let normalized = normalized_accounts(&accounts[..13], 6, 9);
+    process_set_collective_pool_status_core(program_id, &normalized, params, writer_sides)
 }
 
 #[inline(never)]
@@ -115,7 +117,7 @@ pub(super) fn process_collective_swap_exact_in(
     accounts: &[AccountInfo],
     params: SwapAmoebaDlmmExactInV1Params,
 ) -> ProgramResult {
-    if accounts.len() <= COLLECTIVE_SWAP_FIXED_ACCOUNTS {
+    if accounts.len() < COLLECTIVE_SWAP_FIXED_ACCOUNTS {
         return Err(VaultError::InvalidAccountList.into());
     }
     // Existing trader/config/Market/month prefix, then sleeve/group/book before pool.
@@ -131,18 +133,29 @@ pub(super) fn process_collective_swap_exact_in(
     let pool = load_pool(program_id, &accounts[7])?;
     validate_collective_pool_binding(&config, &accounts[2], &accounts[3], &context, &pool)?;
     if context.group_status != WriterSettlementGroupStatus::Active
-        || context.sleeve_status != WriterSleeveStatus::Active
+        || !matches!(
+            context.sleeve_status,
+            WriterSleeveStatus::Active | WriterSleeveStatus::CloseStaging
+        )
         || context.anchor_month_settled
     {
         return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
     }
+    let mut writer =
+        super::super::writer_sleeve::dlmm::load_swap_state(program_id, accounts, &pool)?;
     let normalized: Vec<_> = accounts[..4]
         .iter()
         .chain(accounts[7..23].iter())
-        .chain(accounts[24..].iter())
+        .chain(accounts[32..].iter())
         .cloned()
         .collect();
-    process_collective_swap_exact_in_core(program_id, &normalized, params)?;
+    process_collective_swap_exact_in_core_with_writer(
+        program_id,
+        &normalized,
+        params,
+        &mut writer,
+        accounts,
+    )?;
     // The original trade signature also grants the exact owner/mint settlement capability.
     super::super::scoped_settlement::authorize_collective_settlement(
         program_id,

@@ -6,6 +6,9 @@ impl BorshDeserialize for VaultInstruction {
         let tag = VaultInstructionTag::from_byte(tag_byte)
             .ok_or_else(|| invalid_instruction_tag_error(tag_byte))?;
         match tag {
+            VaultInstructionTag::ManageWriterDlmmV1 => Ok(Self::ManageWriterDlmmV1 {
+                params: ManageWriterDlmmV1Params::deserialize_reader(reader)?,
+            }),
             VaultInstructionTag::Initialize => Ok(Self::Initialize),
             VaultInstructionTag::UpdateConfig => Ok(Self::UpdateConfig {
                 new_admin: Option::<Pubkey>::deserialize_reader(reader)?,
@@ -279,6 +282,9 @@ impl BorshDeserialize for VaultInstruction {
             VaultInstructionTag::FinalizeOracleActiveWeights => {
                 Ok(Self::FinalizeOracleActiveWeights)
             }
+            VaultInstructionTag::IndexOracleRecipeSourceV1 => Ok(Self::IndexOracleRecipeSourceV1 {
+                params: IndexOracleRecipeSourceV1Params::deserialize_reader(reader)?,
+            }),
             VaultInstructionTag::RecomputeOracleBucketMedianV1 => {
                 Ok(Self::RecomputeOracleBucketMedianV1 {
                     params: RecomputeOracleBucketMedianV1Params::deserialize_reader(reader)?,
