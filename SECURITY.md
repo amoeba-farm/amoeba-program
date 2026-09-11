@@ -1,10 +1,12 @@
 # Security
 
-Use the public repository's private security-advisory channel to report a
-potential vulnerability. Never place private keys, wallet seed phrases,
-signing material, or live credentials in an issue, discussion, or pull request.
+To report a vulnerability, [request a private security contact](https://github.com/amoeba-farm/amoeba-program/issues/new?title=Private%20security%20contact).
+Keep the request free of vulnerability details. Share the full report only
+through the private channel arranged with the maintainers.
 
-This repository is a generated source preview. A source commit, local build, or
-passing public CI run is not evidence that a program binary was approved or
-deployed. Verify the official release provenance and SHA-256 digest before
-evaluating any distributed artifact.
+Include the affected commit or program ID, a description of the impact, and
+reproduction steps or a minimal proof of concept. Do not include private keys,
+seed phrases, or live credentials.
+
+For deployed code, identify the exact source revision and artifact using the
+repository's [verification records](deployment-evidence).

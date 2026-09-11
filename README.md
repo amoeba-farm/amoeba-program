@@ -1,73 +1,46 @@
 # Amoeba Program
 
-This generated tree contains the reviewed on-chain source for the Amoeba Program
-program. It is produced from private `ameba_spread/main` by an exact allowlist;
-it is not a second implementation or a development workspace.
+Solana smart contracts for Amoeba's index options protocol. The program implements
+collateral custody, oracle source selection, contract issuance, settlement, and
+an integrated discrete liquidity market maker (DLMM).
 
-The current channel is a **pre-production DevNet source preview**. It is not a
-production or mainnet release, does not contain deployment tooling, and does
-not include an official `light_token_minter.so` binary.
+[Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
-## Included
+## Source
 
-- the production Rust modules for `light_token_minter`
-- a production-only Cargo manifest and locked dependency graph
-- the reviewed DevNet deployment manifest and v0.1.0 DevNet release intent
-- the non-secret, hash-pinned V2 DevNet bootstrap policy
-- the exact governed RAMX and NANDX product-SKU manifests, maintained-source
-  provenance, and separate NANDX benchmark basket
-- public source CI and security-reporting guidance
-- `PUBLIC_SOURCE_PROVENANCE.json`, binding the export to its private source
-  commit, policy hash, file count, normalized modes, and exact tree digest
+The Rust program is in [`programs/light_token_minter`](programs/light_token_minter).
 
-## Deliberately excluded
+| Path | Contents |
+| --- | --- |
+| [`src/processor`](programs/light_token_minter/src/processor) | Instruction handlers and account validation |
+| [`src/state.rs`](programs/light_token_minter/src/state.rs) | Account types and state modules |
+| [`src/instruction.rs`](programs/light_token_minter/src/instruction.rs) | Instruction definitions and codecs |
+| [`governance`](governance) | Governed product and benchmark manifests |
+| [`deployments`](deployments) | Program identities and deployment configuration |
 
-- Rust and TypeScript tests, harnesses, fixtures, and simulated faucets
-- TypeScript operator builders, automation, and release tooling
-- private runbooks, point-in-time audits, operator procedures, and deploy helpers
-- keypairs, credentials, build receipts, `.so` files, and generated bundles
+## Build
 
-The selected Devnet V3 integration is `release/current-integration.json`, whose
-manifest is `deployments/devnet-v3.json`. Build with
-`--features devnet-v3-governance-controller,devnet-solo-backfill-2026` to select program
-`2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw` and its V3 council/gate.
-Account seeds remain `ameba-spread-v2`. The older `deployments/devnet.json`
-and bootstrap policy are historical release inputs; they cannot bootstrap V3.
-The September 6 checkpoint records Active at epoch 3, 13 paused markets with
-zero contract supply, and 400 sources across eight finalized coverage manifests.
-September/October timed activation remains pending; November/December remain
-paused. Light/DLMM initialization has a separate controller-PDA authorization
-blocker. These dated observations are not current write permission.
-The final market-preparation receipt and full release attestation remain
-outstanding; market preparation does not establish funding or trade readiness. This export contains Spread source, not the controller source.
+Use the pinned Rust toolchain in [`rust-toolchain.toml`](rust-toolchain.toml).
+To check the Devnet configuration:
 
-The public RAMX manifest is an audit source, not evidence of deployment. Version
-1 preserves exactly 52 labels, encodes exact-case printable ASCII/UTF-8 labels as
-right-zero-padded bytes32, sorts the encoded values, and commits root
-`52a574e7fee12f9921b3b220b709be16c13a6f290abbdc2cc203ed1191ecf578`.
-Its tag-190 submission plan remains `16/16/16/4`.
-
-The public NANDX manifest independently governs exactly 48 terminal MPNs with
-root `41bb5dc79bacabb3e0876b55e647b01084c7fe8b39846fd707ee0fd973d28c3d`,
-source/PDF SHA-256
-`14e31bd83e0c92c5b3894df5d68aec1091373c0ae48b53775d12640b92cb1be7`, and
-tag-190 chunks `16/16/16`. The separate benchmark basket preserves 22 fixed rows
-(18 item-addressable and 4 assessment-only) totaling exactly `100.00%`; terminal
-identities carry no individual weight and monthly oracle source-recipe weights
-remain separate. No transaction, signature, pause, or deployment is performed
-by publishing this source preview.
-
-## Inspect the source
-
-```bash
-cargo check \
-  --manifest-path programs/light_token_minter/Cargo.toml \
-  --locked --features devnet-v3-governance-controller,devnet-solo-backfill-2026 \
-  --lib
+```sh
+cargo check --manifest-path programs/light_token_minter/Cargo.toml \
+  --locked --lib \
+  --features devnet-v3-governance-controller,devnet-solo-backfill-2026
 ```
 
-Any locally produced SBF file is unofficial. Official candidates require the
-private repository's complete Rust and TypeScript suites, two identical clean
-SBF builds with an attested host and pinned toolchain, the full external Light
-artifact suite, a one-shot receipt, SHA-256 provenance, exact ProgramData
-verification, compatible current-state preservation, and governed approval.
+## Deployment and verification
+
+The published deployment is on **Solana Devnet**. Its program ID is
+`2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw`.
+See the [integration manifest](release/current-integration.json) and
+[Devnet configuration](deployments/devnet-v3.json).
+
+[Source provenance](PUBLIC_SOURCE_PROVENANCE.json) identifies the source revision
+and exported file digest. [Build verification](deployment-evidence/writer-dlmm-verified-build-20260910.json)
+records the published artifact's build configuration and hashes. Deployment
+records describe the revisions they attest; they do not establish current chain state.
+
+## License
+
+See [LICENSE](LICENSE).
