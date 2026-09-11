@@ -15,9 +15,17 @@ pub(in crate::processor) fn process_propose_oracle_source_v3(
     accounts: &[AccountInfo],
     params: ProposeOracleSourceV3Params,
 ) -> ProgramResult {
+    if accounts.len() != 12 {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    crate::processor::oracle_carry::require_import_complete(
+        program_id,
+        accounts[2].key,
+        &accounts[11],
+    )?;
     process_propose_oracle_source(
         program_id,
-        accounts,
+        &accounts[..11],
         ProposeOracleSourceParams {
             source_id: params.source_id,
             bucket_id: params.bucket_id,

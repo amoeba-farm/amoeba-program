@@ -87,6 +87,8 @@ impl OracleSourceObservations {
     pub const LEN: usize = 592;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OSO";
     pub const ACCOUNT_VERSION: u8 = 1;
+    /// Same byte layout; slot zero is an inherited standing-state anchor, not a new print.
+    pub const INHERITED_ANCHOR_VERSION: u8 = 2;
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

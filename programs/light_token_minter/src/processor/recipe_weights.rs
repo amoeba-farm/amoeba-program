@@ -6,9 +6,14 @@ pub(super) fn process_begin_oracle_recipe_weights_v2(
     accounts: &[AccountInfo],
     params: BeginOracleRecipeWeightsV2Params,
 ) -> ProgramResult {
-    if accounts.len() != 7 || !accounts[0].is_signer {
+    if accounts.len() != 8 || !accounts[0].is_signer {
         return Err(VaultError::InvalidAccountList.into());
     }
+    crate::processor::oracle_carry::require_import_complete(
+        program_id,
+        accounts[3].key,
+        &accounts[7],
+    )?;
     let authority_info = &accounts[0];
     let market_info = &accounts[1];
     let config_info = &accounts[2];

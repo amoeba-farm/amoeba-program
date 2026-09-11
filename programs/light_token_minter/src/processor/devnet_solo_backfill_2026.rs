@@ -1610,7 +1610,7 @@ fn process_finalize_opening(
     accounts: &[AccountInfo],
     params: ItemPayload,
 ) -> ProgramResult {
-    if accounts.len() != 10 {
+    if accounts.len() != 13 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let operator_info = &accounts[0];
@@ -1686,6 +1686,7 @@ fn process_finalize_opening(
     {
         return Err(VaultError::OracleOpeningClaimNotFinalizable.into());
     }
+    let source_before = source.clone();
     append_oracle_source_observation(
         &mut source,
         &mut observations,
@@ -1710,6 +1711,23 @@ fn process_finalize_opening(
         .ok_or(VaultError::ArithmeticOverflow)?;
     decrement_pending_oracle_resolution(&mut month)?;
     month.last_updated_slot = slot;
+    crate::processor::oracle_carry::record_fresh_accept(
+        program_id,
+        operator_info,
+        source_info.key,
+        &source_before,
+        &source,
+        &observations,
+        crate::processor::oracle_carry::AcceptedEvent {
+            event: *claim_info.key,
+            value: claim.opening_state,
+            observed_at: claim.source_time,
+            evidence_hash: claim.evidence_hash,
+            archive_hash: claim.archive_url_hash,
+            contributor: claim.claimant,
+        },
+        &accounts[10..],
+    )?;
     store_state(source_info, &source)?;
     store_state(observations_info, &observations)?;
     store_state(claim_info, &claim)?;

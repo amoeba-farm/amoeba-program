@@ -416,6 +416,9 @@ impl BorshDeserialize for VaultInstruction {
             VaultInstructionTag::PrepareWriterBidIndexV1 => Ok(Self::PrepareWriterBidIndexV1 {
                 params: PrepareWriterBidIndexV1Params::deserialize_reader(reader)?,
             }),
+            VaultInstructionTag::OracleCarryForwardV1 => Ok(Self::OracleCarryForwardV1 {
+                action: OracleCarryForwardActionV1::deserialize_reader(reader)?,
+            }),
             VaultInstructionTag::ExecuteCompressedStateV1 => Ok(Self::ExecuteCompressedStateV1 {
                 params: ExecuteCompressedStateParams::deserialize_reader(reader)?,
             }),

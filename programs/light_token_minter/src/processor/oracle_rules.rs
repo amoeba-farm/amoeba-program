@@ -29,7 +29,7 @@ pub(super) fn process_expire_oracle_opening_source(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
 ) -> ProgramResult {
-    if accounts.len() < 4 {
+    if accounts.len() != 5 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let cranker_info = &accounts[0];
@@ -42,6 +42,12 @@ pub(super) fn process_expire_oracle_opening_source(
     let (market, mut month) =
         load_valid_market_and_oracle_month(program_id, market_info, month_info)?;
     ensure_oracle_game_transition_window(&market, &month)?;
+    crate::processor::oracle_carry::require_carry_resolved_before_expiry(
+        program_id,
+        source_info.key,
+        &accounts[4],
+        market.instrument.expiry_ts,
+    )?;
     let mut source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
     if source.status != OracleSourceStatus::Frozen || source.opening_submitted {
         return Err(VaultError::InvalidOracleState.into());

@@ -14,6 +14,9 @@ pub const LIGHT_TOKEN_COMPRESSIBLE_CONFIG: Pubkey =
 pub const LIGHT_TOKEN_RENT_SPONSOR: Pubkey = pubkey!("r18WwUxfG8kQ69bQPAB2jV6zGNKy3GosFGctjQoV4ti");
 /// One compressed-state instruction deliberately stays within one combined Light proof batch.
 pub const MAX_COMPRESSED_STATE_SESSION_RECORDS: usize = 8;
+/// One current-period SKU leaf and a state/descriptor pair per source.
+pub const MAX_ORACLE_ACTIVE_WEIGHT_SOURCES_PER_STEP: usize =
+    (MAX_COMPRESSED_STATE_SESSION_RECORDS - 1) / 2;
 /// Compact leaf payloads contain only non-derivable state. Canonical identities are reconstructed
 /// from the unchanged instruction accounts and verified against the compressed address.
 pub const MAX_COMPRESSED_STATE_LEAF_BYTES: usize = 768;

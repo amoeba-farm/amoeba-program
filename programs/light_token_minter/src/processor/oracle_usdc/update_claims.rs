@@ -134,7 +134,9 @@ pub(in crate::processor) fn process_reveal_oracle_update_claim_v3(
         || accounts[2].is_signer
         || accounts[2].is_writable
         || accounts[3].is_signer
-        || accounts[3].is_writable
+        // Compression materializes both authenticated source leaves in a writable
+        // temporary account. The access contract keeps both logically read-only.
+        || !accounts[3].is_writable
         || accounts[4].is_signer
         || accounts[4].is_writable
         || accounts[5].is_signer

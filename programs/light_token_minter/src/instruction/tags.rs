@@ -7,6 +7,7 @@ pub enum VaultInstructionTag {
     InitUserCollateral = 9,
     DepositCollateral = 10,
     WithdrawCollateral = 11,
+    OracleCarryForwardV1 = 30,
     CloseOracleMonth = 59,
     ConfigureOracleMajorToken = 63,
     DepositOracleMajorTokens = 64,
@@ -126,7 +127,7 @@ pub enum VaultInstructionTag {
 impl VaultInstructionTag {
     pub fn from_byte(tag: u8) -> Option<Self> {
         const VALID_TAGS: [u64; 4] = [
-            0x8800_0000_0000_0e0d,
+            0x8800_0000_4000_0e0d,
             0x1612_6001_7ed3_0803,
             0xcfff_effe_fc00_3fab,
             0x0fff_ffff_f000_2fff,

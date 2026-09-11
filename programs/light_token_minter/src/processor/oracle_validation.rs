@@ -264,7 +264,11 @@ pub(super) fn load_valid_oracle_source_observations(
         || !observations.is_initialized
         || observations.bump != bump
         || observations.account_discriminator != OracleSourceObservations::ACCOUNT_DISCRIMINATOR
-        || observations.account_version != OracleSourceObservations::ACCOUNT_VERSION
+        || !matches!(
+            observations.account_version,
+            OracleSourceObservations::ACCOUNT_VERSION
+                | OracleSourceObservations::INHERITED_ANCHOR_VERSION
+        )
         || observations.month != *month
         || observations.source != *source
     {

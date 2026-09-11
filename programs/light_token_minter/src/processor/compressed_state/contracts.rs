@@ -85,6 +85,9 @@ pub(in crate::processor) fn build_required_access_contract(
     };
 
     let required = match tag {
+        VaultInstructionTag::OracleCarryForwardV1 => {
+            super::super::oracle_carry::required_accesses(payload, core_account_count)?
+        }
         VaultInstructionTag::AddOracleUsdcSkuBudget => required_accesses![spec(5, sku, initialize)],
         VaultInstructionTag::ProposeOracleSourceV3 => required_accesses![
             spec(4, sku, read),
@@ -137,7 +140,7 @@ pub(in crate::processor) fn build_required_access_contract(
         VaultInstructionTag::ChallengeOracleUpdateClaimV2 => {
             required_accesses![spec(3, sku, read), spec(5, source, read)]
         }
-        VaultInstructionTag::RevealOracleUpdateClaimV3 => required_accesses![spec(3, source, read)],
+        VaultInstructionTag::RevealOracleUpdateClaimV3 => source_pair(3, read),
         VaultInstructionTag::FinalizeOracleUpdateClaimV2 => {
             required_accesses![spec(4, source, mutable)]
         }
@@ -264,11 +267,15 @@ pub(in crate::processor) fn build_required_access_contract(
             source_pair_walk(5, core_account_count, 1, mutable)?
         }
         VaultInstructionTag::AccumulateOracleActiveWeightGroup => {
-            if !(10..=13).contains(&core_account_count) {
+            if !(10..=9 + crate::constants::MAX_ORACLE_ACTIVE_WEIGHT_SOURCES_PER_STEP)
+                .contains(&core_account_count)
+            {
                 return Err(VaultError::InvalidCompressionWitness.into());
             }
             // The completed recipe/bucket source indexes are ordinary read-only tail accounts.
-            source_pair_walk(7, core_account_count - 2, 1, read)?
+            let mut accesses = required_accesses![spec(5, sku, read)];
+            accesses.extend(source_pair_walk(7, core_account_count - 2, 1, read)?);
+            accesses
         }
         VaultInstructionTag::RecomputeOracleBucketMedianV1 => {
             if payload.len() != 33 {
@@ -305,7 +312,7 @@ pub(in crate::processor) fn build_required_access_contract(
             require_empty_inner_payload(payload)?;
             match core_account_count {
                 10 => source_pair(9, mutable),
-                14 => required_accesses![spec(9, source, mutable)],
+                17 => required_accesses![spec(9, source, mutable)],
                 _ => return Err(VaultError::InvalidCompressionWitness.into()),
             }
         }

@@ -12,6 +12,10 @@ pub enum VaultInstruction {
     /// 4. [] SPL token program
     /// 5. [] System program
     Initialize,
+    /// Governed, bounded authenticated information carry between prospective periods.
+    OracleCarryForwardV1 {
+        action: OracleCarryForwardActionV1,
+    },
 
     /// Update admin, mint, vault token account, and pause status.
     ///

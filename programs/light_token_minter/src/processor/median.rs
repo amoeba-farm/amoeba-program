@@ -202,7 +202,11 @@ pub(super) fn validate_oracle_observation_shape(
     observations: &OracleSourceObservations,
 ) -> ProgramResult {
     let count = usize::from(source.observation_count);
-    if count == 0
+    if !matches!(
+        observations.account_version,
+        OracleSourceObservations::ACCOUNT_VERSION
+            | OracleSourceObservations::INHERITED_ANCHOR_VERSION
+    ) || count == 0
         || count > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
         || observations.states[0] != source.baseline_state
         || observations.states[count - 1] != source.current_state
@@ -241,7 +245,12 @@ pub fn oracle_temporal_median_state(
     }
     let mut values = [0u64; crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS];
     let mut value_count = 0usize;
-    for index in 0..usize::from(source.observation_count) {
+    // Inherited state retains its original age and can provide the standing fallback,
+    // but re-importing it never manufactures another equal-weight median sample.
+    let first_sample = usize::from(
+        observations.account_version == OracleSourceObservations::INHERITED_ANCHOR_VERSION,
+    );
+    for index in first_sample..usize::from(source.observation_count) {
         let source_time = observations.source_times[index];
         if (window_start_ts..=window_end_ts).contains(&source_time) {
             values[value_count] = observations.states[index];
@@ -257,10 +266,18 @@ pub fn oracle_temporal_median_state(
     // An unchanged source remains economically present without manufacturing a paid update.
     // This fallback does not add an equal-weight sample to an already-populated window, so every
     // source that was settleable under the existing temporal-median rule keeps the same result.
-    Ok((0..usize::from(source.observation_count))
+    let standing = (0..usize::from(source.observation_count))
         .rev()
         .find(|index| observations.source_times[*index] <= window_start_ts)
-        .map(|index| observations.states[index]))
+        .map(|index| observations.states[index]);
+    // A short contract can have a settlement window beginning before its inherited
+    // anchor's original timestamp. With no genuine print in the window, that anchor
+    // still supplies standing state once observed, but never supplies future data.
+    Ok(standing.or_else(|| {
+        (observations.account_version == OracleSourceObservations::INHERITED_ANCHOR_VERSION
+            && observations.source_times[0] <= window_end_ts)
+            .then_some(observations.states[0])
+    }))
 }
 
 pub(super) fn initial_oracle_bucket_source_snapshot(

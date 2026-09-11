@@ -350,6 +350,19 @@ pub(in crate::processor) fn process_resolve_oracle_emergency_dispute_v3_inner(
     let (market, mut month) =
         load_valid_market_and_oracle_month(program_id, market_info, month_info)?;
     let mut dispute = load_dispute_v3(program_id, dispute_info)?;
+    let (remaining_accounts, checkpoint_accounts) =
+        if dispute.kind == OracleEmergencyDisputeKind::Update {
+            if remaining_accounts.len() != 9 {
+                return Err(VaultError::InvalidAccountList.into());
+            }
+            remaining_accounts.split_at(6)
+        } else {
+            (
+                remaining_accounts,
+                &remaining_accounts[remaining_accounts.len()..],
+            )
+        };
+
     if dispute.kind == OracleEmergencyDisputeKind::Update {
         oracle_usdc::ensure_current_cash_update_emergency_window_open(&market)?;
     }
@@ -439,6 +452,16 @@ pub(in crate::processor) fn process_resolve_oracle_emergency_dispute_v3_inner(
     {
         return Err(VaultError::InvalidOracleStakingPool.into());
     }
+    let source_before =
+        if dispute.kind == OracleEmergencyDisputeKind::Update && decision.resolved_choice < 2 {
+            Some(load_valid_oracle_source(
+                program_id,
+                month_info.key,
+                &resolution_accounts[1],
+            )?)
+        } else {
+            None
+        };
     apply_cash_emergency_resolution(
         program_id,
         resolution_accounts,
@@ -449,6 +472,53 @@ pub(in crate::processor) fn process_resolve_oracle_emergency_dispute_v3_inner(
         coverage_context,
         merge_reward_context,
     )?;
+    if let Some(before) = source_before {
+        let source_info = &resolution_accounts[1];
+        let after = load_valid_oracle_source(program_id, month_info.key, source_info)?;
+        let observations = load_valid_oracle_source_observations(
+            program_id,
+            month_info.key,
+            source_info.key,
+            &resolution_accounts[2],
+        )?;
+        let event = if decision.resolved_choice == 0 {
+            let claim = load_valid_oracle_update_claim_v2_from_account(
+                program_id,
+                month_info.key,
+                source_info.key,
+                &resolution_accounts[0],
+            )?;
+            crate::processor::oracle_carry::AcceptedEvent {
+                event: *dispute_info.key,
+                value: claim.claim.new_state,
+                observed_at: claim.claim.source_time,
+                evidence_hash: claim.claim.evidence_hash,
+                archive_hash: claim.claim.archive_url_hash,
+                contributor: claim.claim.claimant,
+            }
+        } else {
+            let challenge =
+                load_valid_oracle_update_challenge(program_id, month_info.key, target_info)?;
+            crate::processor::oracle_carry::AcceptedEvent {
+                event: *dispute_info.key,
+                value: challenge.alternative_state,
+                observed_at: challenge.alternative_source_time,
+                evidence_hash: challenge.evidence_hash,
+                archive_hash: challenge.archive_url_hash,
+                contributor: challenge.challenger,
+            }
+        };
+        crate::processor::oracle_carry::record_fresh_accept(
+            program_id,
+            cranker_info,
+            source_info.key,
+            &before,
+            &after,
+            &observations,
+            event,
+            checkpoint_accounts,
+        )?;
+    }
     if dispute.kind == OracleEmergencyDisputeKind::Source {
         set_cash_emergency_guard_dispute_binding(
             program_id,

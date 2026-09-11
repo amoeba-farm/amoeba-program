@@ -229,6 +229,9 @@ pub(super) fn dispatch_64_124(
 ) -> ProgramResult {
     let compressed_state_transport = context.is_compressed_inner();
     match tag {
+        VaultInstructionTag::OracleCarryForwardV1 => {
+            oracle_carry::process(program_id, accounts, payload, context.is_compressed_inner())
+        }
         VaultInstructionTag::RotateVaultAuthoritiesV2 => {
             let params: RotateVaultAuthoritiesV2Params = decode_instruction_payload(payload)?;
             process_rotate_vault_authorities_v2(program_id, accounts, params)

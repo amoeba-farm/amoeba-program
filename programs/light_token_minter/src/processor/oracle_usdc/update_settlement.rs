@@ -6,6 +6,16 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     accounts: &[AccountInfo],
     params: FinalizeOracleUpdateClaimV2Params,
 ) -> ProgramResult {
+    let (accounts, checkpoint_accounts) =
+        if params.outcome == OracleUpdateClaimOutcome::RuleReviewUnresolved {
+            (accounts, &accounts[accounts.len()..])
+        } else {
+            let core_len = accounts
+                .len()
+                .checked_sub(3)
+                .ok_or(VaultError::InvalidAccountList)?;
+            accounts.split_at(core_len)
+        };
     if accounts.len() < 9
         || !accounts[0].is_signer
         || accounts[1].is_signer
@@ -68,6 +78,7 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     ensure_current_cash_update_resolution_window(&market, &month)?;
     ensure_oracle_opening_resolution_complete(&month)?;
     let mut source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
+    let source_before = source.clone();
     let mut observations = load_valid_oracle_source_observations(
         program_id,
         month_info.key,
@@ -193,6 +204,23 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
             source.current_state = claim.claim.new_state;
             source.last_finalized_step = params.current_step;
             claim.claim.status = OracleClaimStatus::Finalized;
+            crate::processor::oracle_carry::record_fresh_accept(
+                program_id,
+                authority_info,
+                source_info.key,
+                &source_before,
+                &source,
+                &observations,
+                crate::processor::oracle_carry::AcceptedEvent {
+                    event: *claim_info.key,
+                    value: claim.claim.new_state,
+                    observed_at: claim.claim.source_time,
+                    evidence_hash: claim.claim.evidence_hash,
+                    archive_hash: claim.claim.archive_url_hash,
+                    contributor: claim.claim.claimant,
+                },
+                checkpoint_accounts,
+            )?;
             if let Some(challenge) = guarded_challenge.as_mut() {
                 challenge.status = OracleChallengeStatus::Rejected;
             }
@@ -216,6 +244,23 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
             source.current_state = challenge.alternative_state;
             source.last_finalized_step = params.current_step;
             claim.claim.status = OracleClaimStatus::Rejected;
+            crate::processor::oracle_carry::record_fresh_accept(
+                program_id,
+                authority_info,
+                source_info.key,
+                &source_before,
+                &source,
+                &observations,
+                crate::processor::oracle_carry::AcceptedEvent {
+                    event: *claim_info.key,
+                    value: challenge.alternative_state,
+                    observed_at: challenge.alternative_source_time,
+                    evidence_hash: challenge.evidence_hash,
+                    archive_hash: challenge.archive_url_hash,
+                    contributor: challenge.challenger,
+                },
+                checkpoint_accounts,
+            )?;
             challenge.status = OracleChallengeStatus::Accepted;
         }
         OracleUpdateClaimOutcome::RuleReviewUnresolved => {

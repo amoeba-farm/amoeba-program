@@ -528,6 +528,9 @@ impl BorshSerialize for VaultInstruction {
                 VaultInstructionTag::ScopedPositionSettlementV1,
                 action,
             ),
+            Self::OracleCarryForwardV1 { action } => {
+                serialize_tagged_payload(writer, VaultInstructionTag::OracleCarryForwardV1, action)
+            }
             Self::ExecuteCompressedStateV1 { params } => serialize_tagged_payload(
                 writer,
                 VaultInstructionTag::ExecuteCompressedStateV1,

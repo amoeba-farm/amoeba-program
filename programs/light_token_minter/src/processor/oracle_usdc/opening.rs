@@ -397,7 +397,7 @@ pub(in crate::processor) fn process_finalize_oracle_opening_claim_v2(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
 ) -> ProgramResult {
-    if accounts.len() != 7 || !accounts[0].is_signer || !accounts[4].is_writable {
+    if accounts.len() != 10 || !accounts[0].is_signer || !accounts[4].is_writable {
         return Err(VaultError::InvalidAccountList.into());
     }
     let market_info = &accounts[1];
@@ -440,6 +440,7 @@ pub(in crate::processor) fn process_finalize_oracle_opening_claim_v2(
     }
     let _claimant_collateral =
         load_canonical_user_collateral(program_id, claimant_collateral_info, &claim.claimant)?;
+    let source_before = source.clone();
     append_oracle_source_observation(
         &mut source,
         &mut observations,
@@ -464,6 +465,23 @@ pub(in crate::processor) fn process_finalize_oracle_opening_claim_v2(
         .ok_or(VaultError::ArithmeticOverflow)?;
     decrement_pending_oracle_resolution(&mut month)?;
     month.last_updated_slot = slot;
+    crate::processor::oracle_carry::record_fresh_accept(
+        program_id,
+        &accounts[0],
+        source_info.key,
+        &source_before,
+        &source,
+        &observations,
+        crate::processor::oracle_carry::AcceptedEvent {
+            event: *claim_info.key,
+            value: claim.opening_state,
+            observed_at: claim.source_time,
+            evidence_hash: claim.evidence_hash,
+            archive_hash: claim.archive_url_hash,
+            contributor: claim.claimant,
+        },
+        &accounts[7..],
+    )?;
     store_state(source_info, &source)?;
     store_state(observations_info, &observations)?;
     store_state(claim_info, &claim)?;

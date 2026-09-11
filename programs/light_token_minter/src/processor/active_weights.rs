@@ -195,11 +195,13 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
     params: AccumulateOracleActiveWeightGroupParams,
 ) -> ProgramResult {
     if accounts.len() < 10
-        || accounts.len() - 9 > crate::constants::MAX_COMPRESSED_STATE_SESSION_RECORDS / 2
+        || accounts.len() - 9 > crate::constants::MAX_ORACLE_ACTIVE_WEIGHT_SOURCES_PER_STEP
         || !accounts[0].is_signer
         || !accounts[0].is_writable
         || !accounts[2].is_writable
         || !accounts[3].is_writable
+        || accounts[5].is_signer
+        || !accounts[5].is_writable
         || crate::bytes32_is_zero(&params.group_id)
     {
         return Err(VaultError::InvalidAccountList.into());

@@ -83,7 +83,7 @@ pub(in crate::processor) fn compute_source_family_reward(
     trailing: &[AccountInfo],
 ) -> Result<ComputedCashReward, ProgramError> {
     let valid_len = match kind {
-        OracleUsdcRewardKind::SourceProposer => trailing.len() == 3,
+        OracleUsdcRewardKind::SourceProposer => trailing.len() == 4,
         OracleUsdcRewardKind::SourceSupport => {
             trailing.len() >= 4
                 && trailing.len() <= 4 + 2 * usize::from(MAX_ORACLE_USDC_MERGE_DEPTH)
@@ -114,6 +114,11 @@ pub(in crate::processor) fn compute_source_family_reward(
     )?;
     let (subject, amount) = match kind {
         OracleUsdcRewardKind::SourceProposer => {
+            crate::processor::oracle_carry::require_fresh_discovery(
+                program_id,
+                source_info.key,
+                &trailing[3],
+            )?;
             if *recipient != source.proposer {
                 return Err(VaultError::Unauthorized.into());
             }

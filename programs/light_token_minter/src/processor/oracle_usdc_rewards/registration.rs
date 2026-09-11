@@ -203,7 +203,7 @@ pub(in crate::processor) fn process_register_oracle_usdc_reward_source(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
 ) -> ProgramResult {
-    if accounts.len() < 7 || accounts.len() > 8 {
+    if accounts.len() < 8 || accounts.len() > 9 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let payer_info = &accounts[0];
@@ -213,7 +213,12 @@ pub(in crate::processor) fn process_register_oracle_usdc_reward_source(
     let active_manifest_info = &accounts[4];
     let source_info = &accounts[5];
     let source_reward_info = &accounts[6];
-    let opening_claim_info = accounts.get(7);
+    let carry_info = accounts.last().ok_or(VaultError::InvalidAccountList)?;
+    let opening_claim_info = if accounts.len() == 9 {
+        accounts.get(7)
+    } else {
+        None
+    };
     if !payer_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
@@ -257,7 +262,18 @@ pub(in crate::processor) fn process_register_oracle_usdc_reward_source(
         return Err(VaultError::InvalidOracleUsdcSourceReward.into());
     }
 
-    let opening_claim = if source.status == OracleSourceStatus::Active {
+    let inherited = crate::processor::oracle_carry::inherited_reward_opening(
+        program_id,
+        source_info.key,
+        &source,
+        carry_info,
+    )?;
+    let opening_claim = if inherited {
+        if opening_claim_info.is_some() {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        Pubkey::default()
+    } else if source.status == OracleSourceStatus::Active {
         let claim_info = opening_claim_info.ok_or(VaultError::InvalidAccountList)?;
         let claim = load_valid_oracle_opening_claim(
             program_id,
