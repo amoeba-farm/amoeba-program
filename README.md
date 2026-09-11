@@ -1,8 +1,8 @@
 # Amoeba Program
 
-Solana smart contracts for Amoeba's index options protocol. The program implements
+Solana smart contract for Amoeba Farm's capped options protocol. This program is the whole deal, implementing
 collateral custody, oracle source selection, contract issuance, settlement, and
-an integrated discrete liquidity market maker (DLMM).
+a fully integrated discrete liquidity market maker (DLMM).
 
 [Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
