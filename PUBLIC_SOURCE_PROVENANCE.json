@@ -3,15 +3,15 @@
   "channel": "source-preview",
   "policySha256": "8427904a4342967b52f3469016dcadd8903138bec1c85223d28ace77cb5c55e7",
   "schemaVersion": 1,
-  "sourceCommit": "2dcf2d3b47081825bc0752ecc5a330c09a01b331",
+  "sourceCommit": "b1931fecff5229da232f06e9c5c43b1d6328806d",
   "sourceDirty": false,
   "treeDigestExcludesThisProvenanceFile": true,
   "treeDigestIncludesNormalizedModes": true,
-  "upstreamExportedTreeSha256": "49f7e6ccb32b3b54b50bd06435f181e44e97c920bfd539decb5c6931ab06a658",
-  "upstreamExportedFileCount": 156,
+  "upstreamExportedTreeSha256": "e94f1e84a2e3d98b4906d8d5b30b56b19e02074e5b90d6771fbebe202924249a",
+  "upstreamExportedFileCount": 173,
   "publicRepository": "https://github.com/amoeba-farm/amoeba-program",
-  "preservedPublicBaseCommit": "c7e8bc857be02a3e1bf6f1753b8bae6c43fd8fd0",
-  "publicationScope": "Production program source updated from sanitized export; existing public documentation and other non-program files preserved.",
+  "preservedPublicBaseCommit": "237287e4a4998726c6a92409c2e1b8c49148a208",
+  "publicationScope": "Sanitized program module refactor and import cleanup, plus generated build evidence; existing public documentation and other non-program files preserved.",
   "programSourceFiles": [
     {
       "path": "programs/light_token_minter/.cargo/config.toml",
@@ -175,7 +175,7 @@
     },
     {
       "path": "programs/light_token_minter/src/processor/ameba_dlmm.rs",
-      "sha256": "0af4ba00a833fe414208dc5c9b192a273b2aebcd51b4b09cfa94a68463fb062c"
+      "sha256": "d51b77f27be7e47d19a2d4483d0f8ff6b250373d1f96f6163cc8146eed31443c"
     },
     {
       "path": "programs/light_token_minter/src/processor/ameba_dlmm/accounts.rs",
@@ -431,7 +431,7 @@
     },
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve.rs",
-      "sha256": "17c3f99b0ee9863b256ec9e802bd7a3caefb7842527a6870a7bf4568e345c6f5"
+      "sha256": "913b07b1112045d88013b7d2b38cae503c1caeb539d62e0229df2db338b07e43"
     },
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve/accounts.rs",
@@ -439,7 +439,39 @@
     },
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve/auction.rs",
-      "sha256": "ff75dd538a1ceef9d6316597a11362f0a7c96a6ae317f7f6d2dd6fb97c6c1839"
+      "sha256": "31bd79430edd13a767a7f65d8fe8855bf981507fecc381027804832df0fa93e7"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/bidding.rs",
+      "sha256": "c61827aa1cb0a7948163d1603250435862693f88fd6116df53ef263a47e41b88"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/commitments.rs",
+      "sha256": "7cdedcc83037c5bd3795d5ba2dff98a840335ef5145494cfad7764c97ad10899"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/custody.rs",
+      "sha256": "cd198888fc765257c0cc09cfac05a115f69adf38414b223b182cdc2b672969d2"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/execution.rs",
+      "sha256": "c59b5547e2104b44cca21ff19e14c06360fa70edf48189d977e0870124ee30a1"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/finalization.rs",
+      "sha256": "2b9db2e641638b435ebcdf7b1780556a9048e7806317a5bf1c767a1f9c0d3055"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/planning.rs",
+      "sha256": "173b4670bc88c5b1d9517071e58e5246a3e8ca14b69ba2fe91d77b41f38b57a9"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/reveal.rs",
+      "sha256": "d437f486267e5f47c122057d2b3f5241fa86f0b70735cb60e90f16ef98ceb7b6"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/auction/rules.rs",
+      "sha256": "2795099f12011966104760479ca3a2d5783b20937bbc6fdbc70b64d0dfd56704"
     },
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve/bid_index_preparation.rs",
@@ -448,6 +480,22 @@
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve/close.rs",
       "sha256": "38253d966755c2b2869fd7fd05847c60d52b914c569d9e774334784e61c346d2"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/collective_binding.rs",
+      "sha256": "95490161801c938d2f0ac3bbb8696036a0a17285e9e09b2cd5552a1fdd217945"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/commitments.rs",
+      "sha256": "98acc38af82247cb38541b4c57df598f28a38da13babcc6d85a571014b2b8ef4"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/custody.rs",
+      "sha256": "319b9c35a347623aab21742632c958d208f7e35a7b1d79fb642b98e3d6304202"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dispatch.rs",
+      "sha256": "3cb7882d8482d40dc493f635fa68b410cd4ec99bf4249e49a1cec229bba5001a"
     },
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve/dlmm.rs",
@@ -464,6 +512,26 @@
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve/funding.rs",
       "sha256": "1ec75f5d2391ae32790a3fcbddbc52d6a1285300f2285c8ed2cb364aad23ae52"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/initialization.rs",
+      "sha256": "7443595cd004bc47322b7d77d8fc6a6ef7810d36e372634558e57e9231abe87b"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/lifecycle.rs",
+      "sha256": "149e99ce9b57e479b9d0433a8965ca5218b62c6427cb629fbc51ecba06cf64db"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/metrics.rs",
+      "sha256": "a4ae90d6df906e1fbaa6d899c9ab48c73f17a6681560b291351b6e6bf3210ef8"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/policy.rs",
+      "sha256": "67e579c6804de6d353e35338c0d466eceb323aa71203fbfa0f9b0d110f9fb2f9"
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/privileges.rs",
+      "sha256": "f266b2a2dbc35ddeebfc7852cfd4083d873e51551a9d5f17e4171c66c12ee718"
     },
     {
       "path": "programs/light_token_minter/src/processor/writer_sleeve/reconcile.rs",
@@ -568,9 +636,25 @@
     {
       "path": "programs/light_token_minter/src/writer_sleeve_math.rs",
       "sha256": "a87248bfcc9b96c43212d5799e552b35a96fadf2ebb4ebd56c282812dcfcf785"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "4a0a7590572c5859a0487da76cddeffd17d175e34b7338914d2915ce18bc0d3d"
     }
   ],
   "preservedDocumentation": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "0096262b7124de929df2884442870eddeeb6040f75a62d26dfb749dca1a1e9e3"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "30959c78256f63a35447ffe65a2fa3bab2563e967c27e6a89337fc91f954546d"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    },
     {
       "path": "README.md",
       "sha256": "b1499f30782a95a7b2bc5d488c60afbfffca84b57305e864dd3f3970f7de19af"
@@ -578,9 +662,65 @@
     {
       "path": "SECURITY.md",
       "sha256": "30b8e6e0735de711d3815ba72aa78579958ec6532b7cc23039981dd8f459df46"
+    },
+    {
+      "path": "config/devnet_bootstrap.v1.json",
+      "sha256": "5e265ee075698aba887b567f19f33c3bfd41dbf57ec0722d3bfb97a4ec97cdf1"
+    },
+    {
+      "path": "deployment-evidence/oracle-carry-20260911.json",
+      "sha256": "56a392fa88b422fd5e90894e44e75f35fb80f2409dc9973c57410cdb020d5353"
+    },
+    {
+      "path": "deployment-evidence/writer-dlmm-20260909.json",
+      "sha256": "c040a6284dc55c5bb01e5303e8b4ae9cebcd43294e715949a6d82fde6b56719b"
+    },
+    {
+      "path": "deployment-evidence/writer-dlmm-verified-build-20260910.json",
+      "sha256": "56ee98998694a424a9c95333a16ef519ae4c7f76b356a27eb6bfe7e62262c00c"
+    },
+    {
+      "path": "deployments/devnet-v3.json",
+      "sha256": "516f8275c6866c25e4df351f2914e1992fae9725f2bf01425bd84fac9c02847e"
+    },
+    {
+      "path": "deployments/devnet.json",
+      "sha256": "d46e7916a522a47d9f5e89fac71fdfb7fb9a2633ff70969c2aeddda53fdd2e31"
+    },
+    {
+      "path": "governance/nandx_benchmark_basket.v1.json",
+      "sha256": "db7eeb9cd6e4086a05873ad3ed7490fcc9c7d93a51e079791fa43e39d39be95a"
+    },
+    {
+      "path": "governance/nandx_product_sku_manifest.v1.json",
+      "sha256": "d34f4f05e7025e66e651ae017503a223a71898d5567efd0f6dc70416408203e9"
+    },
+    {
+      "path": "governance/ramx_product_sku_manifest.v1.json",
+      "sha256": "a4382c10d8d45d45f222f30be8ff8dfc250dd0c67e55c8078777f65bc6369c7c"
+    },
+    {
+      "path": "release/candidates/writer-dlmm-20260909/candidate.json",
+      "sha256": "6dfb962207128992d3cc98567042a5e2e2a2e762c18a1b3bcf9169b3ae535a13"
+    },
+    {
+      "path": "release/candidates/writer-dlmm-20260909/historical-instruction-manifest.json",
+      "sha256": "54c121382e3cc28d15ad049f63e737814d8845d9739510fedcba28c9dec5bfb3"
+    },
+    {
+      "path": "release/candidates/writer-dlmm-20260909/sbf-source-inputs.json",
+      "sha256": "bbf98f378fd0bcdcc34677e5030292353e42f426d980e4a67df7e4cb6191561f"
+    },
+    {
+      "path": "release/current-integration.json",
+      "sha256": "209e13699ca9f4a961819b752c8fb7bc4046d0a39481cd9e0660a796ef2bec03"
+    },
+    {
+      "path": "release/intents/v0.1.0-devnet.json",
+      "sha256": "0775732f9e49f5e6dcf3f2d09cf181d3aa2be1bf38a68c7b70007ba6a7b8ce99"
     }
   ],
-  "exportedFileCount": 159,
-  "exportedTreeSha256": "ed8f383cbd4fa4de51f8a77e9860f18e0c5e9ac102dfc28ee293fa0f27a1d7c9",
+  "exportedFileCount": 177,
+  "exportedTreeSha256": "3cd63b2a7472520c3b64f0c4c391a3ba38e5087db2232b423cb4adf5caa4cfad",
   "treeDigestScope": "All tracked publication files except this provenance file, using staged Git blob bytes."
 }

@@ -1,0 +1,46 @@
+{
+  "schema": "amoeba-devnet-refactor-prepared-build-v1",
+  "status": "prepared-not-deployed",
+  "preparedAt": "2026-09-12T10:36:33.493Z",
+  "cluster": "devnet",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "publicRepository": "https://github.com/amoeba-farm/amoeba-program",
+  "privateSourceCommit": "b1931fecff5229da232f06e9c5c43b1d6328806d",
+  "build": {
+    "tool": "solana-verify 0.5.1",
+    "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+    "cargoBuildSbf": "4.0.0",
+    "platformTools": "v1.53",
+    "sbfRustc": "1.89.0",
+    "libraryName": "light_token_minter",
+    "architecture": "v1",
+    "mountPath": ".",
+    "workspacePath": "programs/light_token_minter",
+    "features": [
+      "devnet-v3-governance-controller",
+      "devnet-solo-backfill-2026"
+    ],
+    "cargoBuildSbfArgs": "--tools-version v1.53 --skip-tools-install --no-default-features",
+    "artifactBytes": 1385312,
+    "artifactSha256": "903c58504f44e8820e5c9f99765b26be15a97504ec5fdd0855f3668f29927fee",
+    "publicDockerRebuildPerformed": true,
+    "exactPrivateArtifactMatch": true,
+    "publicBuildLogSha256": "cb1d3ad4a7d831b5da3160055fdb858194d1f314ed69e327248735e16ff55e05"
+  },
+  "qualification": {
+    "scope": "User-authorized focused Devnet qualification; the 24 remaining baseline-failing Spread tests were removed at the user request.",
+    "completeSuiteQualificationClaimed": false
+  },
+  "deployment": {
+    "performed": false,
+    "remainingRequirement": "The current Devnet Loader rejects the controller exact 1136-byte extension and requires a minimum 10240-byte allocation. The release specification requires an explicit exception before submission.",
+    "programDataExtensionSubmitted": false,
+    "upgradeSubmitted": false,
+    "verificationMetadataSubmitted": false
+  },
+  "verification": {
+    "hostedRemoteVerificationPerformed": false,
+    "limitation": "Solana hosted remote verification supports Mainnet. Devnet source/build equality and finalized metadata are separate claims."
+  }
+}

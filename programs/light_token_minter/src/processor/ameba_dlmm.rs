@@ -20,8 +20,8 @@ use crate::{
     },
     ameba_dlmm_math::{
         bin_to_page, calculate_share_deposit, calculate_share_withdrawal, page_first_bin,
-        price_from_bin, quote_exact_in, refresh_local_liquidity_bits, AmoebaDlmmBinLiquidity,
-        AmoebaDlmmMathError, AmoebaDlmmSwapDirection,
+        price_from_bin, refresh_local_liquidity_bits, AmoebaDlmmBinLiquidity, AmoebaDlmmMathError,
+        AmoebaDlmmSwapDirection,
     },
     ameba_dlmm_state::{
         derive_ameba_dlmm_authority_pda, derive_ameba_dlmm_bin_page_pda,
