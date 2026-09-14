@@ -9,6 +9,18 @@ use crate::writer_dlmm_quote::{PublicOrderRouteLimits, WriterDlmmRouteQuote};
 
 pub(super) const ORDER_SWAP_FIXED_ACCOUNTS: usize = 35;
 
+fn admit_book_initialization(pool: &AmoebaDlmmPoolV1, now: u64) -> ProgramResult {
+    if pool.account_version != AMOEBA_DLMM_ACCOUNT_VERSION
+        || pool.status == AmoebaDlmmPoolStatus::Closed
+        || now >= pool.expiry_ts
+    {
+        return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
+    }
+    // Existing canonical pools may store 20 bps. The current execution math is
+    // fee-free; account history is neither rewritten nor an initialization gate.
+    Ok(())
+}
+
 pub(super) struct OrderSwapState {
     pub book: DlmmOrderBook,
     pub taker_sequence: Option<u64>,
@@ -51,8 +63,6 @@ pub(super) fn load_book(
         || h.expiry_ts != pool.expiry_ts
         || h.next_sequence == 0
         || pool.account_version != ORDER_POOL_VERSION
-        || pool.swap_fee_bps != 0
-        || pool.protocol_fee_share_bps != 0
         || book.orders.len() > MAX_OPEN_ORDERS
         || crate::pubkey_is_default(&h.rent_payer)
     {
@@ -423,17 +433,10 @@ pub(in crate::processor) fn process(
     validate_spl_interface_account(a[9].key, &a[17])?;
     validate_spl_interface_account(a[10].key, &a[18])?;
     if let DlmmOrderAction::Initialize = action {
-        if a.len() != ORDER_SWAP_FIXED_ACCOUNTS
-            || config.admin != *a[0].key
-            || config.paused
-            || pool.account_version != AMOEBA_DLMM_ACCOUNT_VERSION
-            || pool.status == AmoebaDlmmPoolStatus::Closed
-            || current_unix_timestamp()? >= pool.expiry_ts
-            || pool.swap_fee_bps != 0
-            || pool.protocol_fee_share_bps != 0
-        {
+        if a.len() != ORDER_SWAP_FIXED_ACCOUNTS || config.admin != *a[0].key || config.paused {
             return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
         }
+        admit_book_initialization(&pool, current_unix_timestamp()?)?;
         let (key, bump) = derive_order_book(program, a[7].key);
         if *a[32].key != key || !a[32].is_writable {
             return Err(VaultError::InvalidPda.into());

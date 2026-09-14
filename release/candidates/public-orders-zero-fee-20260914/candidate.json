@@ -1,0 +1,31 @@
+{
+  "releaseId": "spread-devnet-v3-public-orders-zero-fee-20260914",
+  "status": "prepared-not-deployed",
+  "sourceCommit": "7cf4b7d8b00e4769e8346db814c59eab085284e1",
+  "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "controllerProgramId": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+  "stateNamespace": "ameba-spread-v2",
+  "buildFeatures": [
+    "devnet-v3-governance-controller",
+    "devnet-solo-backfill-2026"
+  ],
+  "architecture": "v1",
+  "deploymentAuthorizedByMetadata": false,
+  "schema": "ameba-spread-public-candidate-v1",
+  "artifact": {
+    "bytes": 1460576,
+    "sha256": "eb9b4ebce207b9fc1092854516cc9f4203da27115837b8f113faa9493d9a62cd",
+    "twoBuildsMatch": true
+  },
+  "instructions": {
+    "writerParticipation": 160,
+    "fundedOrders": 188
+  },
+  "limitations": [
+    "Two fresh target directories share the same exact source checkout and installed pinned toolchain.",
+    "Artifact preparation does not assert finalized deployment.",
+    "Funded V1 writer rights remain unchanged; capital-time contributions require an empty canonical sleeve enabled as V2.",
+    "Public orders require explicit book initialization; maximum occupied records per pool is 32. Historical fee fields remain authenticated but new swaps and writer primary sales charge zero fees.",
+    "Application, external SDK, backend, CLI and Petri integration remain later work."
+  ]
+}

@@ -193,25 +193,13 @@ pub fn calculate_fees(
     {
         return Err(AmoebaDlmmMathError::InvalidFee);
     }
-    let total_fee = ceil_mul_div(amount_in, swap_fee_bps as u64, AMOEBA_DLMM_BPS_SCALE)?;
-    let trade_input = amount_in
-        .checked_sub(total_fee)
-        .ok_or(AmoebaDlmmMathError::InvalidAmount)?;
-    if trade_input == 0 {
-        return Err(AmoebaDlmmMathError::InvalidAmount);
-    }
-    let protocol_fee = floor_mul_div(
-        total_fee,
-        protocol_fee_share_bps as u64,
-        AMOEBA_DLMM_BPS_SCALE,
-    )?;
+    // Stored fee fields remain authenticated compatibility data. Current Amoeba
+    // execution charges no taker, LP, or protocol fee, including on existing pools.
     Ok(AmoebaDlmmFeeBreakdown {
-        total_fee,
-        protocol_fee,
-        lp_fee: total_fee
-            .checked_sub(protocol_fee)
-            .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?,
-        trade_input,
+        total_fee: 0,
+        protocol_fee: 0,
+        lp_fee: 0,
+        trade_input: amount_in,
     })
 }
 

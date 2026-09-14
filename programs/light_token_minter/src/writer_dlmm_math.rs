@@ -108,9 +108,8 @@ fn mul_ceil(a: u64, b: u64, scale: u64) -> Result<u64> {
         .map_err(|_| WriterDlmmAdmissionError::Arithmetic)
 }
 
-/// Minimum gross primary ask, maximum protected bid, and conservative round-trip
-/// fee allowance per contract. Primary fees are inclusive in gross writer premium;
-/// normal pool taker fees are separate and grossed up before quote conversion.
+/// Current fee-free ask and protected bid. Historical fee fields remain valid
+/// inputs, but do not add a fee or inflate the required price separation.
 pub fn writer_dlmm_price_bounds(
     seller_floor: u64,
     tick: u64,
@@ -121,35 +120,26 @@ pub fn writer_dlmm_price_bounds(
     if seller_floor == 0
         || tick == 0
         || separation_ticks == 0
-        || swap_fee_bps >= 10_000
-        || primary_fee_bps >= 10_000
+        || swap_fee_bps > 10_000
+        || primary_fee_bps > 10_000
     {
         return Err(WriterDlmmAdmissionError::InvalidPolicy);
     }
-    let ask = mul_ceil(seller_floor, 10_000, 10_000 - u64::from(primary_fee_bps))?;
-    let primary = mul_ceil(ask, u64::from(primary_fee_bps), 10_000)?;
-    let one_taker_leg = mul_ceil(
-        ask,
-        u64::from(swap_fee_bps),
-        10_000 - u64::from(swap_fee_bps),
-    )?;
-    let round_trip = add(primary, add(one_taker_leg, one_taker_leg)?)?;
     let gap = tick
         .checked_mul(u64::from(separation_ticks))
         .ok_or(WriterDlmmAdmissionError::Arithmetic)?;
     let bid = seller_floor
         .checked_sub(gap)
-        .and_then(|value| value.checked_sub(round_trip))
         .ok_or(WriterDlmmAdmissionError::PriceSeparation)?;
-    Ok((ask, bid, round_trip))
+    Ok((seller_floor, bid, 0))
 }
 
-/// Aggregate writer premium fee, excluding ordinary fills and all DLMM taker/LP fees.
-pub fn writer_dlmm_primary_fee(gross_writer_premium: u64, primary_fee_bps: u16) -> Result<u64> {
+/// Current writer premium fee is zero even for an immutable historical policy.
+pub fn writer_dlmm_primary_fee(_gross_writer_premium: u64, primary_fee_bps: u16) -> Result<u64> {
     if primary_fee_bps > 10_000 {
         return Err(WriterDlmmAdmissionError::InvalidPolicy);
     }
-    mul_ceil(gross_writer_premium, u64::from(primary_fee_bps), 10_000)
+    Ok(0)
 }
 
 fn reserve(book: &[WriterSeries], limits: &WriterDlmmRiskLimits) -> Result<WriterReserveSummary> {

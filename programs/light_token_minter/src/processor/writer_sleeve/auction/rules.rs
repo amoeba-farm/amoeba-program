@@ -14,14 +14,8 @@ pub(super) fn checked_premium(
 }
 
 pub(super) fn checked_fee(premium_atoms: u64, fee_bps: u16) -> Result<u64, ProgramError> {
-    let numerator = u128::from(premium_atoms)
-        .checked_mul(u128::from(fee_bps))
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    let fee = numerator
-        .checked_add(9_999)
-        .ok_or(VaultError::ArithmeticOverflow)?
-        / 10_000;
-    u64::try_from(fee).map_err(|_| VaultError::ArithmeticOverflow.into())
+    crate::writer_dlmm_math::writer_dlmm_primary_fee(premium_atoms, fee_bps)
+        .map_err(|_| VaultError::InvalidWriterPolicySnapshot.into())
 }
 
 pub(super) fn is_current_active_writer_auction(

@@ -268,8 +268,6 @@ pub fn quote_dlmm_with_orders(
         || orders.len() > crate::dlmm_order_math::MAX_OPEN_ORDERS
         || limits.maximum_order_fills == 0
         || limits.maximum_order_fills > crate::dlmm_order_math::MAX_ORDER_FILLS
-        || ((!orders.is_empty() || limits.allow_partial)
-            && (config.swap_fee_bps != 0 || config.protocol_fee_share_bps != 0))
     {
         return Err(AmoebaDlmmMathError::InvalidRoute);
     }
