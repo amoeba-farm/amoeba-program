@@ -163,7 +163,8 @@ pub(in crate::processor) fn process_activate_sleeve(
         || snapshot.series_family_hash != writer_series_family_hash(&book)
         || !anchor_registered
         || sleeve.writer_principal_atoms == 0
-        || sleeve.writer_principal_atoms != sleeve.flat_par_supply_atoms
+        || (!sleeve.has_time_participation()
+            && sleeve.writer_principal_atoms != sleeve.flat_par_supply_atoms)
         || !activation_assets_sufficient
         || sleeve.accounted_asset_atoms < required_assets
         || physical_assets < sleeve.accounted_asset_atoms

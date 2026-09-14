@@ -76,6 +76,13 @@ pub(in crate::processor) fn recompute_writer_metrics(
     sleeve.lower_tail_reserve_atoms = reserve.lower_tail_reserve_atoms;
     sleeve.upper_tail_reserve_atoms = reserve.upper_tail_reserve_atoms;
     sleeve.security_exposure_atoms = exposure;
+    if sleeve.writer_principal_atoms > 0 {
+        participation::admit_time_participation(
+            sleeve,
+            sleeve.accounted_asset_atoms,
+            reserve.reserve_atoms,
+        )?;
+    }
     Ok(())
 }
 

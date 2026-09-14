@@ -268,9 +268,15 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
     }
     sleeve.long_liability_initial_atoms = long_total;
     sleeve.long_liability_remaining_atoms = long_total;
-    sleeve.flat_supply_snapshot_atoms = sleeve.flat_par_supply_atoms;
-    sleeve.flat_claim_supply_remaining_atoms = sleeve.flat_par_supply_atoms;
-    if sleeve.flat_par_supply_atoms == 0 {
+    participation::admit_time_participation(&sleeve, sleeve.accounted_asset_atoms, long_total)?;
+    let entitlement_principal = if sleeve.has_time_participation() {
+        sleeve.writer_principal_atoms
+    } else {
+        sleeve.flat_par_supply_atoms
+    };
+    sleeve.flat_supply_snapshot_atoms = entitlement_principal;
+    sleeve.flat_claim_supply_remaining_atoms = entitlement_principal;
+    if entitlement_principal == 0 {
         sleeve.accounted_asset_atoms = long_total;
         sleeve.stranded_surplus_atoms = sleeve
             .stranded_surplus_atoms

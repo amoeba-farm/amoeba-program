@@ -30,6 +30,7 @@ pub struct WriterDlmmRouteConfig {
 
 pub struct WriterDlmmSwapPolicy<'a> {
     pub eligible: bool,
+    pub participation: Option<crate::writer_participation_math::ParticipationTotals>,
     pub book: &'a [WriterSeries],
     pub series_index: usize,
     pub cash: WriterDlmmCash,
@@ -59,6 +60,22 @@ pub struct WriterDlmmRouteQuote {
     /// Writer after-reserves exclude swept quote and atomically retired option claims.
     pub writer_fills: Vec<AmoebaDlmmBinFill>,
     pub writer: WriterDlmmFillTotals,
+    pub order_fills: Vec<PublicOrderFill>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PublicOrderFill {
+    pub sequence: u64,
+    pub quantity: u64,
+    pub quote: u64,
+    pub balance_after: crate::dlmm_order_math::OrderBalance,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PublicOrderRouteLimits {
+    pub allow_partial: bool,
+    pub maximum_option_output: u64,
+    pub maximum_order_fills: usize,
 }
 
 fn checked_add(a: u64, b: u64) -> Result<u64, AmoebaDlmmMathError> {
@@ -139,16 +156,19 @@ fn admit_totals(
                 return false;
             };
             book[policy.series_index].external_oi_atoms = oi;
-            if admit_writer_dlmm_cash(
+            let Ok((reserve, _, _)) = admit_writer_dlmm_cash(
                 &book,
                 WriterDlmmCash {
                     assets_atoms: assets,
                     ..policy.cash
                 },
                 &policy.risk,
-            )
-            .is_err()
-            {
+            ) else {
+                return false;
+            };
+            if policy.participation.is_some_and(|participation| {
+                participation.admit(assets, reserve.reserve_atoms).is_err()
+            }) {
                 return false;
             }
             totals.primary_fee_atoms = fee;
@@ -163,7 +183,7 @@ fn admit_totals(
             else {
                 return false;
             };
-            admit_writer_dlmm_retirement(
+            let Ok(admission) = admit_writer_dlmm_retirement(
                 policy.book,
                 policy.cash,
                 &policy.risk,
@@ -178,8 +198,17 @@ fn admit_totals(
                 policy.month_spent_atoms,
                 allocated_after,
                 false,
-            )
-            .is_ok()
+            ) else {
+                return false;
+            };
+            policy.participation.is_none_or(|participation| {
+                participation
+                    .admit(
+                        admission.assets_after_atoms,
+                        admission.reserve_after.reserve_atoms,
+                    )
+                    .is_ok()
+            })
         }
     }
 }
@@ -209,11 +238,38 @@ pub fn quote_writer_dlmm_exact_in(
     writer: &[WriterDlmmBinV1],
     policy: Option<&WriterDlmmSwapPolicy>,
 ) -> Result<WriterDlmmRouteQuote, AmoebaDlmmMathError> {
+    quote_dlmm_with_orders(
+        config,
+        ordinary,
+        writer,
+        policy,
+        &[],
+        PublicOrderRouteLimits {
+            allow_partial: false,
+            maximum_option_output: u64::MAX,
+            maximum_order_fills: crate::dlmm_order_math::MAX_ORDER_FILLS,
+        },
+    )
+}
+
+pub fn quote_dlmm_with_orders(
+    config: WriterDlmmRouteConfig,
+    ordinary: &[AmoebaDlmmBinLiquidity],
+    writer: &[WriterDlmmBinV1],
+    policy: Option<&WriterDlmmSwapPolicy>,
+    orders: &[crate::dlmm_order_state::DlmmOrder],
+    limits: PublicOrderRouteLimits,
+) -> Result<WriterDlmmRouteQuote, AmoebaDlmmMathError> {
     if config.maximum_bins == 0
         || config.maximum_bins > dlmm::AMOEBA_DLMM_MAXIMUM_BINS_PER_SWAP
-        || config.minimum_amount_out == 0
+        || (!limits.allow_partial && config.minimum_amount_out == 0)
         || writer.len() > crate::state::WRITER_DLMM_POSITION_BINS
         || ordinary.len() > 32 * usize::from(crate::constants::MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP)
+        || orders.len() > crate::dlmm_order_math::MAX_OPEN_ORDERS
+        || limits.maximum_order_fills == 0
+        || limits.maximum_order_fills > crate::dlmm_order_math::MAX_ORDER_FILLS
+        || ((!orders.is_empty() || limits.allow_partial)
+            && (config.swap_fee_bps != 0 || config.protocol_fee_share_bps != 0))
     {
         return Err(AmoebaDlmmMathError::InvalidRoute);
     }
@@ -227,6 +283,21 @@ pub fn quote_writer_dlmm_exact_in(
         return Err(AmoebaDlmmMathError::InvalidRoute);
     }
     let ascending = config.direction == AmoebaDlmmSwapDirection::QuoteForOption;
+    if orders.iter().any(|order| {
+        order.side != if ascending { 1 } else { 0 }
+            || order.remaining_input == 0
+            || order.remaining_quantity == 0
+    }) || orders.windows(2).any(|pair| {
+        let a = &pair[0];
+        let b = &pair[1];
+        (if ascending {
+            a.limit_bin > b.limit_bin
+        } else {
+            a.limit_bin < b.limit_bin
+        }) || (a.limit_bin == b.limit_bin && a.sequence >= b.sequence)
+    }) {
+        return Err(AmoebaDlmmMathError::InvalidRoute);
+    }
     if ordinary.windows(2).any(|pair| {
         if ascending {
             pair[0].bin_id >= pair[1].bin_id
@@ -249,7 +320,17 @@ pub fn quote_writer_dlmm_exact_in(
     let mut allocated = 0u64;
     let mut ordinary_index = 0;
     let mut writer_cursor = 0;
-    while remaining > 0 && (ordinary_index < ordinary.len() || writer_cursor < writer.len()) {
+    let mut order_cursor = 0;
+    while remaining > 0
+        && (ordinary_index < ordinary.len()
+            || writer_cursor < writer.len()
+            || order_cursor < orders.len())
+    {
+        if result.quote.fills.len() == usize::from(config.maximum_bins)
+            || (ascending && result.quote.amount_out == limits.maximum_option_output)
+        {
+            break;
+        }
         let ordinary_bin = ordinary.get(ordinary_index);
         let writer_index = if ascending {
             writer_cursor
@@ -257,7 +338,7 @@ pub fn quote_writer_dlmm_exact_in(
             writer.len().saturating_sub(writer_cursor + 1)
         };
         let writer_bin = (writer_cursor < writer.len()).then(|| &writer[writer_index]);
-        let bin_id = match (ordinary_bin, writer_bin) {
+        let mut bin_id = match (ordinary_bin, writer_bin) {
             (Some(a), Some(b)) => {
                 if ascending {
                     a.bin_id.min(b.bin_id)
@@ -267,8 +348,20 @@ pub fn quote_writer_dlmm_exact_in(
             }
             (Some(a), None) => a.bin_id,
             (None, Some(b)) => b.bin_id,
-            _ => break,
+            _ => {
+                orders
+                    .get(order_cursor)
+                    .ok_or(AmoebaDlmmMathError::InvalidRoute)?
+                    .limit_bin
+            }
         };
+        if let Some(order) = orders.get(order_cursor) {
+            bin_id = if ascending {
+                bin_id.min(order.limit_bin)
+            } else {
+                bin_id.max(order.limit_bin)
+            };
+        }
         if (ascending && bin_id > config.limit_bin_id)
             || (!ascending && bin_id < config.limit_bin_id)
         {
@@ -303,8 +396,21 @@ pub fn quote_writer_dlmm_exact_in(
             if result.quote.fills.len() == usize::from(config.maximum_bins) {
                 break;
             }
-            let mut fill =
-                dlmm::fill_bin_exact_input_without_fee(config.direction, remaining, price, bin)?;
+            let mut offered = *bin;
+            if ascending {
+                offered.option_reserve = offered
+                    .option_reserve
+                    .min(limits.maximum_option_output - result.quote.amount_out);
+            }
+            let mut fill = dlmm::fill_bin_exact_input_without_fee(
+                config.direction,
+                remaining,
+                price,
+                &offered,
+            )?;
+            if ascending {
+                fill.option_reserve_after = bin.option_reserve - fill.amount_out;
+            }
             fill.lp_fee = allocate_fee(
                 fill.trade_input,
                 remaining,
@@ -331,10 +437,69 @@ pub fn quote_writer_dlmm_exact_in(
             combined.lp_fee = fill.lp_fee;
             result.ordinary_fills.push(fill);
         }
-        if remaining > 0 {
+        let mut order_bound_hit = false;
+        while remaining > 0
+            && orders
+                .get(order_cursor)
+                .is_some_and(|order| order.limit_bin == bin_id)
+        {
+            if result.order_fills.len() == limits.maximum_order_fills {
+                order_bound_hit = true;
+                break;
+            }
+            let order = &orders[order_cursor];
+            let mut balance = order
+                .balance(config.tick_size_quote_atomic)
+                .map_err(|_| AmoebaDlmmMathError::InvalidRoute)?;
+            let affordable = |cash: u64| -> u64 {
+                u64::try_from(
+                    u128::from(cash) * u128::from(dlmm::AMOEBA_DLMM_PRICE_SCALE)
+                        / u128::from(price),
+                )
+                .unwrap_or(u64::MAX)
+            };
+            let quantity = if ascending {
+                affordable(remaining).min(balance.remaining_quantity).min(
+                    limits.maximum_option_output - result.quote.amount_out - combined.amount_out,
+                )
+            } else {
+                remaining
+                    .min(balance.remaining_quantity)
+                    .min(affordable(balance.remaining_input))
+            };
+            if quantity == 0 {
+                order_bound_hit = true;
+                break;
+            }
+            let quote = balance
+                .fill(quantity, price)
+                .map_err(|_| AmoebaDlmmMathError::InvalidRoute)?;
+            let (input, output) = if ascending {
+                (quote, quantity)
+            } else {
+                (quantity, quote)
+            };
+            remaining = remaining
+                .checked_sub(input)
+                .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?;
+            combined.trade_input = checked_add(combined.trade_input, input)?;
+            combined.amount_out = checked_add(combined.amount_out, output)?;
+            result.order_fills.push(PublicOrderFill {
+                sequence: order.sequence,
+                quantity,
+                quote,
+                balance_after: balance,
+            });
+            order_cursor += 1;
+        }
+        if remaining > 0 && !order_bound_hit {
             if let (Some(bin), Some(policy)) = (writer_here, policy) {
                 let relevant_reserve = if ascending {
-                    bin.option_atoms
+                    bin.option_atoms.min(
+                        limits.maximum_option_output
+                            - result.quote.amount_out
+                            - combined.amount_out,
+                    )
                 } else {
                     bin.quote_atoms
                         .min(remaining_budget(policy, &result.writer))
@@ -439,17 +604,39 @@ pub fn quote_writer_dlmm_exact_in(
         if writer_here.is_some() {
             writer_cursor += 1;
         }
+        if order_bound_hit {
+            break;
+        }
     }
-    if remaining != 0 {
+    // An empty supplied route is not evidence that the canonical LP side is
+    // empty. In particular, post-only placement must not hide a crossing page.
+    if remaining > 0
+        && result.quote.amount_out < limits.maximum_option_output
+        && result.quote.fills.len() < usize::from(config.maximum_bins)
+        && result.order_fills.len() < limits.maximum_order_fills
+        && config.unloaded_ordinary_boundary.is_some_and(|boundary| {
+            if ascending {
+                boundary <= config.limit_bin_id
+            } else {
+                boundary >= config.limit_bin_id
+            }
+        })
+    {
+        return Err(AmoebaDlmmMathError::InvalidRoute);
+    }
+    if remaining != 0 && !limits.allow_partial {
         return Err(AmoebaDlmmMathError::InsufficientLiquidity);
     }
     if result.quote.amount_out < config.minimum_amount_out {
         return Err(AmoebaDlmmMathError::MinimumOutputNotMet);
     }
+    if result.quote.fills.is_empty() && limits.allow_partial {
+        return Ok(result);
+    }
     if allocated != fees.lp_fee || result.quote.fills.is_empty() {
         return Err(AmoebaDlmmMathError::InvalidRoute);
     }
-    result.quote.amount_in = config.amount_in;
+    result.quote.amount_in = config.amount_in - remaining;
     result.quote.total_fee = fees.total_fee;
     result.quote.protocol_fee = fees.protocol_fee;
     result.quote.lp_fee = fees.lp_fee;

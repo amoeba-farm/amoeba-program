@@ -51,6 +51,22 @@ pub(in crate::processor) fn process_instruction(
         };
     }
     match tag {
+        VaultInstructionTag::ManageDlmmOrdersV1 => {
+            decode_and_process::<crate::dlmm_order_state::DlmmOrderAction>(
+                program_id,
+                accounts,
+                payload,
+                crate::processor::ameba_dlmm::orders::process,
+            )
+        }
+        VaultInstructionTag::ManageWriterParticipationV2 => {
+            decode_and_process::<crate::writer_participation_state::WriterParticipationActionV2>(
+                program_id,
+                accounts,
+                payload,
+                participation::process,
+            )
+        }
         VaultInstructionTag::InitializeWriterPolicyRegistryV1 => {
             decode_and_process::<InitializeWriterPolicyRegistryV1Params>(
                 program_id,

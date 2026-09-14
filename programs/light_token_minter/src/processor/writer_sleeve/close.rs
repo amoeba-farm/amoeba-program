@@ -320,7 +320,8 @@ pub(super) fn process_begin_writer_close(
         .close_nonce
         .checked_add(1)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    if sleeve.vault_config != *config_info.key
+    if sleeve.has_time_participation()
+        || sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::Active
         || group.status != WriterSettlementGroupStatus::Active
         || group.sleeve != *sleeve_info.key

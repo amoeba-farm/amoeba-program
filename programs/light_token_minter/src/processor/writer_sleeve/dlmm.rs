@@ -73,6 +73,13 @@ pub(in crate::processor) fn update_cash_metrics(
     sleeve.security_exposure_atoms =
         calculate_security_exposure(limits.security_mode, &series, summary.reserve_atoms)
             .map_err(writer_math_error)?;
+    if sleeve.writer_principal_atoms > 0 {
+        participation::admit_time_participation(
+            sleeve,
+            sleeve.accounted_asset_atoms,
+            summary.reserve_atoms,
+        )?;
+    }
     Ok(())
 }
 

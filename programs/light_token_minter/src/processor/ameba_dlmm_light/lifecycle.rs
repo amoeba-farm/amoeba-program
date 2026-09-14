@@ -263,7 +263,9 @@ impl DecodedAmoebaDlmmState {
 
     fn has_header_with_state(&self, state: CompressionState) -> bool {
         self.body[2..5] == self.kind.account_discriminator()
-            && self.body[5] == crate::ameba_dlmm_state::AMOEBA_DLMM_ACCOUNT_VERSION
+            && (self.body[5] == crate::ameba_dlmm_state::AMOEBA_DLMM_ACCOUNT_VERSION
+                || (matches!(self.kind, AmoebaDlmmStateKind::Pool)
+                    && self.body[5] == crate::dlmm_order_state::ORDER_POOL_VERSION))
             && self.body[self.body.len() - 10] == state as u8
     }
 

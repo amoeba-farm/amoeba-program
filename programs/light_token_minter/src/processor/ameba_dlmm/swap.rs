@@ -83,12 +83,31 @@ pub(super) fn load_swap_pool(
 }
 
 #[inline(never)]
-pub(super) fn process_collective_swap_exact_in_core_with_writer(
+pub(super) fn process_collective_swap_exact_in_core_with_writer<'a>(
     program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    accounts: &[AccountInfo<'a>],
     params: SwapAmoebaDlmmExactInV1Params,
     writer: &mut Option<super::super::writer_sleeve::dlmm::WriterSwapState>,
-    writer_accounts: &[AccountInfo],
+    writer_accounts: &[AccountInfo<'a>],
+) -> ProgramResult {
+    process_collective_swap_with_orders_core(
+        program_id,
+        accounts,
+        params,
+        writer,
+        writer_accounts,
+        None,
+    )
+}
+
+#[inline(never)]
+pub(super) fn process_collective_swap_with_orders_core<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    params: SwapAmoebaDlmmExactInV1Params,
+    writer: &mut Option<super::super::writer_sleeve::dlmm::WriterSwapState>,
+    writer_accounts: &[AccountInfo<'a>],
+    mut orders: Option<&mut orders::OrderSwapState>,
 ) -> ProgramResult {
     const FIXED_ACCOUNTS: usize = 20;
     if accounts.len() < FIXED_ACCOUNTS {
@@ -104,8 +123,24 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
     let quote_mint_info = &accounts[7];
     let option_vault_info = &accounts[8];
     let quote_vault_info = &accounts[9];
-    let trader_option_info = &accounts[10];
-    let trader_quote_info = &accounts[11];
+    let order_taker = orders
+        .as_ref()
+        .is_some_and(|state| state.taker_sequence.is_some());
+    let trader_option_info = if order_taker {
+        &writer_accounts[33]
+    } else {
+        &accounts[10]
+    };
+    let trader_quote_info = if order_taker {
+        &writer_accounts[34]
+    } else {
+        &accounts[11]
+    };
+    let input_authority = if order_taker {
+        &writer_accounts[32]
+    } else {
+        &accounts[0]
+    };
     let light_token_program_info = &accounts[12];
     let compressed_token_authority_info = &accounts[13];
     let option_interface_info = &accounts[14];
@@ -136,6 +171,9 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
     let market = load_swap_market(program_id, market_info)?;
     let month = Box::new(load_oracle_month_state(month_info, program_id)?);
     let mut pool = load_swap_pool(program_id, pool_info)?;
+    if (pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION) != orders.is_some() {
+        return Err(VaultError::InvalidAccountList.into());
+    }
     if pool.status != AmoebaDlmmPoolStatus::Active {
         return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
     }
@@ -180,7 +218,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
     let _ = load_user_transfer_account(
         program_id,
         input_user_info,
-        trader_info.key,
+        input_authority.key,
         input_mint_info.key,
     )?;
     if output_user_info.owner == &system_program::id() {
@@ -188,7 +226,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
             return Err(VaultError::InvalidLightTokenAccount.into());
         }
         validate_light_associated_token_address(
-            trader_info.key,
+            input_authority.key,
             output_mint_info.key,
             output_user_info,
         )?;
@@ -196,7 +234,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
         let _ = load_user_transfer_account(
             program_id,
             output_user_info,
-            trader_info.key,
+            input_authority.key,
             output_mint_info.key,
         )?;
     }
@@ -291,7 +329,19 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
     let writer_policy = writer
         .as_ref()
         .map(|state| state.quote_policy(pool.tick_size_quote_atomic));
-    let route = crate::writer_dlmm_quote::quote_writer_dlmm_exact_in(
+    let order_makers = orders
+        .as_ref()
+        .map_or_else(Vec::new, |state| state.makers(direction));
+    let limits = if let Some(state) = orders.as_ref() {
+        state.limits()?
+    } else {
+        crate::writer_dlmm_quote::PublicOrderRouteLimits {
+            allow_partial: false,
+            maximum_option_output: u64::MAX,
+            maximum_order_fills: crate::dlmm_order_math::MAX_ORDER_FILLS,
+        }
+    };
+    let route = crate::writer_dlmm_quote::quote_dlmm_with_orders(
         crate::writer_dlmm_quote::WriterDlmmRouteConfig {
             direction,
             amount_in: params.amount_in,
@@ -307,9 +357,20 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
         &bins,
         writer.as_ref().map_or(&[], |state| state.bins()),
         writer_policy.as_ref(),
+        &order_makers,
+        limits,
     )
     .map_err(math_error)?;
     let quote = &route.quote;
+    if orders.as_ref().is_some_and(|state| state.post_only) && quote.amount_in > 0 {
+        return Err(VaultError::InvalidAmoebaDlmmRoute.into());
+    }
+    if quote.amount_in == 0 {
+        if let Some(state) = orders.as_mut() {
+            return store_state(&writer_accounts[32], &state.book);
+        }
+        return Err(VaultError::InvalidAmoebaDlmmRoute.into());
+    }
 
     for fill in &route.ordinary_fills {
         let (page_index, local_index) = bin_to_page(fill.bin_id).map_err(math_error)?;
@@ -369,6 +430,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
     if pages.len() > required_page_count {
         return Err(VaultError::UnexpectedAmoebaDlmmWritableAccount.into());
     }
+    let (maker_input, maker_output) = orders::maker_amounts(&route, direction)?;
     let (input_reserve, output_reserve) = match direction {
         AmoebaDlmmSwapDirection::QuoteForOption => (
             &mut pool.accounted_quote_reserve,
@@ -384,10 +446,12 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
         .checked_sub(quote.protocol_fee)
         .ok_or(VaultError::ArithmeticOverflow)?;
     *output_reserve = output_reserve
-        .checked_sub(quote.amount_out)
+        .checked_add(maker_output)
+        .and_then(|value| value.checked_sub(quote.amount_out))
         .ok_or(VaultError::AmoebaDlmmInvariantViolation)?;
     *input_reserve = input_reserve
         .checked_add(net_input)
+        .and_then(|value| value.checked_sub(maker_input))
         .ok_or(VaultError::ArithmeticOverflow)?;
     match direction {
         AmoebaDlmmSwapDirection::QuoteForOption => {
@@ -451,7 +515,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
     if output_user.owner == &system_program::id() {
         let _ = load_or_create_light_associated_token_account(
             trader_info,
-            trader_info,
+            input_authority,
             output_mint,
             output_user,
             light_token_program_info,
@@ -460,7 +524,18 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
             system_program_info,
         )?;
     }
-    invoke_light_token_account_transfer(
+    if let Some(state) = orders.as_ref() {
+        orders::seed_output(writer_accounts, state, &route, direction)?;
+    }
+    let order_bump = [orders.as_ref().map_or(0, |state| state.book.header.bump)];
+    let order_seeds: &[&[u8]] = &[
+        CURRENT_STATE_NAMESPACE_SEED,
+        crate::dlmm_order_state::ORDER_BOOK_SEED,
+        pool_info.key.as_ref(),
+        &order_bump,
+    ];
+    let order_signers: &[&[&[u8]]] = if order_taker { &[order_seeds] } else { &[] };
+    invoke_light_token_account_transfer_with_signer_seeds(
         quote.amount_in,
         MarketMintAccounting::CANONICAL_DECIMALS,
         light_token_program_info,
@@ -468,11 +543,12 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
         trader_info,
         input_user,
         input_vault,
-        trader_info,
+        input_authority,
         input_mint,
         input_interface,
         spl_token_program_info,
         system_program_info,
+        order_signers,
     )?;
     invoke_light_token_account_transfer_with_signer_seeds(
         quote.amount_out,
@@ -499,6 +575,9 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
             pool.as_mut(),
         )?;
     }
+    if let Some(state) = orders.as_mut() {
+        orders::finish(program_id, writer_accounts, state, &route, direction, &pool)?;
+    }
     let after_vault_amounts = validate_pool_vault_amounts(
         program_id,
         pool_info,
@@ -524,6 +603,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
     let physical_delta_ok = after_input
         == before_input
             .checked_add(quote.amount_in)
+            .and_then(|value| value.checked_sub(maker_input))
             .and_then(|value| {
                 value.checked_sub(match direction {
                     AmoebaDlmmSwapDirection::QuoteForOption => route
@@ -535,6 +615,8 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer(
             })
             .ok_or(VaultError::ArithmeticOverflow)?
         && before_output
+            .checked_add(maker_output)
+            .ok_or(VaultError::ArithmeticOverflow)?
             == after_output
                 .checked_add(quote.amount_out)
                 .ok_or(VaultError::ArithmeticOverflow)?;

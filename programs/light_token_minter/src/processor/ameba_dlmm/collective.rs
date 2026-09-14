@@ -131,6 +131,9 @@ pub(super) fn process_collective_swap_exact_in(
     )?;
     let config = load_canonical_vault_config(program_id, &accounts[1])?;
     let pool = load_pool(program_id, &accounts[7])?;
+    if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
+        return Err(VaultError::InvalidAccountList.into());
+    }
     validate_collective_pool_binding(&config, &accounts[2], &accounts[3], &context, &pool)?;
     if context.group_status != WriterSettlementGroupStatus::Active
         || !matches!(
@@ -172,6 +175,73 @@ pub(super) fn process_collective_swap_exact_in(
         ],
         false,
     )
+}
+
+#[inline(never)]
+pub(super) fn process_collective_order_swap(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    params: SwapAmoebaDlmmExactInV1Params,
+    orders: &mut orders::OrderSwapState,
+) -> ProgramResult {
+    if accounts.len() < orders::ORDER_SWAP_FIXED_ACCOUNTS {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    let context = super::super::writer_sleeve::load_collective_dlmm_context(
+        program_id,
+        &accounts[4],
+        &accounts[5],
+        &accounts[6],
+        &accounts[2],
+        &accounts[3],
+    )?;
+    let config = load_canonical_vault_config(program_id, &accounts[1])?;
+    let pool = load_pool(program_id, &accounts[7])?;
+    validate_collective_pool_binding(&config, &accounts[2], &accounts[3], &context, &pool)?;
+    if context.group_status != WriterSettlementGroupStatus::Active
+        || !matches!(
+            context.sleeve_status,
+            WriterSleeveStatus::Active | WriterSleeveStatus::CloseStaging
+        )
+        || context.anchor_month_settled
+    {
+        return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
+    }
+    let mut writer =
+        super::super::writer_sleeve::dlmm::load_swap_state(program_id, accounts, &pool)?;
+    let normalized: Vec<_> = accounts[..4]
+        .iter()
+        .chain(accounts[7..23].iter())
+        .chain(accounts[35..].iter())
+        .cloned()
+        .collect();
+    let direct = orders.taker_sequence.is_none();
+    process_collective_swap_with_orders_core(
+        program_id,
+        &normalized,
+        params,
+        &mut writer,
+        accounts,
+        Some(orders),
+    )?;
+    if direct {
+        super::super::scoped_settlement::authorize_collective_settlement(
+            program_id,
+            &[
+                accounts[0].clone(),
+                accounts[2].clone(),
+                accounts[9].clone(),
+                accounts[13].clone(),
+                accounts[23].clone(),
+                accounts[15].clone(),
+                accounts[21].clone(),
+                accounts[22].clone(),
+                accounts[20].clone(),
+            ],
+            false,
+        )?;
+    }
+    Ok(())
 }
 
 #[inline(never)]

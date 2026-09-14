@@ -28,6 +28,11 @@ impl WriterSwapState {
     pub(in crate::processor) fn quote_policy(&self, tick: u64) -> WriterDlmmSwapPolicy<'_> {
         WriterDlmmSwapPolicy {
             eligible: self.eligible,
+            participation: self
+                .context
+                .sleeve
+                .has_time_participation()
+                .then(|| self.context.sleeve.participation_totals()),
             book: &self.series,
             series_index: self.series_index,
             cash: WriterDlmmCash {

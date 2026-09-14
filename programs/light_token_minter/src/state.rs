@@ -85,8 +85,8 @@ mod rewards;
 mod sku;
 mod staking;
 mod vault;
-mod writer_sleeve;
 mod writer_dlmm;
+mod writer_sleeve;
 
 pub use compressed::*;
 #[cfg(feature = "devnet-solo-backfill-2026")]

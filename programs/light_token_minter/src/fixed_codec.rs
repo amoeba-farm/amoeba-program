@@ -48,9 +48,9 @@ mod cursor;
 mod fields;
 mod oracle;
 mod state_codecs;
-mod writer_dlmm;
 mod state_macros;
 mod variable;
+mod writer_dlmm;
 
 pub(crate) use cursor::*;
 pub(crate) use fields::*;

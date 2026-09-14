@@ -153,7 +153,10 @@ impl AmoebaDlmmPoolV1 {
     pub fn has_current_layout(&self) -> bool {
         self.is_initialized
             && self.account_discriminator == AMOEBA_DLMM_POOL_ACCOUNT_DISCRIMINATOR
-            && self.account_version == AMOEBA_DLMM_ACCOUNT_VERSION
+            && matches!(
+                self.account_version,
+                AMOEBA_DLMM_ACCOUNT_VERSION | crate::dlmm_order_state::ORDER_POOL_VERSION
+            )
             && self.compression_info.state == CompressionState::Decompressed
     }
 }

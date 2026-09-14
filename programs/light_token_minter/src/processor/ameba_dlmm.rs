@@ -550,6 +550,7 @@ mod collective;
 mod initialization;
 mod lifecycle;
 mod liquidity;
+pub(in crate::processor) mod orders;
 mod scoped_position;
 mod swap;
 

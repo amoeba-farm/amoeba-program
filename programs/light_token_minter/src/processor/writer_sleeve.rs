@@ -34,6 +34,7 @@ mod bid_index_preparation;
 mod close;
 pub(super) mod dlmm;
 mod funding;
+mod participation;
 mod reconcile;
 mod settlement;
 

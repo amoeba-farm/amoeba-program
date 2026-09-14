@@ -182,8 +182,8 @@ pub(super) fn process_instruction_with_context(
         0..=63 => dispatch_0_63(program_id, accounts, tag, payload, context),
         64..=124 => dispatch_64_124(program_id, accounts, tag, payload, context),
         128..=158 => dispatch_128_158(program_id, accounts, tag, payload, context),
-        161..=205 => dispatch_161_205(program_id, accounts, tag, payload, context),
-        159 | 220..=251 => writer_sleeve::process_instruction(
+        161..=187 | 189..=205 => dispatch_161_205(program_id, accounts, tag, payload, context),
+        159 | 160 | 188 | 220..=251 => writer_sleeve::process_instruction(
             program_id,
             accounts,
             tag,

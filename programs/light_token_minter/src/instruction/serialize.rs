@@ -20,6 +20,14 @@ where
 impl BorshSerialize for VaultInstruction {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         match self {
+            Self::ManageDlmmOrdersV1 { params } => {
+                serialize_tagged_payload(writer, VaultInstructionTag::ManageDlmmOrdersV1, params)
+            }
+            Self::ManageWriterParticipationV2 { params } => serialize_tagged_payload(
+                writer,
+                VaultInstructionTag::ManageWriterParticipationV2,
+                params,
+            ),
             Self::ManageWriterDlmmV1 { params } => {
                 serialize_tagged_payload(writer, VaultInstructionTag::ManageWriterDlmmV1, params)
             }

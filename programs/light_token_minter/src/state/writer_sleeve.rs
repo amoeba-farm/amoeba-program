@@ -519,8 +519,8 @@ impl WriterSleeveV1 {
 
     pub fn has_current_layout(&self) -> bool {
         self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
-            && self.account_version == Self::ACCOUNT_VERSION
-            && self.reserved == [0; 32]
+            && ((self.account_version == Self::ACCOUNT_VERSION && self.reserved == [0; 32])
+                || self.participation_layout_valid())
     }
 }
 

@@ -115,7 +115,8 @@ pub(super) fn process_deposit_writer_principal(
     )?;
     let _writer_liquidity_policy =
         dlmm::load_funding_policy(program_id, &accounts[17], sleeve_info, &sleeve, &snapshot)?;
-    if sleeve.status != WriterSleeveStatus::Funding
+    if sleeve.has_time_participation()
+        || sleeve.status != WriterSleeveStatus::Funding
         || sleeve.policy_snapshot != *snapshot_info.key
         || sleeve.usdc_vault != *sleeve_vault_info.key
         || sleeve.settlement_mint != *settlement_mint_info.key
@@ -296,7 +297,8 @@ pub(super) fn process_withdraw_writer_principal(
         return Err(VaultError::InvalidConfigAccount.into());
     }
     let mut sleeve = load_writer_sleeve_without_group_meta(program_id, sleeve_info)?;
-    if sleeve.status != WriterSleeveStatus::Funding
+    if sleeve.has_time_participation()
+        || sleeve.status != WriterSleeveStatus::Funding
         || sleeve.usdc_vault != *sleeve_vault_info.key
         || sleeve.settlement_mint != *settlement_mint_info.key
         || sleeve.flat_mint != *flat_mint_info.key

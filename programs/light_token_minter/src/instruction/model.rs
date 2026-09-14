@@ -689,6 +689,12 @@ pub enum VaultInstruction {
     ManageWriterDlmmV1 {
         params: ManageWriterDlmmV1Params,
     },
+    ManageWriterParticipationV2 {
+        params: crate::writer_participation_state::WriterParticipationActionV2,
+    },
+    ManageDlmmOrdersV1 {
+        params: crate::dlmm_order_state::DlmmOrderAction,
+    },
 
     /// Run one current instruction against transient native views of bounded Light-compressed
     /// typed state. The exact inner accounts come first, followed by one system-program account
