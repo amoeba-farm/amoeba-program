@@ -1,0 +1,137 @@
+{
+  "schema": "ameba-spread-devnet-code-only-deployment-v1",
+  "recordedAt": "2026-09-10T00:09:05.207Z",
+  "source": {
+    "privateRepository": "SPACE999978/ameba_spread",
+    "privateCommit": "60d7a856f627f880a62fb93c951a1252615e1198",
+    "publicRepository": "amoeba-farm/amoeba-program",
+    "publicBinding": "This record is committed with the exported source tree.",
+    "exportedTreeSha256": "9bf8d9335f055bb9ec79bf9517cdb9fac6250091778ea5b7c67469383761862f",
+    "exportedFiles": 150,
+    "provenanceSha256": "40d1bb57b2dd621a0527b9f207bd2e955fce415cfe206274ad946b0aaf4a2a2a"
+  },
+  "build": {
+    "status": "retained-private-build-evidence-no-public-rebuild",
+    "privateSourceCommit": "60d7a856f627f880a62fb93c951a1252615e1198",
+    "artifactBytes": 1351456,
+    "artifactSha256": "6a47719f1c053c6727bf4e8050b1e704362c811b3d28e3a68ec02791644d4b3d",
+    "toolchains": {
+      "os": "Windows host; Rust/SBF in WSL Ubuntu-22.04",
+      "node": "24.14.0",
+      "npm": "11.9.0",
+      "typescript": "5.9.3",
+      "esbuild": "0.27.7",
+      "hostRustc": "1.90.0",
+      "hostCargo": "1.90.0",
+      "cargoBuildSbf": "4.0.0",
+      "platformTools": "v1.53",
+      "sbfRustc": "1.89.0"
+    },
+    "architecture": "v1",
+    "features": [
+      "devnet-v3-governance-controller",
+      "devnet-solo-backfill-2026"
+    ],
+    "workingDirectory": "repository root",
+    "command": "CARGO_TARGET_DIR=<separate-target-directory> cargo-build-sbf --manifest-path programs/light_token_minter/Cargo.toml --arch v1 --tools-version v1.53 --skip-tools-install --sbf-out-dir <artifact-output> --no-default-features --features devnet-v3-governance-controller,devnet-solo-backfill-2026 -- --locked",
+    "packageLocalCargoConfigSelected": false,
+    "originalBuildInputs": {
+      "path": "release/candidates/writer-dlmm-20260909/sbf-source-inputs.json",
+      "sha256": "bbf98f378fd0bcdcc34677e5030292353e42f426d980e4a67df7e4cb6191561f"
+    },
+    "twoBuildsMatch": true,
+    "independentCleanCheckoutsAttested": false,
+    "publicRebuildPerformed": false,
+    "solanaVerifySubmissionPerformed": false
+  },
+  "deployment": {
+    "cluster": "devnet",
+    "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "programDataAddress": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+    "programDataAccountBytes": 1351501,
+    "programDataAccountSha256": "bcb4b3f0782b3e7ea5e741eb2da7a753efbaa8f4e61fe3c3a27e97db99d4d9ca",
+    "deployedSlot": 495873438,
+    "payloadBytes": 1351456,
+    "payloadSha256": "6a47719f1c053c6727bf4e8050b1e704362c811b3d28e3a68ec02791644d4b3d",
+    "artifactBytes": 1351456,
+    "artifactSha256": "6a47719f1c053c6727bf4e8050b1e704362c811b3d28e3a68ec02791644d4b3d",
+    "mandatoryZeroPaddingBytes": 0,
+    "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+    "observedAt": "2026-09-10T00:08:19.673Z",
+    "finalizedObservationSlot": 495878940,
+    "extension": {
+      "bytes": 94152,
+      "extraHeadroomBytes": 0,
+      "signature": "32QBhA6SR9HHDR6dTjfDYg8YjRUHGPVaYBGEpPdHJ6aCcJMTx48uvHGm2mZkiaMnoddEY9mYwbXzJBWMCPHP5Twa",
+      "finalizedSlot": 495867858
+    },
+    "controllerProgramId": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+    "gateEpoch": "18",
+    "gateStatus": "Active"
+  },
+  "ceremonies": {
+    "freeze": {
+      "proposalId": "20",
+      "signature": "3Witfz4PjBeVAFHTPT4wUcEjsVALhtxJKDbU8bhHhiXeQ8zP7TJUt9Cf8b4s6DBcfj3befdWrUYMPExkhqX95Zaq",
+      "finalizedSlot": 495867350,
+      "gateEpoch": "16",
+      "gateStatus": "Frozen"
+    },
+    "spread": {
+      "proposalId": "21",
+      "signature": "5qjt5pGcPZBkeQaigyNZTvvb1JmkjV1zgYYFwBiRt28m7VRWdgyF5mjsGvEHFkVGMb9W65GBr9r6zGUUhQXRu98y",
+      "finalizedSlot": 495873438,
+      "gateEpoch": "17",
+      "gateStatus": "Frozen"
+    },
+    "activation": {
+      "proposalId": "22",
+      "signature": "5o9oFQhKt6DzSZ8Y8Eb9BgR2tJoLSuY98GWTbyuU1yviWgeThTfcr6xctMenfVZ55ZccNqjHySBheDFsToCZrMvj",
+      "finalizedSlot": 495878597,
+      "gateEpoch": "18",
+      "gateStatus": "Active"
+    }
+  },
+  "statePreservation": {
+    "mode": "active-state-code-only-v1",
+    "inventoriesEqual": true,
+    "censuses": {
+      "before-spread": {
+        "startSlot": 495867517,
+        "endSlot": 495867540,
+        "sha256": "4119e7e6289150639df79c3168ab36717a66d6abfefb7f2ab4b8131eab2c0c9e",
+        "programAccounts": 3359,
+        "externalAccounts": 181
+      },
+      "immediate-before-spread": {
+        "startSlot": 495873339,
+        "endSlot": 495873396,
+        "sha256": "4119e7e6289150639df79c3168ab36717a66d6abfefb7f2ab4b8131eab2c0c9e",
+        "programAccounts": 3359,
+        "externalAccounts": 181
+      },
+      "after-spread": {
+        "startSlot": 495873614,
+        "endSlot": 495873652,
+        "sha256": "4119e7e6289150639df79c3168ab36717a66d6abfefb7f2ab4b8131eab2c0c9e",
+        "programAccounts": 3359,
+        "externalAccounts": 181
+      },
+      "before-activation": {
+        "startSlot": 495878531,
+        "endSlot": 495878556,
+        "sha256": "4119e7e6289150639df79c3168ab36717a66d6abfefb7f2ab4b8131eab2c0c9e",
+        "programAccounts": 3359,
+        "externalAccounts": 181
+      }
+    }
+  },
+  "scope": {
+    "businessBootstrapPerformed": false,
+    "oldProgramModified": false,
+    "applicationRolloutIncluded": false,
+    "liveTradeTestPerformed": false,
+    "tradeReadinessClaimed": false
+  }
+}

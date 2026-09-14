@@ -1,0 +1,47 @@
+{
+  "schema": "amoeba-devnet-public-build-attestation-v1",
+  "recordedAt": "2026-09-11T08:47:00.160513+00:00",
+  "repository": "https://github.com/amoeba-farm/amoeba-program",
+  "sourceCommit": "2dcf2d3b47081825bc0752ecc5a330c09a01b331",
+  "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "programData": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+  "cluster": "devnet",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "deployment": {
+    "signature": "2fAoMZC2YGM6H6MJAAGzzGW5Gc52FtbsrLgqArFbMXYA817KU9NZg8gjgBWis382JA2arCCVqe1Dmr4h93M6Ft2Y",
+    "finalizedSlot": 496580643,
+    "gateEpoch": 20,
+    "gateStatus": "EmergencyFrozen",
+    "accountPreservation": {
+      "programAccounts": 3359,
+      "externalAccounts": 181,
+      "beforeAndAfterMatch": true,
+      "sha256": "df6bc239ec0be26c7eb7370587dcd0ec0cdf629f7b058817331b0c375fc49de5"
+    }
+  },
+  "build": {
+    "tool": "solana-verify 0.5.1",
+    "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+    "cargoBuildSbf": "4.0.0",
+    "platformTools": "v1.53",
+    "sbfRustc": "1.89.0",
+    "architecture": "v1",
+    "features": [
+      "devnet-v3-governance-controller",
+      "devnet-solo-backfill-2026"
+    ],
+    "cargoBuildSbfArgs": "--tools-version v1.53 --skip-tools-install --no-default-features",
+    "artifactBytes": 1385312,
+    "artifactSha256": "c0b6cf87f788cac0b88b604a51aa2e20ad8497d784a990d03bde3e8c1ed89afc",
+    "solanaVerifyExecutableHash": "5b7ca4d42b841e2d42185acfbaa824b44733398d7ee2578e6d8746b03a629012",
+    "publicDockerRebuildPerformed": true,
+    "exactDeployedArtifactMatch": true,
+    "finalizedComparisonContextSlot": 496583248
+  },
+  "verificationMetadataPda": "9XofaiTXU9hhBov1edJeNaS54QLy3wjFVk82dQBZdrov",
+  "scope": {
+    "programRedeployedDuringVerification": false,
+    "hostedRemoteVerificationPerformed": false,
+    "hostedRemoteVerificationLimitation": "The installed solana-verify 0.5.1 remote submission service supports mainnet only. This attestation records a public-source Docker rebuild matched to finalized Devnet program bytes."
+  }
+}

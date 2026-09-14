@@ -1,0 +1,77 @@
+{
+  "schema": "amoeba-devnet-public-source-verification-v1",
+  "completedAt": "2026-09-10T01:36:50.945Z",
+  "cluster": "devnet",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "publicSource": {
+    "repository": "https://github.com/amoeba-farm/amoeba-program",
+    "commit": "94af03cd2f6be26e3dabd1e7d725045bc7e1ee49",
+    "privateSourceCommit": "60d7a856f627f880a62fb93c951a1252615e1198",
+    "programFilesCompared": 133
+  },
+  "build": {
+    "tool": "solana-verify 0.5.1",
+    "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+    "cargoBuildSbf": "4.0.0",
+    "platformTools": "v1.53",
+    "sbfRustc": "1.89.0",
+    "architecture": "v1",
+    "features": [
+      "devnet-v3-governance-controller",
+      "devnet-solo-backfill-2026"
+    ],
+    "artifactBytes": 1351456,
+    "artifactSha256": "6a47719f1c053c6727bf4e8050b1e704362c811b3d28e3a68ec02791644d4b3d",
+    "publicDockerRebuildPerformed": true,
+    "exactDeployedArtifactMatch": true,
+    "contractSourceChanged": false,
+    "programRedeployed": false,
+    "solanaVerifyExecutableHash": "76a54073b0799a6573e728ec60efeae8124b0a2cc371b3e6817517b56c091f29"
+  },
+  "verification": {
+    "signature": "2WBjL1f8hkp7mzsh3DnHeigFh14BJ2ZFemdcaGG1hCKiqmyn25nkH8aeWGXMSCNaTejrdyN594BUqRkeg25nNMJ7",
+    "finalizedSlot": 495910827,
+    "feeLamports": 6400,
+    "metadataPda": "9XofaiTXU9hhBov1edJeNaS54QLy3wjFVk82dQBZdrov",
+    "previousCommit": "d40e4ee535d58abfaea3f34d2794b291e29301a0",
+    "previousDeployedSlot": "495476689",
+    "at": "2026-09-10T01:36:50.885Z",
+    "contextSlot": 495910976,
+    "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "programData": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+    "artifactSha256": "6a47719f1c053c6727bf4e8050b1e704362c811b3d28e3a68ec02791644d4b3d",
+    "artifactBytes": 1351456,
+    "deployedSlot": "495873438",
+    "metadata": {
+      "address": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+      "signer": "G2f6Fv477ZyFbmRFtVr21jf9VufXpiRCxf1e91J6SxxT",
+      "version": "0.5.1",
+      "gitUrl": "https://github.com/amoeba-farm/amoeba-program",
+      "commit": "94af03cd2f6be26e3dabd1e7d725045bc7e1ee49",
+      "args": [
+        "--mount-path",
+        "programs/light_token_minter",
+        "--workspace-path",
+        "programs/light_token_minter",
+        "--library-name",
+        "light_token_minter",
+        "--base-image",
+        "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+        "--arch",
+        "v1",
+        "--cargo-build-sbf-args=\"--tools-version v1.53 --skip-tools-install --no-default-features\"",
+        "--",
+        "--features",
+        "devnet-v3-governance-controller,devnet-solo-backfill-2026"
+      ],
+      "deployedSlot": "495873438",
+      "bump": 254
+    }
+  },
+  "scope": {
+    "onChainVerificationMetadataUpdated": true,
+    "hostedRemoteVerificationPerformed": false,
+    "hostedRemoteVerificationLimitation": "solana-verify 0.5.1 hosted verifier job submission supports Mainnet only; this evidence is the public-source Docker rebuild and finalized Devnet verification metadata.",
+    "businessTransactionsPerformed": false
+  }
+}

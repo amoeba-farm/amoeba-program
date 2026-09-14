@@ -1,0 +1,163 @@
+{
+  "schema": "amoeba-devnet-refactor-finalized-release-v1",
+  "status": "deployed-public-build-matched-metadata-finalized",
+  "verifiedAt": "2026-09-12T19:11:54.884Z",
+  "cluster": "devnet",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "programData": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+  "source": {
+    "privateCommit": "b1931fecff5229da232f06e9c5c43b1d6328806d",
+    "publicRepository": "https://github.com/amoeba-farm/amoeba-program",
+    "publicCommit": "bed455196bab7471d3f8803aa43e851047401fb2"
+  },
+  "build": {
+    "libraryName": "light_token_minter",
+    "architecture": "v1",
+    "features": [
+      "devnet-v3-governance-controller",
+      "devnet-solo-backfill-2026"
+    ],
+    "defaultFeatures": false,
+    "toolchain": {
+      "cargoBuildSbf": "4.0.0",
+      "platformTools": "v1.53",
+      "sbfRust": "1.89.0",
+      "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68"
+    },
+    "artifactBytes": 1385312,
+    "artifactSha256": "903c58504f44e8820e5c9f99765b26be15a97504ec5fdd0855f3668f29927fee",
+    "solanaVerifyNormalizedHash": "f73b35ca7a13d87af54d20b0c96ef795099d58cf436c3dad44bdb9860bbf9ae0",
+    "publicDockerRebuildMatchedPrivateArtifact": true,
+    "privateBuildQualification": "Two retained matching artifacts; Spread repeats used separate cached targets, not independent clean builds"
+  },
+  "proposal": {
+    "address": "2qnnMnoJtKpAnmMiMe7fZwUvVibxBLB9ki5CPMh7RZeb",
+    "id": "28",
+    "createdSlot": "497322132",
+    "earliestExecutionSlot": "497326632",
+    "approvalDeadlineSlot": "501322132",
+    "expirySlot": "504322132",
+    "councilEpoch": "1",
+    "timingVersion": "2",
+    "approvalCount": 3,
+    "approvalBitmap": 7,
+    "verifiedChunks": 85,
+    "artifactMerkleRoot": "5be4af6c28646f8d93129a48f2581388b37413ff0c206807bf99931cfddf2e31",
+    "sourceCommitment": "082c31e0a733fa0264bee8f1b88345b72ef3cdc7fdfabbe565279628fff891c6",
+    "buildCommitment": "452fb0b00066544551e9f7f3960fccf2334262319e218b447e038325bbc86449"
+  },
+  "installation": {
+    "signature": "4E7Cxao9fhv1DRsaDxYnVasoy2hNjq93y9YhJXsbS166P5fdL75uswGTrfzmBsdFXAZXxb5XFZsQiwR5j743GrdY",
+    "finalizedSlot": 497328581,
+    "deployedSlot": "497328581",
+    "payloadCapacityBytes": 1385312,
+    "payloadSha256": "903c58504f44e8820e5c9f99765b26be15a97504ec5fdd0855f3668f29927fee",
+    "mandatoryZeroPaddingBytes": 0,
+    "retainedUpgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+    "controllerConfigPreserved": true
+  },
+  "statePreservation": {
+    "mode": "active-state-code-only-v1",
+    "programAccountCount": 3359,
+    "externalAccountCount": 112,
+    "beforeInventorySha256": "5895275de2c8ec917be106a627b83f542f93093939f3178b1542aa9916459f21",
+    "afterInventorySha256": "5895275de2c8ec917be106a627b83f542f93093939f3178b1542aa9916459f21",
+    "exactInventoryMatch": true,
+    "bootstrapPerformed": false,
+    "inventoryProgramId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw"
+  },
+  "gate": {
+    "address": "Cdym9p7FvtxEAjF8XuCqSrishB7LmBDXaZGDMMgWczu",
+    "status": "Active",
+    "epoch": "24",
+    "freeze": {
+      "at": "2026-09-12T18:37:16.954Z",
+      "gate": {
+        "bump": 254,
+        "status": 2,
+        "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+        "targetProgram": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+        "programdata": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+        "epoch": "22",
+        "activeProposal": "11111111111111111111111111111111",
+        "freezeSlot": "497321648",
+        "reason": 3,
+        "lastCompletedProposal": "6VXsQbqwvUvhyczbNssZPgWyXRabFcw56pEmBzVFnb5X"
+      },
+      "proposal": "6VXsQbqwvUvhyczbNssZPgWyXRabFcw56pEmBzVFnb5X",
+      "executedSlot": "497321648",
+      "signature": "35xE8n4ibJW9RzpQKx4EzLd9EMb23nKGJiarr3NCTz5C5z6kkpfQBc8MBtVjMSHWwMcTYihdE9uYTiuQZzF8ucob",
+      "quorum": 3
+    },
+    "activation": {
+      "at": "2026-09-12T19:10:22.608Z",
+      "gate": {
+        "bump": 254,
+        "status": 0,
+        "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+        "targetProgram": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+        "programdata": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+        "epoch": "24",
+        "activeProposal": "11111111111111111111111111111111",
+        "freezeSlot": "0",
+        "reason": 0,
+        "lastCompletedProposal": "G3Gz2KLkWYrmeAaP3PbjjBYuD2jeZ6wYYSzHwWBLkE56"
+      },
+      "proposal": "G3Gz2KLkWYrmeAaP3PbjjBYuD2jeZ6wYYSzHwWBLkE56",
+      "executedSlot": "497333714",
+      "signature": "5NKRWe2QLm2s2RUyYDWyK1PJZUNeYJmh3PzzgsFyPqMSvLr6rjxzWvCsdPsgjbxjpBk5HTZbYgg66jRTwrewMPAB",
+      "quorum": 3
+    }
+  },
+  "verification": {
+    "at": "2026-09-12T19:11:54.881Z",
+    "metadata": "9XofaiTXU9hhBov1edJeNaS54QLy3wjFVk82dQBZdrov",
+    "uploader": "G2f6Fv477ZyFbmRFtVr21jf9VufXpiRCxf1e91J6SxxT",
+    "program": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "version": "0.5.1",
+    "repository": "https://github.com/amoeba-farm/amoeba-program",
+    "commit": "bed455196bab7471d3f8803aa43e851047401fb2",
+    "args": [
+      "--workspace-path",
+      "programs/light_token_minter",
+      "--library-name",
+      "light_token_minter",
+      "--base-image",
+      "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+      "--arch",
+      "v1",
+      "--cargo-build-sbf-args=\"--tools-version v1.53 --skip-tools-install --no-default-features\"",
+      "--",
+      "--features",
+      "devnet-v3-governance-controller,devnet-solo-backfill-2026"
+    ],
+    "deployedSlot": "497328581",
+    "signature": "87aLQgNfPqGLAydtRx5cS3XAyBwHZC5RKwK77E8Kc2xUcCU8MUmvZDBkcDgxDA7dwZ96KGAhx4TnyerxRoPSxyQ",
+    "finalized": 497334279,
+    "artifactSha256": "903c58504f44e8820e5c9f99765b26be15a97504ec5fdd0855f3668f29927fee",
+    "artifactLength": 1385312,
+    "publicBuildEquality": true,
+    "authorityEndorsed": false,
+    "hostedVerification": "Unsupported for Devnet by the current hosted service"
+  },
+  "qualification": {
+    "spreadRustLibraryPassed": 292,
+    "spreadRustMintIntegrationPassed": 26,
+    "spreadTypeScriptPassed": 330,
+    "spreadTypeScriptSkipped": 1,
+    "governanceClientAndVectorPassed": 148,
+    "typechecksPassed": true,
+    "baselineFailingTestsDeletedByUserRequest": 24,
+    "fullSuiteQualificationClaimed": false,
+    "details": "Removed scenarios are not claimed fixed. Baseline formatting/lint drift was not repaired. Existing artifact and check evidence was reused for unchanged inputs."
+  },
+  "scope": {
+    "programLogicChanged": false,
+    "authorityRotatedOrRevoked": false,
+    "tradingRulesChanged": false,
+    "trialTradesSubmitted": false,
+    "serviceRolloutPerformed": false,
+    "protectedPublicPresentationFilesChanged": false
+  }
+}
