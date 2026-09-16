@@ -78,7 +78,7 @@ pub(super) fn ensure_finalized_oracle_issue_sku_coverage(
     }
     let planned_listing_ts = coverage
         .planned_scramble_start_ts
-        .checked_add(ORACLE_PRE_LISTING_WINDOW_SECONDS)
+        .checked_add(schedule_total(month)?)
         .ok_or(VaultError::InvalidOracleSkuCoverageManifest)?;
     if coverage.planned_scramble_start_ts == 0
         || coverage.planned_listing_ts != planned_listing_ts

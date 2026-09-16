@@ -1,7 +1,7 @@
-use super::fixed_state_deserialize;
 use super::*;
+use super::{fixed_state_deserialize, fixed_state_deserialize_flat};
 
-fixed_state_deserialize!(OracleRecipeSourceIndex, OracleRecipeSourceIndex::LEN, {
+fixed_state_deserialize_flat!(OracleRecipeSourceIndex, OracleRecipeSourceIndex::LEN, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -20,7 +20,7 @@ fixed_state_deserialize!(OracleRecipeSourceIndex, OracleRecipeSourceIndex::LEN, 
     complete: bool,
 });
 
-fixed_state_deserialize!(OracleBucketSourceIndex, OracleBucketSourceIndex::LEN, {
+fixed_state_deserialize_flat!(OracleBucketSourceIndex, OracleBucketSourceIndex::LEN, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -32,10 +32,9 @@ fixed_state_deserialize!(OracleBucketSourceIndex, OracleBucketSourceIndex::LEN, 
     first_source_index: u16,
     bucket_weight_bps: u16,
     source_count: u16,
-    source_ids: [[u8; 32]; crate::constants::MAX_ORACLE_BUCKET_SOURCES],
 });
 
-fixed_state_deserialize!(VaultConfig, 135, {
+fixed_state_deserialize_flat!(VaultConfig, 135, {
     is_initialized: bool,
     bump: u8,
     admin: Pubkey,
@@ -45,40 +44,6 @@ fixed_state_deserialize!(VaultConfig, 135, {
     paused: bool,
     account_discriminator: [u8; 3],
     account_version: u8,
-});
-
-fixed_state_deserialize!(OracleEmergencyDisputeV3, 326, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    month: Pubkey,
-    dispute_id: [u8; 32],
-    kind: OracleEmergencyDisputeKind,
-    target_id: [u8; 32],
-    target_account: Pubkey,
-    opened_by: Pubkey,
-    status: OracleChallengeStatus,
-    fallback_choice: u8,
-    resolved_choice: u8,
-    snapshot_slot: u64,
-    snapshot_total_major_tokens: u64,
-    committed_power: u64,
-    committed_vote_count: u32,
-    revealed_power: u64,
-    revealed_vote_count: u32,
-    winning_power: u64,
-    winning_vote_count: u32,
-    winning_choice: u8,
-    choice_power: [u64; 3],
-    choice_vote_count: [u32; 3],
-    supermajority_bps: u16,
-    commit_deadline_slot: u64,
-    reveal_deadline_slot: u64,
-    pot: Pubkey,
-    resolved_slot: u64,
-    minimum_vote_amount: u64,
-    choice_count: u8,
 });
 
 fixed_state_deserialize!(OracleBucketMedianState, 245, {
@@ -101,8 +66,8 @@ fixed_state_deserialize!(OracleBucketMedianState, 245, {
     recompute_processed_source_count: u16,
     last_recompute_source_id: [u8; 32],
     emergency_snapshot_slot: u64,
-    emergency_snapshot_total_samba: u64,
-    opening_source_deltas_bps: [i64; crate::constants::MAX_ORACLE_BUCKET_SOURCES],
+    council_authority_version: u64,
+    opening_source_deltas_bps: [i64; crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY],
 });
 
 fixed_state_deserialize!(OracleActiveWeightManifest, 159, {
@@ -162,35 +127,7 @@ fixed_state_deserialize!(OracleRecipeWeightManifest, 181, {
     last_collected_source_id: [u8; 32],
 });
 
-fixed_state_deserialize!(OracleSambaEmergencyPot, 257, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    dispute: Pubkey,
-    month: Pubkey,
-    samba_mint: Pubkey,
-    token_account: Pubkey,
-    payout_mode: OracleSambaEmergencyPayoutMode,
-    total_committed: u64,
-    committed_vote_count: u32,
-    winning_choice: u8,
-    winning_power: u64,
-    winning_vote_count: u32,
-    registered_power: u64,
-    registered_vote_count: u32,
-    registered_base_total: u64,
-    dust_recipient_vote: Pubkey,
-    dust_amount: u64,
-    registration_finalized: bool,
-    remaining_liability: u64,
-    settled_vote_count: u32,
-    total_paid: u64,
-    resolved_slot: u64,
-    last_updated_slot: u64,
-});
-
-fixed_state_deserialize!(OracleSourceState, 335, {
+fixed_state_deserialize!(OracleSourceState, 346, {
     is_initialized: bool,
     bump: u8,
     month: Pubkey,
@@ -209,11 +146,12 @@ fixed_state_deserialize!(OracleSourceState, 335, {
     opening_submitted: bool,
     opening_evidence_hash: [u8; 32],
     last_finalized_step: u64,
-    observation_count: u8,
+    observation_count: u32,
+    latest_source_time: u64,
     rolling_observation_hash: [u8; 32],
 });
 
-fixed_state_deserialize!(OracleSourceObservations, 582, {
+fixed_state_deserialize_flat!(OracleSourceObservations, 582, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -241,7 +179,7 @@ fixed_state_deserialize!(OracleSourceChallenge, 295, {
     evidence_hash: [u8; 32],
     rule_review_slot: u64,
     escrow_disposition: OracleEscrowDisposition,
-    emergency_snapshot_total_major_tokens: u64,
+    council_authority_version: u64,
     emergency_snapshot_version: u8,
     failed_schedule_escrow_counted: bool,
 });
@@ -267,7 +205,7 @@ fixed_state_deserialize!(OracleUsdcSourceReward, 278, {
     listing_escrow_counted: bool,
 });
 
-fixed_state_deserialize!(OracleUsdcSkuPool, 226, {
+fixed_state_deserialize_flat!(OracleUsdcSkuPool, 226, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -318,13 +256,13 @@ fixed_state_deserialize!(OracleUsdcRewardSchedule, 158, {
     bounty_fee_sweep_finalized: bool,
 });
 
-fixed_state_deserialize!(OracleEconomicParams, 18, {
+fixed_state_deserialize_flat!(OracleEconomicParams, 18, {
     emergency_supermajority_bps: u16,
     emergency_commit_window_slots: u64,
     emergency_reveal_window_slots: u64,
 });
 
-fixed_state_deserialize!(WriterPolicyRegistryV1, 198, {
+fixed_state_deserialize_flat!(WriterPolicyRegistryV1, 134, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -332,15 +270,13 @@ fixed_state_deserialize!(WriterPolicyRegistryV1, 198, {
     vault_config: Pubkey,
     policy_authority: Pubkey,
     pending_policy_authority: Pubkey,
-    protocol_fee_vault: Pubkey,
     pending_activation_slot: u64,
     rotation_delay_slots: u64,
     latest_policy_version: u64,
     last_updated_slot: u64,
-    reserved: [u8; 32],
 });
 
-fixed_state_deserialize!(WriterPolicySnapshotV1, 344, {
+fixed_state_deserialize!(WriterPolicySnapshotV1, 298, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -355,12 +291,10 @@ fixed_state_deserialize!(WriterPolicySnapshotV1, 344, {
     series_family_hash: [u8; 32],
     security_mode: WriterSecurityMode,
     reserve_rounding_mode: WriterReserveRoundingMode,
-    auction_priority_rule: WriterAuctionPriorityRule,
+
     v2_feature_flags: u8,
     max_series: u8,
-    reserved_0: u8,
-    primary_fee_bps: u16,
-    reserved_1: [u8; 2],
+
     drawdown_scale: u64,
     worst_drawdown_limit: u64,
     upper_drawdown_limit: u64,
@@ -368,11 +302,10 @@ fixed_state_deserialize!(WriterPolicySnapshotV1, 344, {
     lower_tail_max_settlement_atomic: u64,
     upper_tail_min_settlement_atomic: u64,
     operational_buffer_atoms: u64,
-    max_auction_issue_atoms: u64,
-    max_close_flat_atoms: u64,
+    max_issue_atoms: u64,
+
     created_slot: u64,
     sealed_slot: u64,
-    reserved: [u8; 32],
 });
 
 fixed_state_deserialize!(WriterSettlementGroupV1, 558, {
@@ -422,124 +355,4 @@ fixed_state_deserialize!(WriterSeriesBookV1, 8312, {
     book_digest: [u8; 32],
     last_updated_slot: u64,
     records: Box<[WriterSeriesRecordV1; WRITER_SERIES_STORAGE_CAPACITY]>,
-});
-
-fixed_state_deserialize!(WriterAuctionV1, 1534, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    sleeve: Pubkey,
-    series_book: Pubkey,
-    policy_snapshot: Pubkey,
-    auction_nonce: u64,
-    escrow: Pubkey,
-    bid_index: Pubkey,
-    fee_vault: Pubkey,
-    policy_version: u64,
-    scenario_set_hash: [u8; 32],
-    risk_limit_hash: [u8; 32],
-    reserve_vector_commitment: [u8; 32],
-    reveal_hash: [u8; 32],
-    revealed_nonce: [u8; 32],
-    commit_slot: u64,
-    bid_deadline_ts: u64,
-    reveal_deadline_ts: u64,
-    execute_deadline_ts: u64,
-    bid_count: u16,
-    planned_bid_count: u16,
-    executed_bid_count: u16,
-    refunded_bid_count: u16,
-    planning_cursor: u16,
-    reserved_0: [u8; 6],
-    total_escrow_atoms: u64,
-    accepted_premium_atoms: u64,
-    accepted_fee_atoms: u64,
-    accepted_contract_atoms: u64,
-    refundable_atoms: u64,
-    plan_digest: [u8; 32],
-    status: WriterAuctionStatus,
-    reserved_1: [u8; 7],
-    last_updated_slot: u64,
-    reserve_prices_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
-    issue_caps_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
-    planned_issue_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
-    executed_issue_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
-});
-
-fixed_state_deserialize!(WriterBidIndexV1, 14936, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    auction: Pubkey,
-    bid_count: u16,
-    planned_bid_count: u16,
-    executed_bid_count: u16,
-    refunded_bid_count: u16,
-    planning_cursor: u16,
-    rolling_digest: [u8; 32],
-    last_updated_slot: u64,
-    records: Box<[WriterBidIndexRecordV1; WRITER_BID_STORAGE_CAPACITY]>,
-});
-
-fixed_state_deserialize!(WriterBidV1, 230, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    auction: Pubkey,
-    bidder: Pubkey,
-    refund_token_account: Pubkey,
-    claim_destination: Pubkey,
-    order_id: u64,
-    series_index: u8,
-    status: WriterBidStatus,
-    delivery_mode: WriterBidDeliveryMode,
-    reserved: [u8; 5],
-    bid_price_per_contract_atoms: u64,
-    requested_contract_atoms: u64,
-    accepted_contract_atoms: u64,
-    executed_contract_atoms: u64,
-    escrowed_atoms: u64,
-    premium_charged_atoms: u64,
-    fee_charged_atoms: u64,
-    refunded_atoms: u64,
-    placed_slot: u64,
-    last_updated_slot: u64,
-});
-
-fixed_state_deserialize!(WriterCloseRequestV1, 1088, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    sleeve: Pubkey,
-    owner: Pubkey,
-    flat_escrow: Pubkey,
-    flat_mint: Pubkey,
-    request_nonce: u64,
-    flat_amount_atoms: u64,
-    minimum_withdrawal_atoms: u64,
-    snapshot_asset_atoms: u64,
-    snapshot_reserve_atoms: u64,
-    snapshot_writer_principal_atoms: u64,
-    snapshot_locked_primary_premium_atoms: u64,
-    snapshot_flat_supply_atoms: u64,
-    snapshot_security_exposure_atoms: u64,
-    snapshot_policy_version: u64,
-    snapshot_group_commitment: [u8; 32],
-    snapshot_book_digest: [u8; 32],
-    deadline_ts: u64,
-    status: WriterCloseRequestStatus,
-    series_count: u8,
-    next_deposit_index: u8,
-    next_cancel_index: u8,
-    reserved: [u8; 6],
-    required_claim_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
-    deposited_claim_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
-    snapshot_external_oi_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
-    final_withdrawal_atoms: u64,
-    finalized_slot: u64,
-    last_updated_slot: u64,
 });

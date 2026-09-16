@@ -153,11 +153,7 @@ impl BorshSerialize for VaultInstruction {
                 writer,
                 VaultInstructionTag::CancelStaleOracleSourceChallengeV2,
             ),
-            Self::ResolveOracleEmergencyDisputeV4 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::ResolveOracleEmergencyDisputeV4,
-                params,
-            ),
+
             Self::SettleFailedOracleMonthEscrowV2 { params } => serialize_tagged_payload(
                 writer,
                 VaultInstructionTag::SettleFailedOracleMonthEscrowV2,
@@ -257,55 +253,7 @@ impl BorshSerialize for VaultInstruction {
             Self::ClaimOracleUsdcReward { params } => {
                 serialize_tagged_payload(writer, VaultInstructionTag::ClaimOracleUsdcReward, params)
             }
-            Self::ConfigureOracleMajorToken { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::ConfigureOracleMajorToken,
-                params,
-            ),
-            Self::DepositOracleMajorTokens { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::DepositOracleMajorTokens,
-                params,
-            ),
-            Self::WithdrawOracleMajorTokens { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::WithdrawOracleMajorTokens,
-                params,
-            ),
-            Self::InitializeOracleSambaPool { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::InitializeOracleSambaPool,
-                params,
-            ),
-            Self::InitializeOracleRewardFunnel { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::InitializeOracleRewardFunnel,
-                params,
-            ),
-            Self::SweepOracleRewardFunnel { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::SweepOracleRewardFunnel,
-                params,
-            ),
-            Self::QueueStakeAmbaForSamba { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::QueueStakeAmbaForSamba,
-                params,
-            ),
-            Self::ActivateQueuedStakeAmbaForSamba { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::ActivateQueuedStakeAmbaForSamba,
-                params,
-            ),
-            Self::CancelQueuedStakeAmba { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::CancelQueuedStakeAmba, params)
-            }
-            Self::RequestUnstakeSamba { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::RequestUnstakeSamba, params)
-            }
-            Self::CompleteUnstakeSamba { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::CompleteUnstakeSamba, params)
-            }
+
             Self::ProposeOracleSourceV3 { params } => {
                 serialize_tagged_payload(writer, VaultInstructionTag::ProposeOracleSourceV3, params)
             }
@@ -323,10 +271,7 @@ impl BorshSerialize for VaultInstruction {
             Self::CancelStaleOracleUpdateClaimV2 => {
                 serialize_tag(writer, VaultInstructionTag::CancelStaleOracleUpdateClaimV2)
             }
-            Self::AbortStaleOracleUpdateEmergencyDisputeV2 => serialize_tag(
-                writer,
-                VaultInstructionTag::AbortStaleOracleUpdateEmergencyDisputeV2,
-            ),
+
             Self::ReopenOracleSkuCoverage => {
                 serialize_tag(writer, VaultInstructionTag::ReopenOracleSkuCoverage)
             }
@@ -377,33 +322,7 @@ impl BorshSerialize for VaultInstruction {
             Self::ExpireOracleOpeningSource => {
                 serialize_tag(writer, VaultInstructionTag::ExpireOracleOpeningSource)
             }
-            Self::TryOpenOracleEmergencyDisputeV2 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::TryOpenOracleEmergencyDisputeV2,
-                params,
-            ),
-            Self::CommitOracleEmergencyVoteV3 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::CommitOracleEmergencyVoteV3,
-                params,
-            ),
-            Self::RevealOracleEmergencyVoteV2 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::RevealOracleEmergencyVoteV2,
-                params,
-            ),
-            Self::ResolveOracleEmergencyDisputeV2 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::ResolveOracleEmergencyDisputeV2,
-                params,
-            ),
-            Self::RegisterOracleSambaWinningVote => {
-                serialize_tag(writer, VaultInstructionTag::RegisterOracleSambaWinningVote)
-            }
-            Self::SettleOracleSambaEmergencyVoteV2 => serialize_tag(
-                writer,
-                VaultInstructionTag::SettleOracleSambaEmergencyVoteV2,
-            ),
+
             Self::CloseOracleMonth => serialize_tag(writer, VaultInstructionTag::CloseOracleMonth),
             Self::FinalizeOracleMonth => {
                 serialize_tag(writer, VaultInstructionTag::FinalizeOracleMonth)
@@ -422,9 +341,13 @@ impl BorshSerialize for VaultInstruction {
                 writer,
                 VaultInstructionTag::InitializeWriterSettlementGroupV1,
             ),
-            Self::InitializeWriterSleeveV1 => {
-                serialize_tag(writer, VaultInstructionTag::InitializeWriterSleeveV1)
-            }
+            Self::InitializeWriterSleeveV1 {
+                participation_start_ts,
+            } => serialize_tagged_payload(
+                writer,
+                VaultInstructionTag::InitializeWriterSleeveV1,
+                participation_start_ts,
+            ),
             Self::RegisterWriterSeriesV1 => {
                 serialize_tag(writer, VaultInstructionTag::RegisterWriterSeriesV1)
             }
@@ -434,16 +357,6 @@ impl BorshSerialize for VaultInstruction {
             Self::OpenWriterFundingV1 => {
                 serialize_tag(writer, VaultInstructionTag::OpenWriterFundingV1)
             }
-            Self::DepositWriterPrincipalV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::DepositWriterPrincipalV1,
-                params,
-            ),
-            Self::WithdrawWriterPrincipalV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::WithdrawWriterPrincipalV1,
-                params,
-            ),
             Self::ActivateWriterSleeveV1 => {
                 serialize_tag(writer, VaultInstructionTag::ActivateWriterSleeveV1)
             }
@@ -462,49 +375,12 @@ impl BorshSerialize for VaultInstruction {
                 VaultInstructionTag::CleanupWriterCustodyV1,
                 params,
             ),
-            Self::CommitWriterAuctionV1 { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::CommitWriterAuctionV1, params)
-            }
-            Self::PlaceWriterBidV1 { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::PlaceWriterBidV1, params)
-            }
-            Self::CancelOrRefundWriterBidV1 => {
-                serialize_tag(writer, VaultInstructionTag::CancelOrRefundWriterBidV1)
-            }
-            Self::RevealWriterAuctionV1 { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::RevealWriterAuctionV1, params)
-            }
-            Self::PlanWriterAuctionChunkV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::PlanWriterAuctionChunkV1,
-                params,
-            ),
-            Self::ExecuteWriterAuctionFillV1 => {
-                serialize_tag(writer, VaultInstructionTag::ExecuteWriterAuctionFillV1)
-            }
-            Self::FinalizeOrAbortWriterAuctionV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::FinalizeOrAbortWriterAuctionV1,
-                params,
-            ),
-            Self::BeginWriterCloseV1 { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::BeginWriterCloseV1, params)
-            }
-            Self::DepositWriterCloseBasketV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::DepositWriterCloseBasketV1,
-                params,
-            ),
-            Self::FinalizeWriterCloseV1 => {
-                serialize_tag(writer, VaultInstructionTag::FinalizeWriterCloseV1)
-            }
-            Self::ProcessWriterCloseCancellationV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::ProcessWriterCloseCancellationV1,
-                params,
-            ),
             Self::PublishWriterGroupSettlementV1 => {
                 serialize_tag(writer, VaultInstructionTag::PublishWriterGroupSettlementV1)
+            }
+            Self::PublishWriterGroupSettlementWithHandoffV3 => {
+                serialize_tag(writer, VaultInstructionTag::PublishWriterGroupSettlementV1)?;
+                writer.write_all(&crate::writer_settlement_handoff::HANDOFF_PAYLOAD)
             }
             Self::FinalizeWriterSleeveSettlementV1 => serialize_tag(
                 writer,
@@ -513,16 +389,6 @@ impl BorshSerialize for VaultInstruction {
             Self::ClaimCollectiveLongV1 { params } => {
                 serialize_tagged_payload(writer, VaultInstructionTag::ClaimCollectiveLongV1, params)
             }
-            Self::ClaimWriterFlatResidualV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::ClaimWriterFlatResidualV1,
-                params,
-            ),
-            Self::PrepareWriterBidIndexV1 { params } => serialize_tagged_payload(
-                writer,
-                VaultInstructionTag::PrepareWriterBidIndexV1,
-                params,
-            ),
             Self::CloseWriterSleeveV1 => {
                 serialize_tag(writer, VaultInstructionTag::CloseWriterSleeveV1)
             }

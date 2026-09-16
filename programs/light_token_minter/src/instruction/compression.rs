@@ -1,5 +1,69 @@
 use super::*;
 
+const CONTEXTUAL_ACCESS_DOMAIN_BIT: u8 = 0x80;
+// Lossless transport-only elision. The authenticated 216-byte source leaf is unchanged.
+const ZERO_HISTORY_DOMAIN_BIT: u8 = 0x40;
+const SOURCE_HISTORY_OFFSET: usize = 172;
+const CONTEXTUAL_ACCESS_SCHEMA_VERSION: u8 = 0;
+const ORACLE_SOURCE_UPDATE_WIRE_BYTES: usize = 134;
+const ORACLE_JOURNAL_UPDATE_WIRE_BYTES: usize = 36;
+
+fn decode_access_domain(value: u8) -> io::Result<(CompressedStateDomain, bool, bool)> {
+    let contextual = value & CONTEXTUAL_ACCESS_DOMAIN_BIT != 0;
+    let zero_history = value & ZERO_HISTORY_DOMAIN_BIT != 0;
+    let domain = match value & !(CONTEXTUAL_ACCESS_DOMAIN_BIT | ZERO_HISTORY_DOMAIN_BIT) {
+        1 => CompressedStateDomain::OracleSkuCoverageRecord,
+        2 => CompressedStateDomain::OracleUsdcSkuPool,
+        3 => CompressedStateDomain::OracleUsdcSourceReward,
+        4 => CompressedStateDomain::OracleUsdcRewardRegistration,
+        5 => CompressedStateDomain::OracleUsdcRewardReceipt,
+        8 => CompressedStateDomain::OracleSupportPosition,
+        9 => CompressedStateDomain::OracleSourceState,
+        10 => CompressedStateDomain::OracleSourceDescriptor,
+        11 => CompressedStateDomain::OracleSourceObservations,
+        12 => CompressedStateDomain::OracleCarryJournal,
+        13 => CompressedStateDomain::OracleCarryCheckpoint,
+        _ => return Err(io::ErrorKind::InvalidData.into()),
+    };
+    if contextual
+        && !matches!(
+            domain,
+            CompressedStateDomain::OracleSourceState | CompressedStateDomain::OracleCarryJournal
+        )
+    {
+        return Err(io::ErrorKind::InvalidData.into());
+    }
+    if zero_history && (contextual || domain != CompressedStateDomain::OracleSourceState) {
+        return Err(io::ErrorKind::InvalidData.into());
+    }
+    Ok((domain, contextual, zero_history))
+}
+
+fn contextual_access_data<R: io::Read>(
+    reader: &mut R,
+    domain: CompressedStateDomain,
+) -> io::Result<Vec<u8>> {
+    let mut data = vec![0; domain.compact_data_len()];
+    match domain {
+        CompressedStateDomain::OracleSourceState => {
+            let mut wire = [0; ORACLE_SOURCE_UPDATE_WIRE_BYTES];
+            reader.read_exact(&mut wire)?;
+            data[64..96].copy_from_slice(&wire[..32]);
+            data[112..130].copy_from_slice(&wire[32..50]);
+            data[132..172].copy_from_slice(&wire[50..90]);
+            data[172..216].copy_from_slice(&wire[90..]);
+        }
+        CompressedStateDomain::OracleCarryJournal => {
+            let mut wire = [0; ORACLE_JOURNAL_UPDATE_WIRE_BYTES];
+            reader.read_exact(&mut wire)?;
+            data[38..70].copy_from_slice(&wire[..32]);
+            data[102..106].copy_from_slice(&wire[32..]);
+        }
+        _ => return Err(io::ErrorKind::InvalidData.into()),
+    }
+    Ok(data)
+}
+
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 pub struct CompressionOutput {
     pub address_tree_info: PackedAddressTreeInfo,
@@ -151,20 +215,59 @@ fn serialize_compact_access_leaf<W: io::Write>(
     {
         return Err(io::ErrorKind::InvalidData.into());
     }
-    leaf.domain.serialize(writer)?;
+    let zero_history = leaf.domain == CompressedStateDomain::OracleSourceState
+        && leaf.data[SOURCE_HISTORY_OFFSET..].iter().all(|v| *v == 0);
+    if zero_history {
+        ((leaf.domain as u8) | ZERO_HISTORY_DOMAIN_BIT).serialize(writer)?;
+    } else {
+        leaf.domain.serialize(writer)?;
+    }
     leaf.revision.serialize(writer)?;
-    writer.write_all(&leaf.data)
+    if zero_history {
+        writer.write_all(&leaf.data[..SOURCE_HISTORY_OFFSET])
+    } else if leaf.domain == CompressedStateDomain::OracleSourceObservations {
+        let wire = crate::observation_wire::pack_compact(&leaf.data)
+            .ok_or_else(|| io::Error::from(io::ErrorKind::InvalidData))?;
+        let wire_len =
+            u16::try_from(wire.len()).map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
+        writer.write_all(&wire_len.to_le_bytes())?;
+        writer.write_all(&wire)
+    } else {
+        writer.write_all(&leaf.data)
+    }
 }
 
 fn deserialize_compact_access_leaf<R: io::Read>(
     reader: &mut R,
 ) -> io::Result<CompressedAmebaStateLeaf> {
-    let domain = CompressedStateDomain::deserialize_reader(reader)?;
+    let (domain, contextual, zero_history) = decode_access_domain(u8::deserialize_reader(reader)?)?;
     let revision = u64::deserialize_reader(reader)?;
-    let mut data = vec![0; domain.compact_data_len()];
-    reader.read_exact(&mut data)?;
+    let data = if contextual {
+        contextual_access_data(reader, domain)?
+    } else if zero_history {
+        let mut data = vec![0; domain.compact_data_len()];
+        reader.read_exact(&mut data[..SOURCE_HISTORY_OFFSET])?;
+        data
+    } else if domain == CompressedStateDomain::OracleSourceObservations {
+        let wire_len = usize::from(u16::deserialize_reader(reader)?);
+        if wire_len == 0 || wire_len > MAX_COMPRESSED_STATE_LEAF_BYTES {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        let mut wire = vec![0; wire_len];
+        reader.read_exact(&mut wire)?;
+        crate::observation_wire::unpack_compact(&wire)
+            .ok_or_else(|| io::Error::from(io::ErrorKind::InvalidData))?
+    } else {
+        let mut data = vec![0; domain.compact_data_len()];
+        reader.read_exact(&mut data)?;
+        data
+    };
     Ok(CompressedAmebaStateLeaf {
-        schema_version: CompressedAmebaStateLeaf::CURRENT_SCHEMA_VERSION,
+        schema_version: if contextual {
+            CONTEXTUAL_ACCESS_SCHEMA_VERSION
+        } else {
+            CompressedAmebaStateLeaf::CURRENT_SCHEMA_VERSION
+        },
         domain,
         canonical_pda: Pubkey::default(),
         revision,
@@ -197,11 +300,12 @@ fn envelope_domain(cursor: &mut CheckedCursor<'_>) -> CompressedStateDomain {
         3 => CompressedStateDomain::OracleUsdcSourceReward,
         4 => CompressedStateDomain::OracleUsdcRewardRegistration,
         5 => CompressedStateDomain::OracleUsdcRewardReceipt,
-        6 => CompressedStateDomain::OracleSambaWinningVote,
-        7 => CompressedStateDomain::OracleSambaVoteSettlementReceipt,
         8 => CompressedStateDomain::OracleSupportPosition,
         9 => CompressedStateDomain::OracleSourceState,
         10 => CompressedStateDomain::OracleSourceDescriptor,
+        11 => CompressedStateDomain::OracleSourceObservations,
+        12 => CompressedStateDomain::OracleCarryJournal,
+        13 => CompressedStateDomain::OracleCarryCheckpoint,
         _ => {
             cursor.invalid = true;
             CompressedStateDomain::OracleSkuCoverageRecord
@@ -209,14 +313,76 @@ fn envelope_domain(cursor: &mut CheckedCursor<'_>) -> CompressedStateDomain {
     }
 }
 
+fn envelope_leaf_domain(cursor: &mut CheckedCursor<'_>) -> (CompressedStateDomain, bool, bool) {
+    match decode_access_domain(cursor.u8()) {
+        Ok(value) => value,
+        Err(_) => {
+            cursor.invalid = true;
+            (CompressedStateDomain::OracleSkuCoverageRecord, false, false)
+        }
+    }
+}
+
+fn contextual_access_data_cursor(
+    cursor: &mut CheckedCursor<'_>,
+    domain: CompressedStateDomain,
+) -> Vec<u8> {
+    let wire_len = match domain {
+        CompressedStateDomain::OracleSourceState => ORACLE_SOURCE_UPDATE_WIRE_BYTES,
+        CompressedStateDomain::OracleCarryJournal => ORACLE_JOURNAL_UPDATE_WIRE_BYTES,
+        _ => {
+            cursor.invalid = true;
+            return vec![0; domain.compact_data_len()];
+        }
+    };
+    let wire = cursor.vec(wire_len);
+    let mut reader = wire.as_slice();
+    match contextual_access_data(&mut reader, domain) {
+        Ok(data) if reader.is_empty() => data,
+        _ => {
+            cursor.invalid = true;
+            vec![0; domain.compact_data_len()]
+        }
+    }
+}
+
 fn envelope_leaf(cursor: &mut CheckedCursor<'_>) -> CompressedAmebaStateLeaf {
-    let domain = envelope_domain(cursor);
+    let (domain, contextual, zero_history) = envelope_leaf_domain(cursor);
+    let revision = cursor.u64();
+    let data = if contextual {
+        contextual_access_data_cursor(cursor, domain)
+    } else if zero_history {
+        let mut data = cursor.vec(SOURCE_HISTORY_OFFSET);
+        data.resize(domain.compact_data_len(), 0);
+        data
+    } else if domain == CompressedStateDomain::OracleSourceObservations {
+        let wire_len = usize::from(cursor.u16());
+        if wire_len == 0 || wire_len > MAX_COMPRESSED_STATE_LEAF_BYTES {
+            cursor.invalid = true;
+            vec![0; domain.compact_data_len()]
+        } else {
+            let wire = cursor.vec(wire_len);
+            match crate::observation_wire::unpack_compact(&wire) {
+                Some(data) => data,
+                None => {
+                    cursor.invalid = true;
+                    vec![0; domain.compact_data_len()]
+                }
+            }
+        }
+    } else {
+        cursor.vec(domain.compact_data_len())
+    };
     CompressedAmebaStateLeaf {
-        schema_version: CompressedAmebaStateLeaf::CURRENT_SCHEMA_VERSION,
+        schema_version: if contextual {
+            CONTEXTUAL_ACCESS_SCHEMA_VERSION
+        } else {
+            CompressedAmebaStateLeaf::CURRENT_SCHEMA_VERSION
+        },
         domain,
         canonical_pda: Pubkey::default(),
-        revision: cursor.u64(),
-        data: cursor.vec(domain.compact_data_len()),
+        revision,
+        data,
     }
 }
 

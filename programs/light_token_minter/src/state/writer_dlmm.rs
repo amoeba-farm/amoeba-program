@@ -4,7 +4,7 @@ pub const WRITER_DLMM_POLICY_SEED: &[u8] = b"writer-dlmm-policy";
 pub const WRITER_DLMM_POSITION_SEED: &[u8] = b"writer-dlmm-position";
 pub const WRITER_DLMM_POSITION_BINS: usize = 32;
 pub const WRITER_DLMM_ACTION_ENTRIES: usize = 8;
-pub const WRITER_DLMM_POLICY_HASH_DOMAIN: &[u8] = b"ameba-writer-dlmm-policy-v1";
+pub const WRITER_DLMM_POLICY_HASH_DOMAIN: &[u8] = b"ameba-writer-dlmm-policy-g3";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct WriterDlmmSeriesPolicyV1 {

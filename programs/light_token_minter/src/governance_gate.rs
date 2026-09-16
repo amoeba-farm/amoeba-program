@@ -24,11 +24,11 @@ pub const PROTOCOL_GATE_DISCRIMINATOR: [u8; 8] = *b"AGVGAT01";
 pub const PROTOCOL_GATE_VERSION_V1: u8 = 1;
 pub const PROTOCOL_GATE_LEN: usize = 192;
 
-#[cfg(not(feature = "devnet-v3-governance-controller"))]
+#[cfg(not(any(feature = "devnet-v3-governance-controller", feature = "mainnet-v3")))]
 const UPGRADE_SEED_DOMAIN_V1: &[u8] = b"ameba-upgrade-v1";
-#[cfg(feature = "devnet-v3-governance-controller")]
+#[cfg(any(feature = "devnet-v3-governance-controller", feature = "mainnet-v3"))]
 const UPGRADE_SEED_DOMAIN_V1: &[u8] = b"ameba-governance-v3";
-#[cfg(not(feature = "devnet-v3-governance-controller"))]
+#[cfg(not(any(feature = "devnet-v3-governance-controller", feature = "mainnet-v3")))]
 const TARGET_SEED: &[u8] = b"target";
 const GATE_SEED: &[u8] = b"gate";
 
@@ -42,6 +42,18 @@ pub use devnet_v3_identity::{
 #[inline(never)]
 fn emit_selected_controller_release_marker() {
     solana_program::msg!("AMEBA_SPREAD_DEVNET_V3:2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw:8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx");
+}
+
+#[cfg(feature = "mainnet-v3")]
+pub use crate::{
+    MAINNET_CONTROLLER_CONFIG_PDA as PINNED_CONTROLLER_CONFIG_PDA,
+    MAINNET_CONTROLLER_PROGRAM_ID as PINNED_CONTROLLER_PROGRAM_ID,
+    MAINNET_PROTOCOL_GATE_PDA as PINNED_PROTOCOL_GATE_PDA,
+};
+#[cfg(feature = "mainnet-v3")]
+#[inline(never)]
+fn emit_selected_controller_release_marker() {
+    solana_program::log::sol_log(crate::MAINNET_PROFILE_RELEASE_MARKER);
 }
 
 #[cfg(feature = "phase3-synthetic-governance-controller")]
@@ -271,12 +283,12 @@ pub fn derive_controller_config_pda(
     controller_program: &Pubkey,
     target_program: &Pubkey,
 ) -> (Pubkey, u8) {
-    #[cfg(feature = "devnet-v3-governance-controller")]
+    #[cfg(any(feature = "devnet-v3-governance-controller", feature = "mainnet-v3"))]
     {
         let _ = target_program;
         Pubkey::find_program_address(&[UPGRADE_SEED_DOMAIN_V1, b"council"], controller_program)
     }
-    #[cfg(not(feature = "devnet-v3-governance-controller"))]
+    #[cfg(not(any(feature = "devnet-v3-governance-controller", feature = "mainnet-v3")))]
     Pubkey::find_program_address(
         &[UPGRADE_SEED_DOMAIN_V1, TARGET_SEED, target_program.as_ref()],
         controller_program,
@@ -318,7 +330,8 @@ pub(crate) fn validate_top_level_envelope<'accounts, 'info, 'data>(
         derive_protocol_gate_pda(&PINNED_CONTROLLER_PROGRAM_ID, program_id);
     #[cfg(any(
         feature = "reviewed-governance-controller",
-        feature = "devnet-v3-governance-controller"
+        feature = "devnet-v3-governance-controller",
+        feature = "mainnet-v3"
     ))]
     if expected_gate != PINNED_PROTOCOL_GATE_PDA {
         return Err(VaultError::InvalidGovernanceGatePda.into());
@@ -349,7 +362,8 @@ pub(crate) fn validate_top_level_envelope<'accounts, 'info, 'data>(
         derive_controller_config_pda(&PINNED_CONTROLLER_PROGRAM_ID, program_id).0;
     #[cfg(any(
         feature = "reviewed-governance-controller",
-        feature = "devnet-v3-governance-controller"
+        feature = "devnet-v3-governance-controller",
+        feature = "mainnet-v3"
     ))]
     if expected_controller_config != PINNED_CONTROLLER_CONFIG_PDA {
         return Err(VaultError::InvalidGovernanceGatePda.into());

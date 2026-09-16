@@ -27,6 +27,7 @@ fn validate_privileges(
     Ok(())
 }
 
+#[inline(never)]
 pub(in crate::processor) fn process_initialize_position(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -201,6 +202,7 @@ fn apply_entries(
 }
 
 /// Add/remove use exact canonical token deltas. No ordinary reserve page or share is changed.
+#[inline(never)]
 pub(in crate::processor) fn process_liquidity_action(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -280,18 +282,14 @@ pub(in crate::processor) fn process_liquidity_action(
         || sleeve.policy_snapshot != *accounts[5].key
         || sleeve.settlement_mint != config.usdc_mint
         || config.usdc_mint != *quote_mint_info.key
-        || sleeve.active_auction.is_some()
         || sleeve.status == WriterSleeveStatus::Closed
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    let closing = sleeve.active_close_request.is_some()
-        || matches!(
-            sleeve.status,
-            WriterSleeveStatus::CloseStaging
-                | WriterSleeveStatus::Expired
-                | WriterSleeveStatus::SettlementFinalized
-        );
+    let closing = matches!(
+        sleeve.status,
+        WriterSleeveStatus::Expired | WriterSleeveStatus::SettlementFinalized
+    );
     if (!sweep && !closing && policy.management_authority != *actor.key) || (add && closing) {
         return Err(VaultError::Unauthorized.into());
     }
@@ -314,7 +312,7 @@ pub(in crate::processor) fn process_liquidity_action(
             || binding.anchor_month_settled
             || current_unix_timestamp()? >= pool.expiry_ts
             || !issue_amount.is_multiple_of(MarketMintAccounting::CANONICAL_ATOMIC_SCALE)
-            || issue_amount > snapshot.max_auction_issue_atoms
+            || issue_amount > snapshot.max_issue_atoms
         {
             return Err(VaultError::InvalidWriterLifecycle.into());
         }
@@ -367,14 +365,14 @@ pub(in crate::processor) fn process_liquidity_action(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    let staged_before = auction::observe_market_staging_amount(
+    let staged_before = custody::observe_market_staging_amount(
         program_id,
         market_info,
         staging_info,
         option_mint_info,
         token_info,
     )?;
-    let retired_before = auction::observe_writer_retirement_custody_amount(
+    let retired_before = custody::observe_writer_retirement_custody_amount(
         program_id,
         sleeve_info,
         market_info,
@@ -419,8 +417,6 @@ pub(in crate::processor) fn process_liquidity_action(
             terms.seller_floor_quote_atoms,
             pool.tick_size_quote_atomic,
             policy.price_separation_ticks,
-            pool.swap_fee_bps,
-            snapshot.primary_fee_bps,
         )
         .map_err(|_| VaultError::InvalidWriterPolicySnapshot)?;
         for entry in &entries {
@@ -430,10 +426,8 @@ pub(in crate::processor) fn process_liquidity_action(
             if entry.option_atoms > 0 && price < minimum_ask {
                 return Err(VaultError::InvalidWriterPolicySnapshot.into());
             }
-            if entry.quote_atoms > 0 {
-                if price > maximum_bid {
-                    return Err(VaultError::InvalidWriterPolicySnapshot.into());
-                }
+            if entry.quote_atoms > 0 && price > maximum_bid {
+                return Err(VaultError::InvalidWriterPolicySnapshot.into());
             }
         }
         if quote_amount > accounted_vault_cash {
@@ -540,7 +534,7 @@ pub(in crate::processor) fn process_liquidity_action(
     }
     if option_amount > 0 {
         if add {
-            let staging = auction::load_or_create_market_staging(
+            let staging = custody::load_or_create_market_staging(
                 program_id,
                 actor,
                 market_info,
@@ -554,7 +548,7 @@ pub(in crate::processor) fn process_liquidity_action(
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
             let market_bump = [market.bump];
-            let market_seeds = auction::market_signer_seeds(&market, &market_bump);
+            let market_seeds = custody::market_signer_seeds(&market, &market_bump);
             if staged_before > 0 {
                 let retirement = load_or_create_writer_retirement_custody(
                     program_id,
@@ -656,7 +650,7 @@ pub(in crate::processor) fn process_liquidity_action(
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
             if retired_before == 0 {
-                funding::close_sleeve_token_custody(
+                custody::close_sleeve_token_custody(
                     &sleeve,
                     sleeve_info,
                     retirement_info,

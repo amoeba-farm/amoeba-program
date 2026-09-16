@@ -18,12 +18,6 @@ fn writer_security_mode_byte(value: WriterSecurityMode) -> u8 {
 }
 
 #[inline(always)]
-fn writer_auction_rule_byte(value: WriterAuctionPriorityRule) -> u8 {
-    match value {
-        WriterAuctionPriorityRule::PayAsBidPriceThenSeriesProRata => 0,
-    }
-}
-
 pub(in crate::processor) fn writer_series_family_hash(book: &WriterSeriesBookV1) -> [u8; 32] {
     let count = usize::from(book.series_count);
     let mut bytes = [0u8; WRITER_SERIES_FAMILY_HASH_MAX_BYTES];
@@ -43,10 +37,6 @@ pub(in crate::processor) fn writer_series_family_hash(book: &WriterSeriesBookV1)
 
 pub(in crate::processor) fn writer_book_digest(book: &WriterSeriesBookV1) -> [u8; 32] {
     writer_book_digest_inner(book, false)
-}
-
-pub(in crate::processor) fn writer_close_book_digest(book: &WriterSeriesBookV1) -> [u8; 32] {
-    writer_book_digest_inner(book, true)
 }
 
 fn writer_book_digest_inner(book: &WriterSeriesBookV1, economic_only: bool) -> [u8; 32] {
@@ -121,7 +111,7 @@ pub(in crate::processor) fn writer_group_commitment(
     // matching a hash of their concatenation without a 512-byte stack buffer.
     // The byte-contract regression below pins that equivalence.
     hashv(&[
-        b"ameba-writer-settlement-group-v1",
+        b"ameba-writer-settlement-group-g3",
         group_key.as_ref(),
         &group.underlying_id,
         &group.expiry_ts.to_le_bytes(),
@@ -182,9 +172,7 @@ pub(super) fn writer_risk_limit_hash(params: &SealWriterPolicyV1Params) -> [u8; 
         &params.upper_tail_min_settlement_atomic.to_le_bytes(),
         &params.operational_buffer_atoms.to_le_bytes(),
         &[writer_security_mode_byte(params.security_mode)],
-        &params.primary_fee_bps.to_le_bytes(),
-        &params.max_auction_issue_atoms.to_le_bytes(),
-        &params.max_close_flat_atoms.to_le_bytes(),
+        &params.max_issue_atoms.to_le_bytes(),
         &[params.v2_feature_flags],
     ])
     .to_bytes()
@@ -218,8 +206,6 @@ pub(super) fn writer_policy_hash(
     bytes.extend_from_slice(&params.lower_tail_max_settlement_atomic.to_le_bytes());
     bytes.extend_from_slice(&params.upper_tail_min_settlement_atomic.to_le_bytes());
     bytes.extend_from_slice(&params.operational_buffer_atoms.to_le_bytes());
-    bytes.extend_from_slice(&params.primary_fee_bps.to_le_bytes());
-    bytes.push(writer_auction_rule_byte(params.auction_priority_rule));
     bytes.push(writer_security_mode_byte(params.security_mode));
     bytes.push(params.v2_feature_flags);
     hashv(&[bytes.as_slice()]).to_bytes()

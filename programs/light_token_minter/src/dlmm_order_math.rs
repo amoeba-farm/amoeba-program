@@ -1,6 +1,6 @@
 //! One-way escrow accounting. A fill creates owner proceeds, never reverse liquidity.
 
-pub const MAX_OPEN_ORDERS: usize = 32;
+/// Deprecated fixture bound; live storage is separate records with bounded witnesses.
 pub const MAX_ORDER_FILLS: usize = 8;
 pub const CONTRACT_SCALE: u64 = 1_000_000;
 

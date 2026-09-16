@@ -6,6 +6,7 @@ use crate::processor::oracle_membership::load_complete_bucket_source_index;
 /// new period, System; for a successor append parent market, parent month and
 /// canonical absent target reward schedule. Opt-in must precede period funding.
 /// A root only enables future checkpointing; it does not reinterpret its opening.
+#[inline(never)]
 pub(super) fn register_period(program: &Pubkey, a: &[AccountInfo], root: bool) -> ProgramResult {
     if a.len() != if root { 7 } else { 10 } {
         return invalid();
@@ -100,6 +101,7 @@ pub(super) fn register_period(program: &Pubkey, a: &[AccountInfo], root: bool) -
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Explicit account and snapshot roles.
 fn next_parent(
     program: &Pubkey,
     target_market: &Market,
@@ -109,6 +111,7 @@ fn next_parent(
     parent_source_info: &AccountInfo,
     index_info: &AccountInfo,
     bucket_info: &AccountInfo,
+    page_info: &AccountInfo,
 ) -> Result<OracleSourceState, ProgramError> {
     if period.predecessor != *parent_month_info.key || period.next_import >= period.expected_imports
     {
@@ -140,9 +143,14 @@ fn next_parent(
         .next_import
         .checked_sub(bucket.first_source_index)
         .ok_or(VaultError::InvalidOracleWeightOrder)?;
-    if offset >= bucket.source_count || bucket.source_ids[usize::from(offset)] != source.source_id {
-        return invalid();
-    }
+    oracle_membership::require_member(
+        program,
+        bucket_info.key,
+        &bucket,
+        page_info,
+        offset,
+        &source.source_id,
+    )?;
     Ok(source)
 }
 
@@ -164,19 +172,20 @@ pub(super) fn definition_hash(underlying: &[u8; 32], source: &OracleSourceState)
 /// First eleven accounts are precisely ProposeOracleSourceV3's target-period accounts.
 /// Append parent source, parent market, parent month, complete recipe index, bucket index,
 /// target period and create-only target carry companion. Six compressed leaves in total.
+#[inline(never)]
 pub(super) fn import_source(
     program: &Pubkey,
     a: &[AccountInfo],
     sku_index: u16,
     sku_proof: &[[u8; 32]],
 ) -> ProgramResult {
-    if a.len() != 18 {
+    if a.len() != 23 {
         return invalid();
     }
     let (market, _) = load_valid_market_and_oracle_month(program, &a[1], &a[2])?;
     let mut period = load_period(program, a[2].key, &a[16])?;
     let parent = next_parent(
-        program, &market, &period, &a[12], &a[13], &a[11], &a[14], &a[15],
+        program, &market, &period, &a[12], &a[13], &a[11], &a[14], &a[15], &a[18],
     )?;
     if parent.status != OracleSourceStatus::Active
         || parent.source_definition_hash == [0; 32]
@@ -201,6 +210,29 @@ pub(super) fn import_source(
         },
         (sku_index, sku_proof),
     )?;
+    for (role, commitment, object, link) in [
+        (0, parent.canonical_locator_hash, 19, 20),
+        (1, parent.source_definition_hash, 21, 22),
+    ] {
+        super::super::oracle_evidence::publish(
+            program,
+            &a[0],
+            &a[9],
+            &a[object],
+            &a[link],
+            a[2].key,
+            a[5].key,
+            a[5].key,
+            a[5].key,
+            role,
+            0,
+            0,
+            0,
+            commitment,
+            commitment,
+            parent.source_id,
+        )?;
+    }
     let companion_pda = address(program, SOURCE_SEED, a[5].key.as_ref());
     let carry = CarrySource {
         header: header::<CarrySource>(companion_pda.1),
@@ -242,8 +274,9 @@ pub(super) fn import_source(
 
 /// Accounts: target market/month/period, parent market/month/source, recipe index/bucket index, rent payer.
 /// An inactive source can be skipped only at the exact next authenticated membership index.
+#[inline(never)]
 pub(super) fn skip_inactive_source(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
-    if a.len() != 9 {
+    if a.len() != 10 {
         return invalid();
     }
     let (market, month) = load_valid_market_and_oracle_month(program, &a[0], &a[1])?;
@@ -251,7 +284,9 @@ pub(super) fn skip_inactive_source(program: &Pubkey, a: &[AccountInfo]) -> Progr
     if month.phase != OraclePhase::SourceSubmission || month.weight_scheme_version != 0 {
         return invalid();
     }
-    let source = next_parent(program, &market, &period, &a[3], &a[4], &a[5], &a[6], &a[7])?;
+    let source = next_parent(
+        program, &market, &period, &a[3], &a[4], &a[5], &a[6], &a[7], &a[9],
+    )?;
     if source.status != OracleSourceStatus::Inactive {
         return invalid();
     }

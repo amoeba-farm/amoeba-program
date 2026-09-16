@@ -11,6 +11,11 @@ __pycache__/
 
 # Logs
 *.log
+!docs/governance/evidence/g3-unified-20260915/*.log
+!docs/governance/evidence/g3-continuity-20260915/*.log
+!docs/governance/evidence/g3-capacity-20260915/*.log
+!docs/governance/evidence/g3-evidence-20260915/*.log
+!docs/governance/evidence/g3-qualification-20260915/*.log
 
 # local artifacts
 output/

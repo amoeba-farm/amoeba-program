@@ -29,7 +29,7 @@ pub(super) fn process_resolve_oracle_source_challenge(
         return Err(VaultError::InvalidOracleChallengeAccount.into());
     }
     let outcome_account_count = match params.outcome {
-        OracleSourceChallengeOutcome::RuleReviewUnresolved => 2,
+        OracleSourceChallengeOutcome::RuleReviewUnresolved => 0,
         // comparison source, exact SKU pool, challenged-source reward, comparison-source reward
         OracleSourceChallengeOutcome::MergeSource => 4,
         _ => 0,
@@ -42,11 +42,6 @@ pub(super) fn process_resolve_oracle_source_challenge(
     }
     let outcome_account_info = if outcome_account_count > 0 {
         Some(&trailing[0])
-    } else {
-        None
-    };
-    let samba_mint_info = if params.outcome == OracleSourceChallengeOutcome::RuleReviewUnresolved {
-        Some(&trailing[1])
     } else {
         None
     };
@@ -132,29 +127,10 @@ pub(super) fn process_resolve_oracle_source_challenge(
                 challenge.status = OracleChallengeStatus::Accepted;
             }
             OracleSourceChallengeOutcome::RuleReviewUnresolved => {
-                let staking_pool_info =
-                    outcome_account_info.ok_or(VaultError::InvalidAccountList)?;
-                let mut staking_pool = load_canonical_oracle_staking_pool(
-                    program_id,
-                    staking_pool_info,
-                    &derive_oracle_major_token_config_pda(program_id).0,
-                )?;
-                let samba_mint = validate_oracle_samba_mint(
-                    &staking_pool,
-                    samba_mint_info.ok_or(VaultError::InvalidAccountList)?,
-                    config_info.key,
-                )?;
-                let slot = Clock::get()?.slot;
                 challenge.status = OracleChallengeStatus::RuleReviewUnresolved;
-                challenge.rule_review_slot = slot;
-                challenge.emergency_snapshot_total_major_tokens =
-                    prepare_oracle_samba_voting_snapshot(
-                        &mut staking_pool,
-                        samba_mint.supply,
-                        slot,
-                    )?;
-                challenge.emergency_snapshot_version = 2;
-                store_state(staking_pool_info, &staking_pool)?;
+                challenge.rule_review_slot = Clock::get()?.slot;
+                challenge.council_authority_version = 1;
+                challenge.emergency_snapshot_version = 3;
             }
             OracleSourceChallengeOutcome::MergeSource => {
                 if challenge.reason != ORACLE_SOURCE_REASON_NON_INDEPENDENT

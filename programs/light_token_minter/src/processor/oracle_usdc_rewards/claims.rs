@@ -368,8 +368,7 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
             trailing,
         )?,
     };
-    if computed.amount == 0
-        || computed.amount > schedule.remaining_reward_budget
+    if computed.amount > schedule.remaining_reward_budget
         || computed.amount > reward_vault.total_reserved
         || computed.amount > reward_token.amount
     {
@@ -387,6 +386,9 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
         return Err(VaultError::InvalidOracleUsdcRewardReceipt.into());
     }
     validate_create_only_program_account_target(program_id, receipt_info)?;
+    if computed.amount == 0 {
+        return Err(VaultError::NoOracleBountyClaimable.into());
+    }
     let kind_seed = [params.kind as u8];
     create_program_account(
         recipient_info,

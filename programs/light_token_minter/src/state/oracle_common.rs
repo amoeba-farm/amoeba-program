@@ -154,18 +154,6 @@ stable_borsh_enum!(OracleEmergencyDisputeKind {
     BucketMedian = 3
 });
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-#[repr(u8)]
-pub enum OracleEmergencyVoteStatus {
-    #[default]
-    Empty = 0,
-    Committed = 1,
-    Revealed = 2,
-    /// The reveal window closed without a reveal; the principal lock was refunded.
-    Expired = 3,
-}
-stable_borsh_enum!(OracleEmergencyVoteStatus { Empty = 0, Committed = 1, Revealed = 2, Expired = 3 });
-
 /// Finite cash-reward entitlements.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[repr(u8)]
@@ -387,7 +375,7 @@ impl OracleMonthState {
     /// One canonical wire layout is shared by the already-created and future current months.
     pub const LEN: usize = 299;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OMS";
-    pub const ACCOUNT_VERSION: u8 = 1;
+    pub const ACCOUNT_VERSION: u8 = 2;
     pub const CANDIDATE_COUNT_TRACKING_VERSION: u8 = 1;
     pub const ACTIVE_WEIGHT_INITIALIZATION_VERSION: u8 = 1;
     pub const ACTIVE_MEDIAN_SCHEME_VERSION: u8 = 2;
@@ -400,7 +388,8 @@ impl OracleMonthState {
             && self.candidate_count_tracking_version == Self::CANDIDATE_COUNT_TRACKING_VERSION
             && self.active_weight_initialization_version
                 == Self::ACTIVE_WEIGHT_INITIALIZATION_VERSION
-            && self.schedule_version == Self::SKU_COVERAGE_SCHEDULE_VERSION
+            && (self.schedule_version == Self::SKU_COVERAGE_SCHEDULE_VERSION
+                || (cfg!(feature = "mainnet-v3") && self.schedule_version == 3))
             && self.work_reward_currency_version == Self::WORK_REWARD_CURRENCY_USDC_V1
     }
 

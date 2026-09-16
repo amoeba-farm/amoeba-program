@@ -13,10 +13,10 @@ use super::*;
 use crate::{
     ameba_dlmm_instruction::{
         decode_exact, AddAmoebaDlmmLiquidityV1Params, AmoebaDlmmDecode, AmoebaDlmmInstructionTag,
-        AmoebaDlmmSwapDirection as WireSwapDirection, CollectAmoebaDlmmProtocolFeesV1Params,
-        InitializeAmoebaDlmmBinPageV1Params, InitializeAmoebaDlmmPoolV1Params,
-        InitializeAmoebaDlmmPositionV1Params, RemoveAmoebaDlmmLiquidityV1Params,
-        SetAmoebaDlmmPoolStatusV1Params, SwapAmoebaDlmmExactInV1Params,
+        AmoebaDlmmSwapDirection as WireSwapDirection, InitializeAmoebaDlmmBinPageV1Params,
+        InitializeAmoebaDlmmPoolV1Params, InitializeAmoebaDlmmPositionV1Params,
+        RemoveAmoebaDlmmLiquidityV1Params, SetAmoebaDlmmPoolStatusV1Params,
+        SwapAmoebaDlmmExactInV1Params,
     },
     ameba_dlmm_math::{
         bin_to_page, calculate_share_deposit, calculate_share_withdrawal, page_first_bin,
@@ -37,12 +37,14 @@ use crate::{
         AMOEBA_DLMM_POOL_PDA_SEED, AMOEBA_DLMM_POSITION_PDA_SEED, AMOEBA_DLMM_SHARE_PAGE_PDA_SEED,
         AMOEBA_DLMM_VAULT_PDA_SEED, MAX_AMOEBA_DLMM_BINS_PER_SWAP, MAX_AMOEBA_DLMM_BIN_COUNT,
         MAX_AMOEBA_DLMM_PAGE_COUNT, MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP,
-        MAX_AMOEBA_DLMM_SWAP_FEE_BPS,
     },
     light_token_instruction::create_token_account_rent_free,
 };
 
 use super::ameba_dlmm_light::{initialize_compression_info, register_initialized_pdas};
+
+mod vault_restore;
+pub(super) use vault_restore::process_restore_vault;
 
 const EVENT_POOL_INITIALIZED: [u8; 8] = *b"ADPIEV1\0";
 const EVENT_PAGE_INITIALIZED: [u8; 8] = *b"ADBIEV1\0";
@@ -51,7 +53,6 @@ const EVENT_LIQUIDITY_ADDED: [u8; 8] = *b"ADLAEV1\0";
 const EVENT_LIQUIDITY_REMOVED: [u8; 8] = *b"ADLREV1\0";
 const EVENT_SWAP_EXECUTED: [u8; 8] = *b"ADSWPV1\0";
 const EVENT_STATUS_CHANGED: [u8; 8] = *b"ADSTEV1\0";
-const EVENT_FEES_COLLECTED: [u8; 8] = *b"ADFEEV1\0";
 const EVENT_POOL_SETTLED: [u8; 8] = *b"ADSEEV1\0";
 const EVENT_POOL_CLOSED: [u8; 8] = *b"ADCLEV1\0";
 
@@ -116,7 +117,6 @@ fn validate_pack_dlmm_account_privileges(
                         | 27
                         | 28
                         | 29
-                        | 31
                 ) || index >= collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
             }
             _ => false,
@@ -195,14 +195,6 @@ struct StatusEvent {
 }
 
 #[cfg_attr(test, derive(borsh::BorshSerialize))]
-struct FeesEvent {
-    pool: Pubkey,
-    option_amount: u64,
-    quote_amount: u64,
-    slot: u64,
-}
-
-#[cfg_attr(test, derive(borsh::BorshSerialize))]
 struct SettledEvent {
     pool: Pubkey,
     settlement: Pubkey,
@@ -225,7 +217,6 @@ enum AmoebaDlmmEvent {
     Liquidity(LiquidityEvent),
     Swap(SwapEvent),
     Status(StatusEvent),
-    Fees(FeesEvent),
     Settled(SettledEvent),
     Closed(ClosedEvent),
 }
@@ -347,12 +338,7 @@ fn encode_event(event: &AmoebaDlmmEvent) -> EventWriter {
             writer.u8(value.new_status as u8);
             writer.u64(value.slot);
         }
-        AmoebaDlmmEvent::Fees(value) => {
-            writer.pubkey(&value.pool);
-            writer.u64(value.option_amount);
-            writer.u64(value.quote_amount);
-            writer.u64(value.slot);
-        }
+
         AmoebaDlmmEvent::Settled(value) => {
             writer.pubkey(&value.pool);
             writer.pubkey(&value.settlement);
@@ -443,16 +429,6 @@ fn process_liquidity_payload(
 }
 
 #[inline(always)]
-fn process_collect_protocol_fees_payload(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    payload: &[u8],
-) -> ProgramResult {
-    let params: CollectAmoebaDlmmProtocolFeesV1Params = decode(payload)?;
-    process_collect_protocol_fees(program_id, accounts, params)
-}
-
-#[inline(always)]
 fn process_close_pool_payload(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -522,9 +498,6 @@ pub fn process_instruction(
         }
         AmoebaDlmmInstructionTag::RemoveLiquidityV1 => {
             process_liquidity_payload(program_id, accounts, payload, false)
-        }
-        AmoebaDlmmInstructionTag::CollectProtocolFeesV1 => {
-            process_collect_protocol_fees_payload(program_id, accounts, payload)
         }
         AmoebaDlmmInstructionTag::ClosePoolV1 => {
             process_close_pool_payload(program_id, accounts, payload)

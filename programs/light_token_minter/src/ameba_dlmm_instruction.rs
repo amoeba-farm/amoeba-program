@@ -20,7 +20,6 @@ pub enum AmoebaDlmmInstructionTag {
     InitializePositionV1 = 208,
     AddLiquidityV1 = 209,
     RemoveLiquidityV1 = 210,
-    CollectProtocolFeesV1 = 213,
     ClosePoolV1 = 215,
     InitializeLightConfig = 216,
     UpdateLightConfig = 217,
@@ -34,7 +33,7 @@ pub enum AmoebaDlmmInstructionTag {
 
 impl AmoebaDlmmInstructionTag {
     pub fn from_byte(value: u8) -> Option<Self> {
-        const VALID_TAGS: u64 = 0xf000_0000_0fa7_8000;
+        const VALID_TAGS: u64 = 0xf000_0000_0f87_8000;
         if value < 192 || VALID_TAGS & (1u64 << (value - 192)) == 0 {
             None
         } else {
@@ -50,7 +49,31 @@ pub struct InitializeAmoebaDlmmPoolV1Params {
     /// not a caller-selected economic parameter.
     pub create_accounts_proof: CreateAccountsProof,
     pub liquidity_manager: Pubkey,
-    pub protocol_fee_share_bps: u16,
+}
+
+/// Tag 219 sub-operation for one canonical pool token vault. The leading 255
+/// cannot be an account offset in the existing decompression envelope (which
+/// also requires fixed accounts and at least one trailing state account).
+pub const RESTORE_AMOEBA_DLMM_VAULT_V3: [u8; 4] = [255, b'V', b'R', 3];
+
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+pub struct RestoreAmoebaDlmmVaultV3Params {
+    pub amount: u64,
+    pub leaf_index: u32,
+    pub root_index: u16,
+    pub prove_by_index: bool,
+    pub proof: ValidityProof,
+}
+
+impl RestoreAmoebaDlmmVaultV3Params {
+    /// Governance tail is appended by the caller's governed instruction builder.
+    pub fn instruction_data(&self) -> Vec<u8> {
+        let mut data = vec![AmoebaDlmmInstructionTag::DecompressLightState as u8];
+        data.extend_from_slice(&RESTORE_AMOEBA_DLMM_VAULT_V3);
+        self.serialize(&mut data)
+            .expect("fixed vault restoration fields");
+        data
+    }
 }
 
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
@@ -115,12 +138,6 @@ pub struct SwapAmoebaDlmmExactInV1Params {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct SetAmoebaDlmmPoolStatusV1Params {
     pub status: AmoebaDlmmPoolStatus,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct CollectAmoebaDlmmProtocolFeesV1Params {
-    pub option_amount: u64,
-    pub quote_amount: u64,
 }
 
 // Runtime decode failures intentionally collapse to one opaque value so callers cannot depend on
@@ -228,7 +245,6 @@ impl AmoebaDlmmDecode for InitializeAmoebaDlmmPoolV1Params {
         let value = Self {
             create_accounts_proof: read_create_accounts_proof(&mut reader)?,
             liquidity_manager: Pubkey::new_from_array(reader.take()?),
-            protocol_fee_share_bps: reader.u16()?,
         };
         reader.finish()?;
         Ok(value)
@@ -356,18 +372,6 @@ impl AmoebaDlmmDecode for SetAmoebaDlmmPoolStatusV1Params {
             _ => return Err(()),
         };
         Ok(Self { status })
-    }
-}
-
-impl AmoebaDlmmDecode for CollectAmoebaDlmmProtocolFeesV1Params {
-    fn decode_exact(payload: &[u8]) -> Result<Self, ()> {
-        let mut reader = PayloadReader::new(payload);
-        let value = Self {
-            option_amount: reader.u64()?,
-            quote_amount: reader.u64()?,
-        };
-        reader.finish()?;
-        Ok(value)
     }
 }
 

@@ -15,37 +15,31 @@ use crate::{
         InstrumentDefinition, Market, MarketMintAccounting, MarketParameters, OptionKind,
         OracleActiveWeightManifest, OracleBucketMedianState, OracleBucketMedianStatus,
         OracleBucketSourceIndex, OracleChallengeStatus, OracleClaimStatus, OracleEconomicParams,
-        OracleEconomicsConfig, OracleEmergencyDisputeKind, OracleEmergencyDisputeV3,
-        OracleEmergencyVoteRecordV3, OracleEmergencyVoteStatus, OracleEscrowDisposition,
-        OracleMajorTokenConfig, OracleMaturityLadderRegistry, OracleMonthState, OracleOpeningClaim,
-        OracleOpeningClaimChallenge, OracleOpeningClaimStatus, OraclePhase, OraclePlayerLedger,
-        OracleProductSkuDraft, OracleProductSkuManifest, OracleRecipeSourceIndex,
-        OracleRecipeWeightManifest, OracleRecipeWeightPhase, OracleRewardFunnel,
-        OracleSambaEmergencyPayoutMode, OracleSambaEmergencyPot, OracleSambaVoteSettlementReceipt,
-        OracleSambaWinningVote, OracleSettlementSourceManifest, OracleSettlementStatus,
+        OracleEconomicsConfig, OracleEmergencyDisputeKind, OracleEscrowDisposition,
+        OracleMaturityLadderRegistry, OracleMonthState, OracleOpeningClaim,
+        OracleOpeningClaimChallenge, OracleOpeningClaimStatus, OraclePhase, OracleProductSkuDraft,
+        OracleProductSkuManifest, OracleRecipeSourceIndex, OracleRecipeWeightManifest,
+        OracleRecipeWeightPhase, OracleSettlementSourceManifest, OracleSettlementStatus,
         OracleSkuCoverageManifest, OracleSkuCoverageRecord, OracleSourceChallenge,
         OracleSourceChallengeGuard, OracleSourceObservations, OracleSourceState,
-        OracleSourceStatus, OracleStakeActivation, OracleStakingPool, OracleSupportPosition,
-        OracleTreasuryState, OracleUnstakeRequest, OracleUpdateChallenge,
+        OracleSourceStatus, OracleSupportPosition, OracleUpdateChallenge,
         OracleUpdateChallengeGuard, OracleUpdateClaimData, OracleUpdateClaimV2,
         OracleUsdcRewardKind, OracleUsdcRewardReceipt, OracleUsdcRewardRegistration,
         OracleUsdcRewardSchedule, OracleUsdcRewardSchedulePhase, OracleUsdcRewardVault,
         OracleUsdcSkuPool, OracleUsdcSourceReward, PositionRecord, SettlementObservation,
         SettlementRecordV2, SettlementSignerRegistry, SettlementSignerSet, SettlementStyle,
-        UserCollateral, VaultConfig, WriterAuctionPriorityRule, WriterAuctionStatus,
-        WriterAuctionV1, WriterBidDeliveryMode, WriterBidIndexRecordV1, WriterBidIndexV1,
-        WriterBidStatus, WriterBidV1, WriterCloseRequestStatus, WriterCloseRequestV1,
-        WriterPolicyRegistryV1, WriterPolicySnapshotV1, WriterReserveRoundingMode,
-        WriterSecurityMode, WriterSeriesBookV1, WriterSeriesCustodyStatus, WriterSeriesRecordV1,
-        WriterSeriesSettlementStatus, WriterSettlementGroupStatus, WriterSettlementGroupV1,
-        WriterSleeveStatus, WriterSleeveV1, ORACLE_PRODUCT_SKU_FRONTIER_NODE_COUNT,
-        WRITER_BID_STORAGE_CAPACITY, WRITER_SERIES_STORAGE_CAPACITY,
+        UserCollateral, VaultConfig, WriterPolicyRegistryV1, WriterPolicySnapshotV1,
+        WriterReserveRoundingMode, WriterSecurityMode, WriterSeriesBookV1,
+        WriterSeriesCustodyStatus, WriterSeriesRecordV1, WriterSeriesSettlementStatus,
+        WriterSettlementGroupStatus, WriterSettlementGroupV1, WriterSleeveStatus, WriterSleeveV1,
+        ORACLE_PRODUCT_SKU_FRONTIER_NODE_COUNT, WRITER_SERIES_STORAGE_CAPACITY,
     },
 };
 
 mod accounts;
 mod cursor;
 mod fields;
+mod flat;
 mod oracle;
 mod state_codecs;
 mod state_macros;
@@ -54,5 +48,6 @@ mod writer_dlmm;
 
 pub(crate) use cursor::*;
 pub(crate) use fields::*;
+pub(crate) use flat::*;
 pub(crate) use state_macros::*;
 pub(crate) use variable::*;

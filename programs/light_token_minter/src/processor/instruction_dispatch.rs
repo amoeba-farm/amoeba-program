@@ -60,7 +60,7 @@ fn current_invocation_stack_height() -> usize {
 #[inline(always)]
 fn require_governed_invocation(tag: u8, accounts: &[AccountInfo]) -> ProgramResult {
     let height = current_invocation_stack_height();
-    #[cfg(feature = "devnet-v3-governance-controller")]
+    #[cfg(any(feature = "devnet-v3-governance-controller", feature = "mainnet-v3"))]
     if height == solana_program::instruction::TRANSACTION_LEVEL_STACK_HEIGHT + 1
         && tag
             == crate::ameba_dlmm_instruction::AmoebaDlmmInstructionTag::InitializeLightConfig as u8
@@ -121,14 +121,24 @@ pub(super) fn process_top_level_instruction(
         let (legacy_accounts, legacy_data, gate) =
             governance_gate::validate_top_level_envelope(program_id, accounts, instruction_data)?;
         let context = ExecutionContext::top_level(&gate);
-        process_instruction_with_context(program_id, legacy_accounts, legacy_data, &context)
+        process_instruction_with_context(
+            program_id,
+            legacy_accounts,
+            crate::business_generation::strip_current_message(legacy_data)?,
+            &context,
+        )
     }
 
     #[cfg(not(feature = "governance-gate-v1"))]
     {
         let gate = governance_gate::disabled_build_capability();
         let context = ExecutionContext::top_level(&gate);
-        process_instruction_with_context(program_id, accounts, instruction_data, &context)
+        process_instruction_with_context(
+            program_id,
+            accounts,
+            crate::business_generation::strip_current_message(instruction_data)?,
+            &context,
+        )
     }
 }
 
@@ -165,7 +175,9 @@ pub(super) fn process_instruction_with_context(
     }
     #[cfg(feature = "devnet-solo-backfill-2026")]
     if devnet_solo_backfill_2026::is_instruction_tag(*tag_bytes) {
-        if context.is_compressed_inner() {
+        if context.is_compressed_inner()
+            && !devnet_solo_backfill_2026::is_compressed_state_transport_tag(*tag_bytes)
+        {
             return Err(VaultError::InvalidInstructionData.into());
         }
         return devnet_solo_backfill_2026::process_instruction(
@@ -202,6 +214,12 @@ pub(super) fn dispatch_0_63(
     payload: &[u8],
     context: &ExecutionContext<'_>,
 ) -> ProgramResult {
+    // OracleCarryForwardV1 is tag 30 and therefore belongs to this low-tag bucket.  Keep its
+    // context-aware transport check on the existing carry handler; the old arm in
+    // dispatch_64_124 was unreachable because the outer range split is exhaustive.
+    if tag == VaultInstructionTag::OracleCarryForwardV1 {
+        return oracle_carry::process(program_id, accounts, payload, context.is_compressed_inner());
+    }
     let handler: fn(&Pubkey, &[AccountInfo], &[u8]) -> ProgramResult = match tag {
         VaultInstructionTag::Initialize => process_initialize_instruction,
         VaultInstructionTag::UpdateConfig => process_update_config_instruction,
@@ -209,9 +227,7 @@ pub(super) fn dispatch_0_63(
         VaultInstructionTag::InitUserCollateral => process_init_user_collateral_instruction,
         VaultInstructionTag::DepositCollateral => process_deposit_collateral_instruction,
         VaultInstructionTag::WithdrawCollateral => process_withdraw_collateral_instruction,
-        VaultInstructionTag::ConfigureOracleMajorToken => {
-            process_configure_oracle_major_token_instruction
-        }
+
         VaultInstructionTag::CloseOracleMonth => process_close_oracle_month_instruction,
         _ => return Err(VaultError::InvalidInstructionData.into()),
     };
@@ -229,9 +245,6 @@ pub(super) fn dispatch_64_124(
 ) -> ProgramResult {
     let compressed_state_transport = context.is_compressed_inner();
     match tag {
-        VaultInstructionTag::OracleCarryForwardV1 => {
-            oracle_carry::process(program_id, accounts, payload, context.is_compressed_inner())
-        }
         VaultInstructionTag::RotateVaultAuthoritiesV2 => {
             let params: RotateVaultAuthoritiesV2Params = decode_instruction_payload(payload)?;
             process_rotate_vault_authorities_v2(program_id, accounts, params)
@@ -274,12 +287,7 @@ pub(super) fn dispatch_64_124(
                 program_id, accounts, payload,
             )
         }
-        VaultInstructionTag::DepositOracleMajorTokens => {
-            process_oracle_major_token_movement_instruction(program_id, accounts, payload, true)
-        }
-        VaultInstructionTag::WithdrawOracleMajorTokens => {
-            process_oracle_major_token_movement_instruction(program_id, accounts, payload, false)
-        }
+
         VaultInstructionTag::AccumulateOracleRecipeBucketV2 => {
             require_compressed_state_transport(compressed_state_transport)?;
             process_accumulate_oracle_recipe_bucket_v2_instruction(program_id, accounts, payload)
@@ -365,35 +373,7 @@ pub(super) fn dispatch_128_158(
             expect_empty_payload(payload)?;
             oracle_usdc::process_finalize_oracle_usdc_reward_schedule(program_id, accounts)
         }
-        VaultInstructionTag::InitializeOracleSambaPool => {
-            expect_empty_payload(payload)?;
-            process_initialize_oracle_samba_pool(program_id, accounts)
-        }
-        VaultInstructionTag::InitializeOracleRewardFunnel => {
-            expect_empty_payload(payload)?;
-            process_initialize_oracle_reward_funnel(program_id, accounts)
-        }
-        VaultInstructionTag::SweepOracleRewardFunnel => {
-            expect_empty_payload(payload)?;
-            process_sweep_oracle_reward_funnel(program_id, accounts)
-        }
-        VaultInstructionTag::QueueStakeAmbaForSamba => {
-            process_queue_stake_amba_for_samba_instruction(program_id, accounts, payload)
-        }
-        VaultInstructionTag::ActivateQueuedStakeAmbaForSamba => {
-            process_activate_queued_stake_amba_for_samba_instruction(program_id, accounts, payload)
-        }
-        VaultInstructionTag::CancelQueuedStakeAmba => {
-            expect_empty_payload(payload)?;
-            process_cancel_queued_stake_amba(program_id, accounts)
-        }
-        VaultInstructionTag::RequestUnstakeSamba => {
-            process_request_unstake_samba_instruction(program_id, accounts, payload)
-        }
-        VaultInstructionTag::CompleteUnstakeSamba => {
-            expect_empty_payload(payload)?;
-            process_complete_unstake_samba(program_id, accounts)
-        }
+
         _ => Err(VaultError::InvalidInstructionData.into()),
     }
 }
@@ -438,11 +418,7 @@ pub(super) fn dispatch_161_205(
             expect_empty_payload(payload)?;
             process_cancel_stale_oracle_source_challenge_v2(program_id, accounts)
         }
-        VaultInstructionTag::ResolveOracleEmergencyDisputeV4 => {
-            expect_empty_payload(payload)?;
-            require_compressed_state_transport(compressed_state_transport)?;
-            oracle_samba_pot::process_resolve_oracle_emergency_dispute_v4(program_id, accounts)
-        }
+
         VaultInstructionTag::SettleFailedOracleMonthEscrowV2 => {
             let params = SettleOracleEscrowParams {
                 kind: match decode_u8_payload(payload)? {
@@ -543,13 +519,7 @@ pub(super) fn dispatch_161_205(
             require_compressed_state_transport(compressed_state_transport)?;
             oracle_usdc::process_cancel_stale_oracle_update_claim_v2(program_id, accounts)
         }
-        VaultInstructionTag::AbortStaleOracleUpdateEmergencyDisputeV2 => {
-            expect_empty_payload(payload)?;
-            require_compressed_state_transport(compressed_state_transport)?;
-            oracle_samba_pot::process_abort_stale_oracle_update_emergency_dispute_v2(
-                program_id, accounts,
-            )
-        }
+
         VaultInstructionTag::ReopenOracleSkuCoverage => {
             expect_empty_payload(payload)?;
             process_reopen_oracle_sku_coverage(program_id, accounts)
@@ -608,51 +578,7 @@ pub(super) fn dispatch_161_205(
             require_compressed_state_transport(compressed_state_transport)?;
             oracle_usdc::process_challenge_oracle_update_claim_v2(program_id, accounts, params)
         }
-        VaultInstructionTag::TryOpenOracleEmergencyDisputeV2 => {
-            let (kind, target_id, expected_case_hash) = decode_emergency_dispute_payload(payload)?;
-            let params = TryOpenOracleEmergencyDisputeParams {
-                kind: match kind {
-                    0 => OracleEmergencyDisputeKind::Source,
-                    1 => OracleEmergencyDisputeKind::Update,
-                    2 => OracleEmergencyDisputeKind::Opening,
-                    3 => OracleEmergencyDisputeKind::BucketMedian,
-                    _ => return Err(VaultError::InvalidInstructionData.into()),
-                },
-                target_id,
-                expected_case_hash,
-            };
-            if params.kind != OracleEmergencyDisputeKind::BucketMedian {
-                require_compressed_state_transport(compressed_state_transport)?;
-            }
-            oracle_samba_pot::process_try_open_oracle_emergency_dispute_v2(
-                program_id, accounts, params,
-            )
-        }
-        VaultInstructionTag::CommitOracleEmergencyVoteV3 => {
-            let params: CommitOracleEmergencyVoteV2Params = decode_instruction_payload(payload)?;
-            oracle_samba_pot::process_commit_oracle_emergency_vote_v3(program_id, accounts, params)
-        }
-        VaultInstructionTag::RevealOracleEmergencyVoteV2 => {
-            let params: RevealOracleEmergencyVoteParams = decode_instruction_payload(payload)?;
-            oracle_samba_pot::process_reveal_oracle_emergency_vote_v2(program_id, accounts, params)
-        }
-        VaultInstructionTag::ResolveOracleEmergencyDisputeV2 => {
-            expect_empty_payload(payload)?;
-            if accounts.len() != 8 {
-                require_compressed_state_transport(compressed_state_transport)?;
-            }
-            oracle_samba_pot::process_resolve_oracle_emergency_dispute_v2(program_id, accounts)
-        }
-        VaultInstructionTag::RegisterOracleSambaWinningVote => {
-            expect_empty_payload(payload)?;
-            require_compressed_state_transport(compressed_state_transport)?;
-            oracle_samba_pot::process_register_oracle_samba_winning_vote(program_id, accounts)
-        }
-        VaultInstructionTag::SettleOracleSambaEmergencyVoteV2 => {
-            expect_empty_payload(payload)?;
-            require_compressed_state_transport(compressed_state_transport)?;
-            oracle_samba_pot::process_settle_oracle_samba_emergency_vote_v2(program_id, accounts)
-        }
+
         VaultInstructionTag::SettleOracleUsdcEscrow => {
             let params = SettleOracleEscrowParams {
                 kind: match decode_u8_payload(payload)? {

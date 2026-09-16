@@ -1,8 +1,7 @@
 //! Append-only USDC custody, bond, and finite-reward processors for oracle months.
 //!
 //! Ordinary oracle participation uses the canonical collateral mint and
-//! `UserCollateral`; it never mutates the AMBA player ledger or AMBA treasury.
-//! Emergency voting remains in the separately verified sAMBA lane.
+//! `UserCollateral`. Emergency adjudication uses the independently authenticated council.
 
 use super::*;
 use crate::{

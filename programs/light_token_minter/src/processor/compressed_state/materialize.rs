@@ -19,6 +19,17 @@ pub(in crate::processor) fn materialize_leaf<'a>(
     leaf: &CompressedAmebaStateLeaf,
 ) -> ProgramResult {
     let full_data = match leaf.domain {
+        CompressedStateDomain::OracleCarryJournal
+        | CompressedStateDomain::OracleCarryCheckpoint => {
+            return super::super::oracle_carry::compressed::materialize_carry(
+                program_id,
+                rent_payer,
+                target,
+                system_program_info,
+                leaf.domain,
+                &leaf.data,
+            );
+        }
         CompressedStateDomain::OracleSkuCoverageRecord => {
             let mut compact = FixedCursor::new(&leaf.data);
             let sku_id = compact.bytes();
@@ -239,6 +250,44 @@ pub(in crate::processor) fn materialize_leaf<'a>(
             )?;
             data
         }
+        CompressedStateDomain::OracleSourceObservations => {
+            if leaf.data.len() != OracleSourceObservations::REQUIRED_DATA_LEN {
+                return Err(VaultError::InvalidOracleObservation.into());
+            }
+            let month = fixed_pubkey(&leaf.data, 6);
+            let source = fixed_pubkey(&leaf.data, 38);
+            let source_info = core_accounts
+                .iter()
+                .find(|candidate| *candidate.key == source)
+                .ok_or(VaultError::InvalidOracleObservation)?;
+            let source_state =
+                super::super::load_self_valid_oracle_source(program_id, source_info)?;
+            if source_state.month != month {
+                return Err(VaultError::InvalidOracleObservation.into());
+            }
+            let (expected, bump) =
+                super::super::derive_oracle_source_observations_pda(program_id, source_info.key);
+            if expected != *target.key || leaf.data[1] != bump {
+                return Err(VaultError::InvalidOracleObservation.into());
+            }
+            let mut data = vec![0; OracleSourceObservations::LEN];
+            data[..OracleSourceObservations::REQUIRED_DATA_LEN].copy_from_slice(&leaf.data);
+            validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
+            let bump_seed = [bump];
+            super::super::create_program_account(
+                rent_payer,
+                target,
+                system_program_info,
+                program_id,
+                OracleSourceObservations::LEN,
+                &[
+                    ORACLE_SOURCE_OBSERVATIONS_PDA_SEED,
+                    source_info.key.as_ref(),
+                    &bump_seed,
+                ],
+            )?;
+            data
+        }
         CompressedStateDomain::OracleSourceDescriptor => {
             super::super::load_self_valid_oracle_source(program_id, target)?;
             let mut data = target.try_borrow_data()?.to_vec();
@@ -305,65 +354,6 @@ pub(in crate::processor) fn materialize_leaf<'a>(
         // an existing receipt, so materializing one would enlarge the replay surface.
         CompressedStateDomain::OracleUsdcRewardReceipt => {
             return Err(VaultError::InvalidOracleUsdcRewardReceipt.into());
-        }
-        CompressedStateDomain::OracleSambaWinningVote => {
-            let dispute_info = core_accounts.get(1).ok_or(VaultError::InvalidAccountList)?;
-            let pot_info = core_accounts.get(2).ok_or(VaultError::InvalidAccountList)?;
-            let vote_info = core_accounts.get(5).ok_or(VaultError::InvalidAccountList)?;
-            let dispute =
-                super::super::oracle_samba_pot::load_dispute_v3(program_id, dispute_info)?;
-            let pot = super::super::oracle_samba_pot::load_pot(
-                program_id,
-                dispute_info,
-                &dispute,
-                pot_info,
-            )?;
-            let vote = super::super::oracle_samba_pot::load_vote_v3(
-                program_id,
-                dispute_info,
-                &dispute,
-                pot_info,
-                vote_info,
-            )?;
-            let (expected, bump) =
-                derive_oracle_samba_winning_vote_pda(program_id, pot_info.key, vote_info.key);
-            if expected != *target.key || pot.dispute != *dispute_info.key {
-                return Err(VaultError::InvalidOracleEmergencyDispute.into());
-            }
-            let mut data = vec![0; OracleSambaWinningVote::LEN];
-            {
-                let mut output = FixedWriter::new(&mut data);
-                true.write(&mut output);
-                bump.write(&mut output);
-                OracleSambaWinningVote::ACCOUNT_DISCRIMINATOR.write(&mut output);
-                OracleSambaWinningVote::ACCOUNT_VERSION.write(&mut output);
-                pot_info.key.write(&mut output);
-                dispute_info.key.write(&mut output);
-                vote_info.key.write(&mut output);
-                vote.voter.write(&mut output);
-                vote.voting_power.write(&mut output);
-                output.raw(&leaf.data);
-                debug_assert!(output.offset <= OracleSambaWinningVote::LEN);
-            }
-            validate_typed_state_data(program_id, target.key, leaf.domain, &data, None)?;
-            let bump_seed = [bump];
-            super::super::create_program_account(
-                rent_payer,
-                target,
-                system_program_info,
-                program_id,
-                OracleSambaWinningVote::LEN,
-                &[
-                    ORACLE_SAMBA_WINNING_VOTE_PDA_SEED,
-                    pot_info.key.as_ref(),
-                    vote_info.key.as_ref(),
-                    &bump_seed,
-                ],
-            )?;
-            data
-        }
-        CompressedStateDomain::OracleSambaVoteSettlementReceipt => {
-            return Err(VaultError::InvalidOracleEmergencyDispute.into());
         }
     };
     let mut data = target.try_borrow_mut_data()?;
@@ -442,6 +432,8 @@ pub(in crate::processor) fn capture_compact_state_data(
     data: &[u8],
 ) -> Vec<u8> {
     match domain {
+        CompressedStateDomain::OracleCarryJournal
+        | CompressedStateDomain::OracleCarryCheckpoint => data.to_vec(),
         CompressedStateDomain::OracleSkuCoverageRecord => {
             capture_fixed_slices(data, 44, &[(38, 82)])
         }
@@ -458,17 +450,15 @@ pub(in crate::processor) fn capture_compact_state_data(
         CompressedStateDomain::OracleUsdcRewardReceipt => {
             capture_fixed_slices(data, 81, &[(102, 135), (70, 102), (135, 151)])
         }
-        CompressedStateDomain::OracleSambaWinningVote => {
-            capture_fixed_slices(data, 16, &[(142, 158)])
-        }
-        CompressedStateDomain::OracleSambaVoteSettlementReceipt => {
-            capture_fixed_slices(data, 17, &[(166, 183)])
-        }
+
         CompressedStateDomain::OracleSourceState => {
-            capture_fixed_slices(data, 205, &[(34, 98), (194, 335)])
+            capture_fixed_slices(data, 216, &[(34, 98), (194, 346)])
         }
         CompressedStateDomain::OracleSourceDescriptor => {
             capture_fixed_slices(data, 96, &[(98, 194)])
+        }
+        CompressedStateDomain::OracleSourceObservations => {
+            data[..OracleSourceObservations::REQUIRED_DATA_LEN].to_vec()
         }
     }
 }

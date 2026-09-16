@@ -379,6 +379,8 @@ pub enum VaultError {
     GovernanceGateEpochMismatch = 6264,
     #[error("reviewed governance bridge controller identity is unavailable")]
     GovernanceBridgeIdentityUnavailable = 6265,
+    #[error("no bounty is claimable for this authenticated entitlement")]
+    NoOracleBountyClaimable = 6266,
 }
 
 impl From<VaultError> for ProgramError {

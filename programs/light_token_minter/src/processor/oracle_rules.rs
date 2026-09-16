@@ -167,32 +167,6 @@ pub fn validate_oracle_update_claim_v2_reveal(
     Ok(())
 }
 
-pub fn settle_expired_oracle_update_commitment_bond(
-    claim: &mut OracleUpdateClaimV2,
-    ledger: &mut OraclePlayerLedger,
-    month: &mut OracleMonthState,
-    current_slot: u64,
-) -> ProgramResult {
-    if claim.claim.status != OracleClaimStatus::Committed
-        || claim.claim.stake == 0
-        || claim.claim.prior_state != 0
-        || claim.claim.new_state != 0
-        || !crate::bytes32_is_zero(&claim.claim.evidence_hash)
-        || claim.claim.escrow_disposition != OracleEscrowDisposition::Unsettled
-        || current_slot <= claim.reveal_deadline_slot
-        || ledger.owner != claim.claim.claimant
-        || month.pending_resolution_count == 0
-    {
-        return Err(VaultError::OracleEscrowNotSettleable.into());
-    }
-    release_oracle_major_lock_at_slot(ledger, claim.claim.stake, current_slot)?;
-    claim.claim.escrow_disposition = OracleEscrowDisposition::Refunded;
-    claim.claim.status = OracleClaimStatus::TimedOut;
-    decrement_pending_oracle_resolution(month)?;
-    month.last_updated_slot = current_slot;
-    Ok(())
-}
-
 pub(super) fn validate_oracle_emergency_choice(
     kind: OracleEmergencyDisputeKind,
     choice: u8,
@@ -207,7 +181,7 @@ pub(super) struct DerivedEmergencyPacket {
     pub(super) fallback_choice: u8,
     pub(super) choice_count: u8,
     pub(super) snapshot_slot: u64,
-    pub(super) snapshot_total_major_tokens: u64,
+    pub(super) authority_version: u64,
 }
 
 pub(super) fn oracle_emergency_choice_count(kind: OracleEmergencyDisputeKind) -> u8 {
@@ -226,29 +200,6 @@ pub(super) fn oracle_emergency_fallback_choice(kind: OracleEmergencyDisputeKind)
         OracleEmergencyDisputeKind::Opening => 2,
         OracleEmergencyDisputeKind::BucketMedian => 0,
     }
-}
-
-pub(super) fn oracle_emergency_kind_byte(kind: OracleEmergencyDisputeKind) -> u8 {
-    match kind {
-        OracleEmergencyDisputeKind::Source => 0,
-        OracleEmergencyDisputeKind::Update => 1,
-        OracleEmergencyDisputeKind::Opening => 2,
-        OracleEmergencyDisputeKind::BucketMedian => 3,
-    }
-}
-
-pub(super) fn oracle_emergency_case_hash(
-    month_key: &Pubkey,
-    kind: OracleEmergencyDisputeKind,
-    target_id: &[u8; 32],
-) -> [u8; 32] {
-    hashv(&[
-        b"amoeba-oracle-emergency-case",
-        month_key.as_ref(),
-        &[oracle_emergency_kind_byte(kind)],
-        target_id,
-    ])
-    .to_bytes()
 }
 
 pub(super) fn ppm_amount(amount: u64, ppm: u64) -> Result<u64, ProgramError> {
@@ -531,25 +482,5 @@ pub(super) fn ensure_live_revealed_oracle_update_claim(
     {
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
-    Ok(())
-}
-
-pub(super) fn release_oracle_major_lock_at_slot(
-    ledger: &mut OraclePlayerLedger,
-    amount: u64,
-    current_slot: u64,
-) -> ProgramResult {
-    if ledger.locked_major_tokens < amount {
-        return Err(VaultError::InvalidOraclePlayerLedger.into());
-    }
-    ledger.locked_major_tokens = ledger
-        .locked_major_tokens
-        .checked_sub(amount)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    ledger.major_tokens = ledger
-        .major_tokens
-        .checked_add(amount)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    ledger.last_updated_slot = current_slot;
     Ok(())
 }

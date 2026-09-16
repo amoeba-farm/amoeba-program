@@ -15,7 +15,7 @@ pub(in crate::processor) struct WriterSwapState {
     series_limits: Vec<WriterDlmmSeriesLimits>,
     eligible: bool,
     before_cash: u64,
-    before_fee: u64,
+
     before_mint_supply: u64,
     before_retirement: u64,
     round_trip_fee: u64,
@@ -53,7 +53,6 @@ impl WriterSwapState {
             series_limits: &self.series_limits,
             month_spent_atoms: self.policy.monthly_spent_atoms,
             series_month_spent_atoms: self.policy.series_monthly_spent_atoms[self.series_index],
-            primary_fee_bps: self.context.snapshot.primary_fee_bps,
         }
     }
 }
@@ -64,8 +63,9 @@ pub(in crate::processor) fn load_swap_state(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     pool: &AmoebaDlmmPoolV1,
+    book_context: WriterBookContext,
 ) -> Result<Option<WriterSwapState>, ProgramError> {
-    if accounts.len() < 32 {
+    if accounts.len() < 31 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let sleeve_info = &accounts[4];
@@ -82,14 +82,19 @@ pub(in crate::processor) fn load_swap_state(
         validate_canonical_system_zero_pda_proof(&expected_position, position_info)?;
         return Ok(None);
     }
-    let context = load_writer_policy_context(
+    let snapshot = load_writer_policy_snapshot(
         program_id,
-        sleeve_info,
-        &accounts[5],
-        &accounts[6],
         &accounts[25],
-        Some(accounts[30].key),
+        sleeve_info.key,
+        accounts[30].key,
+        book_context.sleeve.policy_version,
     )?;
+    let context = WriterPolicyContext {
+        group: book_context.group,
+        sleeve: book_context.sleeve,
+        book: book_context.book,
+        snapshot,
+    };
     let mut policy = load_policy(
         program_id,
         policy_info,
@@ -133,26 +138,20 @@ pub(in crate::processor) fn load_swap_state(
     {
         return Err(VaultError::InvalidWriterSleeve.into());
     }
-    let registry = load_writer_policy_registry(program_id, &accounts[30], accounts[1].key)?;
-    if registry.protocol_fee_vault != *accounts[31].key
-        || derive_writer_protocol_fee_vault_pda(program_id, accounts[30].key).0 != *accounts[31].key
-    {
-        return Err(VaultError::InvalidWriterPolicyRegistry.into());
-    }
-    validate_vault_token_account(&accounts[31], accounts[10].key, accounts[30].key)?;
+    let _registry = load_writer_policy_registry(program_id, &accounts[30], accounts[1].key)?;
     validate_vault_token_account(&accounts[27], accounts[10].key, sleeve_info.key)?;
-    let before_fee = validate_token_account(&accounts[31])?.amount;
+
     let before_cash = validate_token_account(&accounts[27])?.amount;
     let mut market = load_valid_market(program_id, &accounts[2])?;
     let mint = validate_canonical_market_mint(&accounts[2], &mut market, &accounts[9], 0)?;
-    let staged = auction::observe_market_staging_amount(
+    let staged = custody::observe_market_staging_amount(
         program_id,
         &accounts[2],
         &accounts[28],
         &accounts[9],
         &accounts[19],
     )?;
-    let retired = auction::observe_writer_retirement_custody_amount(
+    let retired = custody::observe_writer_retirement_custody_amount(
         program_id,
         sleeve_info,
         &accounts[2],
@@ -169,8 +168,6 @@ pub(in crate::processor) fn load_swap_state(
     // Supply reconciliation and writer cash deficits make only this lane ineligible.
     // Ordinary LP custody is checked independently by the shared pool loader.
     let mut eligible = context.sleeve.status == WriterSleeveStatus::Active
-        && context.sleeve.active_close_request.is_none()
-        && context.sleeve.active_auction.is_none()
         && context.group.status == WriterSettlementGroupStatus::Active
         && mint.supply == record.total_physical_supply_atoms
         && issuer == record.issuer_controlled_atoms
@@ -189,8 +186,6 @@ pub(in crate::processor) fn load_swap_state(
         policy.series[index].seller_floor_quote_atoms,
         pool.tick_size_quote_atomic,
         policy.price_separation_ticks,
-        pool.swap_fee_bps,
-        context.snapshot.primary_fee_bps,
     ) {
         Ok((_, _, fee)) => fee,
         Err(_) => {
@@ -219,7 +214,7 @@ pub(in crate::processor) fn load_swap_state(
         series_limits,
         eligible,
         before_cash,
-        before_fee,
+
         before_mint_supply: mint.supply,
         before_retirement: retired,
         round_trip_fee,
@@ -258,7 +253,7 @@ pub(in crate::processor) fn finish_swap(
     let system_info = &accounts[20];
     let cash_info = &accounts[27];
     let retirement_info = &accounts[29];
-    let fee_info = &accounts[31];
+
     let (_, bump) = derive_ameba_dlmm_authority_pda(program_id, pool_info.key);
     let bump_bytes = [bump];
     let pool_seeds: &[&[u8]] = &[
@@ -287,7 +282,7 @@ pub(in crate::processor) fn finish_swap(
                 .gross_premium_atoms
                 .checked_add(totals.lp_fee_atoms)
                 .ok_or(VaultError::ArithmeticOverflow)?;
-            if writer_cash.checked_add(totals.primary_fee_atoms) != Some(swept) {
+            if writer_cash != swept {
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
             if writer_cash > 0 {
@@ -307,23 +302,7 @@ pub(in crate::processor) fn finish_swap(
                     &[pool_seeds],
                 )?;
             }
-            if totals.primary_fee_atoms > 0 {
-                invoke_light_token_account_transfer_with_signer_seeds(
-                    totals.primary_fee_atoms,
-                    MarketMintAccounting::CANONICAL_DECIMALS,
-                    light_info,
-                    cpi_info,
-                    actor,
-                    quote_vault,
-                    fee_info,
-                    authority_info,
-                    &accounts[10],
-                    quote_interface,
-                    token_info,
-                    system_info,
-                    &[pool_seeds],
-                )?;
-            }
+
             state.context.sleeve.accounted_asset_atoms = state
                 .context
                 .sleeve
@@ -361,10 +340,6 @@ pub(in crate::processor) fn finish_swap(
                 .amount
                 .checked_sub(state.before_cash)
                 != Some(writer_cash)
-                || validate_token_account(fee_info)?
-                    .amount
-                    .checked_sub(state.before_fee)
-                    != Some(totals.primary_fee_atoms)
             {
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
@@ -414,7 +389,7 @@ pub(in crate::processor) fn finish_swap(
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
             if state.before_retirement == 0 {
-                funding::close_sleeve_token_custody(
+                custody::close_sleeve_token_custody(
                     &state.context.sleeve,
                     sleeve_info,
                     retirement_info,

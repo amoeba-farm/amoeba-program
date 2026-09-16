@@ -104,8 +104,9 @@ pub(in crate::processor) fn process_initialize_settlement_group(
 pub(in crate::processor) fn process_initialize_sleeve(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
+    participation_start_ts: u64,
 ) -> ProgramResult {
-    if accounts.len() != 16 {
+    if accounts.len() != 10 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let admin_info = &accounts[0];
@@ -115,36 +116,27 @@ pub(in crate::processor) fn process_initialize_sleeve(
     let sleeve_info = &accounts[4];
     let book_info = &accounts[5];
     let sleeve_vault_info = &accounts[6];
-    let flat_mint_info = &accounts[7];
-    let settlement_mint_info = &accounts[8];
-    let flat_interface_info = &accounts[9];
-    let light_program_info = &accounts[10];
-    let cpi_authority_info = &accounts[11];
-    let token_program_info = &accounts[12];
-    let system_program_info = &accounts[13];
-    let compressible_config_info = &accounts[14];
-    let rent_sponsor_info = &accounts[15];
+    let settlement_mint_info = &accounts[7];
+    let token_program_info = &accounts[8];
+    let system_program_info = &accounts[9];
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    validate_writer_compression_accounts(
-        light_program_info,
-        cpi_authority_info,
-        token_program_info,
-        system_program_info,
-        compressible_config_info,
-        rent_sponsor_info,
-    )?;
-    let config = load_canonical_vault_config(program_id, config_info)?;
-    if config.admin != *admin_info.key
-        || config.usdc_mint != *settlement_mint_info.key
-        || *settlement_mint_info.key == *flat_mint_info.key
+    if *token_program_info.key != spl_token_program_id()
+        || *system_program_info.key != system_program::id()
     {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    let config = load_canonical_vault_config(program_id, config_info)?;
+    if config.admin != *admin_info.key || config.usdc_mint != *settlement_mint_info.key {
         return Err(VaultError::Unauthorized.into());
     }
     let registry = load_writer_policy_registry(program_id, registry_info, config_info.key)?;
     let mut group = load_writer_settlement_group(program_id, group_info)?;
-    if group.status != WriterSettlementGroupStatus::Anchored
+    if participation_start_ts == 0
+        || participation_start_ts >= group.expiry_ts
+        || current_unix_timestamp()? >= group.expiry_ts
+        || group.status != WriterSettlementGroupStatus::Anchored
         || group.settlement_mint != *settlement_mint_info.key
         || group.sleeve != *sleeve_info.key
     {
@@ -154,28 +146,14 @@ pub(in crate::processor) fn process_initialize_sleeve(
     let (expected_book, book_bump) = derive_writer_series_book_pda(program_id, sleeve_info.key);
     let (expected_vault, vault_bump) =
         derive_writer_sleeve_usdc_vault_pda(program_id, sleeve_info.key);
-    let (expected_flat_mint, flat_mint_bump) =
-        derive_writer_flat_mint_pda(program_id, sleeve_info.key);
-    let expected_interface =
-        light_token_instruction::get_spl_interface_pda_and_bump(flat_mint_info.key).0;
     if *sleeve_info.key != expected_sleeve
         || *book_info.key != expected_book
         || *sleeve_vault_info.key != expected_vault
-        || *flat_mint_info.key != expected_flat_mint
-        || *flat_interface_info.key != expected_interface
     {
         return Err(VaultError::InvalidPda.into());
     }
     validate_create_only_program_account_target(program_id, sleeve_info)?;
     validate_create_only_program_account_target(program_id, book_info)?;
-    validate_create_only_program_account_target(program_id, flat_mint_info)?;
-    if flat_interface_info.owner != &system_program::id()
-        || flat_interface_info.executable
-        || flat_interface_info.data_len() != 0
-    {
-        return Err(VaultError::InvalidSplInterfaceAccount.into());
-    }
-
     create_program_account(
         admin_info,
         sleeve_info,
@@ -214,48 +192,7 @@ pub(in crate::processor) fn process_initialize_sleeve(
             &[vault_bump],
         ],
     )?;
-    create_program_account(
-        admin_info,
-        flat_mint_info,
-        system_program_info,
-        token_program_info.key,
-        Mint::LEN,
-        &[
-            crate::constants::WRITER_FLAT_MINT_PDA_SEED,
-            sleeve_info.key.as_ref(),
-            &[flat_mint_bump],
-        ],
-    )?;
-    invoke_token_initialize_mint2(
-        token_program_info,
-        flat_mint_info,
-        sleeve_info.key,
-        None,
-        MarketMintAccounting::CANONICAL_DECIMALS,
-    )?;
-    invoke_create_spl_interface_pda(
-        admin_info,
-        flat_interface_info,
-        system_program_info,
-        flat_mint_info,
-        token_program_info,
-        cpi_authority_info,
-        light_program_info,
-    )?;
     validate_vault_token_account(sleeve_vault_info, settlement_mint_info.key, sleeve_info.key)?;
-    let flat_mint = validate_mint_account(flat_mint_info, token_program_info.key)?;
-    let flat_interface = validate_token_account(flat_interface_info)?;
-    if flat_mint.supply != 0
-        || flat_mint.decimals != MarketMintAccounting::CANONICAL_DECIMALS
-        || flat_mint.mint_authority != COption::Some(*sleeve_info.key)
-        || flat_mint.freeze_authority != COption::None
-        || flat_interface.mint != *flat_mint_info.key
-        || flat_interface.owner != cpi_authority()
-        || flat_interface.amount != 0
-        || flat_interface.state != AccountState::Initialized
-    {
-        return Err(VaultError::InvalidMint.into());
-    }
     let slot = Clock::get()?.slot;
     let mut book = WriterSeriesBookV1 {
         is_initialized: true,
@@ -291,10 +228,6 @@ pub(in crate::processor) fn process_initialize_sleeve(
         settlement_group: *group_info.key,
         series_book: *book_info.key,
         usdc_vault: *sleeve_vault_info.key,
-        flat_mint: *flat_mint_info.key,
-        flat_spl_interface: *flat_interface_info.key,
-        flat_staging: derive_writer_flat_staging_pda(program_id, sleeve_info.key).0,
-        flat_burn_custody: derive_writer_flat_burn_custody_pda(program_id, sleeve_info.key).0,
         policy_registry: *registry_info.key,
         policy_snapshot: Pubkey::default(),
         policy_version: 0,
@@ -307,27 +240,23 @@ pub(in crate::processor) fn process_initialize_sleeve(
         exact_reserve_atoms: 0,
         upper_tail_reserve_atoms: 0,
         lower_tail_reserve_atoms: 0,
-        flat_par_supply_atoms: 0,
         security_exposure_atoms: 0,
         long_liability_initial_atoms: 0,
         long_liability_remaining_atoms: 0,
-        flat_residual_initial_atoms: 0,
-        flat_residual_remaining_atoms: 0,
-        flat_supply_snapshot_atoms: 0,
-        flat_claim_supply_remaining_atoms: 0,
+        writer_residual_initial_atoms: 0,
+        writer_residual_remaining_atoms: 0,
+        settlement_principal_atoms: 0,
+        unclaimed_principal_atoms: 0,
         stranded_surplus_atoms: 0,
         operational_buffer_atoms: 0,
-        auction_nonce: 0,
-        close_nonce: 0,
         series_count: 0,
         status: WriterSleeveStatus::Draft,
         security_mode: WriterSecurityMode::GrossExternalMaxPayout,
-        v2_feature_flags: 0,
-        active_auction: None,
-        active_close_request: None,
         settlement_finalized_slot: 0,
         last_updated_slot: slot,
-        reserved: [0; 32],
+        capital_seconds: 0,
+        maximum_contribution_duration: 0,
+        participation_start_ts,
     };
     group.last_updated_slot = slot;
     let _ = registry;

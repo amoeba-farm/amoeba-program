@@ -8,7 +8,7 @@ pub struct InitMarketV2Params {
     pub collateral_mint: Pubkey,
 }
 
-crate::fixed_codec::fixed_instruction_deserialize!(InitMarketV2Params, 177, {
+crate::fixed_codec::fixed_instruction_deserialize!(InitMarketV2Params, 171, {
     market_id: [u8; 32],
     instrument: InstrumentDefinition,
     params: MarketParameters,

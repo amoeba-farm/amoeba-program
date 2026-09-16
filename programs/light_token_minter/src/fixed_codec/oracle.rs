@@ -1,26 +1,5 @@
-use super::fixed_state_deserialize;
 use super::*;
-
-fixed_state_deserialize!(OracleEmergencyVoteRecordV3, 241, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    month: Pubkey,
-    dispute: Pubkey,
-    pot: Pubkey,
-    voter: Pubkey,
-    samba_mint: Pubkey,
-    commit_hash: [u8; 32],
-    locked_amount: u64,
-    snapshot_power: u64,
-    voting_power: u64,
-    choice: u8,
-    status: OracleEmergencyVoteStatus,
-    escrow_disposition: OracleEscrowDisposition,
-    committed_slot: u64,
-    revealed_slot: u64,
-});
+use super::{fixed_state_deserialize, fixed_state_deserialize_flat};
 
 fixed_state_deserialize!(OracleUpdateChallenge, 280, {
     is_initialized: bool,
@@ -41,7 +20,7 @@ fixed_state_deserialize!(OracleUpdateChallenge, 280, {
     escrow_disposition: OracleEscrowDisposition,
     account_discriminator: [u8; 3],
     account_version: u8,
-    emergency_snapshot_total_major_tokens: u64,
+    council_authority_version: u64,
 });
 
 fixed_state_deserialize!(OracleUpdateClaimData, 264, {
@@ -64,7 +43,7 @@ fixed_state_deserialize!(OracleUpdateClaimData, 264, {
     account_version: u8,
 });
 
-fixed_state_deserialize!(OracleUpdateChallengeGuard, 222, {
+fixed_state_deserialize_flat!(OracleUpdateChallengeGuard, 222, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -80,7 +59,7 @@ fixed_state_deserialize!(OracleUpdateChallengeGuard, 222, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleSourceChallengeGuard, 206, {
+fixed_state_deserialize_flat!(OracleSourceChallengeGuard, 206, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -92,55 +71,6 @@ fixed_state_deserialize!(OracleSourceChallengeGuard, 206, {
     active_challenge_id: [u8; 32],
     active_dispute: Pubkey,
     last_updated_slot: u64,
-});
-
-fixed_state_deserialize!(OracleSambaVoteSettlementReceipt, 183, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    pot: Pubkey,
-    dispute: Pubkey,
-    vote: Pubkey,
-    voter: Pubkey,
-    destination: Pubkey,
-    amount: u64,
-    disposition: OracleEscrowDisposition,
-    settled_slot: u64,
-});
-
-fixed_state_deserialize!(OracleRewardFunnel, 206, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    major_token_config: Pubkey,
-    amba_mint: Pubkey,
-    funnel_token_account: Pubkey,
-    total_swept: u128,
-    total_game_funded: u128,
-    total_scramble_funded: u128,
-    total_challenge_funded: u128,
-    total_staking_funded: u128,
-    total_reserve_funded: u128,
-    last_updated_slot: u64,
-});
-
-fixed_state_deserialize!(OracleStakingPool, 158, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    major_token_config: Pubkey,
-    samba_mint: Pubkey,
-    samba_vote_vault: Pubkey,
-    active_amba_backing: u64,
-    samba_supply: u64,
-    pending_unstake_amba: u64,
-    total_rewards_funded: u64,
-    governance_lock_count: u64,
-    last_updated_slot: u64,
-    orphaned_amba_backing: u64,
 });
 
 fixed_state_deserialize!(OracleUsdcRewardRegistration, 176, {
@@ -158,20 +88,6 @@ fixed_state_deserialize!(OracleUsdcRewardRegistration, 176, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleSambaWinningVote, 158, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    pot: Pubkey,
-    dispute: Pubkey,
-    vote: Pubkey,
-    voter: Pubkey,
-    voting_power: u64,
-    base_entitlement: u64,
-    registered_slot: u64,
-});
-
 fixed_state_deserialize!(OracleUsdcRewardReceipt, 151, {
     is_initialized: bool,
     bump: u8,
@@ -186,7 +102,7 @@ fixed_state_deserialize!(OracleUsdcRewardReceipt, 151, {
     claimed_slot: u64,
 });
 
-fixed_state_deserialize!(SettlementRecordV2, 158, {
+fixed_state_deserialize_flat!(SettlementRecordV2, 158, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],

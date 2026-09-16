@@ -2,24 +2,24 @@
 use super::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-pub(super) const REGISTRY_SEED: &[u8] = b"oracle-carry-registry";
-pub(super) const PERIOD_SEED: &[u8] = b"oracle-carry-period";
-pub(super) const SOURCE_SEED: &[u8] = b"oracle-carry-source";
-pub(super) const JOURNAL_SEED: &[u8] = b"oracle-knowledge";
-pub(super) const CHECKPOINT_SEED: &[u8] = b"oracle-checkpoint";
-pub(super) const VERSION: u8 = 1;
+pub(super) const REGISTRY_SEED: &[u8] = b"g3-oracle-carry-registry";
+pub(super) const PERIOD_SEED: &[u8] = b"g3-oracle-carry-period";
+pub(super) const SOURCE_SEED: &[u8] = b"g3-oracle-carry-source";
+pub(super) const JOURNAL_SEED: &[u8] = b"g3-oracle-knowledge";
+pub(super) const CHECKPOINT_SEED: &[u8] = b"g3-oracle-checkpoint";
 
 #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
 pub(super) struct Header {
-    discriminator: [u8; 3],
-    version: u8,
-    initialized: bool,
-    bump: u8,
+    pub(super) discriminator: [u8; 3],
+    pub(super) version: u8,
+    pub(super) initialized: bool,
+    pub(super) bump: u8,
 }
 
 pub(super) trait Record: BorshDeserialize + BorshSerialize {
     const DISCRIMINATOR: [u8; 3];
     const LEN: usize;
+    const VERSION: u8 = 1;
     fn header(&self) -> &Header;
 }
 
@@ -46,10 +46,23 @@ record!(Period, b"OCP", 32 * 4 + 8 * 2 + 2 * 2, {
     predecessor_recipe: [u8; 32], expiry: u64, registered_at: u64,
     expected_imports: u16, next_import: u16,
 });
-record!(Journal, b"OKJ", 32 * 3 + 4 + 1, {
-    source: Pubkey, head: Pubkey, rolling_observation_hash: [u8; 32],
-    count: u32, observation_count: u8,
-});
+#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
+pub(super) struct Journal {
+    pub header: Header,
+    pub source: Pubkey,
+    pub head: Pubkey,
+    pub rolling_observation_hash: [u8; 32],
+    pub count: u32,
+    pub observation_count: u32,
+}
+impl Record for Journal {
+    const DISCRIMINATOR: [u8; 3] = *b"OKJ";
+    const LEN: usize = 110;
+    const VERSION: u8 = 2;
+    fn header(&self) -> &Header {
+        &self.header
+    }
+}
 record!(Checkpoint, b"OKC", 32 * 9 + 8 * 3 + 4, {
     source: Pubkey, month: Pubkey, event: Pubkey, previous: Pubkey,
     sequence: u32, accepted_at: u64, value: u64, observed_at: u64,
@@ -95,10 +108,18 @@ pub(super) fn checkpoint_address(
 pub(super) fn header<T: Record>(bump: u8) -> Header {
     Header {
         discriminator: T::DISCRIMINATOR,
-        version: VERSION,
+        version: T::VERSION,
         initialized: true,
         bump,
     }
+}
+
+pub(super) fn header_matches<T: Record>(value: &T, bump: u8) -> bool {
+    let h = value.header();
+    h.initialized
+        && h.discriminator == T::DISCRIMINATOR
+        && h.version == T::VERSION
+        && h.bump == bump
 }
 
 pub(super) fn load<T: Record>(
@@ -119,7 +140,7 @@ pub(super) fn load<T: Record>(
     let h = value.header();
     if !h.initialized
         || h.discriminator != T::DISCRIMINATOR
-        || h.version != VERSION
+        || h.version != T::VERSION
         || h.bump != expected.1
     {
         return invalid();
@@ -214,7 +235,7 @@ pub(super) fn load_journal(
     )?;
     if journal.source != *source
         || journal.count == 0
-        || journal.count > u32::from(journal.observation_count)
+        || journal.count != journal.observation_count
         || journal.head == Pubkey::default()
         || journal.observation_count == 0
         || journal.rolling_observation_hash == [0; 32]

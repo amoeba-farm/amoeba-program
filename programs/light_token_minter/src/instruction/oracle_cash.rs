@@ -56,50 +56,6 @@ crate::fixed_codec::fixed_instruction_deserialize!(ConfigureOracleEconomicsTempl
 });
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct ConfigureOracleMajorTokenParams {}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct DepositOracleMajorTokensParams {
-    pub amount: u64,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct WithdrawOracleMajorTokensParams {
-    pub amount: u64,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct InitializeOracleSambaPoolParams {}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct InitializeOracleRewardFunnelParams {}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct SweepOracleRewardFunnelParams {}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct QueueStakeAmbaForSambaParams {
-    pub amba_amount: u64,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct ActivateQueuedStakeAmbaForSambaParams {
-    pub min_samba_out: u64,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct CancelQueuedStakeAmbaParams {}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct RequestUnstakeSambaParams {
-    pub samba_amount: u64,
-    pub min_amba_out: u64,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct CompleteUnstakeSambaParams {}
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
 pub struct SettleOracleEscrowParams {
     pub kind: OracleEscrowKind,
 }

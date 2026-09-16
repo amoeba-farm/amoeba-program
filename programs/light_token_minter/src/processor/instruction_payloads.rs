@@ -142,21 +142,6 @@ pub(super) fn decode_u16_pair_payload(payload: &[u8]) -> Result<(u16, u16), Prog
 }
 
 #[inline(always)]
-pub(super) fn decode_u64_pair_payload(payload: &[u8]) -> Result<(u64, u64), ProgramError> {
-    let bytes: [u8; 16] = payload
-        .try_into()
-        .map_err(|_| ProgramError::from(VaultError::InvalidInstructionData))?;
-    Ok((
-        u64::from_le_bytes([
-            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-        ]),
-        u64::from_le_bytes([
-            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
-        ]),
-    ))
-}
-
-#[inline(always)]
 pub(super) fn decode_bool_payload(payload: &[u8]) -> Result<bool, ProgramError> {
     match payload {
         [0] => Ok(false),
@@ -248,21 +233,6 @@ pub(super) fn decode_update_config_payload(
     } else {
         Err(VaultError::InvalidInstructionData.into())
     }
-}
-
-pub(super) type EmergencyDisputePayload = (u8, [u8; 32], Option<[u8; 32]>);
-
-#[inline(always)]
-pub(super) fn decode_emergency_dispute_payload(
-    payload: &[u8],
-) -> Result<EmergencyDisputePayload, ProgramError> {
-    if payload.len() < 34 {
-        return Err(VaultError::InvalidInstructionData.into());
-    }
-    let kind = payload[0];
-    let target_id = decode_bytes32_payload(&payload[1..33])?;
-    let expected_case_hash = decode_optional_bytes32_payload(&payload[33..])?;
-    Ok((kind, target_id, expected_case_hash))
 }
 
 pub(super) fn expect_empty_payload(payload: &[u8]) -> ProgramResult {

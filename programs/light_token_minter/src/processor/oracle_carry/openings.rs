@@ -55,6 +55,7 @@ fn target_context(
 /// parent source, its journal, parent month and rent payer. Source pairs are logical reads.
 /// The latest journal head is captured AFTER the fresh opening deadline; new parent
 /// checkpoints cannot then acquire an eligible earlier acceptance timestamp.
+#[inline(never)]
 pub(super) fn begin_selection(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     if a.len() != 10 {
         return invalid();
@@ -118,52 +119,24 @@ pub(super) fn begin_selection(program: &Pubkey, a: &[AccountInfo]) -> ProgramRes
 
 /// Accounts: target source identity (no source contents read), carry, next immutable checkpoint.
 /// Exactly one backwards step. Zero remaining is the ONLY completion condition.
+#[inline(never)]
 pub(super) fn scan_checkpoint(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     if a.len() != 3 {
         return invalid();
     }
     let mut carry = load_carry(program, a[0].key, &a[1])?;
-    if carry.status != SELECTING || carry.remaining == 0 || carry.cursor != *a[2].key {
-        return invalid();
-    }
+    // Keep the cursor check ahead of checkpoint decoding so malformed or
+    // unexpected checkpoint bytes retain the classic error precedence.
+    validate_scan_cursor(&carry, a[2].key)?;
     let checkpoint = load_checkpoint(program, &a[2], &carry.parent_source)?;
-    if checkpoint.month != carry.parent_month || checkpoint.sequence != carry.remaining {
-        return invalid();
-    }
-    if checkpoint.observed_at <= carry.cutoff
-        && checkpoint.accepted_at < carry.deadline
-        && (carry.selected_checkpoint == Pubkey::default()
-            || (checkpoint.observed_at, checkpoint.sequence)
-                > (carry.observed_at, carry.selected_sequence))
-    {
-        carry.selected_checkpoint = *a[2].key;
-        carry.selected_sequence = checkpoint.sequence;
-        carry.value = checkpoint.value;
-        carry.observed_at = checkpoint.observed_at;
-        carry.accepted_at = checkpoint.accepted_at;
-        carry.evidence_hash = checkpoint.evidence_hash;
-        carry.archive_hash = checkpoint.archive_hash;
-        carry.contributor = checkpoint.contributor;
-        carry.origin_source = checkpoint.origin_source;
-        carry.origin_checkpoint = checkpoint.origin_checkpoint;
-    }
-    carry.cursor = checkpoint.previous;
-    carry.remaining = carry
-        .remaining
-        .checked_sub(1)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    if (carry.remaining == 0) != (carry.cursor == Pubkey::default()) {
-        return invalid();
-    }
-    if carry.remaining == 0 && carry.selected_checkpoint == Pubkey::default() {
-        carry.status = NO_ELIGIBLE_CHECKPOINT;
-    }
+    apply_scan_transition(&mut carry, a[2].key, &checkpoint)?;
     save(program, &a[1], &carry)
 }
 
 /// Accounts: payer, market/month/source/carry/period, canonical fresh claim,
 /// native observations, target SKU, target reward schedule, journal/checkpoint/System.
 /// Checkpoint event identity is the create-once carry companion. No reward claim is created.
+#[inline(never)]
 pub(super) fn freeze_opening(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     if a.len() != 13 {
         return invalid();
@@ -211,6 +184,7 @@ pub(super) fn freeze_opening(program: &Pubkey, a: &[AccountInfo]) -> ProgramResu
     source.baseline_state = carry.value;
     source.current_state = carry.value;
     source.observation_count = 1;
+    source.latest_source_time = carry.observed_at;
     source.opening_submitted = true;
     source.opening_evidence_hash = hashv(&[
         b"oracle-carried-opening-v1",

@@ -345,7 +345,7 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
 pub(super) fn process_initialize_oracle_month_v5(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    params: InitializeOracleMonthV5Params,
+    mut params: InitializeOracleMonthV5Params,
 ) -> ProgramResult {
     if accounts.len() != 10 {
         return Err(VaultError::InvalidAccountList.into());
@@ -382,69 +382,93 @@ pub(super) fn process_initialize_oracle_month_v5(
     {
         return Err(VaultError::InvalidOracleSkuCoverageManifest.into());
     }
-    validate_rolling_rulebook_schedule_params(
-        &market,
-        &InitializeOracleMonthV3Params {
-            scramble_start_ts: params.scramble_start_ts,
-            listing_ts: params.listing_ts,
-            settlement_base_oracle_atomic: params.settlement_base_oracle_atomic,
-        },
-    )?;
-    let economics_config = load_canonical_oracle_economics_config(program_id, economics_info)?;
+    let launch = cfg!(feature = "mainnet-four-hour-launch")
+        && params.scramble_start_ts == 0
+        && params.listing_ts == 0;
     let (slot, current_ts) = current_slot_and_unix_timestamp()?;
-    let underlying_id = market.instrument.underlying_id;
-    let (expected_maturity_ladder, maturity_ladder_bump) =
-        derive_oracle_maturity_ladder_registry_pda(program_id, &underlying_id);
-    if *maturity_ladder_info.key != expected_maturity_ladder {
-        return Err(VaultError::InvalidOracleMaturityLadder.into());
-    }
-    let (maturity_ladder, maturity_ladder_changed) = if maturity_ladder_info.owner == program_id {
-        let mut existing = load_valid_oracle_maturity_ladder_registry(
+    if launch {
+        (params.scramble_start_ts, params.listing_ts) = initialize_launch_clock(
             program_id,
-            &underlying_id,
-            maturity_ladder_info,
-        )?;
-        match validate_oracle_maturity_ladder_transition(
-            &existing,
-            params.listing_ts,
-            market.instrument.expiry_ts,
-            current_ts,
-        )? {
-            OracleMaturityLadderTransition::SameRung => (existing, false),
-            OracleMaturityLadderTransition::Advance => {
-                existing.planned_listing_ts = params.listing_ts;
-                existing.planned_expiry_ts = market.instrument.expiry_ts;
-                existing.last_updated_slot = slot;
-                (existing, true)
-            }
-        }
-    } else {
-        validate_create_only_program_account_target(program_id, maturity_ladder_info)?;
-        create_program_account(
+            &market,
             payer_info,
             maturity_ladder_info,
             system_program_info,
-            program_id,
-            OracleMaturityLadderRegistry::LEN,
-            &[
-                ORACLE_MATURITY_LADDER_PDA_SEED,
-                &underlying_id,
-                &[maturity_ladder_bump],
-            ],
+            current_ts,
         )?;
-        (
-            OracleMaturityLadderRegistry {
-                is_initialized: true,
-                bump: maturity_ladder_bump,
-                account_discriminator: OracleMaturityLadderRegistry::ACCOUNT_DISCRIMINATOR,
-                account_version: OracleMaturityLadderRegistry::ACCOUNT_VERSION,
-                underlying_id,
-                planned_listing_ts: params.listing_ts,
-                planned_expiry_ts: market.instrument.expiry_ts,
-                last_updated_slot: slot,
+    } else {
+        validate_rolling_rulebook_schedule_params(
+            &market,
+            &InitializeOracleMonthV3Params {
+                scramble_start_ts: params.scramble_start_ts,
+                listing_ts: params.listing_ts,
+                settlement_base_oracle_atomic: params.settlement_base_oracle_atomic,
             },
-            true,
-        )
+        )?;
+    }
+    let economics_config = load_canonical_oracle_economics_config(program_id, economics_info)?;
+    let underlying_id = market.instrument.underlying_id;
+    let maturity_ladder_update = if launch {
+        None
+    } else {
+        let (expected_maturity_ladder, maturity_ladder_bump) =
+            derive_oracle_maturity_ladder_registry_pda(program_id, &underlying_id);
+        if *maturity_ladder_info.key != expected_maturity_ladder {
+            return Err(VaultError::InvalidOracleMaturityLadder.into());
+        }
+        let (maturity_ladder, maturity_ladder_changed) = if maturity_ladder_info.owner == program_id
+        {
+            let mut existing = load_valid_oracle_maturity_ladder_registry(
+                program_id,
+                &underlying_id,
+                maturity_ladder_info,
+            )?;
+            match validate_oracle_maturity_ladder_transition(
+                &existing,
+                params.listing_ts,
+                market.instrument.expiry_ts,
+                current_ts,
+            )? {
+                OracleMaturityLadderTransition::SameRung => (existing, false),
+                OracleMaturityLadderTransition::Advance => {
+                    existing.planned_listing_ts = params.listing_ts;
+                    existing.planned_expiry_ts = market.instrument.expiry_ts;
+                    existing.last_updated_slot = slot;
+                    (existing, true)
+                }
+            }
+        } else {
+            validate_create_only_program_account_target(program_id, maturity_ladder_info)?;
+            create_program_account(
+                payer_info,
+                maturity_ladder_info,
+                system_program_info,
+                program_id,
+                OracleMaturityLadderRegistry::LEN,
+                &[
+                    ORACLE_MATURITY_LADDER_PDA_SEED,
+                    &underlying_id,
+                    &[maturity_ladder_bump],
+                ],
+            )?;
+            (
+                OracleMaturityLadderRegistry {
+                    is_initialized: true,
+                    bump: maturity_ladder_bump,
+                    account_discriminator: OracleMaturityLadderRegistry::ACCOUNT_DISCRIMINATOR,
+                    account_version: OracleMaturityLadderRegistry::ACCOUNT_VERSION,
+                    underlying_id,
+                    planned_listing_ts: params.listing_ts,
+                    planned_expiry_ts: market.instrument.expiry_ts,
+                    last_updated_slot: slot,
+                },
+                true,
+            )
+        };
+        if maturity_ladder_changed {
+            Some(maturity_ladder)
+        } else {
+            None
+        }
     };
     let (expected_month, month_bump) =
         derive_oracle_month_pda(program_id, market_info.key, market.instrument.expiry_ts);
@@ -514,7 +538,11 @@ pub(super) fn process_initialize_oracle_month_v5(
         candidate_count_tracking_version: OracleMonthState::CANDIDATE_COUNT_TRACKING_VERSION,
         active_weight_initialization_version:
             OracleMonthState::ACTIVE_WEIGHT_INITIALIZATION_VERSION,
-        schedule_version: OracleMonthState::SKU_COVERAGE_SCHEDULE_VERSION,
+        schedule_version: if launch {
+            LAUNCH_SCHEDULE_VERSION
+        } else {
+            OracleMonthState::SKU_COVERAGE_SCHEDULE_VERSION
+        },
         work_reward_currency_version: OracleMonthState::WORK_REWARD_CURRENCY_USDC_V1,
         ..OracleMonthState::default()
     };
@@ -533,7 +561,7 @@ pub(super) fn process_initialize_oracle_month_v5(
         coverage_complete_ts: 0,
         last_updated_slot: slot,
     };
-    if maturity_ladder_changed {
+    if let Some(maturity_ladder) = maturity_ladder_update {
         store_state(maturity_ladder_info, &maturity_ladder)?;
     }
     store_state(coverage_info, &coverage)?;

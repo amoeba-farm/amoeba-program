@@ -21,15 +21,12 @@ pub struct MarketParameters {
     pub tick_size: u64,
     pub lot_size: u64,
     pub min_order_qty: u64,
-    pub maker_fee_bps: u16,
-    pub taker_fee_bps: u16,
-    pub cancel_fee_bps: u16,
     pub min_cancel_slots: u64,
     pub max_fills_per_instruction: u8,
 }
 
 impl MarketParameters {
-    pub const LEN: usize = 8 + 8 + 8 + 2 + 2 + 2 + 8 + 1;
+    pub const LEN: usize = 8 + 8 + 8 + 8 + 1;
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

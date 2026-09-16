@@ -1,51 +1,38 @@
 use super::*;
 use crate::{
-    constants::{
-        MAX_AMOEBA_DLMM_BINS_PER_SWAP, MAX_AMOEBA_DLMM_BIN_COUNT, MAX_AMOEBA_DLMM_SWAP_FEE_BPS,
-    },
+    constants::{MAX_AMOEBA_DLMM_BINS_PER_SWAP, MAX_AMOEBA_DLMM_BIN_COUNT},
     instruction::{
-        BeginWriterCloseV1Params, ClaimCollectiveLongV1Params, ClaimWriterFlatResidualV1Params,
-        CleanupWriterCustodyV1Params, FinalizeOrAbortWriterAuctionV1Params,
+        ClaimCollectiveLongV1Params, CleanupWriterCustodyV1Params,
         InitializeWriterPolicyRegistryV1Params, ManageWriterPolicyAuthorityActionV1,
-        ManageWriterPolicyAuthorityV1Params, PlaceWriterBidV1Params,
-        PlanWriterAuctionChunkV1Params, PrepareWriterBidIndexV1Params,
-        ProcessWriterCloseCancellationV1Params, ReconcileWriterSupplyV1Params,
-        RevealWriterAuctionV1Params, SealWriterPolicyV1Params, SetCollectiveMarketPausedV1Params,
-        WriterAmountV1Params, WriterSeriesIndexV1Params,
+        ManageWriterPolicyAuthorityV1Params, ReconcileWriterSupplyV1Params,
+        SealWriterPolicyV1Params, SetCollectiveMarketPausedV1Params,
     },
     state::{
-        WriterAuctionPriorityRule, WriterAuctionStatus, WriterAuctionV1, WriterBidIndexRecordV1,
-        WriterBidIndexV1, WriterBidStatus, WriterBidV1, WriterCloseRequestStatus,
-        WriterCloseRequestV1, WriterPolicyRegistryV1, WriterPolicySnapshotV1,
-        WriterReserveRoundingMode, WriterSecurityMode, WriterSeriesBookV1,
-        WriterSeriesCustodyStatus, WriterSeriesRecordV1, WriterSeriesSettlementStatus,
-        WriterSettlementGroupStatus, WriterSettlementGroupV1, WriterSleeveStatus, WriterSleeveV1,
+        WriterPolicyRegistryV1, WriterPolicySnapshotV1, WriterReserveRoundingMode,
+        WriterSecurityMode, WriterSeriesBookV1, WriterSeriesCustodyStatus, WriterSeriesRecordV1,
+        WriterSeriesSettlementStatus, WriterSettlementGroupStatus, WriterSettlementGroupV1,
+        WriterSleeveStatus, WriterSleeveV1,
     },
     writer_sleeve_math::{
-        drawdown_checks, exact_reserve, maximum_safe_issue_quantity, proportional_close_preview,
-        security_exposure as calculate_security_exposure, WriterIssueAdmissionLimits,
+        drawdown_checks, exact_reserve, security_exposure as calculate_security_exposure,
         WriterMathError, WriterSecurityMode as WriterMathSecurityMode, WriterSeries,
     },
 };
 
 mod accounts;
-mod auction;
-mod bid_index_preparation;
-mod close;
 pub(super) mod dlmm;
-mod funding;
 mod participation;
 mod reconcile;
 mod settlement;
 
 use accounts::*;
 
-const WRITER_SERIES_FAMILY_HASH_DOMAIN: &[u8] = b"ameba-writer-series-family-v1";
-const WRITER_BOOK_HASH_DOMAIN: &[u8] = b"ameba-writer-book-v1";
-const WRITER_PAYOFF_HASH_DOMAIN: &[u8] = b"ameba-writer-payoff-v1";
-const WRITER_RISK_HASH_DOMAIN: &[u8] = b"ameba-writer-risk-v1";
-const WRITER_POLICY_HASH_DOMAIN: &[u8] = b"ameba-writer-policy-v1";
-const WRITER_COVERAGE_HASH_DOMAIN: &[u8] = b"ameba-writer-coverage-v1";
+const WRITER_SERIES_FAMILY_HASH_DOMAIN: &[u8] = b"ameba-writer-series-family-g3";
+const WRITER_BOOK_HASH_DOMAIN: &[u8] = b"ameba-writer-book-g3";
+const WRITER_PAYOFF_HASH_DOMAIN: &[u8] = b"ameba-writer-payoff-g3";
+const WRITER_RISK_HASH_DOMAIN: &[u8] = b"ameba-writer-risk-g3";
+const WRITER_POLICY_HASH_DOMAIN: &[u8] = b"ameba-writer-policy-g3";
+const WRITER_COVERAGE_HASH_DOMAIN: &[u8] = b"ameba-writer-coverage-g3";
 const WRITER_SERIES_FAMILY_HASH_MAX_BYTES: usize =
     WRITER_SERIES_FAMILY_HASH_DOMAIN.len() + 4 + crate::constants::WRITER_MAX_LIVE_SERIES * 64;
 const WRITER_BOOK_HASH_MAX_BYTES: usize = WRITER_BOOK_HASH_DOMAIN.len()
@@ -53,7 +40,6 @@ const WRITER_BOOK_HASH_MAX_BYTES: usize = WRITER_BOOK_HASH_DOMAIN.len()
     + 32
     + 4
     + crate::constants::WRITER_MAX_LIVE_SERIES * (32 + 32 + 7 * 8);
-const WRITER_MAX_PACK_ACCOUNTS: usize = 14 + 3 * crate::constants::WRITER_MAX_LIVE_SERIES;
 
 pub(super) struct CollectiveDlmmContext {
     pub sleeve_status: WriterSleeveStatus,
@@ -66,7 +52,6 @@ pub(super) struct CollectiveDlmmContext {
     pub tick_size_quote_atomic: u64,
     pub maximum_price_quote_atomic: u64,
     pub maximum_bin_id: u16,
-    pub swap_fee_bps: u16,
     pub maximum_bins_per_swap: u8,
 }
 
@@ -90,7 +75,6 @@ struct CollectiveMarketBinding {
     tick_size_quote_atomic: u64,
     maximum_price_quote_atomic: u64,
     maximum_bin_id: u16,
-    swap_fee_bps: u16,
     maximum_bins_per_swap: u8,
 }
 
@@ -105,11 +89,11 @@ mod policy;
 mod privileges;
 
 pub(super) use collective_binding::{
-    load_collective_dlmm_context, load_collective_settlement_group_for_dlmm,
+    load_collective_dlmm_context, load_collective_dlmm_context_with_book,
+    load_collective_settlement_group_for_dlmm,
 };
 pub(super) use commitments::{
-    writer_book_digest, writer_close_book_digest, writer_group_commitment,
-    writer_series_family_hash,
+    writer_book_digest, writer_group_commitment, writer_series_family_hash,
 };
 use commitments::{
     writer_coverage_manifest_hash, writer_payoff_digest, writer_policy_hash, writer_risk_limit_hash,

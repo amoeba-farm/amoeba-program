@@ -127,17 +127,17 @@ pub(super) fn process_collective_swap_with_orders_core<'a>(
         .as_ref()
         .is_some_and(|state| state.taker_sequence.is_some());
     let trader_option_info = if order_taker {
-        &writer_accounts[33]
+        &writer_accounts[32]
     } else {
         &accounts[10]
     };
     let trader_quote_info = if order_taker {
-        &writer_accounts[34]
+        &writer_accounts[33]
     } else {
         &accounts[11]
     };
     let input_authority = if order_taker {
-        &writer_accounts[32]
+        &writer_accounts[31]
     } else {
         &accounts[0]
     };
@@ -349,8 +349,6 @@ pub(super) fn process_collective_swap_with_orders_core<'a>(
             limit_bin_id: params.limit_bin_id,
             tick_size_quote_atomic: pool.tick_size_quote_atomic,
             maximum_bin_id: pool.maximum_bin_id,
-            swap_fee_bps: pool.swap_fee_bps,
-            protocol_fee_share_bps: pool.protocol_fee_share_bps,
             maximum_bins: pool.maximum_bins_per_swap,
             unloaded_ordinary_boundary,
         },
@@ -367,7 +365,7 @@ pub(super) fn process_collective_swap_with_orders_core<'a>(
     }
     if quote.amount_in == 0 {
         if let Some(state) = orders.as_mut() {
-            return store_state(&writer_accounts[32], &state.book);
+            return orders::persist_book(program_id, writer_accounts, &mut state.book);
         }
         return Err(VaultError::InvalidAmoebaDlmmRoute.into());
     }
@@ -453,20 +451,7 @@ pub(super) fn process_collective_swap_with_orders_core<'a>(
         .checked_add(net_input)
         .and_then(|value| value.checked_sub(maker_input))
         .ok_or(VaultError::ArithmeticOverflow)?;
-    match direction {
-        AmoebaDlmmSwapDirection::QuoteForOption => {
-            pool.protocol_fee_quote = pool
-                .protocol_fee_quote
-                .checked_add(quote.protocol_fee)
-                .ok_or(VaultError::ArithmeticOverflow)?;
-        }
-        AmoebaDlmmSwapDirection::OptionForQuote => {
-            pool.protocol_fee_option = pool
-                .protocol_fee_option
-                .checked_add(quote.protocol_fee)
-                .ok_or(VaultError::ArithmeticOverflow)?;
-        }
-    }
+
     pool.best_ask_bin_id = refresh_swap_best_side(&pool, &pages, true)?;
     pool.best_bid_bin_id = refresh_swap_best_side(&pool, &pages, false)?;
     pool.last_trade_bin_id = quote.last_bin_id;

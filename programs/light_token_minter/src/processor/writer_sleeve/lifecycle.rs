@@ -4,7 +4,7 @@ pub(in crate::processor) fn process_open_funding(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
 ) -> ProgramResult {
-    if accounts.len() != 9 {
+    if accounts.len() != 8 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let admin_info = &accounts[0];
@@ -14,7 +14,6 @@ pub(in crate::processor) fn process_open_funding(
     let book_info = &accounts[4];
     let snapshot_info = &accounts[5];
     let sleeve_vault_info = &accounts[6];
-    let flat_mint_info = &accounts[7];
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
@@ -36,18 +35,16 @@ pub(in crate::processor) fn process_open_funding(
         None,
     )?;
     validate_vault_token_account(sleeve_vault_info, &sleeve.settlement_mint, sleeve_info.key)?;
-    validate_writer_flat_mint(sleeve_info, &sleeve, flat_mint_info)?;
     let _writer_liquidity_policy =
-        dlmm::load_funding_policy(program_id, &accounts[8], sleeve_info, &sleeve, &snapshot)?;
+        dlmm::load_funding_policy(program_id, &accounts[7], sleeve_info, &sleeve, &snapshot)?;
     if group.sleeve != *sleeve_info.key
         || sleeve.usdc_vault != *sleeve_vault_info.key
-        || sleeve.flat_mint != *flat_mint_info.key
         || sleeve.policy_snapshot != *snapshot_info.key
         || sleeve.status != WriterSleeveStatus::PolicyFrozen
         || group.status != WriterSettlementGroupStatus::Anchored
         || !book.frozen
         || book.series_count == 0
-        || validate_token_account(sleeve_vault_info)?.amount != sleeve.accounted_asset_atoms
+        || validate_token_account(sleeve_vault_info)?.amount < sleeve.accounted_asset_atoms
         || snapshot.policy_hash != sleeve.policy_hash
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
@@ -61,7 +58,7 @@ pub(in crate::processor) fn process_activate_sleeve(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
 ) -> ProgramResult {
-    if accounts.len() != 16 {
+    if accounts.len() != 15 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let admin_info = &accounts[0];
@@ -79,7 +76,6 @@ pub(in crate::processor) fn process_activate_sleeve(
     let signer_registry_info = &accounts[12];
     let signer_set_info = &accounts[13];
     let sleeve_vault_info = &accounts[14];
-    let flat_mint_info = &accounts[15];
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
@@ -130,7 +126,6 @@ pub(in crate::processor) fn process_activate_sleeve(
         signer_set_info,
     )?;
     validate_vault_token_account(sleeve_vault_info, &sleeve.settlement_mint, sleeve_info.key)?;
-    validate_writer_flat_mint(sleeve_info, &sleeve, flat_mint_info)?;
     let physical_assets = validate_token_account(sleeve_vault_info)?.amount;
     let anchor_registered = book
         .records
@@ -163,8 +158,6 @@ pub(in crate::processor) fn process_activate_sleeve(
         || snapshot.series_family_hash != writer_series_family_hash(&book)
         || !anchor_registered
         || sleeve.writer_principal_atoms == 0
-        || (!sleeve.has_time_participation()
-            && sleeve.writer_principal_atoms != sleeve.flat_par_supply_atoms)
         || !activation_assets_sufficient
         || sleeve.accounted_asset_atoms < required_assets
         || physical_assets < sleeve.accounted_asset_atoms
@@ -209,18 +202,11 @@ pub(in crate::processor) fn process_set_collective_market_paused(
     accounts: &[AccountInfo],
     params: SetCollectiveMarketPausedV1Params,
 ) -> ProgramResult {
-    if accounts.len() != 9 {
+    let [admin_info, config_info, sleeve_info, group_info, book_info, market_info, month_info, coverage_info, active_weight_info] =
+        accounts
+    else {
         return Err(VaultError::InvalidAccountList.into());
-    }
-    let admin_info = &accounts[0];
-    let config_info = &accounts[1];
-    let sleeve_info = &accounts[2];
-    let group_info = &accounts[3];
-    let book_info = &accounts[4];
-    let market_info = &accounts[5];
-    let month_info = &accounts[6];
-    let coverage_info = &accounts[7];
-    let active_weight_info = &accounts[8];
+    };
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }

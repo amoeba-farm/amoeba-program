@@ -23,6 +23,27 @@ fn empty_and_process(
 }
 
 #[inline(never)]
+fn process_dlmm_action(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    payload: &[u8],
+) -> ProgramResult {
+    let action = crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::decode_exact(payload)
+        .map_err(|_| VaultError::InvalidInstructionData)?;
+    match action {
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::BeginPolicy(_)
+        | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::AppendPolicySeries { .. }
+        | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::SealPolicy => {
+            dlmm::process_policy_action(program_id, accounts, action)
+        }
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::InitializePosition {
+            series_index,
+        } => dlmm::process_initialize_position(program_id, accounts, series_index),
+        _ => dlmm::process_liquidity_action(program_id, accounts, action),
+    }
+}
+
+#[inline(never)]
 pub(in crate::processor) fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -76,22 +97,7 @@ pub(in crate::processor) fn process_instruction(
             )
         }
         VaultInstructionTag::ManageWriterDlmmV1 => {
-            let action =
-                crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::decode_exact(payload)
-                    .map_err(|_| VaultError::InvalidInstructionData)?;
-            match action {
-                crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::BeginPolicy(_)
-                | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::AppendPolicySeries {
-                    ..
-                }
-                | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::SealPolicy => {
-                    dlmm::process_policy_action(program_id, accounts, action)
-                }
-                crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::InitializePosition {
-                    series_index,
-                } => dlmm::process_initialize_position(program_id, accounts, series_index),
-                _ => dlmm::process_liquidity_action(program_id, accounts, action),
-            }
+            process_dlmm_action(program_id, accounts, payload)
         }
         VaultInstructionTag::ManageWriterPolicyAuthorityV1 => {
             decode_and_process::<ManageWriterPolicyAuthorityV1Params>(
@@ -108,7 +114,7 @@ pub(in crate::processor) fn process_instruction(
             process_initialize_settlement_group,
         ),
         VaultInstructionTag::InitializeWriterSleeveV1 => {
-            empty_and_process(program_id, accounts, payload, process_initialize_sleeve)
+            process_initialize_sleeve(program_id, accounts, decode_u64_payload(payload)?)
         }
         VaultInstructionTag::RegisterWriterSeriesV1 => {
             empty_and_process(program_id, accounts, payload, process_register_series)
@@ -121,22 +127,6 @@ pub(in crate::processor) fn process_instruction(
         ),
         VaultInstructionTag::OpenWriterFundingV1 => {
             empty_and_process(program_id, accounts, payload, process_open_funding)
-        }
-        VaultInstructionTag::DepositWriterPrincipalV1 => funding::process_deposit_writer_principal(
-            program_id,
-            accounts,
-            WriterAmountV1Params {
-                amount_atoms: decode_u64_payload(payload)?,
-            },
-        ),
-        VaultInstructionTag::WithdrawWriterPrincipalV1 => {
-            funding::process_withdraw_writer_principal(
-                program_id,
-                accounts,
-                WriterAmountV1Params {
-                    amount_atoms: decode_u64_payload(payload)?,
-                },
-            )
         }
         VaultInstructionTag::ActivateWriterSleeveV1 => {
             empty_and_process(program_id, accounts, payload, process_activate_sleeve)
@@ -168,103 +158,9 @@ pub(in crate::processor) fn process_instruction(
                 series_index: decode_u8_payload(payload)?,
             },
         ),
-        VaultInstructionTag::PrepareWriterBidIndexV1 => {
-            decode_and_process::<PrepareWriterBidIndexV1Params>(
-                program_id,
-                accounts,
-                payload,
-                bid_index_preparation::process_prepare_writer_bid_index,
-            )
+        VaultInstructionTag::PublishWriterGroupSettlementV1 => {
+            settlement::process_publish_writer_group_settlement(program_id, accounts, payload)
         }
-        VaultInstructionTag::CommitWriterAuctionV1 => {
-            // Historical wire decoding remains available, but new auction creation is
-            // permanently retired by writer-owned native DLMM primary distribution.
-            // Existing auction fills, finalization and refunds retain their handlers.
-            Err(VaultError::InvalidInstructionData.into())
-        }
-        VaultInstructionTag::PlaceWriterBidV1 => decode_and_process::<PlaceWriterBidV1Params>(
-            program_id,
-            accounts,
-            payload,
-            auction::process_place_writer_bid,
-        ),
-        VaultInstructionTag::CancelOrRefundWriterBidV1 => empty_and_process(
-            program_id,
-            accounts,
-            payload,
-            auction::process_cancel_or_refund_writer_bid,
-        ),
-        VaultInstructionTag::RevealWriterAuctionV1 => {
-            decode_and_process::<RevealWriterAuctionV1Params>(
-                program_id,
-                accounts,
-                payload,
-                auction::process_reveal_writer_auction,
-            )
-        }
-        VaultInstructionTag::PlanWriterAuctionChunkV1 => {
-            let bytes: [u8; 2] = payload
-                .try_into()
-                .map_err(|_| VaultError::InvalidInstructionData)?;
-            auction::process_plan_writer_auction_chunk(
-                program_id,
-                accounts,
-                PlanWriterAuctionChunkV1Params {
-                    max_records: u16::from_le_bytes(bytes),
-                },
-            )
-        }
-        VaultInstructionTag::ExecuteWriterAuctionFillV1 => empty_and_process(
-            program_id,
-            accounts,
-            payload,
-            auction::process_execute_writer_auction_fill,
-        ),
-        VaultInstructionTag::FinalizeOrAbortWriterAuctionV1 => {
-            auction::process_finalize_or_abort_writer_auction(
-                program_id,
-                accounts,
-                FinalizeOrAbortWriterAuctionV1Params {
-                    abort: decode_bool_payload(payload)?,
-                },
-            )
-        }
-        VaultInstructionTag::BeginWriterCloseV1 => decode_and_process::<BeginWriterCloseV1Params>(
-            program_id,
-            accounts,
-            payload,
-            close::process_begin_writer_close,
-        ),
-        VaultInstructionTag::DepositWriterCloseBasketV1 => {
-            close::process_deposit_writer_close_claim(
-                program_id,
-                accounts,
-                WriterSeriesIndexV1Params {
-                    series_index: decode_u8_payload(payload)?,
-                },
-            )
-        }
-        VaultInstructionTag::FinalizeWriterCloseV1 => empty_and_process(
-            program_id,
-            accounts,
-            payload,
-            close::process_finalize_writer_close,
-        ),
-        VaultInstructionTag::ProcessWriterCloseCancellationV1 => {
-            close::process_writer_close_cancellation(
-                program_id,
-                accounts,
-                ProcessWriterCloseCancellationV1Params {
-                    selector: decode_u8_payload(payload)?,
-                },
-            )
-        }
-        VaultInstructionTag::PublishWriterGroupSettlementV1 => empty_and_process(
-            program_id,
-            accounts,
-            payload,
-            settlement::process_publish_writer_group_settlement,
-        ),
         VaultInstructionTag::FinalizeWriterSleeveSettlementV1 => empty_and_process(
             program_id,
             accounts,
@@ -278,15 +174,6 @@ pub(in crate::processor) fn process_instruction(
                 claim_atoms: decode_u64_payload(payload)?,
             },
         ),
-        VaultInstructionTag::ClaimWriterFlatResidualV1 => {
-            settlement::process_claim_writer_flat_residual(
-                program_id,
-                accounts,
-                ClaimWriterFlatResidualV1Params {
-                    flat_atoms: decode_u64_payload(payload)?,
-                },
-            )
-        }
         VaultInstructionTag::CloseWriterSleeveV1 => empty_and_process(
             program_id,
             accounts,

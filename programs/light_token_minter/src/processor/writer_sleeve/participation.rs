@@ -121,12 +121,12 @@ pub(super) fn process(
 ) -> ProgramResult {
     use WriterParticipationActionV2::*;
     let expected = match action {
-        Enable { .. } => 10,
         Contribute { .. } => 13,
         Transfer => 4,
         Split { .. } => 6,
         Claim => 8,
         Close => 4,
+        ExpireUnactivatedV3 => 8,
     };
     if accounts.len() != expected || !accounts[0].is_signer {
         return Err(VaultError::InvalidAccountList.into());
@@ -134,15 +134,15 @@ pub(super) fn process(
     // Every role is distinct except the owner may also receive its own rent.
     for (index, info) in accounts.iter().enumerate() {
         let owner_alias = info.key == accounts[0].key;
-        let signer = owner_alias || (matches!(action, Enable { .. }) && index == 9);
+        let signer = owner_alias;
         let writable = owner_alias
             || match action {
-                Enable { .. } => index == 2,
                 Contribute { .. } => matches!(index, 2 | 7 | 8 | 10),
                 Transfer => index == 2,
                 Split { .. } => matches!(index, 2 | 3),
-                Claim => matches!(index, 1 | 2 | 3 | 4),
+                Claim => matches!(index, 1..=4),
                 Close => matches!(index, 2 | 3),
+                ExpireUnactivatedV3 => matches!(index, 2..=4),
             };
         if info.is_signer != signer
             || (info.is_writable != writable && !(signer && info.is_writable))
@@ -159,78 +159,96 @@ pub(super) fn process(
             .iter()
             .any(|previous| previous.key == info.key)
             && !(matches!(action, Close) && index == 3 && info.key == accounts[0].key)
-            && !(matches!(action, Enable { .. }) && index == 9 && info.key == accounts[0].key)
             && !(matches!(action, Split { .. }) && index == 4 && info.key == accounts[0].key)
         {
             return Err(VaultError::InvalidAccountList.into());
         }
     }
     match action {
-        Enable {
-            participation_start_ts,
-        } => enable(program, accounts, participation_start_ts),
         Contribute {
             nonce,
             amount_atoms,
         } => contribute(program, accounts, nonce, amount_atoms),
         Transfer | Split { .. } | Claim | Close => position_action(program, accounts, action),
+        ExpireUnactivatedV3 => expire_unactivated(program, accounts),
     }
 }
 
-fn enable(program: &Pubkey, a: &[AccountInfo], start: u64) -> ProgramResult {
-    // admin, config, sleeve, group, book, snapshot, DLMM policy, Flat mint,
-    // policy registry, current policy authority.
-    let config = load_canonical_vault_config(program, &a[1])?;
-    let mut context =
-        load_writer_policy_context(program, &a[2], &a[3], &a[4], &a[5], Some(a[8].key))?;
-    let registry = load_writer_policy_registry(program, &a[8], a[1].key)?;
-    if config.admin != *a[0].key
-        || config.paused
-        || !a[9].is_signer
-        || context.sleeve.vault_config != *a[1].key
-        || context.sleeve.policy_registry != *a[8].key
-        || context.group.status != WriterSettlementGroupStatus::Anchored
-        || registry.policy_authority != *a[9].key
-        || start == 0
-        || start >= context.sleeve.expiry_ts
-        || current_unix_timestamp()? >= context.sleeve.expiry_ts
-        || !a[2].is_writable
-        || context.sleeve.account_version != WriterSleeveV1::ACCOUNT_VERSION
-        || context.sleeve.status != WriterSleeveStatus::PolicyFrozen
-        || context.sleeve.writer_principal_atoms != 0
-        || context.sleeve.flat_par_supply_atoms != 0
-        || context.sleeve.accounted_asset_atoms != 0
-        || context.sleeve.locked_primary_premium_atoms != 0
-        || context.sleeve.exact_reserve_atoms != 0
-        || context.sleeve.active_auction.is_some()
-        || context.sleeve.active_close_request.is_some()
-        || !context.book.frozen
-        || context.book.records[..usize::from(context.book.series_count)]
+fn expire_unactivated(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
+    // cranker, config, sleeve, group, book, snapshot, USDC vault, writer policy.
+    // Funding and Anchored are one-way predecessors of activation. Their joint
+    // presence proves no historical activation; zero current supply alone cannot.
+    let _config = load_canonical_vault_config(program, &a[1])?;
+    let WriterPolicyContext {
+        mut group,
+        mut sleeve,
+        mut book,
+        snapshot,
+    } = load_writer_policy_context(program, &a[2], &a[3], &a[4], &a[5], None)?;
+    let clock = Clock::get()?;
+    let now =
+        u64::try_from(clock.unix_timestamp).map_err(|_| VaultError::InvalidWriterLifecycle)?;
+    let policy = dlmm::load_funding_policy(program, &a[7], &a[2], &sleeve, &snapshot)?;
+    validate_vault_token_account(&a[6], &sleeve.settlement_mint, a[2].key)?;
+    if sleeve.vault_config != *a[1].key
+        || sleeve.usdc_vault != *a[6].key
+        || sleeve.status != WriterSleeveStatus::Funding
+        || group.status != WriterSettlementGroupStatus::Anchored
+        || now < sleeve.expiry_ts
+        || !book.frozen
+        || !crate::pubkey_is_default(&group.signer_set)
+        || group.signer_set_version != 0
+        || group.finalized_slot != 0
+        || !crate::bytes32_is_zero(&group.final_settlement_commitment)
+        || sleeve.locked_primary_premium_atoms != 0
+        || sleeve.accounted_asset_atoms != sleeve.writer_principal_atoms
+        || sleeve.exact_reserve_atoms != 0
+        || sleeve.upper_tail_reserve_atoms != 0
+        || sleeve.lower_tail_reserve_atoms != 0
+        || sleeve.security_exposure_atoms != 0
+        || sleeve.long_liability_initial_atoms != 0
+        || sleeve.long_liability_remaining_atoms != 0
+        || sleeve.settlement_finalized_slot != 0
+        || policy.monthly_spent_atoms != 0
+        || policy
+            .series_monthly_spent_atoms
+            .iter()
+            .any(|value| *value != 0)
+        || validate_token_account(&a[6])?.amount < sleeve.accounted_asset_atoms
+        || book.records[..usize::from(book.series_count)]
             .iter()
             .any(|record| {
                 record.total_physical_supply_atoms != 0
                     || record.issuer_controlled_atoms != 0
                     || record.external_open_interest_atoms != 0
+                    || record.primary_premium_collected_atoms != 0
+                    || record.settlement_external_oi_snapshot_atoms != 0
+                    || record.settlement_liability_initial_atoms != 0
+                    || record.settlement_liability_remaining_atoms != 0
+                    || record.custody_status != WriterSeriesCustodyStatus::Absent
+                    || record.settlement_status != WriterSeriesSettlementStatus::Open
             })
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    let policy = dlmm::load_policy(
-        program,
-        &a[6],
-        &a[2],
-        &context.snapshot,
-        &context.book,
-        true,
-    )?;
-    dlmm::require_unwound_policy(Some(&policy))?;
-    if validate_writer_flat_mint(&a[2], &context.sleeve, &a[7])?.supply != 0 {
-        return Err(VaultError::WriterSupplyMismatch.into());
+    // No synthetic oracle price or allocation: residual == principal makes each
+    // transferred/split receipt's existing payout exactly its recorded principal.
+    sleeve.settlement_principal_atoms = sleeve.writer_principal_atoms;
+    sleeve.unclaimed_principal_atoms = sleeve.writer_principal_atoms;
+    sleeve.writer_residual_initial_atoms = sleeve.writer_principal_atoms;
+    sleeve.writer_residual_remaining_atoms = sleeve.writer_principal_atoms;
+    sleeve.status = WriterSleeveStatus::FundingRefunds;
+    sleeve.last_updated_slot = clock.slot;
+    group.status = WriterSettlementGroupStatus::FundingExpired;
+    group.last_updated_slot = clock.slot;
+    for record in &mut book.records[..usize::from(book.series_count)] {
+        record.settlement_status = WriterSeriesSettlementStatus::Exhausted;
     }
-    context.sleeve.account_version = PARTICIPATION_VERSION;
-    context.sleeve.reserved[24..].copy_from_slice(&start.to_le_bytes());
-    context.sleeve.last_updated_slot = Clock::get()?.slot;
-    store_state(&a[2], context.sleeve.as_ref())
+    book.book_digest = writer_book_digest(&book);
+    book.last_updated_slot = clock.slot;
+    store_state(&a[2], sleeve.as_ref())?;
+    store_state(&a[3], group.as_ref())?;
+    store_state(&a[4], book.as_ref())
 }
 
 fn contribute(program: &Pubkey, a: &[AccountInfo], nonce: u64, amount: u64) -> ProgramResult {
@@ -259,8 +277,6 @@ fn contribute(program: &Pubkey, a: &[AccountInfo], nonce: u64, amount: u64) -> P
             context.group.status,
             WriterSettlementGroupStatus::Anchored | WriterSettlementGroupStatus::Active
         )
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
         || now >= sleeve.expiry_ts
         || sleeve.vault_config != *a[1].key
         || sleeve.usdc_vault != *a[7].key
@@ -406,8 +422,10 @@ fn position_action(
             // owner, sleeve, receipt, writer USDC, owner's classic USDC ATA,
             // USDC mint, classic SPL Token, config. Claims remain possible while paused.
             let config = load_canonical_vault_config(program, &a[7])?;
-            if sleeve.status != WriterSleeveStatus::SettlementFinalized
-                || !a[1].is_writable
+            if !matches!(
+                sleeve.status,
+                WriterSleeveStatus::SettlementFinalized | WriterSleeveStatus::FundingRefunds
+            ) || !a[1].is_writable
                 || sleeve.vault_config != *a[7].key
                 || sleeve.usdc_vault != *a[3].key
                 || sleeve.settlement_mint != *a[5].key
@@ -431,15 +449,15 @@ fn position_action(
             }
             let payout = final_payout(
                 lot.interval(),
-                sleeve.flat_supply_snapshot_atoms,
+                sleeve.settlement_principal_atoms,
                 sleeve.participation_totals().capital_seconds,
-                sleeve.flat_residual_initial_atoms,
+                sleeve.writer_residual_initial_atoms,
             )
             .map_err(|_| VaultError::WriterSolvencyViolation)?;
             let before = validate_token_account(&a[3])?.amount;
             if before < sleeve.accounted_asset_atoms
-                || payout > sleeve.flat_residual_remaining_atoms
-                || lot.principal > sleeve.flat_claim_supply_remaining_atoms
+                || payout > sleeve.writer_residual_remaining_atoms
+                || lot.principal > sleeve.unclaimed_principal_atoms
             {
                 return Err(VaultError::WriterSolvencyViolation.into());
             }
@@ -465,8 +483,8 @@ fn position_action(
             {
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
-            sleeve.flat_residual_remaining_atoms -= payout;
-            sleeve.flat_claim_supply_remaining_atoms -= lot.principal;
+            sleeve.writer_residual_remaining_atoms -= payout;
+            sleeve.unclaimed_principal_atoms -= lot.principal;
             sleeve.accounted_asset_atoms = sleeve
                 .accounted_asset_atoms
                 .checked_sub(payout)

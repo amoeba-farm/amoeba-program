@@ -1,5 +1,7 @@
-use super::fixed_state_deserialize;
 use super::*;
+use super::{
+    fixed_state_deserialize, fixed_state_deserialize_compact, fixed_state_deserialize_flat,
+};
 
 fixed_state_deserialize!(OracleSupportPosition, 141, {
     is_initialized: bool,
@@ -14,7 +16,7 @@ fixed_state_deserialize!(OracleSupportPosition, 141, {
     failed_schedule_escrow_counted: bool,
 });
 
-fixed_state_deserialize!(OracleSkuCoverageManifest, 107, {
+fixed_state_deserialize_flat!(OracleSkuCoverageManifest, 107, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -30,7 +32,7 @@ fixed_state_deserialize!(OracleSkuCoverageManifest, 107, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(SettlementSignerRegistry, 126, {
+fixed_state_deserialize_flat!(SettlementSignerRegistry, 126, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -43,7 +45,7 @@ fixed_state_deserialize!(SettlementSignerRegistry, 126, {
     proposal_nonce: u64,
 });
 
-fixed_state_deserialize!(PositionRecord, 115, {
+fixed_state_deserialize_flat!(PositionRecord, 115, {
     is_initialized: bool,
     bump: u8,
     market: Pubkey,
@@ -57,7 +59,7 @@ fixed_state_deserialize!(PositionRecord, 115, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleProductSkuManifest, 86, {
+fixed_state_deserialize_flat!(OracleProductSkuManifest, 86, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -69,7 +71,7 @@ fixed_state_deserialize!(OracleProductSkuManifest, 86, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleUsdcRewardVault, 94, {
+fixed_state_deserialize_flat!(OracleUsdcRewardVault, 94, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -81,7 +83,7 @@ fixed_state_deserialize!(OracleUsdcRewardVault, 94, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleSkuCoverageRecord, 82, {
+fixed_state_deserialize_flat!(OracleSkuCoverageRecord, 82, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -93,7 +95,7 @@ fixed_state_deserialize!(OracleSkuCoverageRecord, 82, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleMaturityLadderRegistry, 62, {
+fixed_state_deserialize_flat!(OracleMaturityLadderRegistry, 62, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -104,37 +106,17 @@ fixed_state_deserialize!(OracleMaturityLadderRegistry, 62, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleUpdateClaimV2, 330, {
+fixed_state_deserialize!(OracleUpdateClaimV2, 346, {
     claim: OracleUpdateClaimData,
     commit_hash: [u8; 32],
     commit_slot: u64,
     earliest_reveal_slot: u64,
     reveal_deadline_slot: u64,
     revealed_slot: u64,
-    samba_checkpoint_active: bool,
+    council_review_pending: bool,
     freshness_reward_multiplier: u8,
-});
-
-fixed_state_deserialize!(OracleUnstakeRequest, 62, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    owner: Pubkey,
-    pending_amba: u64,
-    claimable_at_ts: u64,
-    last_updated_slot: u64,
-});
-
-fixed_state_deserialize!(OracleStakeActivation, 62, {
-    is_initialized: bool,
-    bump: u8,
-    account_discriminator: [u8; 3],
-    account_version: u8,
-    owner: Pubkey,
-    queued_amba: u64,
-    activate_after_ts: u64,
-    last_updated_slot: u64,
+    revealed_at_ts: u64,
+    prior_finalized_step: u64,
 });
 
 fixed_state_deserialize!(InstrumentDefinition, 74, {
@@ -148,28 +130,15 @@ fixed_state_deserialize!(InstrumentDefinition, 74, {
     settlement: SettlementStyle,
 });
 
-fixed_state_deserialize!(OraclePlayerLedger, 66, {
-    is_initialized: bool,
-    bump: u8,
-    owner: Pubkey,
-    major_tokens: u64,
-    locked_major_tokens: u64,
-    last_updated_slot: u64,
-    last_balance_change_slot: u64,
-});
-
-fixed_state_deserialize!(MarketParameters, 39, {
+fixed_state_deserialize_flat!(MarketParameters, 33, {
     tick_size: u64,
     lot_size: u64,
     min_order_qty: u64,
-    maker_fee_bps: u16,
-    taker_fee_bps: u16,
-    cancel_fee_bps: u16,
     min_cancel_slots: u64,
     max_fills_per_instruction: u8,
 });
 
-fixed_state_deserialize!(UserCollateral, 58, {
+fixed_state_deserialize_flat!(UserCollateral, 58, {
     is_initialized: bool,
     bump: u8,
     owner: Pubkey,
@@ -178,18 +147,7 @@ fixed_state_deserialize!(UserCollateral, 58, {
     last_action_slot: u64,
 });
 
-fixed_state_deserialize!(OracleTreasuryState, 50, {
-    is_initialized: bool,
-    bump: u8,
-    major_tokens: u64,
-    game_pool: u64,
-    scramble_pool: u64,
-    challenge_pool: u64,
-    reserve_pool: u64,
-    last_balance_change_slot: u64,
-});
-
-fixed_state_deserialize!(MarketMintAccounting, 32, {
+fixed_state_deserialize_flat!(MarketMintAccounting, 32, {
     account_discriminator: [u8; 3],
     account_version: u8,
     decimals: u8,
@@ -209,14 +167,7 @@ fixed_state_deserialize!(OracleEconomicsConfig, 40, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleMajorTokenConfig, 66, {
-    is_initialized: bool,
-    bump: u8,
-    mint: Pubkey,
-    vault_token_account: Pubkey,
-});
-
-fixed_state_deserialize!(SettlementSignerSet, 393, {
+fixed_state_deserialize_flat!(SettlementSignerSet, 393, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -234,7 +185,7 @@ fixed_state_deserialize!(SettlementSignerSet, 393, {
     proposer: Pubkey,
 });
 
-fixed_state_deserialize!(OracleProductSkuDraft, 380, {
+fixed_state_deserialize_flat!(OracleProductSkuDraft, 380, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -249,31 +200,37 @@ fixed_state_deserialize!(OracleProductSkuDraft, 380, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(SettlementObservation, 16, {
+fixed_state_deserialize_flat!(SettlementObservation, 16, {
     observed_at_ts: u64,
     price_atomic: u64,
 });
 
-fixed_state_deserialize!(OracleOpeningClaim, 304, {
+fixed_state_deserialize_compact!(
+    OracleOpeningClaim,
+    144,
+    {
     is_initialized: bool,
     bump: u8,
-    month: Pubkey,
-    source: Pubkey,
-    source_id: [u8; 32],
     attempt: u32,
     claimant: Pubkey,
     opening_state: u64,
     source_time: u64,
     stake: u64,
-    canonical_locator_hash: [u8; 32],
-    source_definition_hash: [u8; 32],
     evidence_hash: [u8; 32],
     archive_url_hash: [u8; 32],
     submitted_slot: u64,
     challenge_deadline_slot: u64,
     status: OracleOpeningClaimStatus,
     escrow_disposition: OracleEscrowDisposition,
-});
+    },
+    defaults {
+        month: Pubkey,
+        source: Pubkey,
+        source_id: [u8; 32],
+        canonical_locator_hash: [u8; 32],
+        source_definition_hash: [u8; 32],
+    }
+);
 
 fixed_state_deserialize!(OracleOpeningClaimChallenge, 380, {
     is_initialized: bool,
@@ -298,5 +255,5 @@ fixed_state_deserialize!(OracleOpeningClaimChallenge, 380, {
     escrow_disposition: OracleEscrowDisposition,
     account_discriminator: [u8; 3],
     account_version: u8,
-    emergency_snapshot_total_major_tokens: u64,
+    council_authority_version: u64,
 });

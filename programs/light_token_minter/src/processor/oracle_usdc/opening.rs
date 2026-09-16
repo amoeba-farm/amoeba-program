@@ -4,11 +4,16 @@ use super::*;
 pub(in crate::processor) fn process_submit_oracle_opening_claim_v2(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    params: SubmitOracleOpeningClaimParams,
+    mut params: SubmitOracleOpeningClaimParams,
 ) -> ProgramResult {
-    if accounts.len() != 8 {
+    if accounts.len() != 10 {
         return Err(VaultError::InvalidAccountList.into());
     }
+    params.archive_url = crate::processor::oracle_evidence::publication_url(
+        program_id,
+        &accounts[8],
+        &params.archive_url,
+    )?;
     let claimant_info = &accounts[0];
     let market_info = &accounts[1];
     let month_info = &accounts[2];
@@ -70,7 +75,8 @@ pub(in crate::processor) fn process_submit_oracle_opening_claim_v2(
         )?;
         1
     } else {
-        let existing: OracleOpeningClaim = load_state(claim_info, program_id)?;
+        let mut existing: OracleOpeningClaim = load_state(claim_info, program_id)?;
+        bind_oracle_opening_claim_context(&mut existing, month_info.key, source_info.key, &source);
         if !existing.is_initialized
             || existing.month != *month_info.key
             || existing.source != *source_info.key
@@ -112,6 +118,24 @@ pub(in crate::processor) fn process_submit_oracle_opening_claim_v2(
         status: OracleOpeningClaimStatus::Pending,
         escrow_disposition: OracleEscrowDisposition::Unsettled,
     };
+    crate::processor::oracle_evidence::publish(
+        program_id,
+        claimant_info,
+        system_program_info,
+        &accounts[8],
+        &accounts[9],
+        month_info.key,
+        source_info.key,
+        claim_info.key,
+        claim_info.key,
+        2,
+        attempt,
+        params.opening_state,
+        params.source_time,
+        evidence_hash,
+        claim.archive_url_hash,
+        source.source_id,
+    )?;
     source.status = OracleSourceStatus::OpeningPending;
     month.pending_resolution_count = month
         .pending_resolution_count
@@ -128,11 +152,16 @@ pub(in crate::processor) fn process_submit_oracle_opening_claim_v2(
 pub(in crate::processor) fn process_challenge_oracle_opening_claim_v2(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    params: ChallengeOracleOpeningClaimParams,
+    mut params: ChallengeOracleOpeningClaimParams,
 ) -> ProgramResult {
-    if accounts.len() != 9 {
+    if accounts.len() != 11 {
         return Err(VaultError::InvalidAccountList.into());
     }
+    params.archive_url = crate::processor::oracle_evidence::publication_url(
+        program_id,
+        &accounts[9],
+        &params.archive_url,
+    )?;
     let challenger_info = &accounts[0];
     let market_info = &accounts[1];
     let month_info = &accounts[2];
@@ -242,8 +271,26 @@ pub(in crate::processor) fn process_challenge_oracle_opening_claim_v2(
         escrow_disposition: OracleEscrowDisposition::Unsettled,
         account_discriminator: OracleOpeningClaimChallenge::ACCOUNT_DISCRIMINATOR,
         account_version: OracleOpeningClaimChallenge::ACCOUNT_VERSION,
-        emergency_snapshot_total_major_tokens: 0,
+        council_authority_version: 0,
     };
+    crate::processor::oracle_evidence::publish(
+        program_id,
+        challenger_info,
+        system_program_info,
+        &accounts[9],
+        &accounts[10],
+        month_info.key,
+        source_info.key,
+        challenge_info.key,
+        claim_info.key,
+        3,
+        claim.attempt,
+        params.alternative_opening_state,
+        params.alternative_source_time,
+        evidence_hash,
+        challenge.archive_url_hash,
+        source.source_id,
+    )?;
     claim.status = OracleOpeningClaimStatus::Challenged;
     month.pending_resolution_count = month
         .pending_resolution_count
@@ -275,19 +322,7 @@ pub(in crate::processor) fn process_resolve_oracle_opening_claim_challenge_v2(
     let challenger_collateral_info = &accounts[7];
     let challenge_info = &accounts[8];
     validate_oracle_authority(program_id, authority_info, config_info)?;
-    let staking_pool_info = if params.outcome == OracleOpeningChallengeOutcome::RuleReviewUnresolved
-    {
-        Some(accounts.get(9).ok_or(VaultError::InvalidAccountList)?)
-    } else {
-        None
-    };
-    let samba_mint_info = if params.outcome == OracleOpeningChallengeOutcome::RuleReviewUnresolved {
-        Some(accounts.get(10).ok_or(VaultError::InvalidAccountList)?)
-    } else {
-        None
-    };
-    let expected_account_count = if staking_pool_info.is_some() { 11 } else { 9 };
-    if accounts.len() != expected_account_count {
+    if accounts.len() != 9 {
         return Err(VaultError::InvalidAccountList.into());
     }
 
@@ -366,23 +401,10 @@ pub(in crate::processor) fn process_resolve_oracle_opening_claim_challenge_v2(
             decrement_pending_oracle_resolution(&mut month)?;
         }
         OracleOpeningChallengeOutcome::RuleReviewUnresolved => {
-            let staking_pool_info = staking_pool_info.ok_or(VaultError::InvalidAccountList)?;
-            let mut staking_pool = load_canonical_oracle_staking_pool(
-                program_id,
-                staking_pool_info,
-                &derive_oracle_major_token_config_pda(program_id).0,
-            )?;
-            let samba_mint = validate_oracle_samba_mint(
-                &staking_pool,
-                samba_mint_info.ok_or(VaultError::InvalidAccountList)?,
-                config_info.key,
-            )?;
             challenge.status = OracleChallengeStatus::RuleReviewUnresolved;
             challenge.rule_review_slot = slot;
-            challenge.emergency_snapshot_total_major_tokens =
-                prepare_oracle_samba_voting_snapshot(&mut staking_pool, samba_mint.supply, slot)?;
+            challenge.council_authority_version = 1;
             challenge.account_version = OracleOpeningClaimChallenge::ACCOUNT_VERSION;
-            store_state(staking_pool_info, &staking_pool)?;
         }
     }
     month.last_updated_slot = slot;

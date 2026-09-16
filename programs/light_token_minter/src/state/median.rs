@@ -22,6 +22,18 @@ stable_borsh_enum!(OracleBucketMedianStatus {
     EmergencyRejected = 6
 });
 
+impl OracleBucketMedianStatus {
+    /// A completed court keeps the last accepted bucket value. Reject remains
+    /// distinguishable in the bucket record and vote-pot accounting.
+    pub fn retains_last_accepted_price(self) -> bool {
+        matches!(self, Self::EmergencyDefaulted | Self::EmergencyRejected)
+    }
+
+    pub fn permits_settlement(self) -> bool {
+        self == Self::SettlementReady || self.retains_last_accepted_price()
+    }
+}
+
 /// Canonical per-bucket median anchor. Source cash weights are deliberately absent.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OracleBucketMedianState {
@@ -47,9 +59,9 @@ pub struct OracleBucketMedianState {
     pub recompute_processed_source_count: u16,
     pub last_recompute_source_id: [u8; 32],
     pub emergency_snapshot_slot: u64,
-    pub emergency_snapshot_total_samba: u64,
+    pub council_authority_version: u64,
     /// Temporary opening deltas accumulated while the active-source manifest is built.
-    pub opening_source_deltas_bps: [i64; crate::constants::MAX_ORACLE_BUCKET_SOURCES],
+    pub opening_source_deltas_bps: [i64; crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY],
 }
 
 impl Default for OracleBucketMedianState {
@@ -74,16 +86,16 @@ impl Default for OracleBucketMedianState {
             recompute_processed_source_count: 0,
             last_recompute_source_id: [0; 32],
             emergency_snapshot_slot: 0,
-            emergency_snapshot_total_samba: 0,
-            opening_source_deltas_bps: [0; crate::constants::MAX_ORACLE_BUCKET_SOURCES],
+            council_authority_version: 0,
+            opening_source_deltas_bps: [0; crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY],
         }
     }
 }
 
 impl OracleBucketMedianState {
-    pub const LEN: usize = 256;
+    pub const LEN: usize = 245;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OMB";
-    pub const ACCOUNT_VERSION: u8 = 3;
+    pub const ACCOUNT_VERSION: u8 = 4;
 }
 
 pub fn derive_oracle_bucket_median_pda(

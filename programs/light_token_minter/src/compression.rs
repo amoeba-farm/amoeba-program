@@ -1,10 +1,11 @@
+use crate::local_direct_address::derive_address;
+use crate::local_direct_address::hash_to_bn254_field_size_be;
 use borsh::BorshSerialize;
 use light_compressed_account::compressed_account::{
     PackedMerkleContext, PackedReadOnlyCompressedAccount,
 };
 use light_compressed_account::InstructionDiscriminator;
 use light_sdk::{
-    address::v2::derive_address,
     address::AddressSeed,
     constants::{CPI_AUTHORITY_PDA_SEED, LIGHT_SYSTEM_PROGRAM_ID},
     cpi::v2::{
@@ -12,7 +13,7 @@ use light_sdk::{
         LightSystemProgramCpi,
     },
     instruction::account_meta::{CompressedAccountMeta, CompressedAccountMetaReadOnly},
-    light_hasher::{hash_to_field_size::hash_to_bn254_field_size_be, Hasher, Poseidon},
+    light_hasher::{Hasher, Poseidon},
     proof::borsh_compat::ValidityProof,
     LightDiscriminator,
 };

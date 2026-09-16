@@ -28,7 +28,7 @@ pub(in crate::processor) fn ensure_oracle_usdc_schedule_build_window_at(
             // planned placement deadline. A late bootstrap or incomplete SKU
             // set may build its finite reward schedule only while immutable
             // expiry can still fit Challenge, Resolution, and Opening in full.
-            if now >= oracle_source_submission_latest_safe_ts(expiry_ts)? {
+            if now >= source_submission_deadline(month, expiry_ts)? {
                 return Err(VaultError::OracleTimingWindowClosed.into());
             }
         }
@@ -103,7 +103,7 @@ pub(in crate::processor) fn process_begin_oracle_usdc_reward_schedule(
         outstanding_prelisting_escrow_count: 0,
         registered_update_reward_units: 0,
         trading_fee_bounty_total: 0,
-        bounty_fee_sweep_finalized: false,
+        bounty_fee_sweep_finalized: true,
     };
     month.last_updated_slot = slot;
     store_state(schedule_info, &schedule)?;
@@ -115,13 +115,12 @@ pub(in crate::processor) fn process_add_oracle_usdc_sku_budget(
     accounts: &[AccountInfo],
     params: AddOracleUsdcSkuBudgetParams,
 ) -> ProgramResult {
-    let sku_reward_budget = params
+    let _sku_reward_budget = params
         .source_reward_budget
         .checked_add(params.opening_reward_budget)
         .and_then(|value| value.checked_add(params.update_reward_budget))
         .ok_or(VaultError::ArithmeticOverflow)?;
     if crate::bytes32_is_zero(&params.bucket_id)
-        || sku_reward_budget == 0
         || params.proposer_reward_bps == 0
         || params.proposer_reward_bps > 10_000
         || params.listing_bond == 0
@@ -252,7 +251,6 @@ pub(in crate::processor) fn process_finalize_oracle_usdc_reward_schedule(
         || schedule.authority != *authority_info.key
         || schedule.phase != OracleUsdcRewardSchedulePhase::Building
         || schedule.sku_pool_count == 0
-        || schedule.total_reward_budget == 0
         || vault.mint != config.usdc_mint
     {
         return Err(VaultError::InvalidOracleUsdcRewardSchedule.into());

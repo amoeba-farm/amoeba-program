@@ -144,27 +144,11 @@ pub(super) fn load_valid_oracle_month(
     {
         return Err(VaultError::InvalidOracleMonthAccount.into());
     }
-    Ok(month)
-}
-
-pub(super) fn load_valid_oracle_treasury(
-    program_id: &Pubkey,
-    treasury_info: &AccountInfo,
-) -> Result<OracleTreasuryState, ProgramError> {
-    let (expected_treasury, expected_bump) = derive_oracle_treasury_pda(program_id);
-    let treasury: OracleTreasuryState = load_exact_zero_padded_state(
-        treasury_info,
-        program_id,
-        OracleTreasuryState::LEN,
-        VaultError::InvalidOracleTreasury,
-    )?;
-    if *treasury_info.key != expected_treasury
-        || !treasury.is_initialized
-        || treasury.bump != expected_bump
-    {
-        return Err(VaultError::InvalidOracleTreasury.into());
+    if month.schedule_version == LAUNCH_SCHEDULE_VERSION {
+        validate_launch_market(market)?;
+        rulebook_schedule_boundaries(&month)?;
     }
-    Ok(treasury)
+    Ok(month)
 }
 
 pub(super) fn load_canonical_oracle_economics_config(
@@ -418,9 +402,12 @@ pub(super) fn load_valid_oracle_opening_claim(
     claim_info: &AccountInfo,
     source: &OracleSourceState,
 ) -> Result<OracleOpeningClaim, ProgramError> {
-    let claim: OracleOpeningClaim = load_state(claim_info, program_id)?;
-    let (expected_claim, _) = derive_oracle_opening_claim_pda(program_id, month, source_key);
+    let mut claim: OracleOpeningClaim = load_state(claim_info, program_id)?;
+    bind_oracle_opening_claim_context(&mut claim, month, source_key, source);
+    let (expected_claim, expected_bump) =
+        derive_oracle_opening_claim_pda(program_id, month, source_key);
     if *claim_info.key != expected_claim
+        || claim.bump != expected_bump
         || !claim.is_initialized
         || claim.month != *month
         || claim.source != *source_key
@@ -433,4 +420,20 @@ pub(super) fn load_valid_oracle_opening_claim(
         return Err(VaultError::InvalidOracleOpeningClaim.into());
     }
     Ok(claim)
+}
+
+/// Rehydrates the compact claim projection from identities already authenticated by the account
+/// list and the source loader. These values are absent from the physical claim bytes, but remain
+/// present in the logical state consumed by every caller.
+pub(super) fn bind_oracle_opening_claim_context(
+    claim: &mut OracleOpeningClaim,
+    month: &Pubkey,
+    source_key: &Pubkey,
+    source: &OracleSourceState,
+) {
+    claim.month = *month;
+    claim.source = *source_key;
+    claim.source_id = source.source_id;
+    claim.canonical_locator_hash = source.canonical_locator_hash;
+    claim.source_definition_hash = source.source_definition_hash;
 }

@@ -67,7 +67,7 @@ pub(super) struct WriterPolicyContext {
     pub snapshot: Box<WriterPolicySnapshotV1>,
 }
 
-pub(super) struct WriterBookContext {
+pub(in crate::processor) struct WriterBookContext {
     pub group: Box<WriterSettlementGroupV1>,
     pub sleeve: Box<WriterSleeveV1>,
     pub book: Box<WriterSeriesBookV1>,
@@ -146,7 +146,6 @@ pub(super) fn load_writer_policy_registry(
         || !value.has_current_layout()
         || value.vault_config != *expected_vault_config
         || crate::pubkey_is_default(&value.policy_authority)
-        || crate::pubkey_is_default(&value.protocol_fee_vault)
         || (crate::pubkey_is_default(&value.pending_policy_authority)
             != (value.pending_activation_slot == 0))
     {
@@ -254,14 +253,11 @@ fn load_writer_sleeve_inner(
         || value.settlement_group != *expected_group
         || value.series_book != derive_writer_series_book_pda(program_id, info.key).0
         || value.usdc_vault != derive_writer_sleeve_usdc_vault_pda(program_id, info.key).0
-        || value.flat_mint != derive_writer_flat_mint_pda(program_id, info.key).0
-        || value.flat_staging != derive_writer_flat_staging_pda(program_id, info.key).0
-        || value.flat_burn_custody != derive_writer_flat_burn_custody_pda(program_id, info.key).0
         || usize::from(value.series_count) > crate::constants::WRITER_MAX_LIVE_SERIES
         || value.exact_reserve_atoms > value.accounted_asset_atoms
         || value.long_liability_remaining_atoms > value.long_liability_initial_atoms
-        || value.flat_residual_remaining_atoms > value.flat_residual_initial_atoms
-        || value.flat_claim_supply_remaining_atoms > value.flat_supply_snapshot_atoms
+        || value.writer_residual_remaining_atoms > value.writer_residual_initial_atoms
+        || value.unclaimed_principal_atoms > value.settlement_principal_atoms
     {
         return Err(VaultError::InvalidWriterSleeve.into());
     }
@@ -308,173 +304,6 @@ pub(super) fn load_writer_series_book(
         {
             return Err(VaultError::InvalidWriterSeriesBook.into());
         }
-    }
-    Ok(value)
-}
-
-pub(super) fn validate_writer_flat_mint(
-    sleeve_info: &AccountInfo,
-    sleeve: &WriterSleeveV1,
-    mint_info: &AccountInfo,
-) -> Result<Mint, ProgramError> {
-    if *mint_info.key != sleeve.flat_mint || mint_info.owner != &spl_token_program_id() {
-        return Err(VaultError::InvalidMint.into());
-    }
-    let mint = validate_mint_account(mint_info, &spl_token_program_id())?;
-    if !mint.is_initialized
-        || mint.decimals != MarketMintAccounting::CANONICAL_DECIMALS
-        || mint.mint_authority != COption::Some(*sleeve_info.key)
-        || mint.freeze_authority != COption::None
-        || mint.supply != sleeve.flat_par_supply_atoms
-    {
-        return Err(VaultError::InvalidMint.into());
-    }
-    Ok(mint)
-}
-
-fn load_writer_auction_at_stored_nonce(
-    program_id: &Pubkey,
-    info: &AccountInfo,
-    expected_sleeve: &Pubkey,
-) -> Result<Box<WriterAuctionV1>, ProgramError> {
-    let value = Box::new(load_exact_zero_padded_state::<WriterAuctionV1>(
-        info,
-        program_id,
-        WriterAuctionV1::LEN,
-        VaultError::InvalidWriterAuction,
-    )?);
-    let (expected, bump) =
-        derive_writer_auction_pda(program_id, expected_sleeve, value.auction_nonce);
-    if *info.key != expected
-        || !value.is_initialized
-        || value.bump != bump
-        || !value.has_current_layout()
-        || value.sleeve != *expected_sleeve
-        || value.bid_index != derive_writer_bid_index_pda(program_id, info.key).0
-        || value.escrow != derive_writer_auction_escrow_pda(program_id, info.key).0
-    {
-        return Err(VaultError::InvalidWriterAuction.into());
-    }
-    Ok(value)
-}
-
-pub(super) fn load_writer_auction(
-    program_id: &Pubkey,
-    info: &AccountInfo,
-    expected_sleeve: &Pubkey,
-    expected_nonce: u64,
-) -> Result<Box<WriterAuctionV1>, ProgramError> {
-    let value = load_writer_auction_at_stored_nonce(program_id, info, expected_sleeve)?;
-    if value.auction_nonce != expected_nonce {
-        return Err(VaultError::InvalidWriterAuction.into());
-    }
-    Ok(value)
-}
-
-/// Refunds remain reachable after the sleeve advances to a later auction.
-///
-/// The auction's own program-owned nonce remains the PDA authority input. The sleeve nonce is an
-/// upper bound only: a future auction account is never admissible, while a finalized historical
-/// auction can continue returning its escrow to the immutable stored refund destinations.
-pub(super) fn load_writer_auction_for_refund(
-    program_id: &Pubkey,
-    info: &AccountInfo,
-    expected_sleeve: &Pubkey,
-    current_nonce: u64,
-) -> Result<Box<WriterAuctionV1>, ProgramError> {
-    let value = load_writer_auction_at_stored_nonce(program_id, info, expected_sleeve)?;
-    if value.auction_nonce > current_nonce {
-        return Err(VaultError::InvalidWriterAuction.into());
-    }
-    Ok(value)
-}
-
-pub(super) fn load_writer_bid_index(
-    program_id: &Pubkey,
-    info: &AccountInfo,
-    expected_auction: &Pubkey,
-) -> Result<Box<WriterBidIndexV1>, ProgramError> {
-    let value = Box::new(load_exact_zero_padded_state::<WriterBidIndexV1>(
-        info,
-        program_id,
-        WriterBidIndexV1::LEN,
-        VaultError::InvalidWriterAuction,
-    )?);
-    let (expected, bump) = derive_writer_bid_index_pda(program_id, expected_auction);
-    if *info.key != expected
-        || !value.is_initialized
-        || value.bump != bump
-        || !value.has_current_layout()
-        || value.auction != *expected_auction
-    {
-        return Err(VaultError::InvalidWriterAuction.into());
-    }
-    Ok(value)
-}
-
-pub(super) fn load_writer_bid(
-    program_id: &Pubkey,
-    info: &AccountInfo,
-    expected_auction: &Pubkey,
-) -> Result<Box<WriterBidV1>, ProgramError> {
-    let value = Box::new(load_exact_zero_padded_state::<WriterBidV1>(
-        info,
-        program_id,
-        WriterBidV1::LEN,
-        VaultError::InvalidWriterBid,
-    )?);
-    let (expected, bump) =
-        derive_writer_bid_pda(program_id, expected_auction, &value.bidder, value.order_id);
-    if *info.key != expected
-        || !value.is_initialized
-        || value.bump != bump
-        || !value.has_current_layout()
-        || value.auction != *expected_auction
-        || crate::pubkey_is_default(&value.bidder)
-        || crate::pubkey_is_default(&value.refund_token_account)
-        || crate::pubkey_is_default(&value.claim_destination)
-        || value.requested_contract_atoms == 0
-        || value.bid_price_per_contract_atoms == 0
-        || value.accepted_contract_atoms > value.requested_contract_atoms
-        || value.executed_contract_atoms > value.accepted_contract_atoms
-        || value
-            .premium_charged_atoms
-            .checked_add(value.fee_charged_atoms)
-            .and_then(|charged| charged.checked_add(value.refunded_atoms))
-            .is_none_or(|accounted| accounted > value.escrowed_atoms)
-    {
-        return Err(VaultError::InvalidWriterBid.into());
-    }
-    Ok(value)
-}
-
-pub(super) fn load_writer_close_request(
-    program_id: &Pubkey,
-    info: &AccountInfo,
-    expected_sleeve: &Pubkey,
-    expected_nonce: u64,
-) -> Result<Box<WriterCloseRequestV1>, ProgramError> {
-    let value = Box::new(load_exact_zero_padded_state::<WriterCloseRequestV1>(
-        info,
-        program_id,
-        WriterCloseRequestV1::LEN,
-        VaultError::InvalidWriterCloseRequest,
-    )?);
-    let (expected, bump) =
-        derive_writer_close_request_pda(program_id, expected_sleeve, expected_nonce);
-    if *info.key != expected
-        || !value.is_initialized
-        || value.bump != bump
-        || !value.has_current_layout()
-        || value.sleeve != *expected_sleeve
-        || value.request_nonce != expected_nonce
-        || value.flat_escrow != derive_writer_close_flat_escrow_pda(program_id, info.key).0
-        || value.flat_mint == Pubkey::default()
-        || value.owner == Pubkey::default()
-        || value.flat_amount_atoms == 0
-        || value.series_count == 0
-    {
-        return Err(VaultError::InvalidWriterCloseRequest.into());
     }
     Ok(value)
 }

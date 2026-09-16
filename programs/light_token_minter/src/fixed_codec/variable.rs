@@ -13,7 +13,7 @@ pub(crate) fn optional_pubkey_extension(tag: u8) -> std::io::Result<usize> {
 #[inline(always)]
 pub(crate) fn market_encoded_len(data: &[u8]) -> std::io::Result<usize> {
     const CONTRACT_MINT_TAG_OFFSET: usize = 98;
-    const MINIMUM_LEN: usize = 253;
+    const MINIMUM_LEN: usize = 247;
     let contract_mint_extension = optional_pubkey_extension(
         *data
             .get(CONTRACT_MINT_TAG_OFFSET)
@@ -42,29 +42,7 @@ pub(crate) fn oracle_month_encoded_len(data: &[u8]) -> std::io::Result<usize> {
     Ok(encoded_len)
 }
 
-#[inline(always)]
-pub(crate) fn writer_sleeve_encoded_len(data: &[u8]) -> std::io::Result<usize> {
-    const ACTIVE_AUCTION_TAG_OFFSET: usize = 650;
-    const SECOND_OPTION_BASE_OFFSET: usize = ACTIVE_AUCTION_TAG_OFFSET + 1;
-    const MINIMUM_LEN: usize = 700;
-    let auction_extension = optional_pubkey_extension(
-        *data
-            .get(ACTIVE_AUCTION_TAG_OFFSET)
-            .ok_or_else(invalid_fixed_borsh)?,
-    )?;
-    let close_extension = optional_pubkey_extension(
-        *data
-            .get(SECOND_OPTION_BASE_OFFSET + auction_extension)
-            .ok_or_else(invalid_fixed_borsh)?,
-    )?;
-    let encoded_len = MINIMUM_LEN + auction_extension + close_extension;
-    if data.len() < encoded_len {
-        return Err(invalid_fixed_borsh());
-    }
-    Ok(encoded_len)
-}
-
-variable_state_codec!(Market, 285, market_encoded_len, {
+variable_state_codec!(Market, 279, market_encoded_len, {
     is_initialized: bool,
     bump: u8,
     created_by: Pubkey,
@@ -118,7 +96,7 @@ variable_state_codec!(OracleMonthState, 299, oracle_month_encoded_len, {
     accepted_cash_update_count: u32,
 });
 
-variable_state_codec!(WriterSleeveV1, 764, writer_sleeve_encoded_len, {
+fixed_state_deserialize!(WriterSleeveV1, 545, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -130,10 +108,6 @@ variable_state_codec!(WriterSleeveV1, 764, writer_sleeve_encoded_len, {
     settlement_group: Pubkey,
     series_book: Pubkey,
     usdc_vault: Pubkey,
-    flat_mint: Pubkey,
-    flat_spl_interface: Pubkey,
-    flat_staging: Pubkey,
-    flat_burn_custody: Pubkey,
     policy_registry: Pubkey,
     policy_snapshot: Pubkey,
     policy_version: u64,
@@ -146,27 +120,23 @@ variable_state_codec!(WriterSleeveV1, 764, writer_sleeve_encoded_len, {
     exact_reserve_atoms: u64,
     upper_tail_reserve_atoms: u64,
     lower_tail_reserve_atoms: u64,
-    flat_par_supply_atoms: u64,
     security_exposure_atoms: u64,
     long_liability_initial_atoms: u64,
     long_liability_remaining_atoms: u64,
-    flat_residual_initial_atoms: u64,
-    flat_residual_remaining_atoms: u64,
-    flat_supply_snapshot_atoms: u64,
-    flat_claim_supply_remaining_atoms: u64,
+    writer_residual_initial_atoms: u64,
+    writer_residual_remaining_atoms: u64,
+    settlement_principal_atoms: u64,
+    unclaimed_principal_atoms: u64,
     stranded_surplus_atoms: u64,
     operational_buffer_atoms: u64,
-    auction_nonce: u64,
-    close_nonce: u64,
     series_count: u8,
     status: WriterSleeveStatus,
     security_mode: WriterSecurityMode,
-    v2_feature_flags: u8,
-    active_auction: Option<Pubkey>,
-    active_close_request: Option<Pubkey>,
     settlement_finalized_slot: u64,
     last_updated_slot: u64,
-    reserved: [u8; 32],
+    capital_seconds: u128,
+    maximum_contribution_duration: u64,
+    participation_start_ts: u64,
 });
 
 #[inline(never)]

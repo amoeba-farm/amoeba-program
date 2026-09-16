@@ -70,14 +70,10 @@ pub(super) fn process_finalize_oracle_month(
         let bucket = load_valid_oracle_bucket_median(program_id, month_info.key, bucket_info)?;
         if usize::from(bucket.group_index) != group_index
             || bucket.bucket_id <= last_bucket_id
-            || !matches!(
-                bucket.status,
-                OracleBucketMedianStatus::SettlementReady
-                    | OracleBucketMedianStatus::EmergencyDefaulted
-            )
+            || !bucket.status.permits_settlement()
             || bucket.eligible_source_count
                 < minimum_oracle_bucket_eligible_sources(bucket.frozen_source_count)
-                && bucket.status != OracleBucketMedianStatus::EmergencyDefaulted
+                && !bucket.status.retains_last_accepted_price()
             || bucket.last_recomputed_ts < market.instrument.expiry_ts
         {
             return Err(VaultError::InvalidOracleMedian.into());
@@ -177,6 +173,10 @@ pub(super) fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo]) 
     }
     validate_vault_config_initialization_target(program_id, config_info)?;
 
+    #[cfg(feature = "mainnet-v3")]
+    if *usdc_mint_info.key != crate::MAINNET_COLLATERAL_MINT {
+        return Err(VaultError::AccountMismatch.into());
+    }
     validate_collateral_mint_account(usdc_mint_info, token_program_info.key)?;
     validate_vault_token_account(vault_token_info, usdc_mint_info.key, config_info.key)?;
 
@@ -331,6 +331,10 @@ pub(super) fn process_rotate_vault_authorities_v2(
         ],
     )?;
     config.admin = params.new_admin;
+    #[cfg(feature = "mainnet-v3")]
+    if params.new_oracle_authority != crate::MAINNET_ORACLE_AUTHORITY {
+        return Err(VaultError::SettlementSignerGovernanceRequired.into());
+    }
     config.oracle_authority = params.new_oracle_authority;
     store_state(config_info, &config)
 }

@@ -6,16 +6,18 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     accounts: &[AccountInfo],
     params: FinalizeOracleUpdateClaimV2Params,
 ) -> ProgramResult {
-    let (accounts, checkpoint_accounts) =
-        if params.outcome == OracleUpdateClaimOutcome::RuleReviewUnresolved {
-            (accounts, &accounts[accounts.len()..])
-        } else {
-            let core_len = accounts
-                .len()
-                .checked_sub(3)
-                .ok_or(VaultError::InvalidAccountList)?;
-            accounts.split_at(core_len)
-        };
+    let (accounts, checkpoint_accounts) = if params.outcome
+        == OracleUpdateClaimOutcome::RuleReviewUnresolved
+        || (params.outcome == OracleUpdateClaimOutcome::RejectClaim && accounts.len() == 11)
+    {
+        (accounts, &accounts[accounts.len()..])
+    } else {
+        let core_len = accounts
+            .len()
+            .checked_sub(3)
+            .ok_or(VaultError::InvalidAccountList)?;
+        accounts.split_at(core_len)
+    };
     if accounts.len() < 9
         || !accounts[0].is_signer
         || accounts[1].is_signer
@@ -40,15 +42,11 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     let trailing = &accounts[9..];
     let trailing_privileges_valid = match params.outcome {
         OracleUpdateClaimOutcome::RuleReviewUnresolved => {
-            trailing.len() == 4
+            trailing.len() == 2
                 && !trailing[0].is_signer
                 && trailing[0].is_writable
                 && !trailing[1].is_signer
                 && trailing[1].is_writable
-                && !trailing[2].is_signer
-                && !trailing[2].is_writable
-                && !trailing[3].is_signer
-                && trailing[3].is_writable
         }
         OracleUpdateClaimOutcome::AcceptClaim | OracleUpdateClaimOutcome::RejectClaim => {
             (trailing.len() == 1 && !trailing[0].is_signer && !trailing[0].is_writable)
@@ -75,7 +73,7 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
 
     let (market, mut month) =
         load_valid_market_and_oracle_month(program_id, market_info, month_info)?;
-    ensure_current_cash_update_resolution_window(&market, &month)?;
+    ensure_current_cash_update_continuation_window(&market, &month)?;
     ensure_oracle_opening_resolution_complete(&month)?;
     let mut source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
     let source_before = source.clone();
@@ -108,24 +106,24 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     {
         return Err(VaultError::InvalidOracleMedian.into());
     }
-    if claim.samba_checkpoint_active {
+    if claim.council_review_pending {
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
 
     let mut update_guard = None;
     let mut update_guard_info = None;
-    let (challenge_info, staking_pool_info, samba_mint_info) = match params.outcome {
-        OracleUpdateClaimOutcome::RuleReviewUnresolved if trailing.len() == 4 => {
+    let challenge_info = match params.outcome {
+        OracleUpdateClaimOutcome::RuleReviewUnresolved if trailing.len() == 2 => {
             let guard = load_canonical_update_challenge_guard(
                 program_id,
                 month_info.key,
                 claim_info.key,
                 &claim.claim.claim_id,
-                &trailing[3],
+                &trailing[1],
             )?;
             update_guard = Some(guard);
-            update_guard_info = Some(&trailing[3]);
-            (Some(&trailing[0]), Some(&trailing[1]), Some(&trailing[2]))
+            update_guard_info = Some(&trailing[1]);
+            Some(&trailing[0])
         }
         OracleUpdateClaimOutcome::AcceptClaim | OracleUpdateClaimOutcome::RejectClaim
             if matches!(trailing.len(), 1 | 2) =>
@@ -149,14 +147,14 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
                 )?;
                 update_guard = Some(guard);
                 update_guard_info = Some(guard_info);
-                (Some(&trailing[0]), None, None)
+                Some(&trailing[0])
             } else {
                 if trailing.len() != 1 || params.outcome != OracleUpdateClaimOutcome::AcceptClaim {
                     return Err(VaultError::InvalidOracleUpdateAccount.into());
                 }
                 validate_canonical_system_zero_pda_proof(&expected_guard, guard_info)
                     .map_err(|_| ProgramError::from(VaultError::InvalidOracleUpdateAccount))?;
-                (None, None, None)
+                None
             }
         }
         _ => return Err(VaultError::InvalidAccountList.into()),
@@ -187,6 +185,16 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     };
 
     ensure_live_revealed_oracle_update_claim(source_info.key, &source, &claim.claim)?;
+    if claim.prior_finalized_step != source.last_finalized_step {
+        return Err(VaultError::InvalidOracleUpdateAccount.into());
+    }
+    if params.outcome != OracleUpdateClaimOutcome::RuleReviewUnresolved {
+        ensure_update_challenge_elapsed_at(&claim, current_unix_timestamp()?)?;
+    }
+    // Only a timely admitted, canonical challenge can continue beyond the grace.
+    if guarded_challenge.is_none() {
+        ensure_current_cash_update_resolution_window(&market, &month)?;
+    }
     if params.current_step == 0 || params.current_step <= source.last_finalized_step {
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
@@ -233,34 +241,44 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
             let challenge = guarded_challenge
                 .as_mut()
                 .ok_or(VaultError::InvalidOracleUpdateAccount)?;
-            append_oracle_source_observation(
-                &mut source,
-                &mut observations,
-                challenge.alternative_state,
-                challenge.alternative_source_time,
-                &challenge.evidence_hash,
-                &challenge.archive_url_hash,
-            )?;
-            source.current_state = challenge.alternative_state;
+            if (challenge.alternative_state == source_before.current_state)
+                != checkpoint_accounts.is_empty()
+            {
+                return Err(VaultError::InvalidAccountList.into());
+            }
+            if challenge.alternative_state != source_before.current_state {
+                append_oracle_source_observation(
+                    &mut source,
+                    &mut observations,
+                    challenge.alternative_state,
+                    challenge.alternative_source_time,
+                    &challenge.evidence_hash,
+                    &challenge.archive_url_hash,
+                )?;
+                source.current_state = challenge.alternative_state;
+                source.last_finalized_step = params.current_step;
+                claim.claim.status = OracleClaimStatus::Rejected;
+                crate::processor::oracle_carry::record_fresh_accept(
+                    program_id,
+                    authority_info,
+                    source_info.key,
+                    &source_before,
+                    &source,
+                    &observations,
+                    crate::processor::oracle_carry::AcceptedEvent {
+                        event: *claim_info.key,
+                        value: challenge.alternative_state,
+                        observed_at: challenge.alternative_source_time,
+                        evidence_hash: challenge.evidence_hash,
+                        archive_hash: challenge.archive_url_hash,
+                        contributor: challenge.challenger,
+                    },
+                    checkpoint_accounts,
+                )?;
+            }
+            // A winning unchanged alternative settles the challenge, not a new price.
             source.last_finalized_step = params.current_step;
             claim.claim.status = OracleClaimStatus::Rejected;
-            crate::processor::oracle_carry::record_fresh_accept(
-                program_id,
-                authority_info,
-                source_info.key,
-                &source_before,
-                &source,
-                &observations,
-                crate::processor::oracle_carry::AcceptedEvent {
-                    event: *claim_info.key,
-                    value: challenge.alternative_state,
-                    observed_at: challenge.alternative_source_time,
-                    evidence_hash: challenge.evidence_hash,
-                    archive_hash: challenge.archive_url_hash,
-                    contributor: challenge.challenger,
-                },
-                checkpoint_accounts,
-            )?;
             challenge.status = OracleChallengeStatus::Accepted;
         }
         OracleUpdateClaimOutcome::RuleReviewUnresolved => {
@@ -269,32 +287,21 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
                 .ok_or(VaultError::InvalidOracleUpdateAccount)?;
             challenge.status = OracleChallengeStatus::RuleReviewUnresolved;
             challenge.rule_review_slot = slot;
-            let staking_pool_info = staking_pool_info.ok_or(VaultError::InvalidAccountList)?;
-            let mut staking_pool = load_canonical_oracle_staking_pool(
-                program_id,
-                staking_pool_info,
-                &derive_oracle_major_token_config_pda(program_id).0,
-            )?;
-            let samba_mint = validate_oracle_samba_mint(
-                &staking_pool,
-                samba_mint_info.ok_or(VaultError::InvalidAccountList)?,
-                config_info.key,
-            )?;
-            challenge.emergency_snapshot_total_major_tokens =
-                prepare_oracle_samba_voting_snapshot(&mut staking_pool, samba_mint.supply, slot)?;
+            challenge.council_authority_version = 1;
             challenge.account_version = OracleUpdateChallenge::ACCOUNT_VERSION;
             let guard = update_guard
                 .as_mut()
                 .ok_or(VaultError::InvalidOracleUpdateAccount)?;
             guard.resolution_step = params.current_step;
             guard.last_updated_slot = slot;
-            claim.samba_checkpoint_active = true;
-            store_state(staking_pool_info, &staking_pool)?;
+            claim.council_review_pending = true;
         }
     }
     if params.outcome != OracleUpdateClaimOutcome::RuleReviewUnresolved {
-        bucket.status = OracleBucketMedianStatus::Dirty;
-        bucket.recompute_processed_source_count = 0;
+        if source.current_state != source_before.current_state {
+            bucket.status = OracleBucketMedianStatus::Dirty;
+            bucket.recompute_processed_source_count = 0;
+        }
         decrement_pending_oracle_resolution(&mut month)?;
     }
     let (c_settle_bps, settlement_status) =
@@ -374,7 +381,7 @@ pub(in crate::processor) fn process_cancel_stale_oracle_update_claim_v2(
     let now = u64::try_from(clock.unix_timestamp)
         .map_err(|_| ProgramError::from(VaultError::InvalidSettlementRecord))?;
     if guard_info.owner != program_id {
-        if !trailing.is_empty() || claim.samba_checkpoint_active {
+        if !trailing.is_empty() || claim.council_review_pending {
             return Err(VaultError::InvalidAccountList.into());
         }
         validate_canonical_system_zero_pda_proof(&expected_guard, guard_info)
@@ -417,61 +424,29 @@ pub(in crate::processor) fn process_cancel_stale_oracle_update_claim_v2(
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
 
-    let mut staking_pool = None;
-    let staking_pool_info = if trailing.len() == 2 {
-        let pool_info = &trailing[1];
-        if !pool_info.is_writable
-            || !claim.samba_checkpoint_active
-            || guard.resolution_step == 0
-            || challenge.status != OracleChallengeStatus::RuleReviewUnresolved
-            || challenge.emergency_snapshot_total_major_tokens == 0
-        {
-            return Err(VaultError::InvalidOracleUpdateAccount.into());
-        }
-        let pool = load_canonical_oracle_staking_pool(
-            program_id,
-            pool_info,
-            &derive_oracle_major_token_config_pda(program_id).0,
-        )?;
-        if pool.governance_lock_count == 0
-            || pool.samba_supply != challenge.emergency_snapshot_total_major_tokens
-        {
-            return Err(VaultError::InvalidOracleStakingPool.into());
-        }
-        staking_pool = Some(pool);
-        Some(pool_info)
-    } else {
-        if claim.samba_checkpoint_active
-            || guard.resolution_step != 0
-            || challenge.status != OracleChallengeStatus::RuleReview
-            || challenge.emergency_snapshot_total_major_tokens != 0
-        {
-            return Err(VaultError::InvalidOracleUpdateAccount.into());
-        }
-        None
-    };
-
+    if trailing.len() != 1
+        || !matches!(
+            challenge.status,
+            OracleChallengeStatus::RuleReview | OracleChallengeStatus::RuleReviewUnresolved
+        )
+        || (challenge.status == OracleChallengeStatus::RuleReviewUnresolved
+            && (!claim.council_review_pending
+                || challenge.council_authority_version != 1
+                || guard.resolution_step == 0))
+    {
+        return Err(VaultError::InvalidOracleUpdateAccount.into());
+    }
     ensure_oracle_update_cleanup_ready_at(&market, &source, &claim, Some(&guard), now)?;
     claim.claim.status = OracleClaimStatus::TimedOut;
-    claim.samba_checkpoint_active = false;
+    claim.council_review_pending = false;
     challenge.status = OracleChallengeStatus::Cancelled;
     guard.last_updated_slot = slot;
-    if let Some(pool) = staking_pool.as_mut() {
-        pool.governance_lock_count = pool
-            .governance_lock_count
-            .checked_sub(1)
-            .ok_or(VaultError::InvalidOracleStakingPool)?;
-        pool.last_updated_slot = slot;
-    }
     decrement_pending_oracle_resolution(&mut month)?;
     month.last_updated_slot = slot;
 
     store_state(claim_info, &claim)?;
     store_state(challenge_info, &challenge)?;
     store_state(guard_info, &guard)?;
-    if let (Some(pool_info), Some(pool)) = (staking_pool_info, staking_pool.as_ref()) {
-        store_state(pool_info, pool)?;
-    }
     store_oracle_month_state(month_info, &month)
 }
 
@@ -527,11 +502,16 @@ pub(in crate::processor) fn process_settle_expired_oracle_update_commitment_v3(
 pub(in crate::processor) fn process_challenge_oracle_update_claim_v2(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    params: ChallengeOracleUpdateClaimParams,
+    mut params: ChallengeOracleUpdateClaimParams,
 ) -> ProgramResult {
-    if accounts.len() != 10 {
+    if accounts.len() != 12 {
         return Err(VaultError::InvalidAccountList.into());
     }
+    params.archive_url = crate::processor::oracle_evidence::publication_url(
+        program_id,
+        &accounts[10],
+        &params.archive_url,
+    )?;
     let challenger_info = &accounts[0];
     let market_info = &accounts[1];
     let month_info = &accounts[2];
@@ -555,7 +535,7 @@ pub(in crate::processor) fn process_challenge_oracle_update_claim_v2(
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
     let (market, month) = load_valid_market_and_oracle_month(program_id, market_info, month_info)?;
-    ensure_oracle_game_window(&market, &month)?;
+    ensure_current_cash_update_resolution_window(&market, &month)?;
     ensure_oracle_opening_resolution_complete(&month)?;
     let claim = load_valid_oracle_update_claim_v2_from_account(
         program_id,
@@ -577,11 +557,13 @@ pub(in crate::processor) fn process_challenge_oracle_update_claim_v2(
     )?;
     let sku = load_oracle_usdc_sku_for_month(program_id, month_info.key, sku_info)?;
     ensure_live_revealed_oracle_update_claim(source_info.key, &source, &claim.claim)?;
+    if claim.prior_finalized_step != source.last_finalized_step {
+        return Err(VaultError::InvalidOracleUpdateAccount.into());
+    }
     if source.bucket_id != sku.bucket_id
         || claim.claim.escrow_disposition != OracleEscrowDisposition::Unsettled
         || claim.claim.claimant == *challenger_info.key
         || params.alternative_state == claim.claim.new_state
-        || params.alternative_state == source.current_state
     {
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
@@ -663,7 +645,7 @@ pub(in crate::processor) fn process_challenge_oracle_update_claim_v2(
         escrow_disposition: OracleEscrowDisposition::Unsettled,
         account_discriminator: OracleUpdateChallenge::ACCOUNT_DISCRIMINATOR,
         account_version: OracleUpdateChallenge::ACCOUNT_VERSION,
-        emergency_snapshot_total_major_tokens: 0,
+        council_authority_version: 0,
     };
     let challenge_guard = OracleUpdateChallengeGuard {
         is_initialized: true,
@@ -680,6 +662,24 @@ pub(in crate::processor) fn process_challenge_oracle_update_claim_v2(
         created_slot: slot,
         last_updated_slot: slot,
     };
+    crate::processor::oracle_evidence::publish(
+        program_id,
+        challenger_info,
+        system_program_info,
+        &accounts[10],
+        &accounts[11],
+        month_info.key,
+        source_info.key,
+        challenge_info.key,
+        claim_info.key,
+        5,
+        0,
+        params.alternative_state,
+        params.alternative_source_time,
+        params.evidence_hash,
+        archive_url_hash,
+        source.source_id,
+    )?;
     store_state(challenge_info, &challenge)?;
     store_state(challenge_guard_info, &challenge_guard)?;
     store_state(collateral_info, &collateral)

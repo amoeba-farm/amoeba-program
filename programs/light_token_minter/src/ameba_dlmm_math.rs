@@ -180,21 +180,10 @@ pub fn price_from_bin(
 }
 
 #[inline]
-pub fn calculate_fees(
-    amount_in: u64,
-    swap_fee_bps: u16,
-    protocol_fee_share_bps: u16,
-) -> MathResult<AmoebaDlmmFeeBreakdown> {
+pub fn calculate_fees(amount_in: u64) -> MathResult<AmoebaDlmmFeeBreakdown> {
     if amount_in == 0 {
         return Err(AmoebaDlmmMathError::InvalidAmount);
     }
-    if swap_fee_bps as u64 > AMOEBA_DLMM_BPS_SCALE
-        || protocol_fee_share_bps as u64 > AMOEBA_DLMM_BPS_SCALE
-    {
-        return Err(AmoebaDlmmMathError::InvalidFee);
-    }
-    // Stored fee fields remain authenticated compatibility data. Current Amoeba
-    // execution charges no taker, LP, or protocol fee, including on existing pools.
     Ok(AmoebaDlmmFeeBreakdown {
         total_fee: 0,
         protocol_fee: 0,
@@ -302,8 +291,6 @@ pub fn quote_exact_in(
     limit_bin_id: u16,
     tick_size_quote_atomic: u64,
     maximum_bin_id: u16,
-    swap_fee_bps: u16,
-    protocol_fee_share_bps: u16,
     maximum_bins: u8,
     bins: &[AmoebaDlmmBinLiquidity],
 ) -> MathResult<AmoebaDlmmSwapQuote> {
@@ -317,7 +304,7 @@ pub fn quote_exact_in(
         return Err(AmoebaDlmmMathError::TooManyBins);
     }
 
-    let fees = calculate_fees(amount_in, swap_fee_bps, protocol_fee_share_bps)?;
+    let fees = calculate_fees(amount_in)?;
     let mut remaining = fees.trade_input;
     let mut amount_out = 0u64;
     let mut fills = Vec::with_capacity(bins.len());

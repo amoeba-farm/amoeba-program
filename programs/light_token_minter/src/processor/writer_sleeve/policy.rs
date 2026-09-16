@@ -5,21 +5,15 @@ pub(in crate::processor) fn process_initialize_policy_registry(
     accounts: &[AccountInfo],
     params: InitializeWriterPolicyRegistryV1Params,
 ) -> ProgramResult {
-    if accounts.len() != 7 {
+    if accounts.len() != 4 {
         return Err(VaultError::InvalidAccountList.into());
     }
     let admin_info = &accounts[0];
     let config_info = &accounts[1];
     let registry_info = &accounts[2];
-    let fee_vault_info = &accounts[3];
-    let settlement_mint_info = &accounts[4];
-    let token_program_info = &accounts[5];
-    let system_program_info = &accounts[6];
+    let system_program_info = &accounts[3];
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
-    }
-    if *token_program_info.key != spl_token_program_id() {
-        return Err(VaultError::InvalidTokenProgram.into());
     }
     if *system_program_info.key != system_program::id() {
         return Err(VaultError::InvalidSystemProgram.into());
@@ -30,16 +24,12 @@ pub(in crate::processor) fn process_initialize_policy_registry(
     }
     if crate::pubkey_is_default(&params.policy_authority)
         || params.rotation_delay_slots < crate::constants::MIN_WRITER_POLICY_ROTATION_DELAY_SLOTS
-        || config.usdc_mint != *settlement_mint_info.key
     {
         return Err(VaultError::InvalidWriterPolicyRegistry.into());
     }
-    validate_collateral_mint_account(settlement_mint_info, token_program_info.key)?;
 
     let (expected_registry, registry_bump) = derive_writer_policy_registry_pda(program_id);
-    let (expected_fee_vault, fee_vault_bump) =
-        derive_writer_protocol_fee_vault_pda(program_id, registry_info.key);
-    if *registry_info.key != expected_registry || *fee_vault_info.key != expected_fee_vault {
+    if *registry_info.key != expected_registry {
         return Err(VaultError::InvalidPda.into());
     }
     validate_create_only_program_account_target(program_id, registry_info)?;
@@ -54,24 +44,6 @@ pub(in crate::processor) fn process_initialize_policy_registry(
             &[registry_bump],
         ],
     )?;
-    create_classic_token_pda(
-        program_id,
-        admin_info,
-        fee_vault_info,
-        settlement_mint_info,
-        registry_info.key,
-        token_program_info,
-        system_program_info,
-        &[
-            crate::constants::WRITER_PROTOCOL_FEE_VAULT_PDA_SEED,
-            registry_info.key.as_ref(),
-            &[fee_vault_bump],
-        ],
-    )?;
-    validate_vault_token_account(fee_vault_info, settlement_mint_info.key, registry_info.key)?;
-    if validate_token_account(fee_vault_info)?.amount != 0 {
-        return Err(VaultError::InvalidWriterPolicyRegistry.into());
-    }
     let slot = Clock::get()?.slot;
     let registry = WriterPolicyRegistryV1 {
         is_initialized: true,
@@ -81,12 +53,10 @@ pub(in crate::processor) fn process_initialize_policy_registry(
         vault_config: *config_info.key,
         policy_authority: params.policy_authority,
         pending_policy_authority: Pubkey::default(),
-        protocol_fee_vault: *fee_vault_info.key,
         pending_activation_slot: 0,
         rotation_delay_slots: params.rotation_delay_slots,
         latest_policy_version: 0,
         last_updated_slot: slot,
-        reserved: [0; 32],
     };
     store_state(registry_info, &registry)
 }
@@ -197,12 +167,9 @@ pub(in crate::processor) fn process_seal_policy(
         || params.upper_drawdown_limit > params.drawdown_scale
         || params.lower_drawdown_limit > params.drawdown_scale
         || params.lower_tail_max_settlement_atomic >= params.upper_tail_min_settlement_atomic
-        || params.max_auction_issue_atoms == 0
-        || params.max_close_flat_atoms == 0
-        || params.primary_fee_bps > 10_000
+        || params.max_issue_atoms == 0
         || params.security_mode != WriterSecurityMode::GrossExternalMaxPayout
         || params.reserve_rounding_mode != WriterReserveRoundingMode::AggregateBookCeiling
-        || params.auction_priority_rule != WriterAuctionPriorityRule::PayAsBidPriceThenSeriesProRata
         || params.v2_feature_flags != 0
         || crate::bytes32_is_zero(&params.scenario_set_hash)
         || crate::bytes32_is_zero(&params.model_margin_vector_hash)
@@ -258,12 +225,10 @@ pub(in crate::processor) fn process_seal_policy(
         series_family_hash,
         security_mode: params.security_mode,
         reserve_rounding_mode: params.reserve_rounding_mode,
-        auction_priority_rule: params.auction_priority_rule,
+
         v2_feature_flags: params.v2_feature_flags,
         max_series: crate::constants::WRITER_MAX_LIVE_SERIES as u8,
-        reserved_0: 0,
-        primary_fee_bps: params.primary_fee_bps,
-        reserved_1: [0; 2],
+
         drawdown_scale: params.drawdown_scale,
         worst_drawdown_limit: params.worst_drawdown_limit,
         upper_drawdown_limit: params.upper_drawdown_limit,
@@ -271,11 +236,10 @@ pub(in crate::processor) fn process_seal_policy(
         lower_tail_max_settlement_atomic: params.lower_tail_max_settlement_atomic,
         upper_tail_min_settlement_atomic: params.upper_tail_min_settlement_atomic,
         operational_buffer_atoms: params.operational_buffer_atoms,
-        max_auction_issue_atoms: params.max_auction_issue_atoms,
-        max_close_flat_atoms: params.max_close_flat_atoms,
+        max_issue_atoms: params.max_issue_atoms,
+
         created_slot: slot,
         sealed_slot: slot,
-        reserved: [0; 32],
     };
     sleeve.policy_snapshot = *snapshot_info.key;
     sleeve.policy_version = params.policy_version;
@@ -284,7 +248,6 @@ pub(in crate::processor) fn process_seal_policy(
     sleeve.risk_limit_hash = params.risk_limit_hash;
     sleeve.operational_buffer_atoms = params.operational_buffer_atoms;
     sleeve.security_mode = params.security_mode;
-    sleeve.v2_feature_flags = params.v2_feature_flags;
     sleeve.status = WriterSleeveStatus::PolicyFrozen;
     sleeve.last_updated_slot = slot;
     book.frozen = true;

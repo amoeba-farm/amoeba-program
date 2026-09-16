@@ -7,7 +7,10 @@
 use crate::{ameba_dlmm_instruction::AmoebaDlmmInstructionTag, instruction::VaultInstructionTag};
 
 pub const PHASE3_TARGET_SOURCE_BASELINE: &str = "1b2230d96e51f6582155d8284900fbfc11ff1f18";
-pub const RESERVED_INSTRUCTION_TAGS: [u8; 0] = [];
+pub const RESERVED_INSTRUCTION_TAGS: [u8; 35] = [
+    63, 64, 65, 131, 133, 135, 136, 137, 138, 139, 141, 175, 176, 177, 178, 179, 180, 193, 202,
+    213, 227, 228, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 247, 249,
+];
 
 pub const DEVNET_SOLO_BACKFILL_INITIALIZE_SIDECAR_TAG: u8 = 29;
 pub const DEVNET_SOLO_BACKFILL_INITIALIZE_COHORT_TAG: u8 = 31;
@@ -219,7 +222,11 @@ pub fn phase3_instruction_manifest_json() -> String {
         "  \"target_source_baseline\": \"{PHASE3_TARGET_SOURCE_BASELINE}\","
     )
     .unwrap();
-    writeln!(output, "  \"reserved_bytes\": [],").unwrap();
+    writeln!(
+        output,
+        "  \"reserved_bytes\": {RESERVED_INSTRUCTION_TAGS:?},"
+    )
+    .unwrap();
     writeln!(output, "  \"build_counts\": {{").unwrap();
     writeln!(
         output,

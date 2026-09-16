@@ -42,8 +42,11 @@ const EXPECTED_ADMIN: Pubkey =
     solana_program::pubkey!("99riHvpFvwfz2tbrWbanEMPz5iyhHHThBbM7eY35vMwL");
 const EXPECTED_ORACLE_AUTHORITY: Pubkey =
     solana_program::pubkey!("C8gpKjnPss4SKpjhBpFGNH7cbD26XCzSWhcjj6gF4dx7");
+#[cfg(not(feature = "mainnet-v3"))]
 const EXPECTED_COLLATERAL_MINT: Pubkey =
     solana_program::pubkey!("21Ft8EZpugvFofW9713vLnYDRfSqyVUGUo9wvvUGhTsZ");
+#[cfg(feature = "mainnet-v3")]
+const EXPECTED_COLLATERAL_MINT: Pubkey = crate::MAINNET_COLLATERAL_MINT;
 
 /// V3 Devnet preparation ends at the first cohort expiry, 2026-10-01T00:00:00Z.
 /// Consumed bits prevent replay before this fixed terminal bound.
@@ -170,6 +173,16 @@ const fn fixed_text_32(value: &[u8]) -> [u8; 32] {
 
 pub(super) fn is_instruction_tag(tag: u8) -> bool {
     is_devnet_solo_backfill_2026_instruction_tag(tag)
+}
+
+/// The compressed transport only exposes backfill handlers whose complete logical state
+/// contract is authenticated by the observations candidate. The remaining backfill instructions
+/// keep their classic route until their own state domains have an exact witness contract.
+pub(super) fn is_compressed_state_transport_tag(tag: u8) -> bool {
+    matches!(
+        tag,
+        CREATE_SUPPORTED_SOURCE_TAG | FINALIZE_OPENING_TAG | ACCUMULATE_ACTIVE_WEIGHT_TAG
+    )
 }
 
 pub(super) fn process_instruction(
@@ -492,9 +505,6 @@ fn validate_exact_market(
         tick_size: 50_000,
         lot_size: 1,
         min_order_qty: 1,
-        maker_fee_bps: 0,
-        taker_fee_bps: 20,
-        cancel_fee_bps: 0,
         min_cancel_slots: 32,
         max_fills_per_instruction: 8,
     };
@@ -638,7 +648,7 @@ fn create_month_bundle<'a>(
         last_updated_slot: slot,
         outstanding_prelisting_escrow_count: 0,
         trading_fee_bounty_total: 0,
-        bounty_fee_sweep_finalized: false,
+        bounty_fee_sweep_finalized: true,
     };
     store_state(month_info, &month)?;
     store_state(coverage_info, &coverage)?;
@@ -1962,9 +1972,9 @@ fn process_accumulate_active_weight(
         recompute_processed_source_count: 0,
         last_recompute_source_id: [0; 32],
         emergency_snapshot_slot: 0,
-        emergency_snapshot_total_samba: 0,
+        council_authority_version: 0,
         opening_source_deltas_bps: {
-            let mut values = [0; crate::constants::MAX_ORACLE_BUCKET_SOURCES];
+            let mut values = [0; crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY];
             values[0] = delta_bps;
             values
         },

@@ -46,7 +46,7 @@ pub(super) fn advance_oracle_active_manifest_hash(
         &source.bucket_id,
         &source.bucket_weight_bps.to_le_bytes(),
         &[source.status as u8],
-        &[source.observation_count],
+        &source.observation_count.to_le_bytes(),
         &source.rolling_observation_hash,
     ])
     .to_bytes()
@@ -194,8 +194,7 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
     accounts: &[AccountInfo],
     params: AccumulateOracleActiveWeightGroupParams,
 ) -> ProgramResult {
-    if accounts.len() < 10
-        || accounts.len() - 9 > crate::constants::MAX_ORACLE_ACTIVE_WEIGHT_SOURCES_PER_STEP
+    if accounts.len() != 12
         || !accounts[0].is_signer
         || !accounts[0].is_writable
         || !accounts[2].is_writable
@@ -213,7 +212,7 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
     let system_program_info = &accounts[4];
     let sku_info = &accounts[5];
     let bucket_info = &accounts[6];
-    let source_end = accounts.len() - 2;
+    let source_end = accounts.len() - 4;
     validate_system_program(system_program_info)?;
     let (_market, mut month) =
         load_valid_market_and_oracle_month(program_id, market_info, month_info)?;
@@ -245,8 +244,7 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
         || params.finalize_collection != (next_count == usize::from(membership.source_count))
         || (manifest.current_group_source_count > 0
             && (manifest.current_group_bucket_weight_bps != membership.bucket_weight_bps
-                || manifest.last_collected_source_id
-                    != membership.source_ids[usize::from(manifest.current_group_source_count - 1)]))
+                || crate::bytes32_is_zero(&manifest.last_collected_source_id)))
     {
         return Err(VaultError::InvalidOracleWeightOrder.into());
     }
@@ -278,10 +276,15 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
     for source_info in &accounts[7..source_end] {
         let source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
         validate_oracle_terminal_source(&source)?;
-        if source.source_id
-            != membership.source_ids[usize::from(manifest.current_group_source_count)]
-            || source.bucket_weight_bps != membership.bucket_weight_bps
-        {
+        oracle_membership::require_member(
+            program_id,
+            accounts[source_end + 1].key,
+            &membership,
+            &accounts[source_end + 2],
+            manifest.current_group_source_count,
+            &source.source_id,
+        )?;
+        if source.bucket_weight_bps != membership.bucket_weight_bps {
             return Err(VaultError::InvalidOracleWeightOrder.into());
         }
         if manifest.current_group_source_count == 0 {
@@ -356,18 +359,27 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
                     status: OracleBucketMedianStatus::Dirty,
                     bucket_delta_bps: 0,
                     last_recomputed_ts: 0,
-                    source_snapshot_hash: [0; 32],
+                    source_snapshot_hash: initial_oracle_bucket_source_snapshot(
+                        month_info.key,
+                        &params.group_id,
+                        2,
+                    ),
                     recompute_processed_source_count: 0,
                     last_recompute_source_id: [0; 32],
                     emergency_snapshot_slot: 0,
-                    emergency_snapshot_total_samba: 0,
-                    opening_source_deltas_bps: [0; crate::constants::MAX_ORACLE_BUCKET_SOURCES],
+                    council_authority_version: 0,
+                    opening_source_deltas_bps: [0;
+                        crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY],
                 });
             }
             let bucket = bucket.as_mut().ok_or(VaultError::InvalidOracleMedian)?;
             let delta_index = usize::from(manifest.current_group_active_count - 1);
-            bucket.opening_source_deltas_bps[delta_index] =
-                source_delta_bps(source.baseline_state, source.current_state)?;
+            if delta_index < crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY {
+                bucket.opening_source_deltas_bps[delta_index] =
+                    source_delta_bps(source.baseline_state, source.current_state)?;
+            }
+            bucket.source_snapshot_hash =
+                advance_oracle_bucket_source_snapshot(&bucket.source_snapshot_hash, &source);
         } else if source.observation_count != 0
             || !crate::bytes32_is_zero(&source.rolling_observation_hash)
         {
@@ -410,7 +422,21 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
         );
         let active_count = usize::from(bucket.active_source_count);
         let mut values = bucket.opening_source_deltas_bps;
-        bucket.bucket_delta_bps = deterministic_bucket_median(&mut values[..active_count])?;
+        bucket.bucket_delta_bps =
+            if active_count <= crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY {
+                deterministic_bucket_median(&mut values[..active_count])?
+            } else {
+                oracle_carry::verified_bucket_rank(
+                    program_id,
+                    &accounts[source_end + 3],
+                    accounts[source_end + 1].key,
+                    month_info.key,
+                    &bucket.source_snapshot_hash,
+                    bucket.frozen_source_count,
+                    bucket.active_source_count,
+                    2,
+                )?
+            };
         bucket.eligible_source_count = bucket.active_source_count;
         bucket.last_recomputed_ts = u64::try_from(Clock::get()?.unix_timestamp)
             .map_err(|_| VaultError::InvalidOracleMedian)?;

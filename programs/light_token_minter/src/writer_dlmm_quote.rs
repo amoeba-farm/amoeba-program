@@ -8,10 +8,14 @@ use crate::ameba_dlmm_math::{
 use crate::state::WriterDlmmBinV1;
 use crate::writer_dlmm_math::{
     admit_writer_dlmm_cash, admit_writer_dlmm_retirement, writer_dlmm_price_bounds,
-    writer_dlmm_primary_fee, WriterDlmmBuybackLimits, WriterDlmmCash, WriterDlmmRetirement,
-    WriterDlmmRiskLimits, WriterDlmmSeriesLimits,
+    WriterDlmmBuybackLimits, WriterDlmmCash, WriterDlmmRetirement, WriterDlmmRiskLimits,
+    WriterDlmmSeriesLimits,
 };
-use crate::writer_sleeve_math::WriterSeries;
+use crate::writer_sleeve_math::{WriterSeries, WRITER_MAX_SERIES};
+
+/// Full candidate, six geometric reductions, then the smallest input. This is
+/// a bounded feasibility search, not a claim of monotonicity or maximum size.
+pub const MAX_WRITER_ADMISSION_PROBES: usize = 8;
 
 #[derive(Clone, Copy)]
 pub struct WriterDlmmRouteConfig {
@@ -21,8 +25,6 @@ pub struct WriterDlmmRouteConfig {
     pub limit_bin_id: u16,
     pub tick_size_quote_atomic: u64,
     pub maximum_bin_id: u16,
-    pub swap_fee_bps: u16,
-    pub protocol_fee_share_bps: u16,
     pub maximum_bins: u8,
     /// Earliest possible ordinary price omitted from the canonical page prefix.
     pub unloaded_ordinary_boundary: Option<u16>,
@@ -39,13 +41,11 @@ pub struct WriterDlmmSwapPolicy<'a> {
     pub series_limits: &'a [WriterDlmmSeriesLimits],
     pub month_spent_atoms: u64,
     pub series_month_spent_atoms: u64,
-    pub primary_fee_bps: u16,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct WriterDlmmFillTotals {
     pub gross_premium_atoms: u64,
-    pub primary_fee_atoms: u64,
     pub net_premium_atoms: u64,
     pub lp_fee_atoms: u64,
     pub sold_option_atoms: u64,
@@ -108,6 +108,7 @@ fn remaining_budget(policy: &WriterDlmmSwapPolicy, totals: &WriterDlmmFillTotals
         )
 }
 
+#[inline(never)]
 fn admit_totals(
     config: &WriterDlmmRouteConfig,
     policy: &WriterDlmmSwapPolicy,
@@ -116,20 +117,14 @@ fn admit_totals(
     if !policy.eligible
         || policy.series_index >= policy.book.len()
         || policy.book.len() != policy.series_limits.len()
+        || policy.book.len() > WRITER_MAX_SERIES
     {
         return false;
     }
     let terms = policy.series_limits[policy.series_index];
     match config.direction {
         AmoebaDlmmSwapDirection::QuoteForOption => {
-            let Ok(fee) =
-                writer_dlmm_primary_fee(totals.gross_premium_atoms, policy.primary_fee_bps)
-            else {
-                return false;
-            };
-            let Some(net) = totals.gross_premium_atoms.checked_sub(fee) else {
-                return false;
-            };
+            let net = totals.gross_premium_atoms;
             let Ok(floor) = dlmm::ceil_mul_div(
                 totals.sold_option_atoms,
                 terms.seller_floor_quote_atoms,
@@ -148,7 +143,10 @@ fn admit_totals(
             else {
                 return false;
             };
-            let mut book = policy.book.to_vec();
+            // Repeated rejected probes must not consume the SBF bump heap.
+            let mut storage = [WriterSeries::EMPTY; WRITER_MAX_SERIES];
+            let book = &mut storage[..policy.book.len()];
+            book.copy_from_slice(policy.book);
             let Some(oi) = book[policy.series_index]
                 .external_oi_atoms
                 .checked_add(totals.sold_option_atoms)
@@ -157,7 +155,7 @@ fn admit_totals(
             };
             book[policy.series_index].external_oi_atoms = oi;
             let Ok((reserve, _, _)) = admit_writer_dlmm_cash(
-                &book,
+                book,
                 WriterDlmmCash {
                     assets_atoms: assets,
                     ..policy.cash
@@ -171,7 +169,6 @@ fn admit_totals(
             }) {
                 return false;
             }
-            totals.primary_fee_atoms = fee;
             totals.net_premium_atoms = net;
             true
         }
@@ -230,8 +227,8 @@ fn allocate_fee(
 }
 
 /// A bounded writer candidate is clipped to remaining fixed cash budgets first, then
-/// independently admitted against the full current book. If that candidate cannot pass,
-/// this route skips it; it never assumes a hypothetical later or other-series retirement.
+/// independently admitted against the full current book. Rejected candidates use a
+/// bounded smaller-size search; no later or other-series retirement is assumed.
 pub fn quote_writer_dlmm_exact_in(
     config: WriterDlmmRouteConfig,
     ordinary: &[AmoebaDlmmBinLiquidity],
@@ -265,7 +262,7 @@ pub fn quote_dlmm_with_orders(
         || (!limits.allow_partial && config.minimum_amount_out == 0)
         || writer.len() > crate::state::WRITER_DLMM_POSITION_BINS
         || ordinary.len() > 32 * usize::from(crate::constants::MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP)
-        || orders.len() > crate::dlmm_order_math::MAX_OPEN_ORDERS
+        || orders.len() > crate::dlmm_order_state::MAX_ORDER_WITNESSES
         || limits.maximum_order_fills == 0
         || limits.maximum_order_fills > crate::dlmm_order_math::MAX_ORDER_FILLS
     {
@@ -308,11 +305,7 @@ pub fn quote_dlmm_with_orders(
     {
         return Err(AmoebaDlmmMathError::InvalidRoute);
     }
-    let fees = dlmm::calculate_fees(
-        config.amount_in,
-        config.swap_fee_bps,
-        config.protocol_fee_share_bps,
-    )?;
+    let fees = dlmm::calculate_fees(config.amount_in)?;
     let mut result = WriterDlmmRouteQuote::default();
     let mut remaining = fees.trade_input;
     let mut allocated = 0u64;
@@ -511,8 +504,6 @@ pub fn quote_dlmm_with_orders(
                         policy.series_limits[policy.series_index].seller_floor_quote_atoms,
                         config.tick_size_quote_atomic,
                         policy.buyback.price_separation_ticks,
-                        config.swap_fee_bps,
-                        policy.primary_fee_bps,
                     );
                     let price_eligible = bounds.is_ok_and(|(ask, bid, _)| {
                         if ascending {
@@ -527,62 +518,79 @@ pub fn quote_dlmm_with_orders(
                             option_reserve: if ascending { relevant_reserve } else { 0 },
                             quote_reserve: if ascending { 0 } else { relevant_reserve },
                         };
-                        let mut fill = dlmm::fill_bin_exact_input_without_fee(
+                        let full_fill = dlmm::fill_bin_exact_input_without_fee(
                             config.direction,
                             remaining,
                             price,
                             &temporary,
                         )?;
-                        fill.lp_fee = allocate_fee(
-                            fill.trade_input,
-                            remaining,
-                            fees.trade_input,
-                            fees.lp_fee,
-                            allocated,
-                        )?;
-                        let mut totals = result.writer;
-                        totals.lp_fee_atoms = checked_add(totals.lp_fee_atoms, fill.lp_fee)?;
-                        match config.direction {
-                            AmoebaDlmmSwapDirection::QuoteForOption => {
-                                totals.gross_premium_atoms =
-                                    checked_add(totals.gross_premium_atoms, fill.trade_input)?;
-                                totals.sold_option_atoms =
-                                    checked_add(totals.sold_option_atoms, fill.amount_out)?;
+                        let mut probe_input = full_fill.trade_input;
+                        for probe in 0..MAX_WRITER_ADMISSION_PROBES {
+                            if probe == MAX_WRITER_ADMISSION_PROBES - 1 {
+                                probe_input = 1;
                             }
-                            AmoebaDlmmSwapDirection::OptionForQuote => {
-                                totals.retired_option_atoms = checked_add(
-                                    totals.retired_option_atoms,
-                                    checked_add(fill.trade_input, fill.lp_fee)?,
-                                )?;
-                                totals.spent_quote_atoms =
-                                    checked_add(totals.spent_quote_atoms, fill.amount_out)?;
+                            let mut fill = dlmm::fill_bin_exact_input_without_fee(
+                                config.direction,
+                                probe_input,
+                                price,
+                                &temporary,
+                            )?;
+                            fill.lp_fee = allocate_fee(
+                                fill.trade_input,
+                                remaining,
+                                fees.trade_input,
+                                fees.lp_fee,
+                                allocated,
+                            )?;
+                            let mut totals = result.writer;
+                            totals.lp_fee_atoms = checked_add(totals.lp_fee_atoms, fill.lp_fee)?;
+                            match config.direction {
+                                AmoebaDlmmSwapDirection::QuoteForOption => {
+                                    totals.gross_premium_atoms =
+                                        checked_add(totals.gross_premium_atoms, fill.trade_input)?;
+                                    totals.sold_option_atoms =
+                                        checked_add(totals.sold_option_atoms, fill.amount_out)?;
+                                }
+                                AmoebaDlmmSwapDirection::OptionForQuote => {
+                                    totals.retired_option_atoms = checked_add(
+                                        totals.retired_option_atoms,
+                                        checked_add(fill.trade_input, fill.lp_fee)?,
+                                    )?;
+                                    totals.spent_quote_atoms =
+                                        checked_add(totals.spent_quote_atoms, fill.amount_out)?;
+                                }
                             }
-                        }
-                        if fill.amount_out > 0 && admit_totals(&config, policy, &mut totals) {
-                            if ascending {
-                                writer_after.option_atoms = writer_after
-                                    .option_atoms
-                                    .checked_sub(fill.amount_out)
+                            if fill.amount_out > 0 && admit_totals(&config, policy, &mut totals) {
+                                if ascending {
+                                    writer_after.option_atoms = writer_after
+                                        .option_atoms
+                                        .checked_sub(fill.amount_out)
+                                        .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?;
+                                } else {
+                                    writer_after.quote_atoms = writer_after
+                                        .quote_atoms
+                                        .checked_sub(fill.amount_out)
+                                        .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?;
+                                }
+                                fill.option_reserve_after = writer_after.option_atoms;
+                                fill.quote_reserve_after = writer_after.quote_atoms;
+                                remaining = remaining
+                                    .checked_sub(fill.trade_input)
                                     .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?;
-                            } else {
-                                writer_after.quote_atoms = writer_after
-                                    .quote_atoms
-                                    .checked_sub(fill.amount_out)
-                                    .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?;
+                                allocated = checked_add(allocated, fill.lp_fee)?;
+                                combined.trade_input =
+                                    checked_add(combined.trade_input, fill.trade_input)?;
+                                combined.amount_out =
+                                    checked_add(combined.amount_out, fill.amount_out)?;
+                                combined.lp_fee = checked_add(combined.lp_fee, fill.lp_fee)?;
+                                result.writer = totals;
+                                result.writer_fills.push(fill);
+                                break;
                             }
-                            fill.option_reserve_after = writer_after.option_atoms;
-                            fill.quote_reserve_after = writer_after.quote_atoms;
-                            remaining = remaining
-                                .checked_sub(fill.trade_input)
-                                .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?;
-                            allocated = checked_add(allocated, fill.lp_fee)?;
-                            combined.trade_input =
-                                checked_add(combined.trade_input, fill.trade_input)?;
-                            combined.amount_out =
-                                checked_add(combined.amount_out, fill.amount_out)?;
-                            combined.lp_fee = checked_add(combined.lp_fee, fill.lp_fee)?;
-                            result.writer = totals;
-                            result.writer_fills.push(fill);
+                            if probe_input <= 1 {
+                                break;
+                            }
+                            probe_input /= 2;
                         }
                     }
                 }

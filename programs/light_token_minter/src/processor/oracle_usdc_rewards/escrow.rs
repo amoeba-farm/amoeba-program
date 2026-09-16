@@ -372,7 +372,7 @@ pub(in crate::processor) fn settle_cash_update_claim(
         || claim.source_id != source.source_id
         || claim.escrow_disposition != OracleEscrowDisposition::Unsettled
         || claim.stake == 0
-        || oracle_update_claim_samba_checkpoint_active(program_id, claim_info)?
+        || oracle_update_claim_council_review_pending(program_id, claim_info)?
         || !matches!(
             claim.status,
             OracleClaimStatus::Finalized | OracleClaimStatus::TimedOut
@@ -425,7 +425,7 @@ pub(in crate::processor) fn settle_cash_update_challenge(
         || challenge.escrow_disposition != OracleEscrowDisposition::Unsettled
         || claim.stake == 0
         || challenge.bond == 0
-        || oracle_update_claim_samba_checkpoint_active(program_id, claim_info)?
+        || oracle_update_claim_council_review_pending(program_id, claim_info)?
     {
         return Err(VaultError::OracleEscrowNotSettleable.into());
     }

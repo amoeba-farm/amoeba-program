@@ -174,23 +174,24 @@ pub(super) fn rulebook_schedule_boundaries(
     if !month.has_rulebook_schedule() {
         return Err(VaultError::InvalidOracleState.into());
     }
+    let [placement, challenge, resolution, opening] = schedule_windows(month)?;
     let placement_end = month
         .scramble_start_ts
-        .checked_add(ORACLE_PLACEMENT_WINDOW_SECONDS)
+        .checked_add(placement)
         .ok_or(VaultError::ArithmeticOverflow)?;
     let kill_end = placement_end
-        .checked_add(ORACLE_KILL_WINDOW_SECONDS)
+        .checked_add(challenge)
         .ok_or(VaultError::ArithmeticOverflow)?;
     let scramble_end = kill_end
-        .checked_add(ORACLE_RESOLUTION_FREEZE_WINDOW_SECONDS)
+        .checked_add(resolution)
         .ok_or(VaultError::ArithmeticOverflow)?;
     let expected_listing = scramble_end
-        .checked_add(ORACLE_OPENING_WINDOW_SECONDS)
+        .checked_add(opening)
         .ok_or(VaultError::ArithmeticOverflow)?;
     if scramble_end
         != month
             .scramble_start_ts
-            .checked_add(ORACLE_SCRAMBLE_WINDOW_SECONDS)
+            .checked_add(placement + challenge + resolution)
             .ok_or(VaultError::ArithmeticOverflow)?
         || month.listing_ts != expected_listing
     {
@@ -427,6 +428,7 @@ pub(super) fn parse_oracle_opening_archive_url(
     // The slice begins after an ASCII prefix, fourteen ASCII timestamp bytes, and an ASCII slash,
     // so it remains on a UTF-8 boundary within the original `&str`.
     let original_url = unsafe { std::str::from_utf8_unchecked(original_url) };
+    crate::processor::oracle_evidence::public_locator(original_url)?;
     Ok((capture_time, original_url))
 }
 

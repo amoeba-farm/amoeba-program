@@ -6,6 +6,130 @@ use crate::state::{
     ORACLE_RECIPE_SOURCE_INDEX_SEED,
 };
 
+const PAGE_SEED: &[u8] = b"g3-oracle-members-page";
+const PAGE_LEN: usize = 233;
+
+fn member_page_address(program: &Pubkey, bucket: &Pubkey, page: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            CURRENT_STATE_NAMESPACE_SEED,
+            PAGE_SEED,
+            bucket.as_ref(),
+            &page.to_le_bytes(),
+        ],
+        program,
+    )
+}
+
+fn load_member_page(
+    program: &Pubkey,
+    bucket: &Pubkey,
+    page: u16,
+    info: &AccountInfo,
+) -> Result<Vec<[u8; 32]>, ProgramError> {
+    let (key, bump) = member_page_address(program, bucket, page);
+    if info.owner != program
+        || info.executable
+        || info.is_signer
+        || *info.key != key
+        || info.data_len() != PAGE_LEN
+    {
+        return Err(VaultError::InvalidOracleWeightManifest.into());
+    }
+    let data = info.try_borrow_data()?;
+    let count = usize::from(data[40]);
+    if data[..6] != [1, bump, b'O', b'M', b'P', 1]
+        || data[6..38] != bucket.to_bytes()
+        || data[38..40] != page.to_le_bytes()
+        || count == 0
+        || count > crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE
+        || data[41 + count * 32..].iter().any(|b| *b != 0)
+    {
+        return Err(VaultError::InvalidOracleWeightManifest.into());
+    }
+    let mut ids = Vec::with_capacity(count);
+    for bytes in data[41..41 + count * 32].chunks_exact(32) {
+        let id: [u8; 32] = bytes
+            .try_into()
+            .map_err(|_| VaultError::InvalidOracleWeightManifest)?;
+        if crate::bytes32_is_zero(&id) || ids.last().is_some_and(|previous| *previous <= id) {
+            return Err(VaultError::InvalidOracleWeightOrder.into());
+        }
+        ids.push(id);
+    }
+    Ok(ids)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_member_page<'a>(
+    program: &Pubkey,
+    payer: &AccountInfo<'a>,
+    bucket: &Pubkey,
+    info: &AccountInfo<'a>,
+    system: &AccountInfo<'a>,
+    count: usize,
+    id: [u8; 32],
+) -> ProgramResult {
+    let page = u16::try_from(count / crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE)
+        .map_err(|_| VaultError::ArithmeticOverflow)?;
+    let offset = count % crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE;
+    let (key, bump) = member_page_address(program, bucket, page);
+    if *info.key != key || !info.is_writable || info.is_signer {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    if offset == 0 {
+        validate_create_only_program_account_target(program, info)?;
+        create_program_account(
+            payer,
+            info,
+            system,
+            program,
+            PAGE_LEN,
+            &[PAGE_SEED, bucket.as_ref(), &page.to_le_bytes(), &[bump]],
+        )?;
+    } else {
+        let ids = load_member_page(program, bucket, page, info)?;
+        if ids.len() != offset || ids[offset - 1] <= id {
+            return Err(VaultError::InvalidOracleWeightOrder.into());
+        }
+    }
+    let mut data = info.try_borrow_mut_data()?;
+    data[..6].copy_from_slice(&[1, bump, b'O', b'M', b'P', 1]);
+    data[6..38].copy_from_slice(bucket.as_ref());
+    data[38..40].copy_from_slice(&page.to_le_bytes());
+    data[40] = u8::try_from(offset + 1).map_err(|_| VaultError::ArithmeticOverflow)?;
+    data[41 + offset * 32..73 + offset * 32].copy_from_slice(&id);
+    Ok(())
+}
+
+/// Fixed six-member pages are stored in reverse recipe order. A complete root
+/// determines the exact page and slot for every ascending source cursor.
+pub(super) fn require_member(
+    program: &Pubkey,
+    root_key: &Pubkey,
+    root: &OracleBucketSourceIndex,
+    page_info: &AccountInfo,
+    ascending_index: u16,
+    source_id: &[u8; 32],
+) -> ProgramResult {
+    if page_info.is_writable || ascending_index >= root.source_count {
+        return Err(VaultError::InvalidOracleWeightOrder.into());
+    }
+    let reverse = usize::from(root.source_count - 1 - ascending_index);
+    let page = u16::try_from(reverse / crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE)
+        .map_err(|_| VaultError::ArithmeticOverflow)?;
+    let ids = load_member_page(program, root_key, page, page_info)?;
+    let expected_count = (usize::from(root.source_count)
+        - usize::from(page) * crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE)
+        .min(crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE);
+    if ids.len() != expected_count
+        || ids.get(reverse % crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE) != Some(source_id)
+    {
+        return Err(VaultError::InvalidOracleWeightOrder.into());
+    }
+    Ok(())
+}
+
 fn load_recipe_index(
     program_id: &Pubkey,
     month_key: &Pubkey,
@@ -74,6 +198,9 @@ fn load_bucket_index(
     bucket_id: &[u8; 32],
     info: &AccountInfo,
 ) -> Result<OracleBucketSourceIndex, ProgramError> {
+    if info.owner != program_id {
+        return Err(VaultError::InvalidOracleWeightManifest.into());
+    }
     let bucket: OracleBucketSourceIndex = load_exact_zero_padded_state(
         info,
         program_id,
@@ -104,18 +231,6 @@ fn load_bucket_index(
             .is_none_or(|end| end > index.expected_source_count)
     {
         return Err(VaultError::InvalidOracleWeightManifest.into());
-    }
-    if bucket.source_ids[..count]
-        .iter()
-        .any(crate::bytes32_is_zero)
-        || bucket.source_ids[..count]
-            .windows(2)
-            .any(|pair| pair[0] >= pair[1])
-        || bucket.source_ids[count..]
-            .iter()
-            .any(|id| !crate::bytes32_is_zero(id))
-    {
-        return Err(VaultError::InvalidOracleWeightOrder.into());
     }
     Ok(bucket)
 }
@@ -154,12 +269,12 @@ pub(super) fn process_index_oracle_recipe_source(
     accounts: &[AccountInfo],
     params: IndexOracleRecipeSourceV1Params,
 ) -> ProgramResult {
-    if accounts.len() != 7 {
+    if accounts.len() != 8 {
         return Err(VaultError::InvalidAccountList.into());
     }
     for (position, account) in accounts.iter().enumerate() {
         if account.is_signer != (position == 0)
-            || account.is_writable != matches!(position, 0 | 4 | 5)
+            || account.is_writable != matches!(position, 0 | 4 | 5 | 7)
         {
             return Err(VaultError::InvalidAccountList.into());
         }
@@ -282,7 +397,6 @@ pub(super) fn process_index_oracle_recipe_source(
         let bucket = load_bucket_index(program_id, &index, &params.bucket_id, bucket_info)?;
         if bucket.group_index != index.expected_bucket_count - index.indexed_bucket_count
             || bucket.first_source_index != index.remaining_source_count
-            || bucket.source_ids[0] != index.last_source_id
             || params.source_id >= index.last_source_id
             || bucket.bucket_weight_bps != params.bucket_weight_bps
         {
@@ -294,8 +408,15 @@ pub(super) fn process_index_oracle_recipe_source(
     if count >= crate::constants::MAX_ORACLE_BUCKET_SOURCES {
         return Err(VaultError::InvalidOracleWeightManifest.into());
     }
-    bucket.source_ids.copy_within(0..count, 1);
-    bucket.source_ids[0] = params.source_id;
+    append_member_page(
+        program_id,
+        payer,
+        bucket_info.key,
+        &accounts[7],
+        system_info,
+        count,
+        params.source_id,
+    )?;
     bucket.source_count = bucket
         .source_count
         .checked_add(1)

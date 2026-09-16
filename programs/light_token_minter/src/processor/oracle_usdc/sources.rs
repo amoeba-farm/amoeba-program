@@ -15,7 +15,7 @@ pub(in crate::processor) fn process_propose_oracle_source_v3(
     accounts: &[AccountInfo],
     params: ProposeOracleSourceV3Params,
 ) -> ProgramResult {
-    if accounts.len() != 12 {
+    if accounts.len() != 16 {
         return Err(VaultError::InvalidAccountList.into());
     }
     crate::processor::oracle_carry::require_import_complete(
@@ -23,6 +23,29 @@ pub(in crate::processor) fn process_propose_oracle_source_v3(
         accounts[2].key,
         &accounts[11],
     )?;
+    for (role, commitment, object, link) in [
+        (0, params.canonical_locator_hash, 12, 13),
+        (1, params.source_definition_hash, 14, 15),
+    ] {
+        crate::processor::oracle_evidence::publish(
+            program_id,
+            &accounts[0],
+            &accounts[9],
+            &accounts[object],
+            &accounts[link],
+            accounts[2].key,
+            accounts[5].key,
+            accounts[5].key,
+            accounts[5].key,
+            role,
+            0,
+            0,
+            0,
+            commitment,
+            commitment,
+            params.source_id,
+        )?;
+    }
     process_propose_oracle_source(
         program_id,
         &accounts[..11],
@@ -732,7 +755,7 @@ pub(in crate::processor) fn process_challenge_oracle_source_v2(
         evidence_hash: params.evidence_hash,
         rule_review_slot: slot,
         escrow_disposition: OracleEscrowDisposition::Unsettled,
-        emergency_snapshot_total_major_tokens: 0,
+        council_authority_version: 0,
         emergency_snapshot_version: 0,
         failed_schedule_escrow_counted: false,
     };

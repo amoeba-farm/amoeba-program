@@ -9,13 +9,15 @@ crate-type = ["cdylib", "lib"]
 test = false
 
 [features]
+default = []
 no-entrypoint = []
-writer-math-benchmark = []
 devnet-solo-backfill-2026 = []
+mainnet-four-hour-launch = []
 governance-gate-v1 = []
 phase3-synthetic-governance-controller = ["governance-gate-v1"]
 reviewed-governance-controller = ["governance-gate-v1"]
 devnet-v3-governance-controller = ["governance-gate-v1"]
+mainnet-v3 = ["governance-gate-v1", "devnet-solo-backfill-2026"]
 local-ceremony-governance-controller = ["reviewed-governance-controller"]
 
 [dependencies]

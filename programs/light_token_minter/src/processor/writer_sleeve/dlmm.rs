@@ -401,11 +401,8 @@ fn ensure_pre_capital(context: &WriterPolicyContext) -> ProgramResult {
     if sleeve.status != WriterSleeveStatus::PolicyFrozen
         || !context.book.frozen
         || sleeve.writer_principal_atoms != 0
-        || sleeve.flat_par_supply_atoms != 0
         || sleeve.accounted_asset_atoms != 0
         || sleeve.locked_primary_premium_atoms != 0
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
         || context.book.records[..usize::from(context.book.series_count)]
             .iter()
             .any(|record| {
@@ -420,6 +417,7 @@ fn ensure_pre_capital(context: &WriterPolicyContext) -> ProgramResult {
 }
 
 /// One fixed 9-account core for all pre-capital policy actions, excluding governance tail.
+#[inline(never)]
 pub(in crate::processor) fn process_policy_action(
     program_id: &Pubkey,
     accounts: &[AccountInfo],

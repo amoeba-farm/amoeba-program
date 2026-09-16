@@ -4,7 +4,6 @@ use crate::instruction::{CleanupWriterCustodyV1Params, ReconcileWriterSupplyV1Pa
 const RECONCILE_WRITER_SUPPLY_ACCOUNT_COUNT: usize = 16;
 const CLEANUP_WRITER_CUSTODY_ACCOUNT_COUNT: usize = 9;
 const RECONCILE_TARGET_SERIES: u8 = 0;
-const RECONCILE_TARGET_FLAT: u8 = 1;
 
 fn optional_canonical_token_amount(
     info: &AccountInfo,
@@ -35,7 +34,7 @@ fn cumulative_allocation_delta(
         initial_liability,
     )
     .map_err(|error| match error {
-        WriterMathError::InvalidCloseAmount => VaultError::WriterSupplyMismatch.into(),
+        WriterMathError::InvalidClaimAmount => VaultError::WriterSupplyMismatch.into(),
         _ => VaultError::ArithmeticOverflow.into(),
     })
 }
@@ -79,87 +78,14 @@ fn apply_long_forfeiture(
     Ok(())
 }
 
-fn apply_flat_direct_burn(sleeve: &mut WriterSleeveV1, burned_atoms: u64) -> ProgramResult {
-    if burned_atoms == 0 {
-        return Ok(());
-    }
-    if burned_atoms > sleeve.flat_par_supply_atoms {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
-    if sleeve.status == WriterSleeveStatus::SettlementFinalized {
-        let allocation = cumulative_allocation_delta(
-            sleeve.flat_supply_snapshot_atoms,
-            sleeve.flat_claim_supply_remaining_atoms,
-            burned_atoms,
-            sleeve.flat_residual_initial_atoms,
-        )?;
-        if allocation > sleeve.flat_residual_remaining_atoms
-            || allocation > sleeve.accounted_asset_atoms
-        {
-            return Err(VaultError::WriterSolvencyViolation.into());
-        }
-        sleeve.flat_claim_supply_remaining_atoms = sleeve
-            .flat_claim_supply_remaining_atoms
-            .checked_sub(burned_atoms)
-            .ok_or(VaultError::ArithmeticOverflow)?;
-        sleeve.flat_residual_remaining_atoms = sleeve
-            .flat_residual_remaining_atoms
-            .checked_sub(allocation)
-            .ok_or(VaultError::ArithmeticOverflow)?;
-        sleeve.accounted_asset_atoms = sleeve
-            .accounted_asset_atoms
-            .checked_sub(allocation)
-            .ok_or(VaultError::ArithmeticOverflow)?;
-        sleeve.stranded_surplus_atoms = sleeve
-            .stranded_surplus_atoms
-            .checked_add(allocation)
-            .ok_or(VaultError::ArithmeticOverflow)?;
-    } else {
-        if burned_atoms > sleeve.writer_principal_atoms {
-            return Err(VaultError::WriterSupplyMismatch.into());
-        }
-        sleeve.writer_principal_atoms = sleeve
-            .writer_principal_atoms
-            .checked_sub(burned_atoms)
-            .ok_or(VaultError::ArithmeticOverflow)?;
-    }
-    sleeve.flat_par_supply_atoms = sleeve
-        .flat_par_supply_atoms
-        .checked_sub(burned_atoms)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    Ok(())
-}
-
 fn reconciliation_allowed(sleeve: &WriterSleeveV1, target_kind: u8) -> bool {
-    match target_kind {
-        RECONCILE_TARGET_FLAT => match sleeve.status {
-            WriterSleeveStatus::Funding => {
-                sleeve.active_auction.is_none() && sleeve.active_close_request.is_none()
-            }
-            WriterSleeveStatus::Active => sleeve.active_close_request.is_none(),
-            WriterSleeveStatus::CloseStaging => {
-                sleeve.active_auction.is_none() && sleeve.active_close_request.is_some()
-            }
-            WriterSleeveStatus::Expired | WriterSleeveStatus::SettlementFinalized => {
-                sleeve.active_auction.is_none() && sleeve.active_close_request.is_none()
-            }
-            WriterSleeveStatus::Draft
-            | WriterSleeveStatus::PolicyFrozen
-            | WriterSleeveStatus::Closed => false,
-        },
-        RECONCILE_TARGET_SERIES => match sleeve.status {
-            WriterSleeveStatus::Active => sleeve.active_close_request.is_none(),
-            WriterSleeveStatus::Expired | WriterSleeveStatus::SettlementFinalized => {
-                sleeve.active_auction.is_none() && sleeve.active_close_request.is_none()
-            }
-            WriterSleeveStatus::Draft
-            | WriterSleeveStatus::PolicyFrozen
-            | WriterSleeveStatus::Funding
-            | WriterSleeveStatus::CloseStaging
-            | WriterSleeveStatus::Closed => false,
-        },
-        _ => false,
-    }
+    target_kind == RECONCILE_TARGET_SERIES
+        && matches!(
+            sleeve.status,
+            WriterSleeveStatus::Active
+                | WriterSleeveStatus::Expired
+                | WriterSleeveStatus::SettlementFinalized
+        )
 }
 
 fn recompute_reconciled_writer_metrics(
@@ -169,7 +95,7 @@ fn recompute_reconciled_writer_metrics(
     security_cap_atoms: u64,
 ) -> ProgramResult {
     // Holder burns are irreversible. Series reconciliation can only reduce external liability;
-    // Flat reconciliation forfeits principal while A and every long liability remain unchanged.
+    // Receipt principal is unchanged by long-holder forfeiture.
     // Reapplying admission-only solvency/drawdown gates here could reject the accounting update
     // and permanently leave physical supply below its recorded value. Exact reserve, tails, and
     // the aggregate security cap are still recomputed, while later issuance/close flows continue
@@ -209,10 +135,7 @@ pub(super) fn process_reconcile_writer_supply(
     if accounts.len() != RECONCILE_WRITER_SUPPLY_ACCOUNT_COUNT {
         return Err(VaultError::InvalidAccountList.into());
     }
-    if !matches!(
-        params.target_kind,
-        RECONCILE_TARGET_SERIES | RECONCILE_TARGET_FLAT
-    ) {
+    if params.target_kind != RECONCILE_TARGET_SERIES {
         return Err(VaultError::InvalidInstructionData.into());
     }
     let cranker_info = &accounts[0];
@@ -383,47 +306,7 @@ pub(super) fn process_reconcile_writer_supply(
             )?;
             store_state(target_authority_info, &market)?;
         }
-        RECONCILE_TARGET_FLAT => {
-            if params.series_index != 0
-                || *target_authority_info.key != *sleeve_info.key
-                || *target_mint_info.key != sleeve.flat_mint
-                || *staging_info.key != sleeve.flat_staging
-                || *custody_info.key != sleeve.flat_burn_custody
-                || *interface_info.key != sleeve.flat_spl_interface
-            {
-                return Err(VaultError::InvalidAccountList.into());
-            }
-            let mint = validate_mint_account(target_mint_info, token_program_info.key)?;
-            if !mint.is_initialized
-                || mint.decimals != MarketMintAccounting::CANONICAL_DECIMALS
-                || mint.mint_authority != COption::Some(*sleeve_info.key)
-                || mint.freeze_authority != COption::None
-                || mint.supply > sleeve.flat_par_supply_atoms
-            {
-                return Err(VaultError::WriterSupplyMismatch.into());
-            }
-            validate_spl_interface_account(target_mint_info.key, interface_info)?;
-            let staging_atoms = optional_canonical_token_amount(
-                staging_info,
-                &sleeve.flat_staging,
-                target_mint_info.key,
-                sleeve_info.key,
-            )?;
-            let burn_atoms = optional_canonical_token_amount(
-                custody_info,
-                &sleeve.flat_burn_custody,
-                target_mint_info.key,
-                sleeve_info.key,
-            )?;
-            if staging_atoms != 0 || burn_atoms != 0 {
-                return Err(VaultError::WriterSupplyMismatch.into());
-            }
-            let direct_burn = sleeve
-                .flat_par_supply_atoms
-                .checked_sub(mint.supply)
-                .ok_or(VaultError::ArithmeticOverflow)?;
-            apply_flat_direct_burn(&mut sleeve, direct_burn)?;
-        }
+
         _ => return Err(VaultError::InvalidInstructionData.into()),
     }
 
@@ -432,7 +315,7 @@ pub(super) fn process_reconcile_writer_supply(
     if sleeve.status == WriterSleeveStatus::SettlementFinalized {
         let partition_remaining = sleeve
             .long_liability_remaining_atoms
-            .checked_add(sleeve.flat_residual_remaining_atoms)
+            .checked_add(sleeve.writer_residual_remaining_atoms)
             .ok_or(VaultError::ArithmeticOverflow)?;
         if sleeve.accounted_asset_atoms != partition_remaining {
             return Err(VaultError::WriterSolvencyViolation.into());
@@ -495,8 +378,6 @@ pub(super) fn process_cleanup_writer_custody(
         &sleeve.settlement_group,
     )?;
     if sleeve.series_book != *book_info.key
-        || sleeve.active_close_request.is_some()
-        || sleeve.active_auction.is_some()
         || matches!(
             sleeve.status,
             WriterSleeveStatus::Draft | WriterSleeveStatus::Closed
@@ -568,7 +449,7 @@ pub(super) fn process_cleanup_writer_custody(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    funding::close_sleeve_token_custody(
+    custody::close_sleeve_token_custody(
         &sleeve,
         sleeve_info,
         custody_info,

@@ -23,13 +23,7 @@ pub(in crate::processor) fn ensure_failed_v5_reward_schedule_window_at(
     month: &OracleMonthState,
     now: u64,
 ) -> ProgramResult {
-    let preserved_post_submission_seconds = ORACLE_KILL_WINDOW_SECONDS
-        .checked_add(ORACLE_RESOLUTION_FREEZE_WINDOW_SECONDS)
-        .and_then(|value| value.checked_add(ORACLE_OPENING_WINDOW_SECONDS))
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    let latest_safe = expiry_ts
-        .checked_sub(preserved_post_submission_seconds)
-        .ok_or(VaultError::InvalidOracleState)?;
+    let latest_safe = source_submission_deadline(month, expiry_ts)?;
     if month.phase != OraclePhase::SourceSubmission
         || month.pending_resolution_count != 0
         || month.weight_scheme_version != 0
@@ -46,7 +40,6 @@ pub(in crate::processor) fn release_aborted_reward_reservation(
 ) -> ProgramResult {
     if schedule.phase != OracleUsdcRewardSchedulePhase::Funded
         || schedule.outstanding_prelisting_escrow_count != 0
-        || schedule.total_reward_budget == 0
         || schedule.remaining_reward_budget != schedule.total_reward_budget
         || reward_vault.total_reserved < schedule.remaining_reward_budget
     {
@@ -363,11 +356,7 @@ pub(in crate::processor) fn process_register_oracle_usdc_reward_update(
         || sku.bucket_id != source.bucket_id
         || bucket.bucket_id != source.bucket_id
         || !schedule.bounty_fee_sweep_finalized
-        || !matches!(
-            bucket.status,
-            OracleBucketMedianStatus::SettlementReady
-                | OracleBucketMedianStatus::EmergencyDefaulted
-        )
+        || !bucket.status.permits_settlement()
         || claim.claim.source != *source_info.key
         || claim.claim.source_id != source.source_id
         || claim.claim.status != OracleClaimStatus::Finalized
@@ -450,6 +439,9 @@ pub(in crate::processor) fn process_finalize_oracle_usdc_reward_entitlements(
     let (_market, month) = load_valid_market_and_oracle_month(program_id, market_info, month_info)?;
     let vault = load_oracle_usdc_reward_vault(program_id, reward_vault_info)?;
     let mut schedule = load_oracle_usdc_reward_schedule(program_id, month_info.key, schedule_info)?;
+    let zero_only = schedule.total_reward_budget == 0
+        && schedule.remaining_reward_budget == 0
+        && schedule.trading_fee_bounty_total == 0;
     if *authority_info.key != month.authority
         || schedule.authority != *authority_info.key
         || schedule.reward_vault != *reward_vault_info.key
@@ -457,11 +449,13 @@ pub(in crate::processor) fn process_finalize_oracle_usdc_reward_entitlements(
         || !matches!(month.phase, OraclePhase::Settled | OraclePhase::Closed)
         || month.pending_resolution_count != 0
         || month.finalized_at_ts == 0
-        || schedule.registered_source_count != u32::from(month.frozen_source_count)
-        || schedule.registered_opening_count != u32::from(month.opened_source_count)
-        || schedule.registered_update_count != month.accepted_cash_update_count
-        || schedule.registered_update_reward_units < schedule.registered_update_count
+        || (!zero_only && schedule.registered_source_count != u32::from(month.frozen_source_count))
+        || (!zero_only && schedule.registered_opening_count != u32::from(month.opened_source_count))
+        || (!zero_only && schedule.registered_update_count != month.accepted_cash_update_count)
+        || (!zero_only
+            && schedule.registered_update_reward_units < schedule.registered_update_count)
         || !schedule.bounty_fee_sweep_finalized
+        || schedule.outstanding_prelisting_escrow_count != 0
         || schedule.remaining_reward_budget != schedule.total_reward_budget
         || vault.total_reserved < schedule.remaining_reward_budget
     {

@@ -1,13 +1,27 @@
 use super::*;
+mod storage;
 use crate::ameba_dlmm_state::AMOEBA_DLMM_ACCOUNT_VERSION;
-use crate::dlmm_order_math::{OrderBalance, OrderSide, MAX_OPEN_ORDERS, MAX_ORDER_FILLS};
+use crate::dlmm_order_math::{OrderBalance, OrderSide, MAX_ORDER_FILLS};
 use crate::dlmm_order_state::{
     derive_order_book, DlmmOrder, DlmmOrderAction, DlmmOrderBook, DlmmOrderBookHeader,
     ORDER_BOOK_SEED, ORDER_POOL_VERSION,
 };
 use crate::writer_dlmm_quote::{PublicOrderRouteLimits, WriterDlmmRouteQuote};
 
-pub(super) const ORDER_SWAP_FIXED_ACCOUNTS: usize = 35;
+pub(super) fn witness_end(accounts: &[AccountInfo]) -> Result<usize, ProgramError> {
+    storage::witness_end(accounts)
+}
+
+pub(super) const ORDER_SWAP_FIXED_ACCOUNTS: usize = 34;
+
+/// Commit the header together with every loaded or newly created owner record.
+pub(super) fn persist_book(
+    program: &Pubkey,
+    accounts: &[AccountInfo],
+    book: &mut DlmmOrderBook,
+) -> ProgramResult {
+    storage::persist(program, accounts, book)
+}
 
 fn admit_book_initialization(pool: &AmoebaDlmmPoolV1, now: u64) -> ProgramResult {
     if pool.account_version != AMOEBA_DLMM_ACCOUNT_VERSION
@@ -16,8 +30,6 @@ fn admit_book_initialization(pool: &AmoebaDlmmPoolV1, now: u64) -> ProgramResult
     {
         return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
     }
-    // Existing canonical pools may store 20 bps. The current execution math is
-    // fee-free; account history is neither rewritten nor an initialization gate.
     Ok(())
 }
 
@@ -40,7 +52,7 @@ pub(super) fn load_book(
     pool_info: &AccountInfo,
     pool: &AmoebaDlmmPoolV1,
 ) -> Result<DlmmOrderBook, ProgramError> {
-    let mut book = load_exact_zero_padded_state::<DlmmOrderBook>(
+    let book = load_exact_zero_padded_state::<DlmmOrderBook>(
         info,
         program,
         DlmmOrderBook::LEN,
@@ -55,47 +67,22 @@ pub(super) fn load_book(
         || !h.initialized
         || h.bump != bump
         || h.discriminator != *b"DOB"
-        || h.version != 1
+        || h.version != 3
         || h.pool != *pool_info.key
         || h.market != pool.market
         || h.option_mint != pool.option_mint
         || h.quote_mint != pool.quote_mint
         || h.expiry_ts != pool.expiry_ts
         || h.next_sequence == 0
+        || h.bid_head >= h.next_sequence
+        || h.ask_head >= h.next_sequence
+        || h.continuation_sequence >= h.next_sequence
+        || h.record_count >= h.next_sequence
+        || (h.record_count == 0 && (h.bid_head != 0 || h.ask_head != 0))
         || pool.account_version != ORDER_POOL_VERSION
-        || book.orders.len() > MAX_OPEN_ORDERS
         || crate::pubkey_is_default(&h.rent_payer)
     {
         return Err(VaultError::InvalidAmoebaDlmmPool.into());
-    }
-    for (index, order) in book.orders.iter().enumerate() {
-        if order.sequence == 0
-            || order.sequence >= h.next_sequence
-            || order.side > 1
-            || order.limit_bin == 0
-            || order.limit_bin > pool.maximum_bin_id
-            || order.original_quantity == 0
-            || order.remaining_quantity > order.original_quantity
-            || crate::pubkey_is_default(&order.owner)
-            || (order.side == 1 && order.remaining_input != order.remaining_quantity)
-            || (order.remaining_quantity == 0 && order.remaining_input != 0)
-            || book.orders[..index]
-                .iter()
-                .any(|other| other.sequence == order.sequence)
-        {
-            return Err(VaultError::InvalidAmoebaDlmmPool.into());
-        }
-    }
-    let obligations = (h.option_obligations, h.quote_obligations);
-    book.recompute_obligations(pool.tick_size_quote_atomic)
-        .map_err(order_error)?;
-    if obligations
-        != (
-            book.header.option_obligations,
-            book.header.quote_obligations,
-        )
-    {
-        return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
     Ok(book)
 }
@@ -112,11 +99,12 @@ pub(super) fn load_swap_state(
     if a.len() < ORDER_SWAP_FIXED_ACCOUNTS {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let book = load_book(program, &a[32], &a[7], pool)?;
-    let before_option = custody(&a[33], a[32].key, &pool.option_mint)?;
-    let before_quote = custody(&a[34], a[32].key, &pool.quote_mint)?;
-    if !a[33].is_writable
-        || !a[34].is_writable
+    let mut book = load_book(program, &a[31], &a[7], pool)?;
+    storage::load(program, a, &mut book, pool)?;
+    let before_option = custody(&a[32], a[31].key, &pool.option_mint)?;
+    let before_quote = custody(&a[33], a[31].key, &pool.quote_mint)?;
+    if !a[32].is_writable
+        || !a[33].is_writable
         || before_option < book.header.option_obligations
         || before_quote < book.header.quote_obligations
     {
@@ -225,9 +213,9 @@ pub(super) fn seed_output(
     }
     let (source, destination, mint, interface) =
         if direction == AmoebaDlmmSwapDirection::QuoteForOption {
-            (&a[33], &a[11], &a[9], &a[17])
+            (&a[32], &a[11], &a[9], &a[17])
         } else {
-            (&a[34], &a[12], &a[10], &a[18])
+            (&a[33], &a[12], &a[10], &a[18])
         };
     let bump = [state.book.header.bump];
     let seeds: &[&[u8]] = &[
@@ -244,7 +232,7 @@ pub(super) fn seed_output(
         &a[0],
         source,
         destination,
-        &a[32],
+        &a[31],
         mint,
         interface,
         &a[19],
@@ -264,9 +252,9 @@ pub(super) fn finish(
     let (maker_input, maker_output) = maker_amounts(route, direction)?;
     let (source, destination, mint, interface) =
         if direction == AmoebaDlmmSwapDirection::QuoteForOption {
-            (&a[12], &a[34], &a[10], &a[18])
+            (&a[12], &a[33], &a[10], &a[18])
         } else {
-            (&a[11], &a[33], &a[9], &a[17])
+            (&a[11], &a[32], &a[9], &a[17])
         };
     if maker_input > 0 {
         let (_, bump) = derive_ameba_dlmm_authority_pda(program, a[7].key);
@@ -351,8 +339,8 @@ pub(super) fn finish(
         .book
         .recompute_obligations(pool.tick_size_quote_atomic)
         .map_err(order_error)?;
-    let after_option = custody(&a[33], a[32].key, &pool.option_mint)?;
-    let after_quote = custody(&a[34], a[32].key, &pool.quote_mint)?;
+    let after_option = custody(&a[32], a[31].key, &pool.option_mint)?;
+    let after_quote = custody(&a[33], a[31].key, &pool.quote_mint)?;
     let (before_input, before_output, after_input, after_output) =
         if direction == AmoebaDlmmSwapDirection::QuoteForOption {
             (
@@ -382,7 +370,7 @@ pub(super) fn finish(
     {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
-    store_state(&a[32], &state.book)
+    persist_book(program, a, &mut state.book)
 }
 
 /// Non-trading actions use the same 35-account prefix, without reserve pages.
@@ -393,18 +381,26 @@ pub(in crate::processor) fn process(
     action: DlmmOrderAction,
 ) -> ProgramResult {
     if a.len() < ORDER_SWAP_FIXED_ACCOUNTS
-        || a.len() > ORDER_SWAP_FIXED_ACCOUNTS + usize::from(MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP)
+        || a.len()
+            > ORDER_SWAP_FIXED_ACCOUNTS
+                + crate::dlmm_order_state::MAX_ORDER_WITNESSES
+                + usize::from(MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP)
         || !a[0].is_signer
         || !a[0].is_writable
     {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let base: Vec<_> = a[..32].iter().chain(a[35..].iter()).cloned().collect();
+    let witness_end = storage::witness_end(a)?;
+    let base: Vec<_> = a[..31]
+        .iter()
+        .chain(a[witness_end..].iter())
+        .cloned()
+        .collect();
     validate_pack_dlmm_account_privileges(
         AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1,
         &base,
     )?;
-    for index in 32..35 {
+    for index in 31..34 {
         if !a[index].is_writable
             || a[index].is_signer
             || a[index].executable
@@ -438,13 +434,13 @@ pub(in crate::processor) fn process(
         }
         admit_book_initialization(&pool, current_unix_timestamp()?)?;
         let (key, bump) = derive_order_book(program, a[7].key);
-        if *a[32].key != key || !a[32].is_writable {
+        if *a[31].key != key || !a[31].is_writable {
             return Err(VaultError::InvalidPda.into());
         }
-        validate_create_only_program_account_target(program, &a[32])?;
+        validate_create_only_program_account_target(program, &a[31])?;
         create_program_account(
             &a[0],
-            &a[32],
+            &a[31],
             &a[20],
             program,
             DlmmOrderBook::LEN,
@@ -455,7 +451,7 @@ pub(in crate::processor) fn process(
                 initialized: true,
                 bump,
                 discriminator: *b"DOB",
-                version: 1,
+                version: 3,
                 pool: *a[7].key,
                 market: pool.market,
                 option_mint: pool.option_mint,
@@ -466,10 +462,12 @@ pub(in crate::processor) fn process(
                 ..DlmmOrderBookHeader::default()
             },
             orders: Vec::new(),
+            unloaded_option: 0,
+            unloaded_quote: 0,
         };
-        for (mint, vault) in [(&a[9], &a[33]), (&a[10], &a[34])] {
+        for (mint, vault) in [(&a[9], &a[32]), (&a[10], &a[33])] {
             load_or_create_light_associated_token_account(
-                &a[0], &a[32], mint, vault, &a[15], &a[21], &a[22], &a[20],
+                &a[0], &a[31], mint, vault, &a[15], &a[21], &a[22], &a[20],
             )?;
         }
         pool.account_version = ORDER_POOL_VERSION;
@@ -479,10 +477,18 @@ pub(in crate::processor) fn process(
             .position_count
             .checked_add(1)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        store_state(&a[32], &book)?;
+        store_state(&a[31], &book)?;
         return store_light_state(&a[7], &pool);
     }
     let mut state = load_swap_state(program, a, &pool)?;
+    if matches!(
+        action,
+        DlmmOrderAction::Place { .. }
+            | DlmmOrderAction::Match { .. }
+            | DlmmOrderAction::Swap { .. }
+    ) {
+        storage::require_heads(&state.book)?;
+    }
     // A crossing continuation is completed against the older resting head's
     // price before newly submitted same-side interest can take priority.
     if matches!(
@@ -514,11 +520,9 @@ pub(in crate::processor) fn process(
             if config.paused
                 || pool.status != AmoebaDlmmPoolStatus::Active
                 || current_unix_timestamp()? >= pool.expiry_ts
-                || state.book.orders.len() == MAX_OPEN_ORDERS
                 || expected_sequence != state.book.header.next_sequence
                 || side > 1
-                || quantity < crate::dlmm_order_math::CONTRACT_SCALE
-                || quantity % crate::dlmm_order_math::CONTRACT_SCALE != 0
+                || quantity == 0
             {
                 return Err(VaultError::InvalidAmoebaDlmmRoute.into());
             }
@@ -535,13 +539,13 @@ pub(in crate::processor) fn process(
             )
             .map_err(order_error)?;
             let (source, destination, mint, interface) = if side == 0 {
-                (&a[14], &a[34], &a[10], &a[18])
+                (&a[14], &a[33], &a[10], &a[18])
             } else {
-                (&a[13], &a[33], &a[9], &a[17])
+                (&a[13], &a[32], &a[9], &a[17])
             };
             let source_before =
                 load_user_transfer_account(program, source, a[0].key, mint.key)?.amount;
-            let destination_before = custody(destination, a[32].key, mint.key)?;
+            let destination_before = custody(destination, a[31].key, mint.key)?;
             if source_before < balance.remaining_input {
                 return Err(VaultError::InvalidTokenAccount.into());
             }
@@ -562,7 +566,7 @@ pub(in crate::processor) fn process(
             if source_before.checked_sub(
                 load_user_transfer_account(program, source, a[0].key, mint.key)?.amount,
             ) != Some(balance.remaining_input)
-                || custody(destination, a[32].key, mint.key)?.checked_sub(destination_before)
+                || custody(destination, a[31].key, mint.key)?.checked_sub(destination_before)
                     != Some(balance.remaining_input)
             {
                 return Err(VaultError::AmoebaDlmmInvariantViolation.into());
@@ -576,7 +580,7 @@ pub(in crate::processor) fn process(
                 ..DlmmOrder::default()
             };
             order.set_balance(balance);
-            state.book.orders.push(order);
+            storage::insert(&mut state.book, order)?;
             state.book.header.next_sequence = expected_sequence
                 .checked_add(1)
                 .ok_or(VaultError::ArithmeticOverflow)?;
@@ -584,8 +588,8 @@ pub(in crate::processor) fn process(
                 .book
                 .recompute_obligations(pool.tick_size_quote_atomic)
                 .map_err(order_error)?;
-            state.before_option = custody(&a[33], a[32].key, &pool.option_mint)?;
-            state.before_quote = custody(&a[34], a[32].key, &pool.quote_mint)?;
+            state.before_option = custody(&a[32], a[31].key, &pool.option_mint)?;
+            state.before_quote = custody(&a[33], a[31].key, &pool.quote_mint)?;
             state.taker_sequence = Some(if post_only {
                 expected_sequence
             } else {
@@ -633,7 +637,7 @@ pub(in crate::processor) fn process(
         DlmmOrderAction::Cancel { sequence }
         | DlmmOrderAction::Claim { sequence }
         | DlmmOrderAction::Close { sequence } => {
-            if a.len() != ORDER_SWAP_FIXED_ACCOUNTS {
+            if a.len() != witness_end {
                 return Err(VaultError::InvalidAccountList.into());
             }
             let index = state
@@ -660,8 +664,8 @@ pub(in crate::processor) fn process(
                         &bump,
                     ];
                     for (amount, source, destination, mint, interface) in [
-                        (options, &a[33], &a[13], &a[9], &a[17]),
-                        (quote, &a[34], &a[14], &a[10], &a[18]),
+                        (options, &a[32], &a[13], &a[9], &a[17]),
+                        (quote, &a[33], &a[14], &a[10], &a[18]),
                     ] {
                         if amount == 0 {
                             continue;
@@ -681,7 +685,7 @@ pub(in crate::processor) fn process(
                         let before =
                             load_user_transfer_account(program, destination, a[0].key, mint.key)?
                                 .amount;
-                        let custody_before = custody(source, a[32].key, mint.key)?;
+                        let custody_before = custody(source, a[31].key, mint.key)?;
                         invoke_light_token_account_transfer_with_signer_seeds(
                             amount,
                             MarketMintAccounting::CANONICAL_DECIMALS,
@@ -690,14 +694,14 @@ pub(in crate::processor) fn process(
                             &a[0],
                             source,
                             destination,
-                            &a[32],
+                            &a[31],
                             mint,
                             interface,
                             &a[19],
                             &a[20],
                             &[seeds],
                         )?;
-                        if custody_before.checked_sub(custody(source, a[32].key, mint.key)?)
+                        if custody_before.checked_sub(custody(source, a[31].key, mint.key)?)
                             != Some(amount)
                             || load_user_transfer_account(program, destination, a[0].key, mint.key)?
                                 .amount
@@ -736,7 +740,7 @@ pub(in crate::processor) fn process(
                         .book
                         .recompute_obligations(pool.tick_size_quote_atomic)
                         .map_err(order_error)?;
-                    return store_state(&a[32], &state.book);
+                    return persist_book(program, a, &mut state.book);
                 }
                 _ => unreachable!(),
             }
@@ -745,17 +749,17 @@ pub(in crate::processor) fn process(
                 .book
                 .recompute_obligations(pool.tick_size_quote_atomic)
                 .map_err(order_error)?;
-            if custody(&a[33], a[32].key, &pool.option_mint)? < state.book.header.option_obligations
-                || custody(&a[34], a[32].key, &pool.quote_mint)?
+            if custody(&a[32], a[31].key, &pool.option_mint)? < state.book.header.option_obligations
+                || custody(&a[33], a[31].key, &pool.quote_mint)?
                     < state.book.header.quote_obligations
             {
                 return Err(VaultError::AmoebaDlmmInvariantViolation.into());
             }
-            store_state(&a[32], &state.book)
+            persist_book(program, a, &mut state.book)
         }
         DlmmOrderAction::CloseBook => {
             if a.len() != ORDER_SWAP_FIXED_ACCOUNTS
-                || !state.book.orders.is_empty()
+                || state.book.header.record_count != 0
                 || pool.status != AmoebaDlmmPoolStatus::Settled
                 || state.book.header.rent_payer != *a[0].key
             {
@@ -767,7 +771,7 @@ pub(in crate::processor) fn process(
                 .ok_or(VaultError::AmoebaDlmmInvariantViolation)?;
             pool.account_version = AMOEBA_DLMM_ACCOUNT_VERSION;
             store_light_state(&a[7], &pool)?;
-            close_program_account(program, &a[32], &a[0])
+            close_program_account(program, &a[31], &a[0])
         }
         DlmmOrderAction::Initialize => unreachable!(),
     }

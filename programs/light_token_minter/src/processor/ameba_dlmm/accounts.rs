@@ -102,22 +102,12 @@ pub(super) fn load_pool(
         || pool.maximum_bin_id > MAX_AMOEBA_DLMM_BIN_COUNT
         || !grid_matches
         || !(1..=MAX_AMOEBA_DLMM_BINS_PER_SWAP).contains(&pool.maximum_bins_per_swap)
-        || pool.swap_fee_bps > MAX_AMOEBA_DLMM_SWAP_FEE_BPS
-        || pool.protocol_fee_share_bps > 10_000
         || !bitmaps_are_bounded
         || !page_bitmaps_are_consistent
         || !best_ask_matches
         || !best_bid_matches
         || (pool.last_trade_bin_id != AMOEBA_DLMM_EMPTY_BIN_ID
             && pool.last_trade_bin_id > pool.maximum_bin_id)
-        || pool
-            .accounted_option_reserve
-            .checked_add(pool.protocol_fee_option)
-            .is_none()
-        || pool
-            .accounted_quote_reserve
-            .checked_add(pool.protocol_fee_quote)
-            .is_none()
     {
         return Err(VaultError::InvalidAmoebaDlmmPool.into());
     }
@@ -344,14 +334,8 @@ pub(super) fn ensure_custody(
     option_vault: &TokenAccount,
     quote_vault: &TokenAccount,
 ) -> ProgramResult {
-    let option_liability = pool
-        .accounted_option_reserve
-        .checked_add(pool.protocol_fee_option)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    let quote_liability = pool
-        .accounted_quote_reserve
-        .checked_add(pool.protocol_fee_quote)
-        .ok_or(VaultError::ArithmeticOverflow)?;
+    let option_liability = pool.accounted_option_reserve;
+    let quote_liability = pool.accounted_quote_reserve;
     if option_vault.amount < option_liability || quote_vault.amount < quote_liability {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }

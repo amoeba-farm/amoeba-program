@@ -166,28 +166,34 @@ pub(super) fn append_oracle_source_observation(
     evidence_hash: &[u8; 32],
     archive_url_hash: &[u8; 32],
 ) -> ProgramResult {
-    let index = usize::from(source.observation_count);
+    let index =
+        usize::try_from(source.observation_count).map_err(|_| VaultError::ArithmeticOverflow)?;
     if state == 0
         || source_time == 0
         || crate::bytes32_is_zero(evidence_hash)
         || crate::bytes32_is_zero(archive_url_hash)
-        || index >= crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
-        || (index > 0 && source_time <= observations.source_times[index - 1])
+        || source_time <= source.latest_source_time
     {
         return Err(VaultError::InvalidOracleObservation.into());
     }
-    observations.states[index] = state;
-    observations.source_times[index] = source_time;
-    source.observation_count = source
+    let next_count = source
         .observation_count
         .checked_add(1)
         .ok_or(VaultError::ArithmeticOverflow)?;
+    // The first page is never evicted or rewritten. The mandatory atomic acceptance
+    // hook appends every print to the checkpoint chain, including all later pages.
+    if index < crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS {
+        observations.states[index] = state;
+        observations.source_times[index] = source_time;
+    }
+    source.latest_source_time = source_time;
+    source.observation_count = next_count;
     source.rolling_observation_hash = hashv(&[
         crate::constants::ORACLE_UPDATE_EVIDENCE_HASH_DOMAIN,
         &source.rolling_observation_hash,
         source.month.as_ref(),
         &source.source_id,
-        &[source.observation_count],
+        &source.observation_count.to_le_bytes(),
         &state.to_le_bytes(),
         &source_time.to_le_bytes(),
         evidence_hash,
@@ -201,15 +207,21 @@ pub(super) fn validate_oracle_observation_shape(
     source: &OracleSourceState,
     observations: &OracleSourceObservations,
 ) -> ProgramResult {
-    let count = usize::from(source.observation_count);
+    let total =
+        usize::try_from(source.observation_count).map_err(|_| VaultError::ArithmeticOverflow)?;
+    let count = total.min(crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS);
     if !matches!(
         observations.account_version,
         OracleSourceObservations::ACCOUNT_VERSION
             | OracleSourceObservations::INHERITED_ANCHOR_VERSION
     ) || count == 0
-        || count > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
+        || source.latest_source_time == 0
         || observations.states[0] != source.baseline_state
-        || observations.states[count - 1] != source.current_state
+        || (total <= crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
+            && (observations.states[count - 1] != source.current_state
+                || observations.source_times[count - 1] != source.latest_source_time))
+        || (total > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
+            && observations.source_times[count - 1] >= source.latest_source_time)
         || crate::bytes32_is_zero(&source.rolling_observation_hash)
     {
         return Err(VaultError::InvalidOracleObservation.into());
@@ -240,7 +252,10 @@ pub fn oracle_temporal_median_state(
     window_end_ts: u64,
 ) -> Result<Option<u64>, ProgramError> {
     validate_oracle_observation_shape(source, observations)?;
-    if window_start_ts == 0 || window_end_ts < window_start_ts {
+    if window_start_ts == 0
+        || window_end_ts < window_start_ts
+        || source.observation_count > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS as u32
+    {
         return Err(VaultError::InvalidOracleMedian.into());
     }
     let mut values = [0u64; crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS];
@@ -250,7 +265,9 @@ pub fn oracle_temporal_median_state(
     let first_sample = usize::from(
         observations.account_version == OracleSourceObservations::INHERITED_ANCHOR_VERSION,
     );
-    for index in first_sample..usize::from(source.observation_count) {
+    for index in first_sample
+        ..usize::try_from(source.observation_count).map_err(|_| VaultError::ArithmeticOverflow)?
+    {
         let source_time = observations.source_times[index];
         if (window_start_ts..=window_end_ts).contains(&source_time) {
             values[value_count] = observations.states[index];
@@ -266,7 +283,8 @@ pub fn oracle_temporal_median_state(
     // An unchanged source remains economically present without manufacturing a paid update.
     // This fallback does not add an equal-weight sample to an already-populated window, so every
     // source that was settleable under the existing temporal-median rule keeps the same result.
-    let standing = (0..usize::from(source.observation_count))
+    let standing = (0..usize::try_from(source.observation_count)
+        .map_err(|_| VaultError::ArithmeticOverflow)?)
         .rev()
         .find(|index| observations.source_times[*index] <= window_start_ts)
         .map(|index| observations.states[index]);
@@ -304,7 +322,7 @@ pub(super) fn advance_oracle_bucket_source_snapshot(
         &source.source_id,
         &source.bucket_id,
         &source.baseline_state.to_le_bytes(),
-        &[source.observation_count],
+        &source.observation_count.to_le_bytes(),
         &source.rolling_observation_hash,
     ])
     .to_bytes()

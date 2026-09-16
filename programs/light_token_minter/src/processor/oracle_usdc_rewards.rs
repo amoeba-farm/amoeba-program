@@ -1,8 +1,8 @@
 //! Terminal ordinary-USDC escrow settlement and finite cash reward registration/claims.
 //!
 //! Current cash rewards and participant bonds use canonical collateral accounts only.
-//! Emergency voting power remains sAMBA; only an eligible winning vote's reward is paid
-//! from the separately deposited classic-SPL collateral-mint custody.
+//! Optional bounties are paid only from deposited classic-SPL collateral custody.
+//! Council ballots carry neither token stake nor voter payout.
 
 use super::oracle_usdc::{
     calculate_oracle_usdc_equal_share, calculate_oracle_usdc_source_reward_allocation,

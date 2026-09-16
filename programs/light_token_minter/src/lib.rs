@@ -2,6 +2,7 @@ pub mod ameba_dlmm_instruction;
 pub mod ameba_dlmm_math;
 pub mod ameba_dlmm_state;
 pub mod associated_token;
+pub mod business_generation;
 pub mod compression;
 pub mod constants;
 pub mod dlmm_order_math;
@@ -12,6 +13,9 @@ pub mod governance_gate;
 pub mod governance_manifest;
 pub mod instruction;
 mod light_token_instruction;
+mod local_direct_address;
+pub(crate) mod observation_wire;
+pub mod oracle_rank;
 pub mod processor;
 pub mod scoped_settlement;
 pub mod state;
@@ -23,19 +27,40 @@ pub mod writer_dlmm_math;
 pub mod writer_dlmm_quote;
 pub mod writer_participation_math;
 pub mod writer_participation_state;
+pub mod writer_settlement_handoff;
 pub mod writer_sleeve_math;
 
-use light_sdk::{derive_light_cpi_signer, CpiSigner};
+#[cfg(not(feature = "mainnet-v3"))]
+use light_sdk::derive_light_cpi_signer;
+use light_sdk::CpiSigner;
 use solana_program::{entrypoint::ProgramResult, pubkey::Pubkey};
 
+#[cfg(not(feature = "mainnet-v3"))]
 solana_program::declare_id!("2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw");
+#[cfg(feature = "mainnet-v3")]
+include!(env!("AMEBA_MAINNET_PROFILE_RS"));
+#[cfg(all(
+    feature = "mainnet-v3",
+    any(
+        feature = "devnet-v3-governance-controller",
+        feature = "phase3-synthetic-governance-controller",
+        feature = "reviewed-governance-controller",
+        feature = "local-ceremony-governance-controller",
+        feature = "test-sbf"
+    )
+))]
+compile_error!("mainnet-v3 excludes other controllers and test timing capabilities");
+
+#[cfg(all(feature = "mainnet-four-hour-launch", not(feature = "mainnet-v3")))]
+compile_error!("mainnet-four-hour-launch requires the reviewed mainnet-v3 profile");
 
 #[cfg(all(
     feature = "governance-gate-v1",
     not(any(
         feature = "phase3-synthetic-governance-controller",
         feature = "reviewed-governance-controller",
-        feature = "devnet-v3-governance-controller"
+        feature = "devnet-v3-governance-controller",
+        feature = "mainnet-v3"
     ))
 ))]
 compile_error!(
@@ -73,6 +98,7 @@ compile_error!("reviewed-governance-controller cannot be compiled without govern
 compile_error!(
     "local-ceremony-governance-controller cannot be compiled without reviewed-governance-controller"
 );
+#[cfg(not(feature = "mainnet-v3"))]
 pub const LIGHT_CPI_SIGNER: CpiSigner =
     derive_light_cpi_signer!("2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw");
 
@@ -118,19 +144,5 @@ pub fn process_instruction(
     accounts: &[solana_program::account_info::AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    #[cfg(feature = "writer-math-benchmark")]
-    if instruction_data.starts_with(writer_sleeve_math::WRITER_MATH_BENCHMARK_DOMAIN) {
-        if accounts.is_empty()
-            && instruction_data.len() == writer_sleeve_math::WRITER_MATH_BENCHMARK_DOMAIN.len() + 1
-        {
-            return writer_sleeve_math::process_sbf_benchmark(
-                instruction_data[writer_sleeve_math::WRITER_MATH_BENCHMARK_DOMAIN.len()],
-            );
-        }
-        // The benchmark domain begins with byte 97, which is a Devnet backfill tag under a
-        // separate feature. A malformed/non-accountless benchmark must never fall through into
-        // that mutating registry when both features are compiled together.
-        return Err(error::VaultError::InvalidInstructionData.into());
-    }
     processor::process_instruction(program_id, accounts, instruction_data)
 }

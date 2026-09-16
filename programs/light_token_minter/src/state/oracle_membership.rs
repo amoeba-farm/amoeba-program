@@ -46,13 +46,12 @@ pub struct OracleBucketSourceIndex {
     pub first_source_index: u16,
     pub bucket_weight_bps: u16,
     pub source_count: u16,
-    pub source_ids: [[u8; 32]; crate::constants::MAX_ORACLE_BUCKET_SOURCES],
 }
 
 impl OracleBucketSourceIndex {
-    pub const LEN: usize = 110 + 32 * crate::constants::MAX_ORACLE_BUCKET_SOURCES;
+    pub const LEN: usize = 110;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OBI";
-    pub const ACCOUNT_VERSION: u8 = 1;
+    pub const ACCOUNT_VERSION: u8 = 3;
 }
 
 pub fn derive_oracle_recipe_source_index_pda(program_id: &Pubkey, month: &Pubkey) -> (Pubkey, u8) {

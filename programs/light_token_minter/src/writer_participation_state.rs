@@ -10,7 +10,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
 
 pub const CONTRIBUTION_SEED: &[u8] = b"writer-contribution-v2";
-pub const PARTICIPATION_VERSION: u8 = 2;
+pub const PARTICIPATION_VERSION: u8 = 3;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WriterContributionV2 {
@@ -70,25 +70,24 @@ pub fn derive_contribution(
 }
 
 impl WriterSleeveV1 {
-    /// Version 2 retains the exact fixed sleeve layout. Its formerly reserved
-    /// bytes hold U:u128, h_max:u64, and S:u64. Version 1 bytes remain unchanged.
+    /// The current schema stores participation totals and start explicitly.
     pub fn has_time_participation(&self) -> bool {
         self.account_version == PARTICIPATION_VERSION
     }
     pub fn participation_start(&self) -> u64 {
-        u64::from_le_bytes(self.reserved[24..32].try_into().unwrap())
+        self.participation_start_ts
     }
     pub fn participation_totals(&self) -> ParticipationTotals {
         ParticipationTotals {
             principal: self.writer_principal_atoms,
-            capital_seconds: u128::from_le_bytes(self.reserved[..16].try_into().unwrap()),
-            maximum_duration: u64::from_le_bytes(self.reserved[16..24].try_into().unwrap()),
+            capital_seconds: self.capital_seconds,
+            maximum_duration: self.maximum_contribution_duration,
         }
     }
     pub fn set_participation_totals(&mut self, totals: ParticipationTotals) {
         self.writer_principal_atoms = totals.principal;
-        self.reserved[..16].copy_from_slice(&totals.capital_seconds.to_le_bytes());
-        self.reserved[16..24].copy_from_slice(&totals.maximum_duration.to_le_bytes());
+        self.capital_seconds = totals.capital_seconds;
+        self.maximum_contribution_duration = totals.maximum_duration;
     }
     pub fn participation_layout_valid(&self) -> bool {
         let totals = self.participation_totals();
@@ -96,7 +95,6 @@ impl WriterSleeveV1 {
         self.has_time_participation()
             && start > 0
             && start < self.expiry_ts
-            && self.flat_par_supply_atoms == 0
             && totals.maximum_duration <= self.expiry_ts - start
             && ((totals.capital_seconds == 0
                 && totals.maximum_duration == 0
@@ -110,12 +108,66 @@ impl WriterSleeveV1 {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WriterParticipationActionV2 {
-    Enable { participation_start_ts: u64 },
-    Contribute { nonce: u64, amount_atoms: u64 },
+    Contribute {
+        nonce: u64,
+        amount_atoms: u64,
+    },
     Transfer,
-    Split { nonce: u64, principal_atoms: u64 },
+    Split {
+        nonce: u64,
+        principal_atoms: u64,
+    },
     Claim,
     Close,
+    /// G3 selector 6: expire a sleeve that has never activated or issued.
+    ExpireUnactivatedV3,
+}
+
+// Selector zero is permanently retired. Explicit encoding preserves all current selectors.
+impl BorshDeserialize for WriterParticipationActionV2 {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        Ok(match u8::deserialize_reader(reader)? {
+            1 => Self::Contribute {
+                nonce: u64::deserialize_reader(reader)?,
+                amount_atoms: u64::deserialize_reader(reader)?,
+            },
+            2 => Self::Transfer,
+            3 => Self::Split {
+                nonce: u64::deserialize_reader(reader)?,
+                principal_atoms: u64::deserialize_reader(reader)?,
+            },
+            4 => Self::Claim,
+            5 => Self::Close,
+            6 => Self::ExpireUnactivatedV3,
+            _ => return Err(invalid_fixed_borsh()),
+        })
+    }
+}
+impl BorshSerialize for WriterParticipationActionV2 {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        match self {
+            Self::Contribute {
+                nonce,
+                amount_atoms,
+            } => {
+                1u8.serialize(writer)?;
+                nonce.serialize(writer)?;
+                amount_atoms.serialize(writer)
+            }
+            Self::Transfer => 2u8.serialize(writer),
+            Self::Split {
+                nonce,
+                principal_atoms,
+            } => {
+                3u8.serialize(writer)?;
+                nonce.serialize(writer)?;
+                principal_atoms.serialize(writer)
+            }
+            Self::Claim => 4u8.serialize(writer),
+            Self::Close => 5u8.serialize(writer),
+            Self::ExpireUnactivatedV3 => 6u8.serialize(writer),
+        }
+    }
 }

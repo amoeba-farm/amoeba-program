@@ -1,15 +1,18 @@
 use super::*;
 use crate::{
-    instruction::{ClaimCollectiveLongV1Params, ClaimWriterFlatResidualV1Params},
+    instruction::ClaimCollectiveLongV1Params,
+    writer_settlement_handoff::{
+        authorized_handoff_version, derive_writer_settlement_handoff, WriterSettlementHandoffV3,
+        HANDOFF_PAYLOAD, HANDOFF_SEED,
+    },
     writer_sleeve_math::{cumulative_allocation_delta, settlement_series_liabilities},
 };
 
 const PUBLISH_WRITER_GROUP_SETTLEMENT_ACCOUNT_COUNT: usize = 13;
-const FINALIZE_WRITER_SETTLEMENT_FIXED_ACCOUNT_COUNT: usize = 9;
+const FINALIZE_WRITER_SETTLEMENT_FIXED_ACCOUNT_COUNT: usize = 8;
 const CLAIM_COLLECTIVE_LONG_ACCOUNT_COUNT: usize = 20;
-const CLAIM_WRITER_FLAT_ACCOUNT_COUNT: usize = 17;
-const CLOSE_WRITER_SLEEVE_ACCOUNT_COUNT: usize = 10;
-const WRITER_GROUP_FINAL_SETTLEMENT_DOMAIN: &[u8] = b"ameba-writer-final-settlement-v1";
+const CLOSE_WRITER_SLEEVE_ACCOUNT_COUNT: usize = 9;
+const WRITER_GROUP_FINAL_SETTLEMENT_DOMAIN: &[u8] = b"ameba-writer-final-settlement-g3";
 
 fn final_settlement_commitment(
     program_id: &Pubkey,
@@ -37,8 +40,15 @@ fn final_settlement_commitment(
 pub(super) fn process_publish_writer_group_settlement(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
+    payload: &[u8],
 ) -> ProgramResult {
-    if accounts.len() != PUBLISH_WRITER_GROUP_SETTLEMENT_ACCOUNT_COUNT {
+    let handoff = match payload {
+        [] => false,
+        bytes if bytes == HANDOFF_PAYLOAD => true,
+        _ => return Err(ProgramError::InvalidInstructionData),
+    };
+    if accounts.len() != PUBLISH_WRITER_GROUP_SETTLEMENT_ACCOUNT_COUNT + if handoff { 2 } else { 0 }
+    {
         return Err(VaultError::InvalidAccountList.into());
     }
     let submitter_info = &accounts[0];
@@ -65,12 +75,10 @@ pub(super) fn process_publish_writer_group_settlement(
         || group.sleeve != *sleeve_info.key
         || group.status != WriterSettlementGroupStatus::Active
         || sleeve.status != WriterSleeveStatus::Active
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
         || group.anchor_market != *anchor_market_info.key
         || group.anchor_oracle_month != *month_info.key
         || group.signer_registry != *signer_registry_info.key
-        || group.signer_set != *signer_set_info.key
+        || (!handoff && group.signer_set != *signer_set_info.key)
         || !crate::bytes32_is_zero(&group.settlement_source_digest)
         || !crate::bytes32_is_zero(&group.final_settlement_commitment)
         || group.finalized_slot != 0
@@ -103,7 +111,7 @@ pub(super) fn process_publish_writer_group_settlement(
     )?;
     let active =
         load_valid_oracle_active_weight_manifest(program_id, month_info.key, active_weight_info)?;
-    let _registry = load_canonical_settlement_signer_registry(program_id, signer_registry_info)?;
+    let registry = load_canonical_settlement_signer_registry(program_id, signer_registry_info)?;
     let signer_set = load_canonical_settlement_signer_set(
         program_id,
         signer_registry_info.key,
@@ -111,13 +119,27 @@ pub(super) fn process_publish_writer_group_settlement(
     )?;
     ensure_finalized_oracle_active_weight_manifest(&month, &active)?;
     ensure_finalized_oracle_issue_sku_coverage(&month, &coverage, &active)?;
+    // The canonical record can only be created by a then-current signer quorum.
+    // Never use this handoff to authenticate signatures or rewrite the original
+    // group binding. A later rotation cannot invalidate a completed attestation.
+    let signer_binding_valid = if handoff {
+        authorized_handoff_version(
+            group.signer_set_version,
+            signer_set.version,
+            registry.current_version,
+        ) && group.signer_set
+            == derive_settlement_signer_set_pda(program_id, group.signer_set_version).0
+            && !crate::bytes32_is_zero(&group.signer_set_hash)
+    } else {
+        signer_set.version == group.signer_set_version
+            && signer_set.set_hash == group.signer_set_hash
+    };
     if month.phase != OraclePhase::Settled
         || month.finalized_at_ts == 0
         || month.settlement_record != Some(*settlement_info.key)
         || settlement.settlement_ts != group.settlement_ts
-        || settlement.signer_set_version != group.signer_set_version
-        || signer_set.version != group.signer_set_version
-        || signer_set.set_hash != group.signer_set_hash
+        || settlement.signer_set_version != signer_set.version
+        || !signer_binding_valid
         || writer_coverage_manifest_hash(&coverage) != group.coverage_manifest_hash
         || recipe.phase != OracleRecipeWeightPhase::Finalized
         || recipe.recipe_hash != group.recipe_hash
@@ -143,6 +165,41 @@ pub(super) fn process_publish_writer_group_settlement(
         return Err(VaultError::InvalidWriterSettlementGroup.into());
     }
     let slot = Clock::get()?.slot;
+    if handoff {
+        let handoff_info = &accounts[13];
+        let system_info = &accounts[14];
+        let (key, bump) = derive_writer_settlement_handoff(program_id, group_info.key);
+        if key != *handoff_info.key || *system_info.key != system_program::id() {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        validate_create_only_program_account_target(program_id, handoff_info)?;
+        create_program_account(
+            submitter_info,
+            handoff_info,
+            system_info,
+            program_id,
+            WriterSettlementHandoffV3::LEN,
+            &[HANDOFF_SEED, group_info.key.as_ref(), &[bump]],
+        )?;
+        store_state(
+            handoff_info,
+            &WriterSettlementHandoffV3 {
+                initialized: true,
+                bump,
+                discriminator: WriterSettlementHandoffV3::DISCRIMINATOR,
+                version: WriterSettlementHandoffV3::VERSION,
+                group: *group_info.key,
+                group_commitment_before_settlement: writer_group_commitment(group_info.key, &group),
+                original_signer_set: group.signer_set,
+                original_version: group.signer_set_version,
+                replacement_signer_set: *signer_set_info.key,
+                replacement_version: signer_set.version,
+                replacement_set_hash: signer_set.set_hash,
+                settlement_record: *settlement_info.key,
+                recorded_slot: slot,
+            },
+        )?;
+    }
     // Bind terminal evidence exactly once, before hashing the final group state.
     group.settlement_source_digest = settlement_sources.rolling_source_digest;
     group.settlement_price_atomic = settlement.settlement_price_atomic;
@@ -172,8 +229,7 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
     let book_info = &accounts[4];
     let snapshot_info = &accounts[5];
     let sleeve_vault_info = &accounts[6];
-    let flat_mint_info = &accounts[7];
-    let lp_policy_info = &accounts[8];
+    let lp_policy_info = &accounts[7];
     if !cranker_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
@@ -202,22 +258,15 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
         || sleeve.status != WriterSleeveStatus::Expired
         || group.status != WriterSettlementGroupStatus::Settled
         || crate::bytes32_is_zero(&group.final_settlement_commitment)
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
         || sleeve.policy_snapshot != *snapshot_info.key
         || sleeve.policy_hash != snapshot.policy_hash
         || sleeve.usdc_vault != *sleeve_vault_info.key
-        || sleeve.flat_mint != *flat_mint_info.key
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
     validate_vault_token_account(sleeve_vault_info, &sleeve.settlement_mint, sleeve_info.key)?;
     if validate_token_account(sleeve_vault_info)?.amount < sleeve.accounted_asset_atoms {
         return Err(VaultError::WriterSolvencyViolation.into());
-    }
-    let flat_mint = validate_writer_flat_mint(sleeve_info, &sleeve, flat_mint_info)?;
-    if flat_mint.supply != sleeve.flat_par_supply_atoms {
-        return Err(VaultError::WriterSupplyMismatch.into());
     }
     let count = usize::from(book.series_count);
     for (index, mint_info) in accounts[FINALIZE_WRITER_SETTLEMENT_FIXED_ACCOUNT_COUNT..]
@@ -251,7 +300,7 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
     if long_total > sleeve.accounted_asset_atoms {
         return Err(VaultError::WriterSolvencyViolation.into());
     }
-    let mut flat_residual = sleeve
+    let mut writer_residual = sleeve
         .accounted_asset_atoms
         .checked_sub(long_total)
         .ok_or(VaultError::ArithmeticOverflow)?;
@@ -269,23 +318,19 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
     sleeve.long_liability_initial_atoms = long_total;
     sleeve.long_liability_remaining_atoms = long_total;
     participation::admit_time_participation(&sleeve, sleeve.accounted_asset_atoms, long_total)?;
-    let entitlement_principal = if sleeve.has_time_participation() {
-        sleeve.writer_principal_atoms
-    } else {
-        sleeve.flat_par_supply_atoms
-    };
-    sleeve.flat_supply_snapshot_atoms = entitlement_principal;
-    sleeve.flat_claim_supply_remaining_atoms = entitlement_principal;
+    let entitlement_principal = sleeve.writer_principal_atoms;
+    sleeve.settlement_principal_atoms = entitlement_principal;
+    sleeve.unclaimed_principal_atoms = entitlement_principal;
     if entitlement_principal == 0 {
         sleeve.accounted_asset_atoms = long_total;
         sleeve.stranded_surplus_atoms = sleeve
             .stranded_surplus_atoms
-            .checked_add(flat_residual)
+            .checked_add(writer_residual)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        flat_residual = 0;
+        writer_residual = 0;
     }
-    sleeve.flat_residual_initial_atoms = flat_residual;
-    sleeve.flat_residual_remaining_atoms = flat_residual;
+    sleeve.writer_residual_initial_atoms = writer_residual;
+    sleeve.writer_residual_remaining_atoms = writer_residual;
     sleeve.exact_reserve_atoms = long_total;
     sleeve.lower_tail_reserve_atoms = 0;
     sleeve.upper_tail_reserve_atoms = 0;
@@ -409,8 +454,6 @@ fn claim_collective_long<'a>(
     if sleeve.vault_config != *config_info.key
         || sleeve.status != WriterSleeveStatus::SettlementFinalized
         || group.status != WriterSettlementGroupStatus::Settled
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
         || sleeve.settlement_mint != *settlement_mint_info.key
         || sleeve.usdc_vault != *sleeve_vault_info.key
         || config.usdc_mint != *settlement_mint_info.key
@@ -619,204 +662,6 @@ fn claim_collective_long<'a>(
     store_state(sleeve_info, &sleeve)
 }
 
-pub(super) fn process_claim_writer_flat_residual(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    params: ClaimWriterFlatResidualV1Params,
-) -> ProgramResult {
-    if accounts.len() != CLAIM_WRITER_FLAT_ACCOUNT_COUNT {
-        return Err(VaultError::InvalidAccountList.into());
-    }
-    if params.flat_atoms == 0 {
-        return Err(VaultError::AmountMustBePositive.into());
-    }
-    let holder_info = &accounts[0];
-    let config_info = &accounts[1];
-    let sleeve_info = &accounts[2];
-    let flat_mint_info = &accounts[3];
-    let flat_source_info = &accounts[4];
-    let flat_burn_info = &accounts[5];
-    let flat_interface_info = &accounts[6];
-    let sleeve_vault_info = &accounts[7];
-    let payout_destination_info = &accounts[8];
-    let settlement_mint_info = &accounts[9];
-    let usdc_interface_info = &accounts[10];
-    let light_program_info = &accounts[11];
-    let cpi_authority_info = &accounts[12];
-    let token_program_info = &accounts[13];
-    let system_program_info = &accounts[14];
-    let compressible_config_info = &accounts[15];
-    let rent_sponsor_info = &accounts[16];
-    if !holder_info.is_signer || !holder_info.is_writable {
-        return Err(ProgramError::MissingRequiredSignature);
-    }
-    validate_writer_compression_accounts(
-        light_program_info,
-        cpi_authority_info,
-        token_program_info,
-        system_program_info,
-        compressible_config_info,
-        rent_sponsor_info,
-    )?;
-    let config = load_canonical_vault_config(program_id, config_info)?;
-    let mut sleeve = load_writer_sleeve_without_group_meta(program_id, sleeve_info)?;
-    if sleeve.vault_config != *config_info.key
-        || sleeve.status != WriterSleeveStatus::SettlementFinalized
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
-        || sleeve.flat_mint != *flat_mint_info.key
-        || sleeve.usdc_vault != *sleeve_vault_info.key
-        || sleeve.settlement_mint != *settlement_mint_info.key
-        || config.usdc_mint != *settlement_mint_info.key
-        || params.flat_atoms > sleeve.flat_claim_supply_remaining_atoms
-        || params.flat_atoms > sleeve.flat_par_supply_atoms
-    {
-        return Err(VaultError::InvalidWriterLifecycle.into());
-    }
-    let payout = cumulative_allocation_delta(
-        sleeve.flat_supply_snapshot_atoms,
-        sleeve.flat_claim_supply_remaining_atoms,
-        params.flat_atoms,
-        sleeve.flat_residual_initial_atoms,
-    )
-    .map_err(writer_math_error)?;
-    if payout > sleeve.flat_residual_remaining_atoms || payout > sleeve.accounted_asset_atoms {
-        return Err(VaultError::WriterSolvencyViolation.into());
-    }
-    let flat_mint = validate_writer_flat_mint(sleeve_info, &sleeve, flat_mint_info)?;
-    validate_light_associated_token_account(holder_info.key, flat_mint_info.key, flat_source_info)?;
-    let source_before =
-        load_canonical_light_token_account(flat_source_info, holder_info.key, flat_mint_info.key)?;
-    if source_before.amount < params.flat_atoms {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
-    validate_spl_interface_account(flat_mint_info.key, flat_interface_info)?;
-    let (expected_burn, burn_bump) =
-        derive_writer_flat_burn_custody_pda(program_id, sleeve_info.key);
-    let burn_before = funding::load_or_create_sleeve_token_custody(
-        program_id,
-        holder_info,
-        sleeve_info,
-        flat_burn_info,
-        flat_mint_info,
-        token_program_info,
-        system_program_info,
-        crate::constants::WRITER_FLAT_BURN_CUSTODY_PDA_SEED,
-        expected_burn,
-        burn_bump,
-    )?;
-    if burn_before.amount != 0 {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
-    validate_vault_token_account(sleeve_vault_info, settlement_mint_info.key, sleeve_info.key)?;
-    let vault_before = validate_token_account(sleeve_vault_info)?.amount;
-    if vault_before < sleeve.accounted_asset_atoms || vault_before < payout {
-        return Err(VaultError::WriterSolvencyViolation.into());
-    }
-    validate_collateral_mint_account(settlement_mint_info, token_program_info.key)?;
-    validate_spl_interface_account(settlement_mint_info.key, usdc_interface_info)?;
-    let destination_before = load_or_create_light_associated_token_account(
-        holder_info,
-        holder_info,
-        settlement_mint_info,
-        payout_destination_info,
-        light_program_info,
-        compressible_config_info,
-        rent_sponsor_info,
-        system_program_info,
-    )?;
-
-    invoke_light_token_account_transfer(
-        params.flat_atoms,
-        MarketMintAccounting::CANONICAL_DECIMALS,
-        light_program_info,
-        cpi_authority_info,
-        holder_info,
-        flat_source_info,
-        flat_burn_info,
-        holder_info,
-        flat_mint_info,
-        flat_interface_info,
-        token_program_info,
-        system_program_info,
-    )?;
-    let bump = [sleeve.bump];
-    let signer = writer_sleeve_signer_seeds(&sleeve.settlement_group, &bump);
-    invoke_token_burn_checked(
-        token_program_info,
-        flat_burn_info,
-        flat_mint_info,
-        sleeve_info,
-        params.flat_atoms,
-        MarketMintAccounting::CANONICAL_DECIMALS,
-        &[&signer],
-    )?;
-    if payout != 0 {
-        invoke_light_token_account_transfer_with_signer_seeds(
-            payout,
-            MarketMintAccounting::CANONICAL_DECIMALS,
-            light_program_info,
-            cpi_authority_info,
-            holder_info,
-            sleeve_vault_info,
-            payout_destination_info,
-            sleeve_info,
-            settlement_mint_info,
-            usdc_interface_info,
-            token_program_info,
-            system_program_info,
-            &[&signer],
-        )?;
-    }
-    let source_after =
-        load_canonical_light_token_account(flat_source_info, holder_info.key, flat_mint_info.key)?;
-    let destination_after = load_canonical_light_token_account(
-        payout_destination_info,
-        holder_info.key,
-        settlement_mint_info.key,
-    )?;
-    if source_before.amount.checked_sub(source_after.amount) != Some(params.flat_atoms)
-        || validate_token_account(flat_burn_info)?.amount != 0
-        || flat_mint
-            .supply
-            .checked_sub(validate_mint_account(flat_mint_info, token_program_info.key)?.supply)
-            != Some(params.flat_atoms)
-        || destination_after
-            .amount
-            .checked_sub(destination_before.amount)
-            != Some(payout)
-        || vault_before.checked_sub(validate_token_account(sleeve_vault_info)?.amount)
-            != Some(payout)
-    {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
-    funding::close_sleeve_token_custody(
-        &sleeve,
-        sleeve_info,
-        flat_burn_info,
-        holder_info,
-        token_program_info,
-    )?;
-    sleeve.flat_claim_supply_remaining_atoms = sleeve
-        .flat_claim_supply_remaining_atoms
-        .checked_sub(params.flat_atoms)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    sleeve.flat_par_supply_atoms = sleeve
-        .flat_par_supply_atoms
-        .checked_sub(params.flat_atoms)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    sleeve.flat_residual_remaining_atoms = sleeve
-        .flat_residual_remaining_atoms
-        .checked_sub(payout)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    sleeve.accounted_asset_atoms = sleeve
-        .accounted_asset_atoms
-        .checked_sub(payout)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    sleeve.last_updated_slot = Clock::get()?.slot;
-    store_state(sleeve_info, &sleeve)
-}
-
 pub(super) fn process_close_writer_sleeve(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -831,9 +676,8 @@ pub(super) fn process_close_writer_sleeve(
     let book_info = &accounts[4];
     let snapshot_info = &accounts[5];
     let sleeve_vault_info = &accounts[6];
-    let flat_mint_info = &accounts[7];
-    let token_program_info = &accounts[8];
-    let system_program_info = &accounts[9];
+    let token_program_info = &accounts[7];
+    let system_program_info = &accounts[8];
     if !cranker_info.is_signer || !cranker_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
@@ -857,20 +701,24 @@ pub(super) fn process_close_writer_sleeve(
         None,
     )?;
     if sleeve.vault_config != *config_info.key
-        || sleeve.status != WriterSleeveStatus::SettlementFinalized
-        || group.status != WriterSettlementGroupStatus::Settled
+        || !matches!(
+            (sleeve.status, group.status),
+            (
+                WriterSleeveStatus::SettlementFinalized,
+                WriterSettlementGroupStatus::Settled
+            ) | (
+                WriterSleeveStatus::FundingRefunds,
+                WriterSettlementGroupStatus::FundingExpired
+            )
+        )
         || sleeve.policy_snapshot != *snapshot_info.key
         || sleeve.policy_hash != snapshot.policy_hash
-        || sleeve.active_auction.is_some()
-        || sleeve.active_close_request.is_some()
         || sleeve.accounted_asset_atoms != 0
         || sleeve.exact_reserve_atoms != 0
         || sleeve.long_liability_remaining_atoms != 0
-        || sleeve.flat_residual_remaining_atoms != 0
-        || sleeve.flat_claim_supply_remaining_atoms != 0
-        || sleeve.flat_par_supply_atoms != 0
+        || sleeve.writer_residual_remaining_atoms != 0
+        || sleeve.unclaimed_principal_atoms != 0
         || sleeve.usdc_vault != *sleeve_vault_info.key
-        || sleeve.flat_mint != *flat_mint_info.key
         || book.records[..usize::from(book.series_count)]
             .iter()
             .any(|record| {
@@ -887,14 +735,6 @@ pub(super) fn process_close_writer_sleeve(
     validate_vault_token_account(sleeve_vault_info, &sleeve.settlement_mint, sleeve_info.key)?;
     let physical = validate_token_account(sleeve_vault_info)?.amount;
     if physical < sleeve.stranded_surplus_atoms {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
-    let flat_mint = validate_mint_account(flat_mint_info, token_program_info.key)?;
-    if flat_mint.supply != 0
-        || flat_mint.decimals != MarketMintAccounting::CANONICAL_DECIMALS
-        || flat_mint.mint_authority != COption::Some(*sleeve_info.key)
-        || flat_mint.freeze_authority != COption::None
-    {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
     if physical == 0 {

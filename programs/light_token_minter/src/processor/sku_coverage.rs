@@ -52,13 +52,25 @@ pub(super) fn ensure_oracle_coverage_source_submission_window(
 ) -> ProgramResult {
     let expected_planned_listing = coverage
         .planned_scramble_start_ts
-        .checked_add(ORACLE_PRE_LISTING_WINDOW_SECONDS)
+        .checked_add(schedule_total(month)?)
         .ok_or(VaultError::ArithmeticOverflow)?;
     if coverage.planned_scramble_start_ts == 0
         || coverage.planned_listing_ts == 0
         || coverage.planned_listing_ts != expected_planned_listing
     {
         return Err(VaultError::InvalidOracleSkuCoverageManifest.into());
+    }
+    if month.schedule_version == LAUNCH_SCHEDULE_VERSION {
+        let now = current_unix_timestamp()?;
+        if now < coverage.planned_scramble_start_ts
+            || now
+                >= coverage
+                    .planned_scramble_start_ts
+                    .checked_add(LAUNCH_PHASE_SECONDS)
+                    .ok_or(VaultError::ArithmeticOverflow)?
+        {
+            return Err(VaultError::OracleTimingWindowClosed.into());
+        }
     }
     match month.phase {
         OraclePhase::SourceSubmission => {
@@ -67,11 +79,7 @@ pub(super) fn ensure_oracle_coverage_source_submission_window(
             }
             let now = current_unix_timestamp()?;
             let preserved_review_end = now
-                .checked_add(
-                    ORACLE_KILL_WINDOW_SECONDS
-                        + ORACLE_RESOLUTION_FREEZE_WINDOW_SECONDS
-                        + ORACLE_OPENING_WINDOW_SECONDS,
-                )
+                .checked_add(schedule_review_seconds(month)?)
                 .ok_or(VaultError::ArithmeticOverflow)?;
             if now < coverage.planned_scramble_start_ts
                 || preserved_review_end >= market.instrument.expiry_ts
@@ -90,19 +98,20 @@ pub(super) fn ensure_oracle_coverage_source_submission_window(
     }
 }
 
-pub(super) fn finalized_oracle_sku_coverage_schedule(
+pub(super) fn finalized_oracle_sku_coverage_schedule_for_month(
+    month: &OracleMonthState,
     coverage: &OracleSkuCoverageManifest,
     market_expiry_ts: u64,
     now: u64,
 ) -> Result<(u64, u64), ProgramError> {
     let planned_placement_end = coverage
         .planned_scramble_start_ts
-        .checked_add(ORACLE_PLACEMENT_WINDOW_SECONDS)
+        .checked_add(schedule_windows(month)?[0])
         .ok_or(VaultError::ArithmeticOverflow)?;
     if coverage.planned_listing_ts
         != coverage
             .planned_scramble_start_ts
-            .checked_add(ORACLE_PRE_LISTING_WINDOW_SECONDS)
+            .checked_add(schedule_total(month)?)
             .ok_or(VaultError::ArithmeticOverflow)?
     {
         return Err(VaultError::InvalidOracleSkuCoverageManifest.into());
@@ -116,12 +125,12 @@ pub(super) fn finalized_oracle_sku_coverage_schedule(
             coverage.planned_listing_ts,
         ));
     }
-    let preserved_post_submission_seconds = ORACLE_KILL_WINDOW_SECONDS
-        .checked_add(ORACLE_RESOLUTION_FREEZE_WINDOW_SECONDS)
-        .and_then(|value| value.checked_add(ORACLE_OPENING_WINDOW_SECONDS))
-        .ok_or(VaultError::ArithmeticOverflow)?;
+    if month.schedule_version == LAUNCH_SCHEDULE_VERSION {
+        return Err(VaultError::OracleTimingWindowClosed.into());
+    }
+    let preserved_post_submission_seconds = schedule_review_seconds(month)?;
     let shifted_scramble_start = now
-        .checked_sub(ORACLE_PLACEMENT_WINDOW_SECONDS)
+        .checked_sub(schedule_windows(month)?[0])
         .ok_or(VaultError::ArithmeticOverflow)?;
     let shifted_listing = now
         .checked_add(preserved_post_submission_seconds)
@@ -160,8 +169,12 @@ pub(super) fn process_finalize_oracle_sku_coverage(
         });
     }
     let (slot, now) = current_slot_and_unix_timestamp()?;
-    let (final_scramble_start, final_listing) =
-        finalized_oracle_sku_coverage_schedule(&coverage, market.instrument.expiry_ts, now)?;
+    let (final_scramble_start, final_listing) = finalized_oracle_sku_coverage_schedule_for_month(
+        &month,
+        &coverage,
+        market.instrument.expiry_ts,
+        now,
+    )?;
     if final_scramble_start == coverage.planned_scramble_start_ts
         && (month.scramble_start_ts != coverage.planned_scramble_start_ts
             || month.listing_ts != coverage.planned_listing_ts)
@@ -207,6 +220,9 @@ pub(super) fn reopen_oracle_sku_coverage_state(
     now: u64,
     slot: u64,
 ) -> ProgramResult {
+    if month.schedule_version == LAUNCH_SCHEDULE_VERSION {
+        return Err(VaultError::OracleTimingWindowClosed.into());
+    }
     let (placement_end, _, scramble_end) = rulebook_schedule_boundaries(month)?;
     if month.phase != OraclePhase::Scramble
         || month.pending_resolution_count != 0
@@ -251,23 +267,6 @@ pub(super) fn remove_supported_source_from_sku_coverage(
     Ok(())
 }
 
-pub(super) fn oracle_source_submission_latest_safe_ts(expiry_ts: u64) -> Result<u64, ProgramError> {
-    let preserved_post_submission_seconds = ORACLE_KILL_WINDOW_SECONDS
-        .checked_add(ORACLE_RESOLUTION_FREEZE_WINDOW_SECONDS)
-        .and_then(|value| value.checked_add(ORACLE_OPENING_WINDOW_SECONDS))
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    expiry_ts
-        .checked_sub(preserved_post_submission_seconds)
-        .ok_or_else(|| VaultError::InvalidOracleState.into())
-}
-
-pub(super) fn oracle_source_submission_is_unlistable(
-    expiry_ts: u64,
-    now: u64,
-) -> Result<bool, ProgramError> {
-    Ok(now >= oracle_source_submission_latest_safe_ts(expiry_ts)?)
-}
-
 pub(super) fn oracle_stale_source_challenge_cleanup_ready(
     month: &OracleMonthState,
     now: u64,
@@ -280,7 +279,7 @@ pub(super) fn oracle_unlistable_source_cleanup_ready(
     expiry_ts: u64,
     now: u64,
 ) -> Result<bool, ProgramError> {
-    if !oracle_source_submission_is_unlistable(expiry_ts, now)? {
+    if now < source_submission_deadline(month, expiry_ts)? {
         return Ok(false);
     }
     match month.phase {
@@ -298,7 +297,6 @@ pub(super) fn cancel_stale_oracle_source_challenge_state(
     challenge: &mut OracleSourceChallenge,
     source_guard: &mut OracleSourceChallengeGuard,
     comparison_guard: Option<&mut OracleSourceChallengeGuard>,
-    staking_pool: Option<&mut OracleStakingPool>,
     now: u64,
     slot: u64,
 ) -> ProgramResult {
@@ -334,8 +332,6 @@ pub(super) fn cancel_stale_oracle_source_challenge_state(
         || source_guard.active_challenge != *challenge_key
         || source_guard.active_challenge_id != challenge.challenge_id
         || !crate::pubkey_is_default(&source_guard.active_dispute)
-        || staking_pool.is_some()
-            != (challenge.status == OracleChallengeStatus::RuleReviewUnresolved)
     {
         return Err(VaultError::InvalidOracleChallengeAccount.into());
     }
@@ -347,15 +343,12 @@ pub(super) fn cancel_stale_oracle_source_challenge_state(
             return Err(VaultError::InvalidOracleChallengeAccount.into());
         }
     }
-    if let Some(pool) = staking_pool.as_ref() {
-        if challenge.emergency_snapshot_version != 2
+    if challenge.status == OracleChallengeStatus::RuleReviewUnresolved
+        && (challenge.emergency_snapshot_version != 3
             || challenge.rule_review_slot == 0
-            || challenge.emergency_snapshot_total_major_tokens == 0
-            || pool.governance_lock_count == 0
-            || pool.samba_supply != challenge.emergency_snapshot_total_major_tokens
-        {
-            return Err(VaultError::InvalidOracleStakingPool.into());
-        }
+            || challenge.council_authority_version != 1)
+    {
+        return Err(VaultError::InvalidOracleChallengeAccount.into());
     }
 
     release_source_challenge_guard(
@@ -373,13 +366,6 @@ pub(super) fn cancel_stale_oracle_source_challenge_state(
             &Pubkey::default(),
             slot,
         )?;
-    }
-    if let Some(pool) = staking_pool {
-        pool.governance_lock_count = pool
-            .governance_lock_count
-            .checked_sub(1)
-            .ok_or(VaultError::InvalidOracleStakingPool)?;
-        pool.last_updated_slot = slot;
     }
     decrement_pending_oracle_resolution(month)?;
     challenge.status = OracleChallengeStatus::Cancelled;
@@ -534,23 +520,7 @@ pub(super) fn process_cancel_stale_oracle_source_challenge_v2(
     } else {
         None
     };
-    let staking_index = 6 + usize::from(has_comparison);
-    let staking_pool_info = if challenge.status == OracleChallengeStatus::RuleReviewUnresolved {
-        let info = accounts
-            .get(staking_index)
-            .ok_or(VaultError::InvalidAccountList)?;
-        if !info.is_writable
-            || info.key == source_guard_info.key
-            || comparison_guard_info.is_some_and(|comparison| comparison.key == info.key)
-        {
-            return Err(VaultError::InvalidAccountList.into());
-        }
-        Some(info)
-    } else {
-        None
-    };
-    let expected_len = staking_index + usize::from(staking_pool_info.is_some());
-    if accounts.len() != expected_len {
+    if accounts.len() != 6 + usize::from(has_comparison) {
         return Err(VaultError::InvalidAccountList.into());
     }
 
@@ -573,16 +543,6 @@ pub(super) fn process_cancel_stale_oracle_source_challenge_v2(
     } else {
         None
     };
-    let mut staking_pool = if let Some(info) = staking_pool_info {
-        Some(load_canonical_oracle_staking_pool(
-            program_id,
-            info,
-            &derive_oracle_major_token_config_pda(program_id).0,
-        )?)
-    } else {
-        None
-    };
-
     let (slot, now) = current_slot_and_unix_timestamp()?;
     cancel_stale_oracle_source_challenge_state(
         &mut month,
@@ -591,16 +551,12 @@ pub(super) fn process_cancel_stale_oracle_source_challenge_v2(
         &mut challenge,
         &mut source_guard,
         comparison_guard.as_mut().map(|(guard, _)| guard),
-        staking_pool.as_mut(),
         now,
         slot,
     )?;
     store_state(source_guard_info, &source_guard)?;
     if let Some((guard, info)) = comparison_guard.as_ref() {
         store_state(info, guard)?;
-    }
-    if let (Some(pool), Some(info)) = (staking_pool.as_ref(), staking_pool_info) {
-        store_state(info, pool)?;
     }
     store_state(challenge_info, &challenge)?;
     store_state(coverage_info, &coverage)?;

@@ -143,11 +143,12 @@ pub enum CompressedStateDomain {
     OracleUsdcSourceReward = 3,
     OracleUsdcRewardRegistration = 4,
     OracleUsdcRewardReceipt = 5,
-    OracleSambaWinningVote = 6,
-    OracleSambaVoteSettlementReceipt = 7,
     OracleSupportPosition = 8,
     OracleSourceState = 9,
     OracleSourceDescriptor = 10,
+    OracleSourceObservations = 11,
+    OracleCarryJournal = 12,
+    OracleCarryCheckpoint = 13,
 }
 stable_borsh_enum!(CompressedStateDomain {
     OracleSkuCoverageRecord = 1,
@@ -155,11 +156,12 @@ stable_borsh_enum!(CompressedStateDomain {
     OracleUsdcSourceReward = 3,
     OracleUsdcRewardRegistration = 4,
     OracleUsdcRewardReceipt = 5,
-    OracleSambaWinningVote = 6,
-    OracleSambaVoteSettlementReceipt = 7,
     OracleSupportPosition = 8,
     OracleSourceState = 9,
     OracleSourceDescriptor = 10,
+    OracleSourceObservations = 11,
+    OracleCarryJournal = 12,
+    OracleCarryCheckpoint = 13,
 });
 
 impl CompressedStateDomain {
@@ -177,11 +179,12 @@ impl CompressedStateDomain {
             Self::OracleUsdcSourceReward => 112,
             Self::OracleUsdcRewardRegistration => 105,
             Self::OracleUsdcRewardReceipt => 81,
-            Self::OracleSambaWinningVote => 16,
-            Self::OracleSambaVoteSettlementReceipt => 17,
             Self::OracleSupportPosition => 107,
-            Self::OracleSourceState => 205,
+            Self::OracleSourceState => 216,
             Self::OracleSourceDescriptor => 96,
+            Self::OracleSourceObservations => 582,
+            Self::OracleCarryJournal => 110,
+            Self::OracleCarryCheckpoint => 322,
         }
     }
 }

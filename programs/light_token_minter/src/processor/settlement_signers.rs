@@ -100,6 +100,13 @@ pub(super) fn process_initialize_settlement_signer_registry(
     if !config.paused {
         return Err(VaultError::SettlementSignerRecoveryRequiresPause.into());
     }
+    #[cfg(feature = "mainnet-v3")]
+    if *registry_info.key != crate::MAINNET_SETTLEMENT_SIGNER_REGISTRY
+        || params.recovery_authority != crate::MAINNET_RECOVERY_AUTHORITY
+        || config.admin != crate::MAINNET_CONFIG_ADMIN
+    {
+        return Err(VaultError::InvalidSettlementSignerConfiguration.into());
+    }
     if params.signer_set_version != 1
         || params.recovery_authority != *recovery_authority_info.key
         || crate::pubkey_is_default(&params.recovery_authority)

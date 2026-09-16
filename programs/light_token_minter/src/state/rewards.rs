@@ -2,7 +2,7 @@ use super::*;
 
 /// Canonical program authority for the separate classic-SPL USDC reward ATA.
 ///
-/// This custody is never mixed with the AMBA treasury or sAMBA backing. `total_reserved`
+/// This custody is separate from participant bond and trading collateral. `total_reserved`
 /// is the outstanding external liability across frozen cash schedules; claims decrease it
 /// while moving the same amount into the primary collateral vault and player ledger.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -59,7 +59,7 @@ pub struct OracleUsdcRewardSchedule {
     pub outstanding_prelisting_escrow_count: u32,
     /// Trading-fee-derived additions to SKU update-bounty pools.
     pub trading_fee_bounty_total: u64,
-    /// Set exactly once by the settled DLMM bounty transfer, including a zero-fee month.
+    /// Fresh zero-fee schedules finalize this component at construction; no sweep is required.
     pub bounty_fee_sweep_finalized: bool,
 }
 

@@ -49,10 +49,6 @@ impl AmoebaDlmmPoolStatus {
         )
     }
 
-    pub fn allows_protocol_fee_collection(self) -> bool {
-        matches!(self, Self::Paused | Self::Settled)
-    }
-
     pub fn can_admin_transition_to(self, next: Self) -> bool {
         matches!(
             (self, next),
@@ -90,13 +86,11 @@ pub struct AmoebaDlmmPoolV1 {
     pub initialized_page_bitmap: u64,
     pub bid_page_bitmap: u64,
     pub ask_page_bitmap: u64,
-    pub swap_fee_bps: u16,
-    pub protocol_fee_share_bps: u16,
+
     pub maximum_bins_per_swap: u8,
     pub accounted_option_reserve: u64,
     pub accounted_quote_reserve: u64,
-    pub protocol_fee_option: u64,
-    pub protocol_fee_quote: u64,
+
     pub position_count: u32,
     pub status: AmoebaDlmmPoolStatus,
     pub settlement_price_atomic: u64,
@@ -129,13 +123,11 @@ impl Default for AmoebaDlmmPoolV1 {
             initialized_page_bitmap: 0,
             bid_page_bitmap: 0,
             ask_page_bitmap: 0,
-            swap_fee_bps: 0,
-            protocol_fee_share_bps: 0,
+
             maximum_bins_per_swap: 0,
             accounted_option_reserve: 0,
             accounted_quote_reserve: 0,
-            protocol_fee_option: 0,
-            protocol_fee_quote: 0,
+
             position_count: 0,
             status: AmoebaDlmmPoolStatus::Pending,
             settlement_price_atomic: 0,
@@ -147,7 +139,7 @@ impl Default for AmoebaDlmmPoolV1 {
 }
 
 impl AmoebaDlmmPoolV1 {
-    pub const LEN: usize = 384;
+    pub const LEN: usize = 364;
     pub const BODY_LEN: usize = Self::LEN - 8;
 
     pub fn has_current_layout(&self) -> bool {
@@ -330,13 +322,11 @@ fixed_state_deserialize!(AmoebaDlmmPoolV1, AmoebaDlmmPoolV1::BODY_LEN, {
     initialized_page_bitmap: u64,
     bid_page_bitmap: u64,
     ask_page_bitmap: u64,
-    swap_fee_bps: u16,
-    protocol_fee_share_bps: u16,
+
     maximum_bins_per_swap: u8,
     accounted_option_reserve: u64,
     accounted_quote_reserve: u64,
-    protocol_fee_option: u64,
-    protocol_fee_quote: u64,
+
     position_count: u32,
     status: AmoebaDlmmPoolStatus,
     settlement_price_atomic: u64,

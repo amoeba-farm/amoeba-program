@@ -85,11 +85,7 @@ pub(super) fn process_accumulate_oracle_settlement_source_bucket(
             || (offset == 0 && bucket.bucket_id != params.bucket_id)
             || (manifest.processed_bucket_count > 0
                 && bucket.bucket_id <= manifest.current_bucket_id)
-            || !matches!(
-                bucket.status,
-                OracleBucketMedianStatus::SettlementReady
-                    | OracleBucketMedianStatus::EmergencyDefaulted
-            )
+            || !bucket.status.permits_settlement()
             || crate::bytes32_is_zero(&bucket.source_snapshot_hash)
         {
             return Err(VaultError::InvalidOracleWeightOrder.into());

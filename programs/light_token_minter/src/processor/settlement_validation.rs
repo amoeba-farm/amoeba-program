@@ -417,9 +417,6 @@ pub(super) fn validate_market_parameters(
         || maximum_bin_id > crate::constants::MAX_AMOEBA_DLMM_BIN_COUNT as u64
         || params.lot_size != 1
         || params.min_order_qty != 1
-        || params.maker_fee_bps > 10_000
-        || params.taker_fee_bps != 20
-        || params.cancel_fee_bps > 10_000
         || params.max_fills_per_instruction != crate::constants::MAX_AMOEBA_DLMM_BINS_PER_SWAP
     {
         return Err(VaultError::InvalidMarketConfig.into());
@@ -539,7 +536,7 @@ pub(super) fn load_or_create_light_associated_token_account<'a>(
     rent_sponsor_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
 ) -> Result<TokenAccount, ProgramError> {
-    validate_light_associated_token_address(owner_info.key, mint_info.key, account_info)?;
+    validate_light_associated_token_destination(owner_info.key, mint_info.key, account_info)?;
     if account_info.owner == &light_token_program_id() {
         return load_canonical_light_token_account(account_info, owner_info.key, mint_info.key);
     }
@@ -586,11 +583,4 @@ pub(super) fn load_or_create_light_associated_token_account<'a>(
         ],
     )?;
     load_canonical_light_token_account(account_info, owner_info.key, mint_info.key)
-}
-
-pub(super) fn ensure_market_not_expired(market: &Market) -> Result<(), ProgramError> {
-    if current_unix_timestamp()? >= market.instrument.expiry_ts {
-        return Err(VaultError::MarketExpired.into());
-    }
-    Ok(())
 }

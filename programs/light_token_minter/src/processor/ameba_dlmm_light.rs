@@ -426,6 +426,13 @@ pub fn process_lifecycle_instruction(
             process_compress(program_id, accounts, payload)
         }
         AmoebaDlmmInstructionTag::DecompressLightState => {
+            if payload.starts_with(&crate::ameba_dlmm_instruction::RESTORE_AMOEBA_DLMM_VAULT_V3) {
+                return super::ameba_dlmm::process_restore_vault(
+                    program_id,
+                    accounts,
+                    &payload[4..],
+                );
+            }
             process_decompress(program_id, accounts, payload)
         }
         _ => Err(VaultError::InvalidInstructionData.into()),

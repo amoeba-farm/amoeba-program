@@ -108,21 +108,13 @@ fn mul_ceil(a: u64, b: u64, scale: u64) -> Result<u64> {
         .map_err(|_| WriterDlmmAdmissionError::Arithmetic)
 }
 
-/// Current fee-free ask and protected bid. Historical fee fields remain valid
-/// inputs, but do not add a fee or inflate the required price separation.
+/// Current ask and protected bid with the immutable quote-grid separation.
 pub fn writer_dlmm_price_bounds(
     seller_floor: u64,
     tick: u64,
     separation_ticks: u16,
-    swap_fee_bps: u16,
-    primary_fee_bps: u16,
 ) -> Result<(u64, u64, u64)> {
-    if seller_floor == 0
-        || tick == 0
-        || separation_ticks == 0
-        || swap_fee_bps > 10_000
-        || primary_fee_bps > 10_000
-    {
+    if seller_floor == 0 || tick == 0 || separation_ticks == 0 {
         return Err(WriterDlmmAdmissionError::InvalidPolicy);
     }
     let gap = tick
@@ -132,14 +124,6 @@ pub fn writer_dlmm_price_bounds(
         .checked_sub(gap)
         .ok_or(WriterDlmmAdmissionError::PriceSeparation)?;
     Ok((seller_floor, bid, 0))
-}
-
-/// Current writer premium fee is zero even for an immutable historical policy.
-pub fn writer_dlmm_primary_fee(_gross_writer_premium: u64, primary_fee_bps: u16) -> Result<u64> {
-    if primary_fee_bps > 10_000 {
-        return Err(WriterDlmmAdmissionError::InvalidPolicy);
-    }
-    Ok(0)
 }
 
 fn reserve(book: &[WriterSeries], limits: &WriterDlmmRiskLimits) -> Result<WriterReserveSummary> {

@@ -12,9 +12,10 @@ pub(in crate::processor) struct AcceptedEvent {
 }
 
 /// Mandatory atomic hook for ordinary opening/update, accepted challenge alternatives,
-/// sAMBA emergency acceptance and the feature-gated Devnet opening acceptance.
+/// council emergency acceptance and the feature-gated Devnet opening acceptance.
 /// Tail accounts: source journal, create-only event checkpoint, System program.
 /// A failure must propagate through the accepting transaction, never be swallowed.
+#[allow(clippy::too_many_arguments)] // Explicit account and snapshot roles.
 pub(in crate::processor) fn record_fresh_accept<'a>(
     program: &Pubkey,
     payer: &AccountInfo<'a>,
@@ -38,7 +39,7 @@ pub(in crate::processor) fn record_fresh_accept<'a>(
                 &before.rolling_observation_hash,
                 after.month.as_ref(),
                 &after.source_id,
-                &[after.observation_count],
+                &after.observation_count.to_le_bytes(),
                 &event.value.to_le_bytes(),
                 &event.observed_at.to_le_bytes(),
                 &event.evidence_hash,
@@ -61,6 +62,7 @@ pub(in crate::processor) fn record_fresh_accept<'a>(
     )
 }
 
+#[allow(clippy::too_many_arguments)] // Explicit account and snapshot roles.
 pub(super) fn append_checkpoint<'a>(
     program: &Pubkey,
     payer: &AccountInfo<'a>,
@@ -69,7 +71,7 @@ pub(super) fn append_checkpoint<'a>(
     observations: &OracleSourceObservations,
     event: AcceptedEvent,
     tail: &[AccountInfo<'a>],
-    previous_state: Option<(u8, [u8; 32])>,
+    previous_state: Option<(u32, [u8; 32])>,
     origin: Option<(Pubkey, Pubkey)>,
 ) -> ProgramResult {
     if tail.len() != 3
@@ -87,12 +89,9 @@ pub(super) fn append_checkpoint<'a>(
         return invalid();
     }
     validate_oracle_observation_shape(source, observations)?;
-    let last = usize::from(source.observation_count)
-        .checked_sub(1)
-        .ok_or(VaultError::InvalidOracleObservation)?;
     let timestamp = now()?;
-    if observations.states[last] != event.value
-        || observations.source_times[last] != event.observed_at
+    if source.current_state != event.value
+        || source.latest_source_time != event.observed_at
         || event.observed_at > timestamp
     {
         return invalid();
@@ -101,6 +100,9 @@ pub(super) fn append_checkpoint<'a>(
     let new_journal = tail[0].owner == &system_program::id();
     let (previous, count) = if new_journal {
         validate_canonical_system_zero_pda_proof(&journal_pda.0, &tail[0])?;
+        if source.observation_count != 1 {
+            return invalid();
+        }
         (Pubkey::default(), 0)
     } else {
         let journal = load_journal(program, source_key, &tail[0])?;
@@ -173,6 +175,7 @@ pub(super) fn append_checkpoint<'a>(
 /// Accounts: payer, market, month, source, observations, accepted claim/challenge,
 /// journal, checkpoint, System; accepted alternatives append their rejected claim.
 /// Payload: kind (0 opening / 1 update / 2 accepted alternative), prior rolling hash.
+#[inline(never)]
 pub(super) fn capture_current(
     program: &Pubkey,
     a: &[AccountInfo],
@@ -217,7 +220,7 @@ pub(super) fn capture_current(
         1 => {
             let claim =
                 load_valid_oracle_update_claim_v2_from_account(program, a[2].key, a[3].key, &a[5])?;
-            if claim.claim.status != OracleClaimStatus::Finalized || claim.samba_checkpoint_active {
+            if claim.claim.status != OracleClaimStatus::Finalized || claim.council_review_pending {
                 return invalid();
             }
             AcceptedEvent {
@@ -237,7 +240,10 @@ pub(super) fn capture_current(
                 || challenge.claim != *a[9].key
                 || challenge.claim_id != claim.claim.claim_id
                 || claim.claim.status != OracleClaimStatus::Rejected
-                || claim.samba_checkpoint_active
+                || claim.council_review_pending
+                // A keep-prior verdict is not an accepted price event, even if
+                // its evidence reproduces the last observation's commitment.
+                || challenge.alternative_state == claim.claim.prior_state
             {
                 return invalid();
             }
@@ -258,7 +264,7 @@ pub(super) fn capture_current(
             &previous_hash,
             source.month.as_ref(),
             &source.source_id,
-            &[source.observation_count],
+            &source.observation_count.to_le_bytes(),
             &event.value.to_le_bytes(),
             &event.observed_at.to_le_bytes(),
             &event.evidence_hash,

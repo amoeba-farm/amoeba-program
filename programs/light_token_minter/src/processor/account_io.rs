@@ -651,7 +651,9 @@ pub(super) fn load_valid_oracle_update_claim_v2_from_account(
         && crate::bytes32_is_zero(&claim.claim.evidence_hash)
         && crate::bytes32_is_zero(&claim.claim.archive_url_hash)
         && claim.freshness_reward_multiplier == 1
-        && claim.revealed_slot == 0;
+        && claim.revealed_slot == 0
+        && claim.revealed_at_ts == 0
+        && claim.prior_finalized_step == 0;
     let revealed_or_terminal_shape = !matches!(
         claim.claim.status,
         OracleClaimStatus::Open | OracleClaimStatus::Committed
@@ -665,7 +667,8 @@ pub(super) fn load_valid_oracle_update_claim_v2_from_account(
             1 | crate::constants::ORACLE_FRESH_UPDATE_REWARD_MULTIPLIER
         )
         && claim.revealed_slot >= claim.earliest_reveal_slot
-        && claim.revealed_slot <= claim.reveal_deadline_slot;
+        && claim.revealed_slot <= claim.reveal_deadline_slot
+        && claim.revealed_at_ts != 0;
     let expired_shape = claim.claim.status == OracleClaimStatus::TimedOut
         && claim.claim.prior_state == 0
         && claim.claim.new_state == 0
@@ -674,6 +677,8 @@ pub(super) fn load_valid_oracle_update_claim_v2_from_account(
         && crate::bytes32_is_zero(&claim.claim.archive_url_hash)
         && claim.freshness_reward_multiplier == 1
         && claim.revealed_slot == 0
+        && claim.revealed_at_ts == 0
+        && claim.prior_finalized_step == 0
         && claim.claim.escrow_disposition == OracleEscrowDisposition::Refunded;
     if !claim.claim.is_initialized
         || claim.claim.account_discriminator != OracleUpdateClaimV2::ACCOUNT_DISCRIMINATOR
@@ -726,7 +731,7 @@ pub(super) fn store_oracle_update_claim(
     store_state(account_info, &current)
 }
 
-pub(super) fn oracle_update_claim_samba_checkpoint_active(
+pub(super) fn oracle_update_claim_council_review_pending(
     program_id: &Pubkey,
     account_info: &AccountInfo,
 ) -> Result<bool, ProgramError> {
@@ -739,7 +744,7 @@ pub(super) fn oracle_update_claim_samba_checkpoint_active(
         OracleUpdateClaimV2::LEN,
         VaultError::InvalidOracleUpdateAccount,
     )?;
-    Ok(current.samba_checkpoint_active)
+    Ok(current.council_review_pending)
 }
 
 pub(super) fn load_valid_oracle_active_weight_manifest(

@@ -8,6 +8,19 @@ pub(in crate::processor) fn validate_typed_state_data(
     compact_out: Option<&mut Vec<u8>>,
 ) -> ProgramResult {
     let (account_len, encoded_len, error) = match domain {
+        CompressedStateDomain::OracleCarryJournal
+        | CompressedStateDomain::OracleCarryCheckpoint => {
+            super::super::oracle_carry::compressed::validate_carry_payload(
+                program_id,
+                canonical_pda,
+                domain,
+                data,
+            )?;
+            if let Some(output) = compact_out {
+                *output = data.to_vec();
+            }
+            return Ok(());
+        }
         CompressedStateDomain::OracleSkuCoverageRecord => (
             OracleSkuCoverageRecord::LEN,
             OracleSkuCoverageRecord::REQUIRED_DATA_LEN,
@@ -38,21 +51,17 @@ pub(in crate::processor) fn validate_typed_state_data(
             OracleUsdcRewardReceipt::REQUIRED_DATA_LEN,
             VaultError::InvalidOracleUsdcRewardReceipt,
         ),
-        CompressedStateDomain::OracleSambaWinningVote => (
-            OracleSambaWinningVote::LEN,
-            OracleSambaWinningVote::REQUIRED_DATA_LEN,
-            VaultError::InvalidOracleEmergencyDispute,
-        ),
-        CompressedStateDomain::OracleSambaVoteSettlementReceipt => (
-            OracleSambaVoteSettlementReceipt::LEN,
-            OracleSambaVoteSettlementReceipt::REQUIRED_DATA_LEN,
-            VaultError::InvalidOracleEmergencyDispute,
-        ),
+
         CompressedStateDomain::OracleSourceState
         | CompressedStateDomain::OracleSourceDescriptor => (
             OracleSourceState::LEN,
             OracleSourceState::REQUIRED_DATA_LEN,
             VaultError::InvalidOracleSourceAccount,
+        ),
+        CompressedStateDomain::OracleSourceObservations => (
+            OracleSourceObservations::LEN,
+            OracleSourceObservations::REQUIRED_DATA_LEN,
+            VaultError::InvalidOracleObservation,
         ),
     };
     if data.len() != account_len || data[encoded_len..].iter().any(|byte| *byte != 0) {
@@ -60,9 +69,10 @@ pub(in crate::processor) fn validate_typed_state_data(
     }
 
     let invalid_encoding = match domain {
+        CompressedStateDomain::OracleCarryJournal
+        | CompressedStateDomain::OracleCarryCheckpoint => unreachable!(),
         CompressedStateDomain::OracleSkuCoverageRecord
-        | CompressedStateDomain::OracleUsdcSkuPool
-        | CompressedStateDomain::OracleSambaWinningVote => data[0] > 1,
+        | CompressedStateDomain::OracleUsdcSkuPool => data[0] > 1,
         CompressedStateDomain::OracleUsdcSourceReward => {
             data[0] > 1
                 || data[202] > 1
@@ -81,15 +91,15 @@ pub(in crate::processor) fn validate_typed_state_data(
         CompressedStateDomain::OracleUsdcRewardReceipt => {
             data[0] > 1 || data[102] > OracleUsdcRewardKind::Update as u8
         }
-        CompressedStateDomain::OracleSambaVoteSettlementReceipt => {
-            data[0] > 1 || data[174] > OracleEscrowDisposition::Transferred as u8
-        }
+
         CompressedStateDomain::OracleSourceState
         | CompressedStateDomain::OracleSourceDescriptor => {
+            data[0] > 1 || data[260] > OracleSourceStatus::TimedOut as u8 || data[261] > 1
+        }
+        CompressedStateDomain::OracleSourceObservations => {
             data[0] > 1
-                || data[260] > OracleSourceStatus::TimedOut as u8
-                || data[261] > 1
-                || usize::from(data[302]) > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
+                || (data[5] != OracleSourceObservations::ACCOUNT_VERSION
+                    && data[5] != OracleSourceObservations::INHERITED_ANCHOR_VERSION)
         }
     };
     if invalid_encoding {
@@ -97,6 +107,8 @@ pub(in crate::processor) fn validate_typed_state_data(
     }
 
     let invalid = match domain {
+        CompressedStateDomain::OracleCarryJournal
+        | CompressedStateDomain::OracleCarryCheckpoint => unreachable!(),
         CompressedStateDomain::OracleSkuCoverageRecord => {
             let month = fixed_pubkey(data, 6);
             let sku_id = fixed_bytes32(data, 38);
@@ -210,36 +222,7 @@ pub(in crate::processor) fn validate_typed_state_data(
                 || fixed_bytes32_is_zero(data, 103)
                 || fixed_u64(data, 135) == 0
         }
-        CompressedStateDomain::OracleSambaWinningVote => {
-            let pot = fixed_pubkey(data, 6);
-            let vote = fixed_pubkey(data, 70);
-            let (expected, bump) = derive_oracle_samba_winning_vote_pda(program_id, &pot, &vote);
-            *canonical_pda != expected
-                || data[0] != 1
-                || data[1] != bump
-                || data[2..5] != OracleSambaWinningVote::ACCOUNT_DISCRIMINATOR
-                || data[5] != OracleSambaWinningVote::ACCOUNT_VERSION
-                || fixed_bytes32_is_zero(data, 6)
-                || fixed_bytes32_is_zero(data, 38)
-                || fixed_bytes32_is_zero(data, 70)
-                || fixed_bytes32_is_zero(data, 102)
-        }
-        CompressedStateDomain::OracleSambaVoteSettlementReceipt => {
-            let pot = fixed_pubkey(data, 6);
-            let vote = fixed_pubkey(data, 70);
-            let (expected, bump) = derive_oracle_samba_vote_settlement_pda(program_id, &pot, &vote);
-            *canonical_pda != expected
-                || data[0] != 1
-                || data[1] != bump
-                || data[2..5] != OracleSambaVoteSettlementReceipt::ACCOUNT_DISCRIMINATOR
-                || data[5] != OracleSambaVoteSettlementReceipt::ACCOUNT_VERSION
-                || fixed_bytes32_is_zero(data, 6)
-                || fixed_bytes32_is_zero(data, 38)
-                || fixed_bytes32_is_zero(data, 70)
-                || fixed_bytes32_is_zero(data, 102)
-                || fixed_bytes32_is_zero(data, 134)
-                || data[174] == OracleEscrowDisposition::Unsettled as u8
-        }
+
         CompressedStateDomain::OracleSourceState
         | CompressedStateDomain::OracleSourceDescriptor => {
             let month = fixed_pubkey(data, 2);
@@ -257,6 +240,25 @@ pub(in crate::processor) fn validate_typed_state_data(
                     && (fixed_bytes32_is_zero(data, 98)
                         || fixed_bytes32_is_zero(data, 130)
                         || fixed_bytes32_is_zero(data, 162)))
+        }
+        CompressedStateDomain::OracleSourceObservations => {
+            let source = fixed_pubkey(data, 38);
+            let (expected, bump) =
+                super::super::derive_oracle_source_observations_pda(program_id, &source);
+            *canonical_pda != expected
+                || data[0] != 1
+                || data[1] != bump
+                || data[2..5] != OracleSourceObservations::ACCOUNT_DISCRIMINATOR
+                || !matches!(
+                    data[5],
+                    OracleSourceObservations::ACCOUNT_VERSION
+                        | OracleSourceObservations::INHERITED_ANCHOR_VERSION
+                )
+                || fixed_bytes32_is_zero(data, 6)
+                || fixed_bytes32_is_zero(data, 38)
+                || !observation_projection_is_well_formed(
+                    &data[..OracleSourceObservations::REQUIRED_DATA_LEN],
+                )
         }
     };
     if invalid {
@@ -294,7 +296,19 @@ pub(in crate::processor) fn validate_compact_state_data(
     domain: CompressedStateDomain,
     data: &[u8],
 ) -> ProgramResult {
+    if domain == CompressedStateDomain::OracleSourceObservations {
+        if data.len() != OracleSourceObservations::REQUIRED_DATA_LEN
+            || !observation_projection_is_well_formed(data)
+        {
+            return Err(VaultError::InvalidOracleObservation.into());
+        }
+        return Ok(());
+    }
     let (required_len, error) = match domain {
+        CompressedStateDomain::OracleCarryJournal
+        | CompressedStateDomain::OracleCarryCheckpoint => {
+            return super::super::oracle_carry::compressed::validate_carry_body(domain, data)
+        }
         CompressedStateDomain::OracleSkuCoverageRecord => (
             CompactOracleSkuCoverageRecord::REQUIRED_DATA_LEN,
             VaultError::InvalidOracleSkuCoverageRecord,
@@ -319,15 +333,7 @@ pub(in crate::processor) fn validate_compact_state_data(
             CompactOracleUsdcRewardReceipt::REQUIRED_DATA_LEN,
             VaultError::InvalidOracleUsdcRewardReceipt,
         ),
-        CompressedStateDomain::OracleSambaWinningVote
-        | CompressedStateDomain::OracleSambaVoteSettlementReceipt => (
-            if domain == CompressedStateDomain::OracleSambaWinningVote {
-                CompactOracleSambaWinningVote::REQUIRED_DATA_LEN
-            } else {
-                CompactOracleSambaVoteSettlementReceipt::REQUIRED_DATA_LEN
-            },
-            VaultError::InvalidOracleEmergencyDispute,
-        ),
+
         CompressedStateDomain::OracleSourceState
         | CompressedStateDomain::OracleSourceDescriptor => (
             if domain == CompressedStateDomain::OracleSourceState {
@@ -337,15 +343,20 @@ pub(in crate::processor) fn validate_compact_state_data(
             },
             VaultError::InvalidOracleSourceAccount,
         ),
+        CompressedStateDomain::OracleSourceObservations => (
+            CompactOracleSourceObservations::REQUIRED_DATA_LEN,
+            VaultError::InvalidOracleObservation,
+        ),
     };
     if data.len() < required_len || data[required_len..].iter().any(|byte| *byte != 0) {
         return Err(error.into());
     }
 
     let invalid = match domain {
+        CompressedStateDomain::OracleCarryJournal
+        | CompressedStateDomain::OracleCarryCheckpoint => unreachable!(),
         CompressedStateDomain::OracleSkuCoverageRecord
-        | CompressedStateDomain::OracleUsdcSkuPool
-        | CompressedStateDomain::OracleSambaWinningVote => false,
+        | CompressedStateDomain::OracleUsdcSkuPool => false,
         CompressedStateDomain::OracleUsdcSourceReward => {
             data[36] > 1 || data[37] > OracleSourceStatus::TimedOut as u8 || data[111] > 1
         }
@@ -376,22 +387,21 @@ pub(in crate::processor) fn validate_compact_state_data(
                 || fixed_bytes32_is_zero(data, 33)
                 || fixed_u64(data, 65) == 0
         }
-        CompressedStateDomain::OracleSambaVoteSettlementReceipt => {
-            data[8] > OracleEscrowDisposition::Transferred as u8
-                || data[8] == OracleEscrowDisposition::Unsettled as u8
-        }
+
         CompressedStateDomain::OracleSourceState => {
             fixed_bytes32_is_zero(data, 0)
                 || fixed_bytes32_is_zero(data, 32)
                 || fixed_bytes32_is_zero(data, 64)
                 || data[130] > OracleSourceStatus::TimedOut as u8
                 || data[131] > 1
-                || usize::from(data[172]) > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS
         }
         CompressedStateDomain::OracleSourceDescriptor => {
             fixed_bytes32_is_zero(data, 0)
                 || fixed_bytes32_is_zero(data, 32)
                 || fixed_bytes32_is_zero(data, 64)
+        }
+        CompressedStateDomain::OracleSourceObservations => {
+            !observation_projection_is_well_formed(data)
         }
     };
     if invalid {
@@ -399,4 +409,40 @@ pub(in crate::processor) fn validate_compact_state_data(
     } else {
         Ok(())
     }
+}
+
+/// Validates the canonical 582-byte observation projection. The account header and authenticated
+/// month/source identities stay in the projection; only the adaptive transport omits the two
+/// identities. Empty histories are valid for newly-created or frozen accounts, while populated
+/// histories must be a contiguous, strictly increasing `(state, timestamp)` prefix.
+#[inline(never)]
+fn observation_projection_is_well_formed(data: &[u8]) -> bool {
+    if data.len() != OracleSourceObservations::REQUIRED_DATA_LEN
+        || data[0] != 1
+        || data[2..5] != OracleSourceObservations::ACCOUNT_DISCRIMINATOR
+        || !matches!(
+            data[5],
+            OracleSourceObservations::ACCOUNT_VERSION
+                | OracleSourceObservations::INHERITED_ANCHOR_VERSION
+        )
+        || fixed_bytes32_is_zero(data, 6)
+        || fixed_bytes32_is_zero(data, 38)
+    {
+        return false;
+    }
+    let mut previous_time = 0;
+    let mut empty_tail = false;
+    for index in 0..crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS {
+        let state = fixed_u64(data, 70 + index * 8);
+        let timestamp = fixed_u64(data, 326 + index * 8);
+        if state == 0 && timestamp == 0 {
+            empty_tail = true;
+            continue;
+        }
+        if empty_tail || state == 0 || timestamp == 0 || (index > 0 && timestamp <= previous_time) {
+            return false;
+        }
+        previous_time = timestamp;
+    }
+    true
 }

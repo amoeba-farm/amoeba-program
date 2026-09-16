@@ -20,7 +20,8 @@ pub struct OracleSourceState {
     pub opening_submitted: bool,
     pub opening_evidence_hash: [u8; 32],
     pub last_finalized_step: u64,
-    pub observation_count: u8,
+    pub observation_count: u32,
+    pub latest_source_time: u64,
     pub rolling_observation_hash: [u8; 32],
 }
 
@@ -46,16 +47,19 @@ impl Default for OracleSourceState {
             opening_evidence_hash: [0; 32],
             last_finalized_step: 0,
             observation_count: 0,
+            latest_source_time: 0,
             rolling_observation_hash: [0; 32],
         }
     }
 }
 
 impl OracleSourceState {
-    pub const LEN: usize = 336;
+    pub const LEN: usize = 352;
 }
 
-/// Canonical timestamped accepted-state history for one current source.
+/// Immutable first page of accepted observations. Every accepted observation also
+/// creates an immutable linked checkpoint; histories beyond this page use a bounded
+/// authenticated checkpoint walk to verify their exact temporal median.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OracleSourceObservations {
     pub is_initialized: bool,
@@ -86,9 +90,9 @@ impl Default for OracleSourceObservations {
 impl OracleSourceObservations {
     pub const LEN: usize = 592;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OSO";
-    pub const ACCOUNT_VERSION: u8 = 1;
+    pub const ACCOUNT_VERSION: u8 = 3;
     /// Same byte layout; slot zero is an inherited standing-state anchor, not a new print.
-    pub const INHERITED_ANCHOR_VERSION: u8 = 2;
+    pub const INHERITED_ANCHOR_VERSION: u8 = 4;
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -129,10 +133,9 @@ pub struct OracleSourceChallenge {
     pub evidence_hash: [u8; 32],
     pub rule_review_slot: u64,
     pub escrow_disposition: OracleEscrowDisposition,
-    /// Immutable eligible-player voting supply captured when review becomes unresolved.
-    /// Frozen sAMBA share supply.
-    pub emergency_snapshot_total_major_tokens: u64,
-    /// Current exact-sAMBA-supply snapshot marker.
+    /// Council authorization schema marker; one for the current five-seat court.
+    pub council_authority_version: u64,
+    /// Current council-review snapshot marker (version three).
     pub emergency_snapshot_version: u8,
     /// Makes V5 reward-schedule accounting for this challenge principal exactly once.
     pub failed_schedule_escrow_counted: bool,
@@ -157,7 +160,7 @@ impl Default for OracleSourceChallenge {
             evidence_hash: [0; 32],
             rule_review_slot: 0,
             escrow_disposition: OracleEscrowDisposition::Unsettled,
-            emergency_snapshot_total_major_tokens: 0,
+            council_authority_version: 0,
             emergency_snapshot_version: 0,
             failed_schedule_escrow_counted: false,
         }
@@ -244,7 +247,7 @@ impl Default for OracleOpeningClaim {
 }
 
 impl OracleOpeningClaim {
-    pub const LEN: usize = 320;
+    pub const LEN: usize = 144;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -273,9 +276,8 @@ pub struct OracleOpeningClaimChallenge {
     /// Current OCH account marker.
     pub account_discriminator: [u8; 3],
     pub account_version: u8,
-    /// Immutable eligible-player voting supply captured when review becomes unresolved.
-    /// Frozen sAMBA share supply used by the emergency voting threshold.
-    pub emergency_snapshot_total_major_tokens: u64,
+    /// Council authorization schema marker; one for the current five-seat court.
+    pub council_authority_version: u64,
 }
 
 impl Default for OracleOpeningClaimChallenge {
@@ -303,7 +305,7 @@ impl Default for OracleOpeningClaimChallenge {
             escrow_disposition: OracleEscrowDisposition::Unsettled,
             account_discriminator: [0; 3],
             account_version: 0,
-            emergency_snapshot_total_major_tokens: 0,
+            council_authority_version: 0,
         }
     }
 }
@@ -311,8 +313,8 @@ impl Default for OracleOpeningClaimChallenge {
 impl OracleOpeningClaimChallenge {
     pub const LEN: usize = 384;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OCH";
-    /// Version 3 proves that any unresolved voting snapshot was taken from sAMBA supply.
-    pub const ACCOUNT_VERSION: u8 = 3;
+    /// Current version binds council authorization instead of token voting supply.
+    pub const ACCOUNT_VERSION: u8 = 4;
 
     pub fn has_valid_account_layout(&self) -> bool {
         self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
@@ -373,18 +375,21 @@ impl Default for OracleUpdateClaimData {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OracleUpdateClaimV2 {
-    /// Current claim body with the UC2/v1 marker.
+    /// Current claim body with the UC2/v3 marker.
     pub claim: OracleUpdateClaimData,
     pub commit_hash: [u8; 32],
     pub commit_slot: u64,
     pub earliest_reveal_slot: u64,
     pub reveal_deadline_slot: u64,
     pub revealed_slot: u64,
-    /// True only while this revealed claim owns one unresolved sAMBA voting checkpoint.
-    pub samba_checkpoint_active: bool,
+    /// True only while this revealed claim has one unresolved council review.
+    pub council_review_pending: bool,
     /// One for an ordinary accepted print; `ORACLE_FRESH_UPDATE_REWARD_MULTIPLIER` for a print
     /// whose archive timestamp falls inside the primary settlement freshness window.
     pub freshness_reward_multiplier: u8,
+    /// Set by the runtime only when the commitment is publicly revealed.
+    pub revealed_at_ts: u64,
+    pub prior_finalized_step: u64,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -397,8 +402,10 @@ impl Default for OracleUpdateClaimV2 {
             earliest_reveal_slot: 0,
             reveal_deadline_slot: 0,
             revealed_slot: 0,
-            samba_checkpoint_active: false,
+            council_review_pending: false,
             freshness_reward_multiplier: 0,
+            revealed_at_ts: 0,
+            prior_finalized_step: 0,
         }
     }
 }
@@ -406,7 +413,7 @@ impl Default for OracleUpdateClaimV2 {
 impl OracleUpdateClaimV2 {
     pub const LEN: usize = 384;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"UC2";
-    pub const ACCOUNT_VERSION: u8 = 2;
+    pub const ACCOUNT_VERSION: u8 = 4;
 }
 
 pub fn derive_oracle_update_claim_v2_pda(
@@ -450,9 +457,8 @@ pub struct OracleUpdateChallenge {
     /// Current UCH account marker.
     pub account_discriminator: [u8; 3],
     pub account_version: u8,
-    /// Immutable eligible-player voting supply captured when review becomes unresolved.
-    /// Frozen sAMBA share supply.
-    pub emergency_snapshot_total_major_tokens: u64,
+    /// Council authorization schema marker; one for the current five-seat court.
+    pub council_authority_version: u64,
 }
 
 impl Default for OracleUpdateChallenge {
@@ -476,7 +482,7 @@ impl Default for OracleUpdateChallenge {
             escrow_disposition: OracleEscrowDisposition::Unsettled,
             account_discriminator: [0; 3],
             account_version: 0,
-            emergency_snapshot_total_major_tokens: 0,
+            council_authority_version: 0,
         }
     }
 }
@@ -484,8 +490,8 @@ impl Default for OracleUpdateChallenge {
 impl OracleUpdateChallenge {
     pub const LEN: usize = 320;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"UCH";
-    /// Version 3 proves that any unresolved voting snapshot was taken from sAMBA supply.
-    pub const ACCOUNT_VERSION: u8 = 4;
+    /// Current version binds council authorization instead of token voting supply.
+    pub const ACCOUNT_VERSION: u8 = 5;
 
     pub fn has_valid_account_layout(&self) -> bool {
         self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
@@ -499,7 +505,7 @@ impl OracleUpdateChallenge {
 }
 
 /// Immutable one-challenge-per-claim proof. `active_dispute` is initially zero and may be bound
-/// once when the exact unresolved challenge escalates into the current sAMBA dispute.
+/// once when the exact unresolved challenge escalates into the current council case.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct OracleUpdateChallengeGuard {
     pub is_initialized: bool,
@@ -522,4 +528,36 @@ impl OracleUpdateChallengeGuard {
     pub const LEN: usize = 224;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OUG";
     pub const ACCOUNT_VERSION: u8 = 1;
+}
+
+pub fn derive_oracle_source_challenge_guard_pda(
+    program_id: &Pubkey,
+    month: &Pubkey,
+    source: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            CURRENT_STATE_NAMESPACE_SEED,
+            crate::constants::ORACLE_SOURCE_CHALLENGE_GUARD_PDA_SEED,
+            month.as_ref(),
+            source.as_ref(),
+        ],
+        program_id,
+    )
+}
+
+pub fn derive_oracle_update_challenge_guard_pda(
+    program_id: &Pubkey,
+    month: &Pubkey,
+    claim: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            CURRENT_STATE_NAMESPACE_SEED,
+            crate::constants::ORACLE_UPDATE_CHALLENGE_GUARD_PDA_SEED,
+            month.as_ref(),
+            claim.as_ref(),
+        ],
+        program_id,
+    )
 }

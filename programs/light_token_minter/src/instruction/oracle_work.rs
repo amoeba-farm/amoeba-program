@@ -298,35 +298,3 @@ pub struct FinalizeOracleUpdateClaimV2Params {
     pub outcome: OracleUpdateClaimOutcome,
     pub current_step: u64,
 }
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct TryOpenOracleEmergencyDisputeParams {
-    pub kind: OracleEmergencyDisputeKind,
-    pub target_id: [u8; 32],
-    pub expected_case_hash: Option<[u8; 32]>,
-}
-
-#[derive(BorshSerialize, Clone, Debug, Eq, PartialEq)]
-pub struct CommitOracleEmergencyVoteV2Params {
-    pub commit_hash: [u8; 32],
-    pub samba_amount: u64,
-}
-
-crate::fixed_codec::fixed_instruction_deserialize!(CommitOracleEmergencyVoteV2Params, 40, {
-    commit_hash: [u8; 32],
-    samba_amount: u64,
-});
-
-#[derive(BorshSerialize, Clone, Debug, Eq, PartialEq)]
-pub struct RevealOracleEmergencyVoteParams {
-    pub choice: u8,
-    pub salt: [u8; 32],
-}
-
-crate::fixed_codec::fixed_instruction_deserialize!(RevealOracleEmergencyVoteParams, 33, {
-    choice: u8,
-    salt: [u8; 32],
-});
-
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
-pub struct ResolveOracleEmergencyDisputeParams {}

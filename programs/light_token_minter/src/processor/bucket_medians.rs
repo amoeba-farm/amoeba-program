@@ -4,17 +4,17 @@ pub(super) const RECOMPUTE_SOURCE_ACCOUNT_INDEX: u8 = 4;
 
 pub(super) fn recompute_core_account_count(mode: u8) -> Option<usize> {
     match mode {
-        0 => Some(8),
-        1 => Some(11),
+        0 => Some(10),
+        1 => Some(10),
         _ => None,
     }
 }
 
 /// Recompute one bucket as an ordered, one-source-per-call walk.
 ///
-/// Accounts are `[cranker, market, month, bucket, source, observations]`, followed in grace
-/// mode by `[vault_config, staking_pool, samba_mint]`. Both modes then append the completed
-/// recipe source index and bucket source index (read-only). Walk every frozen source in
+/// Accounts are `[cranker, market, month, bucket, source, observations]` followed by the
+/// authenticated recipe/source index and aggregation accounts in both modes. No token
+/// electorate is loaded in grace mode. Walk every frozen source in
 /// authenticated order, including inactive ones; only active sources contribute observations.
 /// For an inactive source, observations is its absent canonical observations PDA.
 /// One compressed source per call preserves the full temporal median within the packet cap.
@@ -41,13 +41,6 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
         || !accounts[4].is_writable
         || accounts[5].is_signer
         || accounts[5].is_writable
-        || (grace
-            && (accounts[6].is_signer
-                || accounts[6].is_writable
-                || accounts[7].is_signer
-                || !accounts[7].is_writable
-                || accounts[8].is_signer
-                || accounts[8].is_writable))
         || crate::bytes32_is_zero(&params.bucket_id)
     {
         return Err(VaultError::InvalidAccountList.into());
@@ -73,8 +66,8 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
         month_info.key,
         &month,
         &params.bucket_id,
-        &accounts[expected_accounts - 2],
-        &accounts[expected_accounts - 1],
+        &accounts[expected_accounts - 4],
+        &accounts[expected_accounts - 3],
     )?;
 
     let mut bucket = load_valid_oracle_bucket_median(program_id, month_info.key, bucket_info)?;
@@ -106,8 +99,7 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
         bucket.opening_source_deltas_bps.fill(0);
     } else if !valid_status
         || bucket.recompute_processed_source_count >= membership.source_count
-        || bucket.last_recompute_source_id
-            != membership.source_ids[usize::from(bucket.recompute_processed_source_count - 1)]
+        || crate::bytes32_is_zero(&bucket.last_recompute_source_id)
     {
         return Err(VaultError::InvalidOracleMedian.into());
     }
@@ -118,13 +110,19 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
         OracleSourceStatus::Active | OracleSourceStatus::Inactive
     ) || source.bucket_id != params.bucket_id
         || source.bucket_weight_bps != bucket.bucket_weight_bps
-        || source.source_id
-            != membership.source_ids[usize::from(bucket.recompute_processed_source_count)]
         || (!crate::bytes32_is_zero(&bucket.last_recompute_source_id)
             && source.source_id <= bucket.last_recompute_source_id)
     {
         return Err(VaultError::InvalidOracleMedian.into());
     }
+    oracle_membership::require_member(
+        program_id,
+        accounts[expected_accounts - 3].key,
+        &membership,
+        &accounts[expected_accounts - 2],
+        bucket.recompute_processed_source_count,
+        &source.source_id,
+    )?;
     let clock = Clock::get()?;
     let now = u64::try_from(clock.unix_timestamp)
         .map_err(|_| ProgramError::from(VaultError::InvalidOracleMedian))?;
@@ -138,18 +136,30 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
         .ok_or(VaultError::ArithmeticOverflow)?;
     let window_start = oracle_settlement_window_start(market.instrument.expiry_ts, days)?;
     let temporal_state = if source.status == OracleSourceStatus::Active {
-        let observations = load_valid_oracle_source_observations(
-            program_id,
-            month_info.key,
-            source_info.key,
-            observations_info,
-        )?;
-        oracle_temporal_median_state(
-            &source,
-            &observations,
-            window_start,
-            market.instrument.expiry_ts,
-        )?
+        if source.observation_count > crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS as u32 {
+            oracle_carry::verified_history_median(
+                program_id,
+                observations_info,
+                source_info.key,
+                &source,
+                window_start,
+                market.instrument.expiry_ts,
+                params.mode,
+            )?
+        } else {
+            let observations = load_valid_oracle_source_observations(
+                program_id,
+                month_info.key,
+                source_info.key,
+                observations_info,
+            )?;
+            oracle_temporal_median_state(
+                &source,
+                &observations,
+                window_start,
+                market.instrument.expiry_ts,
+            )?
+        }
     } else {
         if source.observation_count != 0
             || !crate::bytes32_is_zero(&source.rolling_observation_hash)
@@ -169,10 +179,10 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
     };
     if let Some(state) = temporal_state {
         let index = usize::from(bucket.eligible_source_count);
-        if index >= crate::constants::MAX_ORACLE_BUCKET_SOURCES {
-            return Err(VaultError::InvalidOracleMedian.into());
+        if index < crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY {
+            bucket.opening_source_deltas_bps[index] =
+                source_delta_bps(source.baseline_state, state)?;
         }
-        bucket.opening_source_deltas_bps[index] = source_delta_bps(source.baseline_state, state)?;
         bucket.eligible_source_count = bucket
             .eligible_source_count
             .checked_add(1)
@@ -200,30 +210,27 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
         if !grace {
             bucket.status = OracleBucketMedianStatus::GraceRequired;
         } else {
-            let config_info = &accounts[6];
-            let staking_pool_info = &accounts[7];
-            let samba_mint_info = &accounts[8];
-            let _config = load_current_canonical_vault_config(program_id, config_info)?;
-            let mut staking_pool = load_canonical_oracle_staking_pool(
-                program_id,
-                staking_pool_info,
-                &derive_oracle_major_token_config_pda(program_id).0,
-            )?;
-            let samba_mint =
-                validate_oracle_samba_mint(&staking_pool, samba_mint_info, config_info.key)?;
-            bucket.emergency_snapshot_total_samba = prepare_oracle_samba_voting_snapshot(
-                &mut staking_pool,
-                samba_mint.supply,
-                clock.slot,
-            )?;
+            bucket.council_authority_version = 1;
             bucket.emergency_snapshot_slot = clock.slot;
             bucket.status = OracleBucketMedianStatus::EmergencyRequired;
-            store_state(staking_pool_info, &staking_pool)?;
         }
     } else {
         let eligible = usize::from(bucket.eligible_source_count);
         let mut values = bucket.opening_source_deltas_bps;
-        let new_delta = deterministic_bucket_median(&mut values[..eligible])?;
+        let new_delta = if eligible <= crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY {
+            deterministic_bucket_median(&mut values[..eligible])?
+        } else {
+            oracle_carry::verified_bucket_rank(
+                program_id,
+                &accounts[expected_accounts - 1],
+                accounts[expected_accounts - 3].key,
+                month_info.key,
+                &bucket.source_snapshot_hash,
+                bucket.frozen_source_count,
+                bucket.eligible_source_count,
+                params.mode,
+            )?
+        };
         update_month_bucket_contribution(&mut month, &mut bucket, new_delta)?;
         bucket.status = OracleBucketMedianStatus::SettlementReady;
         month.last_updated_slot = clock.slot;

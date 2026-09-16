@@ -9,17 +9,16 @@ pub(in crate::processor) fn load_collective_settlement_group_for_dlmm(
 
 #[inline(never)]
 fn load_collective_group_binding(
-    program_id: &Pubkey,
     sleeve_info: &AccountInfo,
-    group_info: &AccountInfo,
     book_info: &AccountInfo,
     market_key: &Pubkey,
+    context: &WriterBookContext,
 ) -> Result<CollectiveGroupBinding, ProgramError> {
     let WriterBookContext {
         group,
         sleeve,
         book,
-    } = load_writer_book_context(program_id, sleeve_info, group_info, book_info)?;
+    } = context;
     let record = book.records[..usize::from(book.series_count)]
         .iter()
         .find(|record| record.market == *market_key)
@@ -79,7 +78,6 @@ fn load_collective_market_binding(
         || maximum_bin_id == 0
         || maximum_bin_id > MAX_AMOEBA_DLMM_BIN_COUNT
         || maximum_bins_per_swap == 0
-        || market.params.taker_fee_bps > MAX_AMOEBA_DLMM_SWAP_FEE_BPS
         || !market.mint_accounting.has_canonical_layout()
     {
         return Err(VaultError::InvalidWriterSettlementGroup.into());
@@ -91,7 +89,6 @@ fn load_collective_market_binding(
         tick_size_quote_atomic: market.params.tick_size,
         maximum_price_quote_atomic: market.instrument.max_payout_per_contract,
         maximum_bin_id,
-        swap_fee_bps: market.params.taker_fee_bps,
         maximum_bins_per_swap,
     })
 }
@@ -129,28 +126,48 @@ pub(in crate::processor) fn load_collective_dlmm_context(
     market_info: &AccountInfo,
     anchor_month_info: &AccountInfo,
 ) -> Result<CollectiveDlmmContext, ProgramError> {
-    let binding = load_collective_group_binding(
+    load_collective_dlmm_context_with_book(
         program_id,
         sleeve_info,
         group_info,
         book_info,
-        market_info.key,
-    )?;
+        market_info,
+        anchor_month_info,
+    )
+    .map(|(context, _)| context)
+}
+
+/// Retain the validated book for the writer lane. The SBF bump allocator cannot
+/// reclaim a dropped book, so decoding it twice consumes another 8 KiB per swap.
+#[inline(never)]
+pub(in crate::processor) fn load_collective_dlmm_context_with_book(
+    program_id: &Pubkey,
+    sleeve_info: &AccountInfo,
+    group_info: &AccountInfo,
+    book_info: &AccountInfo,
+    market_info: &AccountInfo,
+    anchor_month_info: &AccountInfo,
+) -> Result<(CollectiveDlmmContext, WriterBookContext), ProgramError> {
+    let book_context = load_writer_book_context(program_id, sleeve_info, group_info, book_info)?;
+    let binding =
+        load_collective_group_binding(sleeve_info, book_info, market_info.key, &book_context)?;
     let market = load_collective_market_binding(program_id, market_info, &binding)?;
     let anchor_month_settled =
         load_collective_anchor_month_status(program_id, anchor_month_info, &binding)?;
-    Ok(CollectiveDlmmContext {
-        sleeve_status: binding.sleeve_status,
-        group_status: binding.group_status,
-        active_weight_manifest_hash: binding.active_weight_manifest_hash,
-        anchor_month_settled,
-        option_mint: market.option_mint,
-        quote_mint: market.quote_mint,
-        expiry_ts: market.expiry_ts,
-        tick_size_quote_atomic: market.tick_size_quote_atomic,
-        maximum_price_quote_atomic: market.maximum_price_quote_atomic,
-        maximum_bin_id: market.maximum_bin_id,
-        swap_fee_bps: market.swap_fee_bps,
-        maximum_bins_per_swap: market.maximum_bins_per_swap,
-    })
+    Ok((
+        CollectiveDlmmContext {
+            sleeve_status: binding.sleeve_status,
+            group_status: binding.group_status,
+            active_weight_manifest_hash: binding.active_weight_manifest_hash,
+            anchor_month_settled,
+            option_mint: market.option_mint,
+            quote_mint: market.quote_mint,
+            expiry_ts: market.expiry_ts,
+            tick_size_quote_atomic: market.tick_size_quote_atomic,
+            maximum_price_quote_atomic: market.maximum_price_quote_atomic,
+            maximum_bin_id: market.maximum_bin_id,
+            maximum_bins_per_swap: market.maximum_bins_per_swap,
+        },
+        book_context,
+    ))
 }

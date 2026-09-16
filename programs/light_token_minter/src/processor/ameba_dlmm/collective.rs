@@ -3,8 +3,8 @@ use crate::state::{WriterSettlementGroupStatus, WriterSleeveStatus};
 
 const INITIALIZE_COLLECTIVE_PREFIX_ACCOUNTS: usize = 20;
 const SET_COLLECTIVE_STATUS_ACCOUNTS: usize = 16;
-pub(super) const COLLECTIVE_SWAP_FIXED_ACCOUNTS: usize = 32;
-const SETTLE_COLLECTIVE_POOL_ACCOUNTS: usize = 17;
+pub(super) const COLLECTIVE_SWAP_FIXED_ACCOUNTS: usize = 31;
+const SETTLE_COLLECTIVE_POOL_ACCOUNTS: usize = 6;
 
 fn normalized_accounts<'a>(
     accounts: &[AccountInfo<'a>],
@@ -34,7 +34,6 @@ pub(super) fn validate_collective_pool_binding(
         || pool.tick_size_quote_atomic != context.tick_size_quote_atomic
         || pool.maximum_price_quote_atomic != context.maximum_price_quote_atomic
         || pool.maximum_bin_id != context.maximum_bin_id
-        || pool.swap_fee_bps != context.swap_fee_bps
         || pool.maximum_bins_per_swap != context.maximum_bins_per_swap
     {
         return Err(VaultError::InvalidAmoebaDlmmPool.into());
@@ -121,14 +120,15 @@ pub(super) fn process_collective_swap_exact_in(
         return Err(VaultError::InvalidAccountList.into());
     }
     // Existing trader/config/Market/month prefix, then sleeve/group/book before pool.
-    let context = super::super::writer_sleeve::load_collective_dlmm_context(
-        program_id,
-        &accounts[4],
-        &accounts[5],
-        &accounts[6],
-        &accounts[2],
-        &accounts[3],
-    )?;
+    let (context, book_context) =
+        super::super::writer_sleeve::load_collective_dlmm_context_with_book(
+            program_id,
+            &accounts[4],
+            &accounts[5],
+            &accounts[6],
+            &accounts[2],
+            &accounts[3],
+        )?;
     let config = load_canonical_vault_config(program_id, &accounts[1])?;
     let pool = load_pool(program_id, &accounts[7])?;
     if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
@@ -136,20 +136,21 @@ pub(super) fn process_collective_swap_exact_in(
     }
     validate_collective_pool_binding(&config, &accounts[2], &accounts[3], &context, &pool)?;
     if context.group_status != WriterSettlementGroupStatus::Active
-        || !matches!(
-            context.sleeve_status,
-            WriterSleeveStatus::Active | WriterSleeveStatus::CloseStaging
-        )
+        || !matches!(context.sleeve_status, WriterSleeveStatus::Active)
         || context.anchor_month_settled
     {
         return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
     }
-    let mut writer =
-        super::super::writer_sleeve::dlmm::load_swap_state(program_id, accounts, &pool)?;
+    let mut writer = super::super::writer_sleeve::dlmm::load_swap_state(
+        program_id,
+        accounts,
+        &pool,
+        book_context,
+    )?;
     let normalized: Vec<_> = accounts[..4]
         .iter()
         .chain(accounts[7..23].iter())
-        .chain(accounts[32..].iter())
+        .chain(accounts[31..].iter())
         .cloned()
         .collect();
     process_collective_swap_exact_in_core_with_writer(
@@ -187,32 +188,34 @@ pub(super) fn process_collective_order_swap(
     if accounts.len() < orders::ORDER_SWAP_FIXED_ACCOUNTS {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let context = super::super::writer_sleeve::load_collective_dlmm_context(
-        program_id,
-        &accounts[4],
-        &accounts[5],
-        &accounts[6],
-        &accounts[2],
-        &accounts[3],
-    )?;
+    let (context, book_context) =
+        super::super::writer_sleeve::load_collective_dlmm_context_with_book(
+            program_id,
+            &accounts[4],
+            &accounts[5],
+            &accounts[6],
+            &accounts[2],
+            &accounts[3],
+        )?;
     let config = load_canonical_vault_config(program_id, &accounts[1])?;
     let pool = load_pool(program_id, &accounts[7])?;
     validate_collective_pool_binding(&config, &accounts[2], &accounts[3], &context, &pool)?;
     if context.group_status != WriterSettlementGroupStatus::Active
-        || !matches!(
-            context.sleeve_status,
-            WriterSleeveStatus::Active | WriterSleeveStatus::CloseStaging
-        )
+        || !matches!(context.sleeve_status, WriterSleeveStatus::Active)
         || context.anchor_month_settled
     {
         return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
     }
-    let mut writer =
-        super::super::writer_sleeve::dlmm::load_swap_state(program_id, accounts, &pool)?;
+    let mut writer = super::super::writer_sleeve::dlmm::load_swap_state(
+        program_id,
+        accounts,
+        &pool,
+        book_context,
+    )?;
     let normalized: Vec<_> = accounts[..4]
         .iter()
         .chain(accounts[7..23].iter())
-        .chain(accounts[35..].iter())
+        .chain(accounts[orders::witness_end(accounts)?..].iter())
         .cloned()
         .collect();
     let direct = orders.taker_sequence.is_none();
@@ -299,14 +302,6 @@ pub(super) fn process_settle_collective_pool(
         return Err(VaultError::InvalidAmoebaDlmmSettlement.into());
     }
     let slot = Clock::get()?.slot;
-    sweep_pool_oracle_bounty(
-        program_id,
-        accounts,
-        month_info.key,
-        pool_info,
-        &mut pool,
-        slot,
-    )?;
     pool.status = AmoebaDlmmPoolStatus::Settled;
     pool.settlement_price_atomic = group.settlement_price_atomic;
     pool.settled_slot = slot;

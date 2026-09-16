@@ -43,6 +43,8 @@ pub(in crate::processor) fn process_commit_oracle_update_claim_v3(
         || source.bucket_id != sku.bucket_id
         || source.current_state == 0
         || params.stake != sku.update_min_bond
+        || source.observation_count == u32::MAX
+        || source.latest_source_time >= market.instrument.expiry_ts
     {
         return Err(VaultError::InvalidOracleUsdcBond.into());
     }
@@ -108,8 +110,10 @@ pub(in crate::processor) fn process_commit_oracle_update_claim_v3(
         earliest_reveal_slot,
         reveal_deadline_slot,
         revealed_slot: 0,
-        samba_checkpoint_active: false,
+        council_review_pending: false,
         freshness_reward_multiplier: 1,
+        revealed_at_ts: 0,
+        prior_finalized_step: 0,
     };
     month.pending_resolution_count = month
         .pending_resolution_count
@@ -125,18 +129,21 @@ pub(in crate::processor) fn process_commit_oracle_update_claim_v3(
 pub(in crate::processor) fn process_reveal_oracle_update_claim_v3(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    params: RevealOracleUpdateClaimV3Params,
+    mut params: RevealOracleUpdateClaimV3Params,
 ) -> ProgramResult {
-    if accounts.len() != 6
+    if accounts.len() != 9
         || !accounts[0].is_signer
+        || !accounts[0].is_writable
+        || accounts[6].is_signer || accounts[6].is_writable
+        || accounts[7].is_signer || accounts[7].is_writable
+        || accounts[8].is_signer || !accounts[8].is_writable
         || accounts[1].is_signer
         || accounts[1].is_writable
         || accounts[2].is_signer
         || accounts[2].is_writable
         || accounts[3].is_signer
-        // Compression materializes both authenticated source leaves in a writable
-        // temporary account. The access contract keeps both logically read-only.
-        || !accounts[3].is_writable
+        // The wrapper materializes writable storage, then restores this logical read-only view.
+        || accounts[3].is_writable
         || accounts[4].is_signer
         || accounts[4].is_writable
         || accounts[5].is_signer
@@ -144,6 +151,11 @@ pub(in crate::processor) fn process_reveal_oracle_update_claim_v3(
     {
         return Err(VaultError::InvalidAccountList.into());
     }
+    params.archive_url = crate::processor::oracle_evidence::publication_url(
+        program_id,
+        &accounts[7],
+        &params.archive_url,
+    )?;
     let claimant_info = &accounts[0];
     let market_info = &accounts[1];
     let month_info = &accounts[2];
@@ -201,6 +213,24 @@ pub(in crate::processor) fn process_reveal_oracle_update_claim_v3(
         &params,
         slot,
     )?;
+    crate::processor::oracle_evidence::publish(
+        program_id,
+        claimant_info,
+        &accounts[6],
+        &accounts[7],
+        &accounts[8],
+        month_info.key,
+        source_info.key,
+        claim_info.key,
+        claim_info.key,
+        4,
+        0,
+        params.new_state,
+        params.source_time,
+        params.evidence_hash,
+        archive_url_hash,
+        source.source_id,
+    )?;
     claim.claim.prior_state = params.prior_state;
     claim.claim.new_state = params.new_state;
     claim.claim.evidence_hash = params.evidence_hash;
@@ -208,6 +238,8 @@ pub(in crate::processor) fn process_reveal_oracle_update_claim_v3(
     claim.claim.archive_url_hash = archive_url_hash;
     claim.claim.status = OracleClaimStatus::Revealed;
     claim.revealed_slot = slot;
+    claim.revealed_at_ts = current_unix_timestamp()?;
+    claim.prior_finalized_step = source.last_finalized_step;
     let freshness_start = oracle_settlement_window_start(
         market.instrument.expiry_ts,
         crate::constants::ORACLE_SETTLEMENT_FRESHNESS_BUSINESS_DAYS,
@@ -225,34 +257,44 @@ pub(in crate::processor) fn ensure_current_cash_update_resolution_window(
     market: &Market,
     month: &OracleMonthState,
 ) -> ProgramResult {
-    if month.phase != OraclePhase::Game {
-        return Err(VaultError::InvalidOraclePhase.into());
-    }
+    ensure_current_cash_update_continuation_window(market, month)?;
     rulebook_schedule_boundaries(month)?;
-    let now = current_unix_timestamp()?;
     let resolution_end = market
         .instrument
         .expiry_ts
         .checked_add(ORACLE_SETTLEMENT_GRACE_SECONDS)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    if month.listing_ts >= market.instrument.expiry_ts
-        || now < month.listing_ts
-        || now >= resolution_end
-    {
+    if current_unix_timestamp()? >= resolution_end {
         return Err(VaultError::OracleTimingWindowClosed.into());
     }
     Ok(())
 }
 
-pub(in crate::processor) fn ensure_current_cash_update_emergency_window_open(
-    market: &Market,
+pub(in crate::processor) fn ensure_update_challenge_elapsed_at(
+    claim: &OracleUpdateClaimV2,
+    now: u64,
 ) -> ProgramResult {
-    let cleanup_boundary = market
-        .instrument
-        .expiry_ts
-        .checked_add(ORACLE_SETTLEMENT_GRACE_SECONDS)
+    let ready_at = claim
+        .revealed_at_ts
+        .checked_add(crate::constants::ORACLE_UPDATE_CHALLENGE_SECONDS)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    if current_unix_timestamp()? >= cleanup_boundary {
+    if claim.revealed_at_ts == 0 || now < ready_at {
+        return Err(VaultError::OracleTimingWindowClosed.into());
+    }
+    Ok(())
+}
+
+// Admission has a timestamp cutoff; completion of an authenticated, already
+// admitted challenge keeps its original slot-based review/voting entitlement.
+pub(in crate::processor) fn ensure_current_cash_update_continuation_window(
+    market: &Market,
+    month: &OracleMonthState,
+) -> ProgramResult {
+    if month.phase != OraclePhase::Game {
+        return Err(VaultError::InvalidOraclePhase.into());
+    }
+    let now = current_unix_timestamp()?;
+    if month.listing_ts >= market.instrument.expiry_ts || now < month.listing_ts {
         return Err(VaultError::OracleTimingWindowClosed.into());
     }
     Ok(())
@@ -272,11 +314,13 @@ pub(in crate::processor) fn ensure_oracle_update_cleanup_ready_at(
         .ok_or(VaultError::ArithmeticOverflow)?;
     let source_is_stale = source.status != OracleSourceStatus::Active
         || !source.opening_submitted
-        || claim.claim.prior_state != source.current_state;
+        || claim.claim.prior_state != source.current_state
+        || claim.prior_finalized_step != source.last_finalized_step;
     let guarded_step_is_stale = guard.is_some_and(|guard| {
         guard.resolution_step != 0 && guard.resolution_step <= source.last_finalized_step
     });
-    if now < cleanup_boundary && !source_is_stale && !guarded_step_is_stale {
+    // Time alone must not consume an unresolved challenge or an open vote.
+    if (now < cleanup_boundary || guard.is_some()) && !source_is_stale && !guarded_step_is_stale {
         return Err(VaultError::OracleTimingWindowClosed.into());
     }
     Ok(())

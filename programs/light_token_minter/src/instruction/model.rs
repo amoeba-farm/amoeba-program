@@ -210,19 +210,9 @@ pub enum VaultInstruction {
     ///
     /// Accounts: 0 cranker signer; 1 market; 2 writable month; 3 writable OSC;
     /// 4 writable challenge; 5 writable primary-source guard; 6 writable comparison-source guard
-    /// only for a differentiation challenge; final writable staking pool only when the stale
-    /// challenge is `RuleReviewUnresolved`.
+    /// only for a differentiation challenge. Council review holds no token lock.
     CancelStaleOracleSourceChallengeV2,
-    /// Resolve a V5 source OED/v3 while atomically maintaining exact OSC/OSK coverage.
-    ///
-    /// Accounts: 0 cranker signer; 1 market; 2 writable month; 3 writable OED/v3 dispute;
-    /// 4 writable source challenge; 5 writable OEP/v1 pot; 6 writable pot sAMBA ATA;
-    /// 7 writable staking pool; then source, primary guard, optional comparison source and guard.
-    /// When a comparison exists, append its exact SKU pool, challenged-source reward, and
-    /// comparison-source reward before the writable OSC and exact writable OSK.
-    ResolveOracleEmergencyDisputeV4 {
-        params: ResolveOracleEmergencyDisputeParams,
-    },
+
     /// Reconcile one V5 pre-listing escrow after the month has crossed its immutable latest-safe
     /// coverage boundary. The schedule counter and the escrow's own counted latch change
     /// atomically, so an already-accounted principal cannot be counted twice.
@@ -303,8 +293,8 @@ pub enum VaultInstruction {
     /// 4 writable source; 5 active-weight manifest; 6 active-source weight; 7 writable claim.
     /// Unchallenged acceptance appends the exact absent update-guard PDA proof. Challenged
     /// acceptance/rejection appends the writable challenge and initialized guard. An unresolved
-    /// challenge appends the writable challenge, writable staking pool, sAMBA mint, and writable
-    /// guard.
+    /// challenge appends only the writable challenge and writable guard. Council review uses
+    /// the separately authenticated controller Config; no token account is required.
     FinalizeOracleUpdateClaimV2 {
         params: FinalizeOracleUpdateClaimV2Params,
     },
@@ -334,81 +324,6 @@ pub enum VaultInstruction {
         params: ClaimOracleUsdcRewardParams,
     },
 
-    /// Configure the real AMBA SPL token mint and program-owned custody account.
-    ConfigureOracleMajorToken {
-        params: ConfigureOracleMajorTokenParams,
-    },
-
-    /// Deposit real AMBA SPL tokens into oracle custody and credit the player's ledger.
-    DepositOracleMajorTokens {
-        params: DepositOracleMajorTokensParams,
-    },
-
-    /// Withdraw available AMBA SPL tokens from oracle custody.
-    WithdrawOracleMajorTokens {
-        params: WithdrawOracleMajorTokensParams,
-    },
-
-    /// Create the canonical sAMBA SPL mint, vote vault, and liquid-staking pool.
-    /// Accounts: oracle authority signer/payer, vault config, Major config, AMBA mint,
-    /// staking pool, sAMBA mint, sAMBA vote vault, token program, system program.
-    InitializeOracleSambaPool {
-        params: InitializeOracleSambaPoolParams,
-    },
-
-    /// Create the canonical reward-funnel PDA and its classic SPL AMBA associated token account.
-    /// This setup lane is permissionless and remains available while the protocol is paused.
-    /// Accounts: payer, vault config, Major config, AMBA mint, funnel PDA, funnel ATA,
-    /// token program, associated-token program, system program.
-    InitializeOracleRewardFunnel {
-        params: InitializeOracleRewardFunnelParams,
-    },
-
-    /// Atomically sweep the funnel's entire AMBA balance into canonical custody and allocate it
-    /// across Game, Scramble, Challenge, sAMBA backing, and Reserve. This inbound-only lane remains
-    /// available while paused. Accounts: cranker, vault config, Major config, funnel PDA, funnel
-    /// ATA, AMBA vault, AMBA mint, treasury, staking pool, sAMBA mint, token program.
-    SweepOracleRewardFunnel {
-        params: SweepOracleRewardFunnelParams,
-    },
-
-    /// Lock available AMBA in an owner-scoped activation request. Queued principal remains outside
-    /// active staking backing and earns no rewards until delayed activation.
-    /// Accounts: owner signer/payer, vault config, Major config, player ledger, staking pool,
-    /// stake-activation PDA, system program.
-    QueueStakeAmbaForSamba {
-        params: QueueStakeAmbaForSambaParams,
-    },
-
-    /// After the fixed activation delay, mint transferable sAMBA at the then-current exchange rate.
-    /// The canonical reward funnel must be empty so unswept rewards are priced before minting.
-    /// Accounts: owner signer, vault config, Major config, staking pool, stake-activation PDA,
-    /// reward-funnel PDA, reward-funnel ATA, sAMBA mint, owner sAMBA token account, token program.
-    ActivateQueuedStakeAmbaForSamba {
-        params: ActivateQueuedStakeAmbaForSambaParams,
-    },
-
-    /// Return queued AMBA to the owner's available ledger. This owner safety lane remains usable
-    /// while paused and while governance freezes sAMBA supply.
-    /// Accounts: owner signer, vault config, player ledger, stake-activation PDA.
-    CancelQueuedStakeAmba {
-        params: CancelQueuedStakeAmbaParams,
-    },
-
-    /// Burn sAMBA and reserve its current AMBA value behind a seven-day unbonding request.
-    /// Accounts: owner signer/payer, vault config, Major config, staking pool, unstake request,
-    /// sAMBA mint, owner sAMBA token account, token program, system program.
-    RequestUnstakeSamba {
-        params: RequestUnstakeSambaParams,
-    },
-
-    /// Complete a mature unbonding request and credit its reserved AMBA to available balance.
-    /// Accounts: owner signer/payer, vault config, player ledger, staking pool,
-    /// unstake request, system program.
-    CompleteUnstakeSamba {
-        params: CompleteUnstakeSambaParams,
-    },
-
     /// Coverage-aware source proposal. The bucket/SKU must prove membership in the immutable
     /// month manifest. It remains available while an incomplete month is extending submission.
     ProposeOracleSourceV3 {
@@ -434,35 +349,17 @@ pub enum VaultInstruction {
         params: ResolveOracleSourceChallengeParams,
     },
 
-    /// Terminalize a stale current-cash update claim without moving either USDC or sAMBA.
+    /// Terminalize a stale current-cash update claim without moving USDC.
     ///
     /// Accounts:
     /// 0. [signer] Permissionless cranker.
     /// 1. [] Market.
     /// 2. [writable] Current-cash oracle month.
     /// 3. [] Canonical source.
-    /// 4. [writable] Canonical UC2/v1 update claim.
+    /// 4. [writable] Canonical current-version update claim.
     /// 5. [] Canonical absent-guard proof, or [writable] exact OUG/v1 guard.
-    /// 6. [writable, optional] Exact UCH/v3 challenge when the guard exists.
-    /// 7. [writable, optional] Canonical staking pool for an unresolved checkpoint.
+    /// 6. [writable, optional] Exact current-version challenge when the guard exists.
     CancelStaleOracleUpdateClaimV2,
-
-    /// Neutralize a stale current-cash update emergency dispute while leaving all principal in
-    /// its existing USDC and sAMBA escrow lanes for tags 169 and 180.
-    ///
-    /// Accounts:
-    /// 0. [signer] Permissionless cranker.
-    /// 1. [] Market.
-    /// 2. [writable] Current-cash oracle month.
-    /// 3. [] Canonical source.
-    /// 4. [writable] Canonical UC2/v1 update claim.
-    /// 5. [writable] Exact UCH/v3 challenge.
-    /// 6. [writable] Exact OUG/v1 guard.
-    /// 7. [writable] Exact OED/v3 update dispute.
-    /// 8. [writable] Exact OEP/v1 sAMBA pot.
-    /// 9. [] Canonical OEP sAMBA ATA.
-    /// 10. [writable] Canonical staking pool.
-    AbortStaleOracleUpdateEmergencyDisputeV2,
 
     /// Re-enter fail-closed source submission after a resolution made coverage incomplete.
     ReopenOracleSkuCoverage,
@@ -513,67 +410,6 @@ pub enum VaultInstruction {
     /// 3. [writable] Oracle source PDA
     ExpireOracleOpeningSource,
 
-    /// Open the cash-month OED/v3 emergency lane and its isolated per-dispute sAMBA pot ATA.
-    ///
-    /// Accounts: 0 cranker signer/payer; 1 market; 2 month; 3 writable OED/v3;
-    /// 4 target; 5 writable pot PDA; 6 writable pot sAMBA ATA; 7 vault config;
-    /// 8 staking pool; 9 sAMBA mint; 10 classic SPL token program;
-    /// 11 associated-token program; 12 system program; 13+ exact kind-specific accounts:
-    /// - Source: source, writable primary guard, then comparison source and writable comparison
-    ///   guard only for differentiation.
-    /// - Update: claim, source, active-weight manifest, active-source weight, writable update guard.
-    /// - Opening: claim, source.
-    TryOpenOracleEmergencyDisputeV2 {
-        params: TryOpenOracleEmergencyDisputeParams,
-    },
-
-    /// Commit a V3 vote and transfer its exact sAMBA principal into the isolated pot ATA.
-    ///
-    /// Accounts: 0 voter signer/payer; 1 config; 2 staking pool; 3 sAMBA mint;
-    /// 4 writable voter sAMBA account; 5 writable OED/v3; 6 writable pot; 7 writable pot ATA;
-    /// 8 writable OEV/v3; 9 classic SPL token program; 10 system program.
-    CommitOracleEmergencyVoteV3 {
-        params: CommitOracleEmergencyVoteV2Params,
-    },
-
-    /// Reveal one V3 vote under the amount-, mint-, program-, and dispute-bound commitment.
-    ///
-    /// Accounts: 0 voter signer; 1 writable OED/v3; 2 pot; 3 writable OEV/v3.
-    RevealOracleEmergencyVoteV2 {
-        params: RevealOracleEmergencyVoteParams,
-    },
-
-    /// Resolve the target, freeze the pot as Redistribute or RefundAll, and release one sAMBA
-    /// governance lock. This instruction never moves AMBA, USDC, or sAMBA principal.
-    ///
-    /// Accounts: 0 cranker signer; 1 market; 2 writable month; 3 writable OED/v3;
-    /// 4 writable target;
-    /// 5 writable pot; 6 pot ATA; 7 writable staking pool; 8+ exact kind-specific cash-resolution
-    /// accounts:
-    /// - Source: writable source, writable primary guard, then writable comparison source and
-    ///   writable comparison guard only for differentiation (regardless of the resolved choice).
-    /// - Update: writable claim, writable source, read-only OAW, read-only OAS, writable update
-    ///   guard.
-    /// - Opening: writable claim, writable source.
-    ResolveOracleEmergencyDisputeV2 {
-        params: ResolveOracleEmergencyDisputeParams,
-    },
-
-    /// Permissionlessly register one revealed winning vote. The last canonical registration
-    /// finalizes exact dust for the lexicographically smallest winning vote PDA.
-    ///
-    /// Accounts: 0 payer signer; 1 OED/v3; 2 writable pot; 3 OEV/v3;
-    /// 4 writable winning-vote registration; 5 system program.
-    RegisterOracleSambaWinningVote,
-
-    /// Permissionlessly settle one V3 vote to its voter's canonical classic-SPL sAMBA ATA.
-    ///
-    /// Accounts: 0 payer signer; 1 OED/v3; 2 writable pot; 3 writable pot ATA; 4 sAMBA mint;
-    /// 5 writable OEV/v3; 6 writable canonical voter ATA; 7 writable settlement receipt;
-    /// 8 classic SPL token program; 9 system program; 10 winning registration only when the
-    /// resolved pot is Redistribute and the vote revealed the winning choice.
-    SettleOracleSambaEmergencyVoteV2,
-
     /// Close the oracle month after the option settlement has been recorded.
     CloseOracleMonth,
 
@@ -591,7 +427,9 @@ pub enum VaultInstruction {
     /// Bind one underlying-expiry sleeve to a canonical shared settlement world.
     InitializeWriterSettlementGroupV1,
     /// Create sleeve accounting, its fixed-capacity book, USDC vault, and Flat token surfaces.
-    InitializeWriterSleeveV1,
+    InitializeWriterSleeveV1 {
+        participation_start_ts: u64,
+    },
     /// Register one existing canonical Market in the sleeve's fixed-capacity series book.
     RegisterWriterSeriesV1,
     /// Seal one immutable, versioned economic-policy snapshot for the sleeve.
@@ -601,13 +439,7 @@ pub enum VaultInstruction {
     /// Freeze series registration and admit writer-principal funding.
     OpenWriterFundingV1,
     /// Deposit writer principal and mint equal-par Flat ownership.
-    DepositWriterPrincipalV1 {
-        params: WriterAmountV1Params,
-    },
     /// Reverse still-uncommitted funding before sleeve activation.
-    WithdrawWriterPrincipalV1 {
-        params: WriterAmountV1Params,
-    },
     /// Activate a funded sleeve after recomputing every oracle and solvency commitment.
     ActivateWriterSleeveV1,
     /// Operate the collective Market circuit breaker under sleeve-level admission rules.
@@ -623,45 +455,19 @@ pub enum VaultInstruction {
         params: CleanupWriterCustodyV1Params,
     },
     /// Commit the next funded primary auction and its sealed reserve-price vector.
-    CommitWriterAuctionV1 {
-        params: CommitWriterAuctionV1Params,
-    },
     /// Fund one deterministic primary-auction bid.
-    PlaceWriterBidV1 {
-        params: PlaceWriterBidV1Params,
-    },
     /// Cancel an eligible bid or refund its unaccepted/unexecuted escrow.
-    CancelOrRefundWriterBidV1,
     /// Reveal the reserve-price and issue-cap vectors committed by the sealed auction.
-    RevealWriterAuctionV1 {
-        params: Box<RevealWriterAuctionV1Params>,
-    },
     /// Advance deterministic clearing over a bounded number of funded-bid records.
-    PlanWriterAuctionChunkV1 {
-        params: PlanWriterAuctionChunkV1Params,
-    },
     /// Execute one already-planned accepted fill atomically into sleeve custody and buyer claims.
-    ExecuteWriterAuctionFillV1,
     /// Finalize a fully executed auction or abort it without creating liabilities.
-    FinalizeOrAbortWriterAuctionV1 {
-        params: FinalizeOrAbortWriterAuctionV1Params,
-    },
     /// Lock Flat and snapshot the whole-book proportional close basket.
-    BeginWriterCloseV1 {
-        params: BeginWriterCloseV1Params,
-    },
     /// Deposit the next required series basket component into retirement custody.
-    DepositWriterCloseBasketV1 {
-        params: WriterSeriesIndexV1Params,
-    },
     /// Atomically finalize the whole-book close and release its statewise-safe USDC amount.
-    FinalizeWriterCloseV1,
     /// Refund one staged close component, or the final Flat escrow after cancellation.
-    ProcessWriterCloseCancellationV1 {
-        params: ProcessWriterCloseCancellationV1Params,
-    },
     /// Copy the exact canonical anchor settlement into the shared sleeve settlement group.
     PublishWriterGroupSettlementV1,
+    PublishWriterGroupSettlementWithHandoffV3,
     /// Freeze the long-reserve and Flat-residual ledgers at the shared settlement value.
     FinalizeWriterSleeveSettlementV1,
     /// Burn/deliver collective long claims and pay from the frozen long-reserve ledger.
@@ -669,14 +475,8 @@ pub enum VaultInstruction {
         params: ClaimCollectiveLongV1Params,
     },
     /// Burn Flat and pay pro rata from the independently frozen residual ledger.
-    ClaimWriterFlatResidualV1 {
-        params: ClaimWriterFlatResidualV1Params,
-    },
     /// Close a fully exhausted collective sleeve and its terminal companion state.
     CloseWriterSleeveV1,
-    PrepareWriterBidIndexV1 {
-        params: PrepareWriterBidIndexV1Params,
-    },
     /// Exact wallet/contract-mint authority; execution reads the final holder balance.
     ScopedCollectiveSettlementV1 {
         action: ScopedSettlementActionV1,

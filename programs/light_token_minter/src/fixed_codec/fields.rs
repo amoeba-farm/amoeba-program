@@ -284,24 +284,22 @@ fixed_enum_field!(WriterSecurityMode {
 fixed_enum_field!(WriterReserveRoundingMode {
     0 => WriterReserveRoundingMode::AggregateBookCeiling,
 });
-fixed_enum_field!(WriterAuctionPriorityRule {
-    0 => WriterAuctionPriorityRule::PayAsBidPriceThenSeriesProRata,
-});
 fixed_enum_field!(WriterSettlementGroupStatus {
     0 => WriterSettlementGroupStatus::Anchored,
     1 => WriterSettlementGroupStatus::Active,
     2 => WriterSettlementGroupStatus::Settled,
     3 => WriterSettlementGroupStatus::Closed,
+    4 => WriterSettlementGroupStatus::FundingExpired,
 });
 fixed_enum_field!(WriterSleeveStatus {
     0 => WriterSleeveStatus::Draft,
     1 => WriterSleeveStatus::PolicyFrozen,
     2 => WriterSleeveStatus::Funding,
     3 => WriterSleeveStatus::Active,
-    4 => WriterSleeveStatus::CloseStaging,
     5 => WriterSleeveStatus::Expired,
     6 => WriterSleeveStatus::SettlementFinalized,
     7 => WriterSleeveStatus::Closed,
+    8 => WriterSleeveStatus::FundingRefunds,
 });
 fixed_enum_field!(WriterSeriesCustodyStatus {
     0 => WriterSeriesCustodyStatus::Absent,
@@ -312,36 +310,6 @@ fixed_enum_field!(WriterSeriesSettlementStatus {
     0 => WriterSeriesSettlementStatus::Open,
     1 => WriterSeriesSettlementStatus::Frozen,
     2 => WriterSeriesSettlementStatus::Exhausted,
-});
-fixed_enum_field!(WriterAuctionStatus {
-    0 => WriterAuctionStatus::Committed,
-    1 => WriterAuctionStatus::Bidding,
-    2 => WriterAuctionStatus::Revealed,
-    3 => WriterAuctionStatus::Planning,
-    4 => WriterAuctionStatus::Executing,
-    5 => WriterAuctionStatus::Finalized,
-    6 => WriterAuctionStatus::Refundable,
-    7 => WriterAuctionStatus::Closed,
-});
-fixed_enum_field!(WriterBidStatus {
-    0 => WriterBidStatus::Empty,
-    1 => WriterBidStatus::Funded,
-    2 => WriterBidStatus::Cancelled,
-    3 => WriterBidStatus::Planned,
-    4 => WriterBidStatus::Executed,
-    5 => WriterBidStatus::Refundable,
-    6 => WriterBidStatus::Refunded,
-});
-fixed_enum_field!(WriterBidDeliveryMode {
-    0 => WriterBidDeliveryMode::LightToken,
-    1 => WriterBidDeliveryMode::ClassicSpl,
-});
-fixed_enum_field!(WriterCloseRequestStatus {
-    0 => WriterCloseRequestStatus::Collecting,
-    1 => WriterCloseRequestStatus::Complete,
-    2 => WriterCloseRequestStatus::Finalized,
-    3 => WriterCloseRequestStatus::Cancelling,
-    4 => WriterCloseRequestStatus::Cancelled,
 });
 
 impl FixedField for WriterSeriesRecordV1 {
@@ -431,74 +399,6 @@ impl FixedField for Box<[WriterSeriesRecordV1; WRITER_SERIES_STORAGE_CAPACITY]> 
     }
 }
 
-impl FixedField for WriterBidIndexRecordV1 {
-    #[inline(always)]
-    fn read(input: &mut FixedCursor<'_>) -> Self {
-        Self {
-            occupied: FixedField::read(input),
-            status: FixedField::read(input),
-            series_index: FixedField::read(input),
-            reserved: FixedField::read(input),
-            bid_price_per_contract_atoms: FixedField::read(input),
-            requested_contract_atoms: FixedField::read(input),
-            accepted_contract_atoms: FixedField::read(input),
-            executed_contract_atoms: FixedField::read(input),
-            escrowed_atoms: FixedField::read(input),
-            bid: FixedField::read(input),
-            bidder: FixedField::read(input),
-            order_id: FixedField::read(input),
-        }
-    }
-
-    #[inline(always)]
-    fn write(&self, output: &mut FixedWriter<'_>) {
-        FixedField::write(&self.occupied, output);
-        FixedField::write(&self.status, output);
-        FixedField::write(&self.series_index, output);
-        FixedField::write(&self.reserved, output);
-        FixedField::write(&self.bid_price_per_contract_atoms, output);
-        FixedField::write(&self.requested_contract_atoms, output);
-        FixedField::write(&self.accepted_contract_atoms, output);
-        FixedField::write(&self.executed_contract_atoms, output);
-        FixedField::write(&self.escrowed_atoms, output);
-        FixedField::write(&self.bid, output);
-        FixedField::write(&self.bidder, output);
-        FixedField::write(&self.order_id, output);
-    }
-}
-
-impl FixedField for [WriterBidIndexRecordV1; WRITER_BID_STORAGE_CAPACITY] {
-    #[inline(always)]
-    fn read(input: &mut FixedCursor<'_>) -> Self {
-        core::array::from_fn(|_| WriterBidIndexRecordV1::read(input))
-    }
-
-    #[inline(always)]
-    fn write(&self, output: &mut FixedWriter<'_>) {
-        for record in self {
-            record.write(output);
-        }
-    }
-}
-
-impl FixedField for Box<[WriterBidIndexRecordV1; WRITER_BID_STORAGE_CAPACITY]> {
-    #[inline(never)]
-    fn read(input: &mut FixedCursor<'_>) -> Self {
-        (0..WRITER_BID_STORAGE_CAPACITY)
-            .map(|_| WriterBidIndexRecordV1::read(input))
-            .collect::<Vec<_>>()
-            .into_boxed_slice()
-            .try_into()
-            .expect("fixed writer bid capacity")
-    }
-
-    #[inline(always)]
-    fn write(&self, output: &mut FixedWriter<'_>) {
-        for record in self.iter() {
-            record.write(output);
-        }
-    }
-}
 fixed_enum_field!(AmoebaDlmmPoolStatus {
     0 => AmoebaDlmmPoolStatus::Pending,
     1 => AmoebaDlmmPoolStatus::Active,
@@ -585,11 +485,7 @@ fixed_enum_field!(OracleRecipeWeightPhase {
     2 => OracleRecipeWeightPhase::ReadyToFinalize,
     3 => OracleRecipeWeightPhase::Finalized,
 });
-fixed_enum_field!(OracleSambaEmergencyPayoutMode {
-    0 => OracleSambaEmergencyPayoutMode::Open,
-    1 => OracleSambaEmergencyPayoutMode::Redistribute,
-    2 => OracleSambaEmergencyPayoutMode::RefundAll,
-});
+
 fixed_enum_field!(OracleSourceStatus {
     0 => OracleSourceStatus::Candidate,
     1 => OracleSourceStatus::Frozen,
@@ -615,12 +511,7 @@ fixed_enum_field!(OracleUsdcRewardSchedulePhase {
 fixed_enum_field!(SettlementStyle {
     0 => SettlementStyle::CashSettledMonthly,
 });
-fixed_enum_field!(OracleEmergencyVoteStatus {
-    0 => OracleEmergencyVoteStatus::Empty,
-    1 => OracleEmergencyVoteStatus::Committed,
-    2 => OracleEmergencyVoteStatus::Revealed,
-    3 => OracleEmergencyVoteStatus::Expired,
-});
+
 fixed_enum_field!(OracleClaimStatus {
     0 => OracleClaimStatus::Open,
     1 => OracleClaimStatus::Committed,

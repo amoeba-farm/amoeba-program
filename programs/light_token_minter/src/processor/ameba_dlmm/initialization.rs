@@ -71,8 +71,6 @@ pub(super) fn process_initialize_collective_pool_core(
         || maximum_price == 0
         || !maximum_price.is_multiple_of(tick)
         || maximum_price / tick > MAX_AMOEBA_DLMM_BIN_COUNT as u64
-        || market.params.taker_fee_bps > MAX_AMOEBA_DLMM_SWAP_FEE_BPS
-        || params.protocol_fee_share_bps > 10_000
     {
         return Err(VaultError::InvalidAmoebaDlmmGrid.into());
     }
@@ -157,8 +155,6 @@ pub(super) fn process_initialize_collective_pool_core(
         tick_size_quote_atomic: tick,
         maximum_price_quote_atomic: maximum_price,
         maximum_bin_id,
-        swap_fee_bps: market.params.taker_fee_bps,
-        protocol_fee_share_bps: params.protocol_fee_share_bps,
         maximum_bins_per_swap,
         last_updated_slot: slot,
         ..AmoebaDlmmPoolV1::default()

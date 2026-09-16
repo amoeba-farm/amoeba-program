@@ -14,7 +14,7 @@ use crate::{
     },
     constants::{
         MAX_COMPRESSED_INNER_INSTRUCTION_BYTES, MAX_COMPRESSED_STATE_SESSION_RECORDS,
-        ORACLE_SAMBA_WINNING_VOTE_PDA_SEED, ORACLE_SKU_COVERAGE_RECORD_PDA_SEED,
+        ORACLE_SKU_COVERAGE_RECORD_PDA_SEED, ORACLE_SOURCE_OBSERVATIONS_PDA_SEED,
         ORACLE_SOURCE_PDA_SEED, ORACLE_SUPPORT_POSITION_PDA_SEED,
         ORACLE_USDC_REWARD_REGISTRATION_PDA_SEED, ORACLE_USDC_REWARD_REGISTRATION_VERSION_SEED,
         ORACLE_USDC_SKU_POOL_PDA_SEED, ORACLE_USDC_SOURCE_REWARD_PDA_SEED,
@@ -26,15 +26,14 @@ use crate::{
     },
     instruction::{CompressedStateAccess, ExecuteCompressedStateParams, VaultInstructionTag},
     state::{
-        derive_oracle_samba_vote_settlement_pda, derive_oracle_samba_winning_vote_pda,
         derive_oracle_sku_coverage_record_pda, derive_oracle_usdc_reward_receipt_pda,
         derive_oracle_usdc_reward_registration_pda, derive_oracle_usdc_reward_schedule_pda,
         derive_oracle_usdc_reward_vault_pda, derive_oracle_usdc_sku_pool_pda,
         derive_oracle_usdc_source_reward_pda, CompressedAmebaStateLeaf, CompressedStateDomain,
-        OracleEscrowDisposition, OracleSambaVoteSettlementReceipt, OracleSambaWinningVote,
-        OracleSkuCoverageRecord, OracleSourceState, OracleSourceStatus, OracleSupportPosition,
-        OracleUsdcRewardKind, OracleUsdcRewardReceipt, OracleUsdcRewardRegistration,
-        OracleUsdcRewardSchedule, OracleUsdcSkuPool, OracleUsdcSourceReward,
+        OracleEscrowDisposition, OracleSkuCoverageRecord, OracleSourceObservations,
+        OracleSourceState, OracleSourceStatus, OracleSupportPosition, OracleUsdcRewardKind,
+        OracleUsdcRewardReceipt, OracleUsdcRewardRegistration, OracleUsdcRewardSchedule,
+        OracleUsdcSkuPool, OracleUsdcSourceReward,
     },
 };
 
@@ -143,19 +142,6 @@ struct CompactOracleUsdcRewardReceipt {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct CompactOracleSambaWinningVote {
-    base_entitlement: u64,
-    registered_slot: u64,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct CompactOracleSambaVoteSettlementReceipt {
-    amount: u64,
-    disposition: OracleEscrowDisposition,
-    settled_slot: u64,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
 struct CompactOracleSupportPosition {
     source: Pubkey,
     supporter: Pubkey,
@@ -185,7 +171,8 @@ struct CompactOracleSourceState {
     opening_submitted: bool,
     opening_evidence_hash: [u8; 32],
     last_finalized_step: u64,
-    observation_count: u8,
+    observation_count: u32,
+    latest_source_time: u64,
     rolling_observation_hash: [u8; 32],
 }
 
@@ -196,7 +183,22 @@ struct CompactOracleSourceDescriptor {
     source_definition_hash: [u8; 32],
 }
 
-crate::fixed_codec::fixed_state_deserialize!(CompactOracleUsdcSkuPool, 156, {
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CompactOracleSourceObservations {
+    // Domain 11's canonical 582-byte projection retains the six-byte typed-account header.
+    // The adaptive wire codec omits only month/source after binding them from the access
+    // contract; the compact leaf and its reference codec still carry the header verbatim.
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    month: Pubkey,
+    source: Pubkey,
+    states: [u64; crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS],
+    source_times: [u64; crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS],
+}
+
+crate::fixed_codec::fixed_state_deserialize_flat!(CompactOracleUsdcSkuPool, 156, {
     bucket_id: [u8; 32],
     source_reward_budget: u64,
     remaining_source_reward_budget: u64,
@@ -231,14 +233,14 @@ crate::fixed_codec::fixed_state_deserialize!(CompactOracleUsdcSourceReward, 112,
     listing_escrow_counted: bool,
 });
 
-crate::fixed_codec::fixed_state_deserialize!(CompactOracleSkuCoverageRecord, 44, {
+crate::fixed_codec::fixed_state_deserialize_flat!(CompactOracleSkuCoverageRecord, 44, {
     sku_id: [u8; 32],
     sku_index: u16,
     active_supported_source_count: u16,
     last_updated_slot: u64,
 });
 
-crate::fixed_codec::fixed_state_deserialize!(CompactOracleUsdcRewardRegistration, 105, {
+crate::fixed_codec::fixed_state_deserialize_flat!(CompactOracleUsdcRewardRegistration, 105, {
     sku_pool: Pubkey,
     subject: Pubkey,
     recipient: Pubkey,
@@ -254,17 +256,6 @@ crate::fixed_codec::fixed_state_deserialize!(CompactOracleUsdcRewardReceipt, 81,
     claimed_slot: u64,
 });
 
-crate::fixed_codec::fixed_state_deserialize!(CompactOracleSambaWinningVote, 16, {
-    base_entitlement: u64,
-    registered_slot: u64,
-});
-
-crate::fixed_codec::fixed_state_deserialize!(CompactOracleSambaVoteSettlementReceipt, 17, {
-    amount: u64,
-    disposition: OracleEscrowDisposition,
-    settled_slot: u64,
-});
-
 crate::fixed_codec::fixed_state_deserialize!(CompactOracleSupportPosition, 107, {
     source: Pubkey,
     supporter: Pubkey,
@@ -275,7 +266,7 @@ crate::fixed_codec::fixed_state_deserialize!(CompactOracleSupportPosition, 107, 
     source_id: [u8; 32],
 });
 
-crate::fixed_codec::fixed_state_deserialize!(CompactOracleSourceState, 205, {
+crate::fixed_codec::fixed_state_deserialize!(CompactOracleSourceState, 216, {
     source_id: [u8; 32],
     bucket_id: [u8; 32],
     proposer: Pubkey,
@@ -288,15 +279,29 @@ crate::fixed_codec::fixed_state_deserialize!(CompactOracleSourceState, 205, {
     opening_submitted: bool,
     opening_evidence_hash: [u8; 32],
     last_finalized_step: u64,
-    observation_count: u8,
+    observation_count: u32,
+    latest_source_time: u64,
     rolling_observation_hash: [u8; 32],
 });
 
-crate::fixed_codec::fixed_state_deserialize!(CompactOracleSourceDescriptor, 96, {
+crate::fixed_codec::fixed_state_deserialize_flat!(CompactOracleSourceDescriptor, 96, {
     source_type_hash: [u8; 32],
     canonical_locator_hash: [u8; 32],
     source_definition_hash: [u8; 32],
 });
+
+crate::fixed_codec::fixed_state_deserialize!(CompactOracleSourceObservations, 582, {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    month: Pubkey,
+    source: Pubkey,
+    states: [u64; crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS],
+    source_times: [u64; crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS],
+});
+
+impl CompactOracleSourceObservations {}
 
 impl CompactOracleUsdcSkuPool {}
 
@@ -305,10 +310,6 @@ impl CompactOracleUsdcSourceReward {}
 impl CompactOracleUsdcRewardRegistration {}
 
 impl CompactOracleUsdcRewardReceipt {}
-
-impl CompactOracleSambaWinningVote {}
-
-impl CompactOracleSambaVoteSettlementReceipt {}
 
 impl CompactOracleSupportPosition {}
 
