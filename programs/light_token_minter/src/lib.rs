@@ -42,6 +42,7 @@ include!(env!("AMEBA_MAINNET_PROFILE_RS"));
 #[cfg(all(
     feature = "mainnet-v3",
     any(
+        feature = "devnet-solo-backfill-2026",
         feature = "devnet-v3-governance-controller",
         feature = "phase3-synthetic-governance-controller",
         feature = "reviewed-governance-controller",

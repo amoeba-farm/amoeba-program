@@ -40,8 +40,8 @@ The two networks have separate state and build profiles. The
 [Mainnet build evidence](MAINNET_BUILD.json) records the deployed artifact and
 the exact public build recipe. Its generated profile contains public identities
 only; no RPC credentials or signing keys are needed to build.
-The intended Sep/Oct backfill feature remains enabled. The separate
-`mainnet-four-hour-launch` feature is not enabled.
+The Mainnet build enables `mainnet-four-hour-launch` for the September/October
+cohorts and rejects the Devnet backfill feature.
 
 With solana-verify 0.5.1, run from this repository's root:
 
@@ -50,14 +50,15 @@ solana-verify build "$PWD/programs/light_token_minter" \
   --workspace-path "$PWD/programs/light_token_minter" \
   --library-name light_token_minter \
   --base-image solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68 \
-  --arch v1 -- --no-default-features --features mainnet-v3,devnet-solo-backfill-2026
+  --arch v1 -- --no-default-features --features mainnet-v3
 ```
 
 [Source provenance](PUBLIC_SOURCE_PROVENANCE.json) identifies the private source
-revision and the public reproducibility additions. The public Docker rebuild
-matches the deployed artifact byte-for-byte. Hosted verification remains a
+revision and the public reproducibility additions. The current build evidence
+distinguishes native SBF reproduction from Docker verification. Hosted verification remains a
 separate result; check the [verifier status](https://verify.osec.io/status/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw).
-Deployment does not imply that the governance gate is active.
+The upgraded Mainnet program's gate is Active at epoch 3. Market and oracle
+bootstrap readiness is separate from executable identity.
 
 ## License
 

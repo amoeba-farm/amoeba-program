@@ -28,7 +28,7 @@ jobs:
         run: |
           cargo fmt --manifest-path programs/light_token_minter/Cargo.toml --all -- --check --config reorder_modules=false
           cargo check --manifest-path programs/light_token_minter/Cargo.toml --locked --lib --features devnet-v3-governance-controller,devnet-solo-backfill-2026
-          (cd programs/light_token_minter && cargo check --locked --lib --no-default-features --features mainnet-v3,devnet-solo-backfill-2026)
+          (cd programs/light_token_minter && cargo check --locked --lib --no-default-features --features mainnet-v3)
       - name: Reject binaries and private development surfaces
         shell: bash
         run: |
@@ -45,6 +45,7 @@ jobs:
           guard = '''#[cfg(all(
               feature = "mainnet-v3",
               any(
+                  feature = "devnet-solo-backfill-2026",
                   feature = "devnet-v3-governance-controller",
                   feature = "phase3-synthetic-governance-controller",
                   feature = "reviewed-governance-controller",
