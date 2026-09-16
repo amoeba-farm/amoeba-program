@@ -2,12 +2,13 @@
   "binaryIncluded": false,
   "channel": "source-preview",
   "exportedFileCount": 181,
-  "exportedTreeSha256": "8fb3b1c6b824ceab20e101f1683c8bdf82822f89dbdf0e9476a17d66a8b0b992",
+  "exportedTreeSha256": "340bbbc50b2c1e6721a2db4ecf346abb5ad6124d1d9fd2c8eb0ced3c622afc84",
   "publicReproducibilityOverlay": {
     "basePublicCommit": "dedcfe2efb39658d2f90a327cab39b1515a8cbc8",
     "baseExportedTreeSha256": "437a918d575a092fff99f92760b6fafbd1e69b8534165ffab43146fcd3b31b5a",
     "policySha256Scope": "original private-source export",
     "paths": [
+      ".github/workflows/ci.yml",
       "MAINNET_BUILD.json",
       "README.md",
       "programs/light_token_minter/.cargo/config.toml",
