@@ -174,7 +174,6 @@ pub(in crate::processor) fn process_activate_sleeve(
         || !crate::bytes32_is_zero(&group.settlement_source_digest)
         || !crate::bytes32_is_zero(&group.final_settlement_commitment)
         || group.finalized_slot != 0
-        || active.max_open_interest_payout == 0
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
@@ -185,6 +184,8 @@ pub(in crate::processor) fn process_activate_sleeve(
     // Source identities are frozen by recipe/coverage/active hashes. The actual
     // terminal digest remains zero until normal settlement publication binds it.
     group.active_weight_manifest_hash = active.rolling_manifest_hash;
+    // Preserve the authenticated legacy binding for settlement commitments;
+    // this field is no longer an issuance or trading admission limit.
     group.security_cap_atoms = active.max_open_interest_payout;
     group.signer_set = *signer_set_info.key;
     group.signer_set_version = signer_set.version;

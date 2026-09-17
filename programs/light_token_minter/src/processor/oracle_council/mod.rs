@@ -7,6 +7,7 @@ mod helpers;
 mod state;
 mod targets;
 use crate::instruction::OracleCouncilActionV1;
+pub(in crate::processor) use authority::council as current_council;
 pub use authority::decode_council;
 use authority::*;
 use effects::*;

@@ -119,6 +119,14 @@ fn serialize_leaf<T: BorshSerialize>(leaf: &T) -> Result<Vec<u8>, ProgramError> 
     leaf.try_to_vec().map_err(|_| ProgramError::Custom(16016))
 }
 
+fn serialize_state_leaf(leaf: &CompressedAmebaStateLeaf) -> Result<Vec<u8>, ProgramError> {
+    // Borsh header: schema + domain + pubkey + revision + vector length.
+    let mut bytes = Vec::with_capacity(1 + 1 + 32 + 8 + 4 + leaf.data.len());
+    leaf.serialize(&mut bytes)
+        .map_err(|_| ProgramError::Custom(16016))?;
+    Ok(bytes)
+}
+
 #[inline(never)]
 /// Light's canonical BN254-field-compatible data hash for compressed account
 /// bodies and decompressed-PDA placeholders.
@@ -244,7 +252,26 @@ fn push_packed_merkle_context(output: &mut Vec<u8>, context: &PackedMerkleContex
 }
 
 fn encode_light_cpi(instruction: &LightSystemProgramCpi) -> Vec<u8> {
-    let mut output = Vec::new();
+    // The SBF allocator does not reclaim old Vec buffers after growth. Size
+    // this exact wire once, especially for seven-record compressed creations.
+    let encoded_len = 73
+        + instruction.proof.as_ref().map_or(0, |_| 128)
+        + instruction.new_address_params.len() * 38
+        + instruction
+            .account_infos
+            .iter()
+            .map(|account| {
+                3 + account.address.as_ref().map_or(0, |_| 32)
+                    + account.input.as_ref().map_or(0, |_| 57)
+                    + account
+                        .output
+                        .as_ref()
+                        .map_or(0, |output| 53 + output.data.len())
+            })
+            .sum::<usize>()
+        + instruction.read_only_addresses.len() * 35
+        + instruction.read_only_accounts.len() * 41;
+    let mut output = Vec::with_capacity(encoded_len);
     output.extend_from_slice(instruction.discriminator());
     output.push(instruction.mode);
     output.push(instruction.bump);
@@ -320,6 +347,7 @@ fn encode_light_cpi(instruction: &LightSystemProgramCpi) -> Vec<u8> {
         push_packed_merkle_context(&mut output, &account.merkle_context);
         output.extend_from_slice(&account.root_index.to_le_bytes());
     }
+    debug_assert_eq!(output.len(), encoded_len);
     output
 }
 
@@ -599,6 +627,14 @@ pub(crate) fn apply_compressed_state_leaf_mutations<'a>(
     let packed_accounts = packed_light_accounts(remaining_accounts)?;
     let mut instruction = new_light_system_cpi((*proof).into());
 
+    instruction
+        .account_infos
+        .reserve_exact(updates.len() + closes.len() + creates.len());
+    instruction.new_address_params.reserve_exact(creates.len());
+    instruction
+        .read_only_accounts
+        .reserve_exact(read_only.len());
+
     for witness in read_only {
         validate_compressed_state_leaf(witness.leaf)?;
         let expected = derive_compressed_state_leaf_address(
@@ -611,10 +647,7 @@ pub(crate) fn apply_compressed_state_leaf_mutations<'a>(
         if witness.meta.address != expected {
             return Err(VaultError::InvalidCompressionWitness.into());
         }
-        let data = witness
-            .leaf
-            .try_to_vec()
-            .map_err(|_| ProgramError::Custom(16016))?;
+        let data = serialize_state_leaf(witness.leaf)?;
         let account = read_only_leaf_account_info(
             program_id,
             witness.meta,
@@ -649,8 +682,8 @@ pub(crate) fn apply_compressed_state_leaf_mutations<'a>(
         if update.meta.address != expected {
             return Err(VaultError::InvalidCompressionWitness.into());
         }
-        let old_data = serialize_leaf(update.old_leaf)?;
-        let new_data = serialize_leaf(&update.new_leaf)?;
+        let old_data = serialize_state_leaf(update.old_leaf)?;
+        let new_data = serialize_state_leaf(&update.new_leaf)?;
         instruction.account_infos.push(write_leaf_account_info(
             update.meta,
             CompressedAmebaStateLeaf::LIGHT_DISCRIMINATOR,
@@ -671,7 +704,7 @@ pub(crate) fn apply_compressed_state_leaf_mutations<'a>(
         if close.meta.address != expected {
             return Err(VaultError::InvalidCompressionWitness.into());
         }
-        let old_data = serialize_leaf(close.old_leaf)?;
+        let old_data = serialize_state_leaf(close.old_leaf)?;
         instruction.account_infos.push(write_leaf_account_info(
             close.meta,
             CompressedAmebaStateLeaf::LIGHT_DISCRIMINATOR,
@@ -708,7 +741,7 @@ pub(crate) fn apply_compressed_state_leaf_mutations<'a>(
         let assigned_index = assigned_start
             .checked_add(offset)
             .ok_or(VaultError::ArithmeticOverflow)? as u8;
-        let data = serialize_leaf(&create.leaf)?;
+        let data = serialize_state_leaf(&create.leaf)?;
         instruction.account_infos.push(init_leaf_account_info(
             address,
             create.output.output_state_tree_index,

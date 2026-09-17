@@ -155,6 +155,21 @@ pub(super) fn process_instruction_with_context(
     let (tag_bytes, payload) = instruction_data
         .split_first()
         .ok_or(VaultError::InvalidInstructionData)?;
+    if matches!(
+        classify_active_instruction_tag(*tag_bytes),
+        InstructionGovernanceClass::Unknown
+            | InstructionGovernanceClass::Reserved
+            | InstructionGovernanceClass::RecognizedReadOnly
+    ) {
+        return Err(VaultError::InvalidInstructionData.into());
+    }
+    // Subaction 20 authenticates its immutable CFM policy before activating a
+    // reserved month. No other entrypoint may consume a CFM-typed month yet.
+    if !(*tag_bytes == VaultInstructionTag::OracleCarryForwardV1 as u8
+        && payload.first() == Some(&20))
+    {
+        cfm_parent_proxy::reject_cfm_accounts(program_id, accounts)?;
+    }
     if !context.is_compressed_inner() {
         if let Some(tag) =
             crate::ameba_dlmm_instruction::AmoebaDlmmInstructionTag::from_byte(*tag_bytes)

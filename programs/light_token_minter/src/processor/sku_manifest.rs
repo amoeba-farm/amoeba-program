@@ -345,7 +345,16 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
 pub(super) fn process_initialize_oracle_month_v5(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
+    params: InitializeOracleMonthV5Params,
+) -> ProgramResult {
+    process_initialize_oracle_month_with_registry(program_id, accounts, params, None)
+}
+
+pub(super) fn process_initialize_oracle_month_with_registry(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
     mut params: InitializeOracleMonthV5Params,
+    cfm: Option<&crate::oracle_parent_proxy::CfmRegistry>,
 ) -> ProgramResult {
     if accounts.len() != 10 {
         return Err(VaultError::InvalidAccountList.into());
@@ -385,6 +394,17 @@ pub(super) fn process_initialize_oracle_month_v5(
     let launch = cfg!(feature = "mainnet-four-hour-launch")
         && params.scramble_start_ts == 0
         && params.listing_ts == 0;
+    if let Some(registry) = cfm {
+        cfm_parent_proxy::require_pending_month(program_id, market_info.key, month_info)?;
+        if !launch
+            || market.instrument.expiry_ts
+                != crate::oracle_parent_proxy::policy::SEPTEMBER_EXPIRY_TS
+        {
+            return Err(VaultError::InvalidOracleState.into());
+        }
+        params.required_sku_root = registry.economic_root();
+        params.required_sku_count = registry.parent_count() as u16;
+    }
     let (slot, current_ts) = current_slot_and_unix_timestamp()?;
     if launch {
         (params.scramble_start_ts, params.listing_ts) = initialize_launch_clock(
@@ -477,7 +497,7 @@ pub(super) fn process_initialize_oracle_month_v5(
     }
     if month_info.owner == program_id {
         let existing = load_oracle_month_state(month_info, program_id)?;
-        if existing.is_initialized {
+        if existing.is_initialized && cfm.is_none() {
             return Err(VaultError::AlreadyInitialized.into());
         }
     } else {
@@ -525,8 +545,16 @@ pub(super) fn process_initialize_oracle_month_v5(
     let month = OracleMonthState {
         is_initialized: true,
         bump: month_bump,
-        account_discriminator: OracleMonthState::ACCOUNT_DISCRIMINATOR,
-        account_version: OracleMonthState::ACCOUNT_VERSION,
+        account_discriminator: if cfm.is_some() {
+            OracleMonthState::CFM_DISCRIMINATOR
+        } else {
+            OracleMonthState::ACCOUNT_DISCRIMINATOR
+        },
+        account_version: if cfm.is_some() {
+            OracleMonthState::CFM_VERSION
+        } else {
+            OracleMonthState::ACCOUNT_VERSION
+        },
         market: *market_info.key,
         authority: *authority_info.key,
         scramble_start_ts: params.scramble_start_ts,
@@ -549,7 +577,11 @@ pub(super) fn process_initialize_oracle_month_v5(
     let coverage = OracleSkuCoverageManifest {
         is_initialized: true,
         bump: coverage_bump,
-        account_discriminator: OracleSkuCoverageManifest::ACCOUNT_DISCRIMINATOR,
+        account_discriminator: if cfm.is_some() {
+            OracleSkuCoverageManifest::CFM_DISCRIMINATOR
+        } else {
+            OracleSkuCoverageManifest::ACCOUNT_DISCRIMINATOR
+        },
         account_version: OracleSkuCoverageManifest::ACCOUNT_VERSION,
         month: *month_info.key,
         required_sku_root: params.required_sku_root,

@@ -138,6 +138,25 @@ pub(in crate::processor) fn required_accesses(
     use RequiredAccessKind::{Initialize, Mutable, MutableOrInitialize, ReadOnly as Read};
     let s = RequiredAccessSpec::new;
     let (expected, specs): (usize, Vec<RequiredAccessSpec>) = match decode(payload)? {
+        Action::SeptemberBootstrap { operation, .. } => match operation {
+            0 => (17, vec![]),
+            1 => (
+                21,
+                vec![
+                    s(9, Source, Initialize),
+                    s(9, Descriptor, Initialize),
+                    s(10, Observations, Initialize),
+                    s(11, Sku, Initialize),
+                    s(12, Reward, Initialize),
+                    s(14, Journal, Initialize),
+                    s(15, Checkpoint, Initialize),
+                ],
+            ),
+            2 => (11, vec![]),
+            _ => return invalid(),
+        },
+        Action::InitializeCfmMonth { .. } => (12, vec![]),
+        Action::InitializeCfmPolicy { .. } => (10, vec![]),
         Action::Council(action) => {
             return super::oracle_council::required_accesses(&action, account_count)
         }
@@ -234,6 +253,26 @@ pub(in crate::processor) fn process(
     // The wrapper already verifies every logical read remains unchanged. All source
     // views are physically writable during materialization, including logical reads.
     match decode(payload)? {
+        Action::SeptemberBootstrap {
+            operation,
+            market,
+            row,
+            plan_hash,
+        } => super::september_bootstrap::process(
+            program, accounts, operation, market, row, plan_hash,
+        ),
+        Action::InitializeCfmMonth {
+            product,
+            settlement_base_oracle_atomic,
+        } => super::cfm_parent_proxy::initialize_month(
+            program,
+            accounts,
+            product,
+            settlement_base_oracle_atomic,
+        ),
+        Action::InitializeCfmPolicy { product } => {
+            super::cfm_parent_proxy::initialize_policy(program, accounts, product)
+        }
         Action::Council(action) => super::oracle_council::process(program, accounts, action),
         Action::RegisterRoot => register_period(program, accounts, true),
         Action::BackfillSourceEvidence => {

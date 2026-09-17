@@ -157,6 +157,8 @@ pub struct OracleActiveWeightManifest {
     pub processed_bucket_weight_bps: u16,
     pub last_collected_source_id: [u8; 32],
     pub rolling_manifest_hash: [u8; 32],
+    /// Legacy authenticated wire field, no longer an oracle exposure limit.
+    /// Newly collected manifests store u64::MAX; old stored values remain valid.
     pub max_open_interest_payout: u64,
 }
 

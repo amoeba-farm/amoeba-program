@@ -74,7 +74,7 @@ pub(super) fn pinned_controller() -> Result<Pubkey, ProgramError> {
     Err(VaultError::GovernanceBridgeIdentityUnavailable.into())
 }
 
-pub(super) fn council(info: &AccountInfo) -> Result<CouncilView, ProgramError> {
+pub(in crate::processor) fn council(info: &AccountInfo) -> Result<CouncilView, ProgramError> {
     if info.is_signer || info.is_writable || info.executable {
         return Err(VaultError::InvalidAccountList.into());
     }

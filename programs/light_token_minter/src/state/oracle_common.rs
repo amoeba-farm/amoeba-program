@@ -382,15 +382,27 @@ impl OracleMonthState {
     pub const SKU_COVERAGE_SCHEDULE_VERSION: u8 = 2;
     pub const WORK_REWARD_CURRENCY_USDC_V1: u8 = 1;
 
+    /// Explicit prospective pricing type, not a legacy-layout fallback. The
+    /// dispatcher requires its governed CFM policy capability before handlers.
+    pub const CFM_DISCRIMINATOR: [u8; 3] = *b"CFM";
+    pub const CFM_VERSION: u8 = 1;
+
+    pub fn is_cfm_parent_proxy(&self) -> bool {
+        self.account_discriminator == Self::CFM_DISCRIMINATOR
+            && self.account_version == Self::CFM_VERSION
+    }
+
     pub fn has_current_layout(&self) -> bool {
-        self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
-            && self.account_version == Self::ACCOUNT_VERSION
+        ((self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
+            && self.account_version == Self::ACCOUNT_VERSION)
+            || self.is_cfm_parent_proxy())
             && self.candidate_count_tracking_version == Self::CANDIDATE_COUNT_TRACKING_VERSION
             && self.active_weight_initialization_version
                 == Self::ACTIVE_WEIGHT_INITIALIZATION_VERSION
             && (self.schedule_version == Self::SKU_COVERAGE_SCHEDULE_VERSION
-                || (cfg!(feature = "mainnet-v3") && self.schedule_version == 3))
+                || (cfg!(feature = "mainnet-v3") && matches!(self.schedule_version, 3 | 4)))
             && self.work_reward_currency_version == Self::WORK_REWARD_CURRENCY_USDC_V1
+            && (!self.is_cfm_parent_proxy() || self.schedule_version == 3)
     }
 
     pub fn has_rulebook_schedule(&self) -> bool {

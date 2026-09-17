@@ -14,6 +14,20 @@ pub struct OracleCouncilActionV1 {
 /// unbounded Borsh Vec prefix; the wire shape matches the client carry builders.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OracleCarryForwardActionV1 {
+    /// September-only council bootstrap: begin, append one parent, finish.
+    SeptemberBootstrap {
+        operation: u8,
+        market: u8,
+        row: u8,
+        plan_hash: [u8; 32],
+    },
+    InitializeCfmMonth {
+        product: u8,
+        settlement_base_oracle_atomic: u64,
+    },
+    InitializeCfmPolicy {
+        product: u8,
+    },
     Council(OracleCouncilActionV1),
     RegisterRoot,
     RegisterSuccessor,
@@ -61,6 +75,53 @@ pub enum OracleCarryForwardActionV1 {
 impl BorshDeserialize for OracleCarryForwardActionV1 {
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
+            21 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"SCB1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                let operation = u8::deserialize_reader(reader)?;
+                let market = u8::deserialize_reader(reader)?;
+                let row = u8::deserialize_reader(reader)?;
+                let plan_hash = <[u8; 32]>::deserialize_reader(reader)?;
+                if operation > 2
+                    || market > 3
+                    || (operation != 1 && row != 0)
+                    || (operation == 1 && row >= if market < 2 { 13 } else { 22 })
+                    || plan_hash == [0; 32]
+                {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::SeptemberBootstrap {
+                    operation,
+                    market,
+                    row,
+                    plan_hash,
+                }
+            }
+            20 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"CFM1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                let product = u8::deserialize_reader(reader)?;
+                let settlement_base_oracle_atomic = u64::deserialize_reader(reader)?;
+                if product > 1 || settlement_base_oracle_atomic == 0 {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::InitializeCfmMonth {
+                    product,
+                    settlement_base_oracle_atomic,
+                }
+            }
+            19 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"CFM1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                let product = u8::deserialize_reader(reader)?;
+                if product > 1 {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::InitializeCfmPolicy { product }
+            }
             18 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"CV01" {
                     return Err(io::ErrorKind::InvalidData.into());
@@ -162,6 +223,9 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
 impl BorshSerialize for OracleCarryForwardActionV1 {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         let tag: u8 = match self {
+            Self::SeptemberBootstrap { .. } => 21,
+            Self::InitializeCfmMonth { .. } => 20,
+            Self::InitializeCfmPolicy { .. } => 19,
             Self::Council(_) => 18,
             Self::RegisterRoot => 0,
             Self::RegisterSuccessor => 1,
@@ -183,6 +247,47 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
             Self::BackfillClaimEvidence { .. } => 17,
         };
         match self {
+            Self::SeptemberBootstrap {
+                operation,
+                market,
+                row,
+                plan_hash,
+            } => {
+                if *operation > 2
+                    || *market > 3
+                    || (*operation != 1 && *row != 0)
+                    || (*operation == 1 && *row >= if *market < 2 { 13 } else { 22 })
+                    || *plan_hash == [0; 32]
+                {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                tag.serialize(writer)?;
+                writer.write_all(b"SCB1")?;
+                operation.serialize(writer)?;
+                market.serialize(writer)?;
+                row.serialize(writer)?;
+                plan_hash.serialize(writer)
+            }
+            Self::InitializeCfmMonth {
+                product,
+                settlement_base_oracle_atomic,
+            } => {
+                if *product > 1 || *settlement_base_oracle_atomic == 0 {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                tag.serialize(writer)?;
+                writer.write_all(b"CFM1")?;
+                product.serialize(writer)?;
+                settlement_base_oracle_atomic.serialize(writer)
+            }
+            Self::InitializeCfmPolicy { product } => {
+                if *product > 1 {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                tag.serialize(writer)?;
+                writer.write_all(b"CFM1")?;
+                product.serialize(writer)
+            }
             Self::Council(action) => {
                 tag.serialize(writer)?;
                 writer.write_all(b"CV01")?;

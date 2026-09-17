@@ -416,7 +416,7 @@ pub(in crate::processor) fn capture_fixed_slices(
     encoded_len: usize,
     ranges: &[(u16, u16)],
 ) -> Vec<u8> {
-    let mut encoded = Vec::new();
+    let mut encoded = Vec::with_capacity(encoded_len);
     for &(start, end) in ranges {
         encoded.extend_from_slice(&data[usize::from(start)..usize::from(end)]);
     }

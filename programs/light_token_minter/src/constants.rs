@@ -192,7 +192,7 @@ pub const ORACLE_SETTLEMENT_FRESHNESS_BUSINESS_DAYS: u8 = 5;
 pub const ORACLE_SETTLEMENT_FRESHNESS_GRACE_BUSINESS_DAYS: u8 = 5;
 /// Accepted prints inside the primary settlement window receive three reward units.
 pub const ORACLE_FRESH_UPDATE_REWARD_MULTIPLIER: u8 = 3;
-/// Per-bucket open-interest safety factor from ORACLE V1.1. Exactly 50% is the allowed ceiling.
+/// Historical ORACLE V1.1 arithmetic constant; not used by current admission.
 pub const ORACLE_OI_CAP_KAPPA_BPS: u16 = 5_000;
 /// Half of the DLMM's USDC protocol-fee sleeve is reserved for month/SKU update bounties.
 pub const ORACLE_BOUNTY_PROTOCOL_FEE_SHARE_BPS: u16 = 5_000;

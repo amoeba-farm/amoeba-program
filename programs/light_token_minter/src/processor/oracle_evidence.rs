@@ -153,6 +153,36 @@ fn committed_hash(kind: u8, bytes: &[u8]) -> Result<[u8; 32], ProgramError> {
         _ => invalid(),
     }
 }
+/// Exact immutable kind-2 preimage for a pinned prospective registry.
+pub(super) fn sealed_definition_preimage(
+    program: &Pubkey,
+    object: &AccountInfo,
+    expected_commitment: &[u8; 32],
+) -> Result<Vec<u8>, ProgramError> {
+    with_sealed_definition_preimage(program, object, expected_commitment, |bytes| {
+        Ok(bytes.to_vec())
+    })
+}
+
+/// Decode while the authenticated account bytes are borrowed, without a heap copy.
+pub(super) fn with_sealed_definition_preimage<T>(
+    program: &Pubkey,
+    object: &AccountInfo,
+    expected_commitment: &[u8; 32],
+    decode: impl FnOnce(&[u8]) -> Result<T, ProgramError>,
+) -> Result<T, ProgramError> {
+    validate_object(program, object)?;
+    let data = object.try_borrow_data()?;
+    if data[38] != 2
+        || data[75] != 1
+        || data[39..71] != expected_commitment[..]
+        || committed_hash(2, &data[HEADER..])? != *expected_commitment
+    {
+        return invalid();
+    }
+    decode(&data[HEADER..])
+}
+
 /// Current G3 publication transports the URL only through its sealed object.
 /// Reject inline URL bytes: there is one current payload interpretation.
 pub(super) fn publication_url(

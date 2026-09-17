@@ -144,9 +144,22 @@ pub(super) fn load_valid_oracle_month(
     {
         return Err(VaultError::InvalidOracleMonthAccount.into());
     }
-    if month.schedule_version == LAUNCH_SCHEDULE_VERSION {
+    if matches!(
+        month.schedule_version,
+        LAUNCH_SCHEDULE_VERSION | COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
+    ) {
         validate_launch_market(market)?;
         rulebook_schedule_boundaries(&month)?;
+        if month.schedule_version == COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
+            && (market.instrument.expiry_ts
+                != crate::oracle_parent_proxy::september_bootstrap::EXPIRY
+                || !matches!(
+                    month.phase,
+                    OraclePhase::Game | OraclePhase::Settled | OraclePhase::Closed
+                ))
+        {
+            return Err(VaultError::InvalidOracleState.into());
+        }
     }
     Ok(month)
 }

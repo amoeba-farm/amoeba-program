@@ -1,8 +1,8 @@
 {
   "binaryIncluded": false,
   "channel": "source-preview",
-  "exportedFileCount": 181,
-  "exportedTreeSha256": "5aab3722fd9d6736e3b335ca81e16c9c373aa8a4638f4c22cdb064599cbd89bd",
+  "exportedFileCount": 187,
+  "exportedTreeSha256": "c08b8495e95e8c1d32342e0188e4d56ce9d15136be7ef15fcc40850d5903f3e8",
   "policySha256": "5af65e289f869a5465a2c30306b42c014aa571fc950c3afb667b470174f7f323",
   "schemaVersion": 1,
   "sourceCommit": "fc2cf05393f6b5dec493cbcd9b5173c56c802ade",
@@ -10,8 +10,8 @@
   "treeDigestExcludesThisProvenanceFile": true,
   "treeDigestIncludesNormalizedModes": true,
   "publicReproducibilityOverlay": {
-    "basePublicCommit": "b224541ca3c6ec4fe997e9fba508d21599fc052e",
-    "baseExportedTreeSha256": "364aae3460aeacaefdbc1f755f71be26b3a91b435bc5a6d93a768fd1a38803c5",
+    "basePublicCommit": "cc75e8b45b62ffaa8e96aff0f3c4c0e197ca99f1",
+    "baseExportedTreeSha256": "9558b637be314c454cdcc3d99390c31124a8014bd3d3cebcd7240f5290ce29c6",
     "policySha256Scope": "current sanitized private-source export",
     "paths": [
       ".github/workflows/ci.yml",
@@ -22,5 +22,5 @@
     ],
     "purpose": "Bind the deployed Mainnet four-hour launch artifact to public source and a self-contained build recipe"
   },
-  "sourceInputInventorySha256": "1e040fa721b3db7e6c43972c0f522cac1f1192a446d5f1fa6ff350c7ed19ea7e"
+  "sourceInputInventorySha256": "968f5eb8a4542b680fbbe6d8c669f35bd0e7b406077f8f3a45f8329d069829d4"
 }

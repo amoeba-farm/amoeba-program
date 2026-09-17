@@ -198,9 +198,18 @@ impl OracleSkuCoverageManifest {
     pub const LEN: usize = 128;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OSC";
     pub const ACCOUNT_VERSION: u8 = 1;
+    /// Economic parent coverage for an explicitly typed CFM month. The
+    /// original terminal registry remains immutable in the bound policy.
+    pub const CFM_DISCRIMINATOR: [u8; 3] = *b"CFC";
+
+    pub fn is_cfm_parent_coverage(&self) -> bool {
+        self.account_discriminator == Self::CFM_DISCRIMINATOR
+            && self.account_version == Self::ACCOUNT_VERSION
+    }
 
     pub fn has_canonical_layout(&self) -> bool {
-        self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
+        (self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
+            || self.account_discriminator == Self::CFM_DISCRIMINATOR)
             && self.account_version == Self::ACCOUNT_VERSION
     }
 }

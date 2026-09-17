@@ -130,6 +130,8 @@ pub fn minimum_oracle_bucket_eligible_sources(frozen_source_count: u16) -> u16 {
     3u16.max((frozen_source_count / 2) + (frozen_source_count % 2))
 }
 
+/// Historical arithmetic retained for API/fixture compatibility only. No
+/// current admission, manifest construction or trading path consumes this cap.
 pub fn oracle_bucket_security_cap(
     active_source_count: u16,
     listing_bond: u64,

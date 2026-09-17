@@ -3,10 +3,14 @@ use super::*;
 
 pub(super) const LAUNCH_SCHEDULE_VERSION: u8 = 3;
 pub(super) const LAUNCH_PHASE_SECONDS: u64 = 3_600;
+/// Written only by the consumed September council bootstrap. Original launch
+/// timestamps remain in its receipt; no historical review phases are invented.
+pub(super) const COUNCIL_BOOTSTRAP_SCHEDULE_VERSION: u8 = 4;
 const SEED: &[u8] = b"g3-launch-clock-v1";
 
 pub(super) fn schedule_windows(month: &OracleMonthState) -> Result<[u64; 4], ProgramError> {
     match month.schedule_version {
+        COUNCIL_BOOTSTRAP_SCHEDULE_VERSION if cfg!(feature = "mainnet-v3") => Ok([0; 4]),
         OracleMonthState::SKU_COVERAGE_SCHEDULE_VERSION => Ok([
             ORACLE_PLACEMENT_WINDOW_SECONDS,
             ORACLE_KILL_WINDOW_SECONDS,

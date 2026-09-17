@@ -375,7 +375,6 @@ pub fn validate_oracle_active_manifest_completion(
         || month.opened_source_count == 0
         || month.active_weight_group_count != manifest.expected_group_count
         || manifest.processed_bucket_weight_bps != 10_000
-        || manifest.max_open_interest_payout == 0
         || crate::bytes32_is_zero(&manifest.rolling_manifest_hash)
         || recipe.phase != OracleRecipeWeightPhase::Finalized
         || recipe.recipe_hash != month.recipe_hash

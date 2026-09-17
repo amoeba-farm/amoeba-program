@@ -33,7 +33,7 @@ pub(super) fn mul_bps(amount: u64, bps: u16) -> Result<u64, ProgramError> {
     u64::try_from(value).map_err(|_| VaultError::ArithmeticOverflow.into())
 }
 
-pub(super) fn source_delta_bps(
+pub(crate) fn source_delta_bps(
     opening_state: u64,
     current_state: u64,
 ) -> Result<i64, ProgramError> {

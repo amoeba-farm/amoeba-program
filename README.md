@@ -55,9 +55,11 @@ solana-verify build "$PWD/programs/light_token_minter" \
 
 [Source provenance](PUBLIC_SOURCE_PROVENANCE.json) identifies the private source
 revision and the public reproducibility additions. The current build evidence
-distinguishes native SBF reproduction from Docker verification. Hosted verification remains a
+records two matching private-source native SBF builds. This sanitized public
+export has not yet been independently rebuilt; public native, Docker and hosted
+verification are not claimed. Hosted verification remains a
 separate result; check the [verifier status](https://verify.osec.io/status/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw).
-The upgraded Mainnet program's gate is Active at epoch 3. Market and oracle
+The upgraded Mainnet program's gate is Active at epoch 9. Market and oracle
 bootstrap readiness is separate from executable identity.
 
 ## License

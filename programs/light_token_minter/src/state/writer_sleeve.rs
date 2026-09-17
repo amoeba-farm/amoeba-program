@@ -240,6 +240,8 @@ pub struct WriterSettlementGroupV1 {
     pub recipe_hash: [u8; 32],
     pub settlement_source_digest: [u8; 32],
     pub active_weight_manifest_hash: [u8; 32],
+    /// Legacy oracle-manifest binding, retained in account/settlement hashes.
+    /// It does not constrain issuance or trading; reserve/custody checks do.
     pub security_cap_atoms: u64,
     pub signer_registry: Pubkey,
     pub signer_set: Pubkey,

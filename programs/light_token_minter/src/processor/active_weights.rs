@@ -1,22 +1,5 @@
 use super::*;
 
-#[inline]
-/// Tighten by economically active (nonzero-weight) buckets only.
-///
-/// Current terminal-source validation rejects zero bucket weight before this fold, so the zero
-/// branch defines the audit mutation without admitting a new manifest shape.
-pub(super) fn fold_economically_active_bucket_security_cap(
-    current_cap: u64,
-    bucket_weight_bps: u16,
-    bucket_cap: u64,
-) -> u64 {
-    if bucket_weight_bps == 0 {
-        current_cap
-    } else {
-        current_cap.min(bucket_cap)
-    }
-}
-
 pub(super) fn initial_oracle_active_weight_hash(
     month: &Pubkey,
     recipe_hash: &[u8; 32],
@@ -394,19 +377,6 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
         manifest.last_collected_source_id = source.source_id;
     }
 
-    let max_open_interest_payout = if bucket.is_some() {
-        let minimum = minimum_oracle_bucket_eligible_sources(manifest.current_group_source_count);
-        let security_source_count = manifest.current_group_active_count.min(minimum);
-        let (_, cap) = oracle_bucket_security_cap(
-            security_source_count,
-            sku.listing_bond,
-            sku.support_bond,
-            crate::constants::ORACLE_OI_CAP_KAPPA_BPS,
-        )?;
-        Some(cap)
-    } else {
-        None
-    };
     if params.finalize_collection {
         validate_active_group_collection_completion(&manifest)?;
         let bucket = bucket.as_mut().ok_or(VaultError::InvalidOracleMedian)?;
@@ -415,11 +385,9 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
         {
             return Err(VaultError::OracleWeightManifestHashMismatch.into());
         }
-        manifest.max_open_interest_payout = fold_economically_active_bucket_security_cap(
-            manifest.max_open_interest_payout,
-            bucket.bucket_weight_bps,
-            max_open_interest_payout.ok_or(VaultError::InvalidOracleMedian)?,
-        );
+        // Retain the serialized field, but no oracle bond/source count limits
+        // writer exposure. Solvency and collateral are enforced by writer lanes.
+        manifest.max_open_interest_payout = u64::MAX;
         let active_count = usize::from(bucket.active_source_count);
         let mut values = bucket.opening_source_deltas_bps;
         bucket.bucket_delta_bps =

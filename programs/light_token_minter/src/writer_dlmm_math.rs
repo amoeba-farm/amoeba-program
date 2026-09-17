@@ -34,6 +34,7 @@ pub struct WriterDlmmRiskLimits {
     pub lower_tail_max_settlement_atomic: u64,
     pub upper_tail_min_settlement_atomic: u64,
     pub security_mode: WriterSecurityMode,
+    /// Legacy caller field; not used as an exposure admission limit.
     pub security_cap_atoms: u64,
 }
 
@@ -187,9 +188,8 @@ pub fn admit_writer_dlmm_cash(
     )?;
     let exposure = security_exposure(limits.security_mode, book, summary.reserve_atoms)
         .map_err(WriterDlmmAdmissionError::Envelope)?;
-    if exposure > limits.security_cap_atoms {
-        return Err(WriterDlmmAdmissionError::SecurityCap);
-    }
+    // The legacy oracle cap is informational only. Cash, exact reserve and
+    // drawdown checks above remain mandatory for every admitted operation.
     Ok((summary, free_cash, exposure))
 }
 

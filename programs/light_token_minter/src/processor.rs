@@ -5,6 +5,8 @@ mod active_weights;
 mod ameba_dlmm;
 mod ameba_dlmm_light;
 mod bucket_medians;
+mod cfm_parent_proxy;
+mod september_bootstrap;
 mod collateral_accounts;
 mod compressed_state;
 #[cfg(feature = "devnet-solo-backfill-2026")]
@@ -17,7 +19,7 @@ mod market_admin;
 mod market_settlement;
 mod median;
 mod oracle_carry;
-mod oracle_core;
+pub(crate) mod oracle_core;
 mod oracle_council;
 mod oracle_economics;
 mod oracle_evidence;

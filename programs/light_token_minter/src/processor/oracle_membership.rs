@@ -130,7 +130,7 @@ pub(super) fn require_member(
     Ok(())
 }
 
-fn load_recipe_index(
+pub(super) fn load_recipe_index(
     program_id: &Pubkey,
     month_key: &Pubkey,
     month: &OracleMonthState,

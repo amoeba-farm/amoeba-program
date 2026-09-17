@@ -147,6 +147,7 @@ pub struct WriterReserveSummary {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WriterIssueAdmissionLimits {
     pub security_mode: WriterSecurityMode,
+    /// Legacy caller field; not used as an exposure admission limit.
     pub security_cap_atoms: u64,
     pub accounted_asset_atoms: u64,
     pub locked_primary_premium_atoms: u64,
@@ -488,17 +489,6 @@ pub fn maximum_safe_issue_quantity(
     let target = &series[series_index];
     let mut maximum_contracts = maximum_quantity_atoms / WRITER_CONTRACT_ATOMIC_SCALE;
 
-    if limits.security_mode == WriterSecurityMode::GrossExternalMaximumPayout {
-        let gross_base = gross_external_maximum_payout(series)?;
-        restrict_linear_admission(
-            &mut maximum_contracts,
-            gross_base,
-            target.max_payout_per_contract_atoms,
-            limits.security_cap_atoms,
-            0,
-        );
-    }
-
     for settlement in candidates.as_slice() {
         let liability_base = liability_atoms_from_numerator(
             aggregate_liability_numerator_unchecked(series, *settlement)?,
@@ -534,15 +524,6 @@ pub fn maximum_safe_issue_quantity(
                 liability_per_contract,
                 upper_drawdown_base,
                 bid_price_per_contract_atoms,
-            );
-        }
-        if limits.security_mode == WriterSecurityMode::ExactExternalEnvelope {
-            restrict_linear_admission(
-                &mut maximum_contracts,
-                liability_base,
-                liability_per_contract,
-                limits.security_cap_atoms,
-                0,
             );
         }
     }

@@ -15,6 +15,7 @@ pub mod instruction;
 mod light_token_instruction;
 mod local_direct_address;
 pub(crate) mod observation_wire;
+pub mod oracle_parent_proxy;
 pub mod oracle_rank;
 pub mod processor;
 pub mod scoped_settlement;

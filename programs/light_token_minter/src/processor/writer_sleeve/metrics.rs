@@ -94,7 +94,7 @@ pub(in crate::processor) fn calculate_writer_metrics(
     accounted_asset_atoms: u64,
     locked_primary_premium_atoms: u64,
     writer_principal_atoms: u64,
-    security_cap_atoms: Option<u64>,
+    _legacy_security_cap_atoms: Option<u64>,
     enforce_solvency_and_drawdown: bool,
 ) -> Result<(crate::writer_sleeve_math::WriterReserveSummary, u64), ProgramError> {
     let reserve = exact_reserve(
@@ -111,9 +111,8 @@ pub(in crate::processor) fn calculate_writer_metrics(
     };
     let exposure = calculate_security_exposure(math_security_mode, series, reserve.reserve_atoms)
         .map_err(writer_math_error)?;
-    if security_cap_atoms.is_some_and(|cap| exposure > cap) {
-        return Err(VaultError::WriterSecurityCapExceeded.into());
-    }
+    // Oracle bonds are not a writer exposure budget. Keep computing exposure
+    // for accounting, with all exact reserve, solvency and drawdown checks below.
     if enforce_solvency_and_drawdown {
         let required_assets = reserve
             .reserve_atoms
