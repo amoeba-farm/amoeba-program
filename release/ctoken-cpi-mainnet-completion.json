@@ -1,0 +1,89 @@
+{
+  "schema": "ameba-individual-mainnet-completion-v1",
+  "completedAt": "2026-09-25T11:46:05.781Z",
+  "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "target": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "controller": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+  "buildSourceCommit": "3cb40d6cba4f936a15e2afdcf0cd9c76750e0934",
+  "artifactBytes": 1446848,
+  "artifactSha256": "78fe11bf361d7b9096d5d4f455f2a3a31ec74398941006d07b369daeac7df3ec",
+  "programDataSha256": "d407061163316aaf62a76ad5c6e52cbe23d70ee576cf76890729ab9dd7bbc4d1",
+  "programDataCapacity": 1457072,
+  "programDataPayloadSha256": "0248cf17b5c5348f8d5c5433b71e3eff9a2a4b9ad297b875d2af8d2548ffb820",
+  "mandatoryZeroPaddingBytes": 10224,
+  "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+  "proposalId": "20",
+  "proposalAddress": "CZ6Y2K5BbsZNAERAWJLUrQefFBpx5gcQnukHr99yZFCx",
+  "approvals": 3,
+  "verifiedChunks": 89,
+  "executionSignature": "3DtEaVDqRf3zFr72f9eC1oR5ZitHoR3qE2FrL7rzVm4KgHJrCJ1QB31cjqFoDoGZi2okd8oVDmwBhB9cfTK4nLe5",
+  "deployedSlot": "450340844",
+  "gate": {
+    "bump": 254,
+    "status": 2,
+    "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+    "targetProgram": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "programdata": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+    "epoch": "17",
+    "activeProposal": "11111111111111111111111111111111",
+    "freezeSlot": "450340844",
+    "reason": 2,
+    "lastCompletedProposal": "CZ6Y2K5BbsZNAERAWJLUrQefFBpx5gcQnukHr99yZFCx"
+  },
+  "programAccountsPreserved": 503,
+  "externalReferencesPreserved": 39,
+  "externalReferencesTotal": 41,
+  "exactInventoryPreserved": false,
+  "allProtocolCustodyPreserved": true,
+  "custodyPreservationBasis": "Exact Amoeba-owned state and protocol-specific vaults preserved; shared global dependencies are excluded from byte equality and were inaccessible to the upgrade transaction",
+  "sharedDependencyDrift": [
+    {
+      "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "kind": "global-usdc-mint"
+    },
+    {
+      "address": "F3HRaXW5kDwnFcZ2AJXH2RajbJDK7iFxSYqdLKSdNq1R",
+      "kind": "global-light-usdc-spl-interface"
+    }
+  ],
+  "externalDifferencesOutsideUpgradeTransaction": [
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "F3HRaXW5kDwnFcZ2AJXH2RajbJDK7iFxSYqdLKSdNq1R"
+  ],
+  "strictCensusComparisonPassed": false,
+  "treasury": "8XUjnzVzR71DaVuqbSHaNev5H4vrxofyFP4iZt2FXa1j",
+  "bufferRentReturnedLamports": 7350826040,
+  "transactionFeeLamports": 6400,
+  "services": {
+    "run": "mainnet-ctoken-cpi-20260925",
+    "stoppedAtUnix": 1790334217,
+    "priorServices": {
+      "ameba-runtime-recovery.timer": "active",
+      "ameba-runtime-recovery.service": "inactive",
+      "ameba-writing-queue-private.socket": "active",
+      "ameba-liquidity-manager.service": "active",
+      "ameba-gas-sponsor.service": "active",
+      "ameba-admin-funding@ramx.service": "active",
+      "ameba-admin-funding@nandx.service": "active",
+      "ameba-writing-queue.service": "active",
+      "ameba-writing-queue-private.service": "active"
+    },
+    "services": {
+      "ameba-runtime-recovery.timer": "inactive",
+      "ameba-runtime-recovery.service": "inactive",
+      "ameba-writing-queue-private.socket": "inactive",
+      "ameba-liquidity-manager.service": "inactive",
+      "ameba-gas-sponsor.service": "inactive",
+      "ameba-admin-funding@ramx.service": "inactive",
+      "ameba-admin-funding@nandx.service": "inactive",
+      "ameba-writing-queue.service": "inactive",
+      "ameba-writing-queue-private.service": "inactive"
+    },
+    "maintenanceHold": "/etc/ameba-lean/maintenance.hold",
+    "backendRelease": "/opt/ameba-lean/releases/f77e59cf7dff183a4242422d56621684090e4081",
+    "transactionServicesStopped": true
+  },
+  "applicationReleaseCompleted": false,
+  "individualWritingEnabled": false,
+  "sourcePublished": false
+}

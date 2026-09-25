@@ -1,0 +1,18 @@
+{
+  "schema": "ameba-mainnet-g3-build-v1",
+  "profileSha256": "e51c6850d1dd262f152a4d2171ded32c7c2ca874da511009b1ac8cbec14977d0",
+  "generatedProfileRsSha256": "fbf6fc9c54f6b66ca344e8352b37ef39568ce9c9e4eeb21bc1c50bd4a8c23637",
+  "sourceInputInventorySha256": "2d0da6d53654661c38d493feb4b23746362ae12c948c742a8801f95c05773f4f",
+  "localTestOnly": false,
+  "productionUseAuthorized": true,
+  "deployed": false,
+  "runtimeQualified": false,
+  "features": ["mainnet-v3", "mainnet-four-hour-launch"],
+  "defaultFeatures": true,
+  "architecture": "v1",
+  "independentBuildTargetDirectories": 2,
+  "builds": [
+    {"artifactBytes": 1446848, "artifactSha256": "78fe11bf361d7b9096d5d4f455f2a3a31ec74398941006d07b369daeac7df3ec", "stackDiagnostics": 0},
+    {"artifactBytes": 1446848, "artifactSha256": "78fe11bf361d7b9096d5d4f455f2a3a31ec74398941006d07b369daeac7df3ec", "stackDiagnostics": 0}
+  ]
+}

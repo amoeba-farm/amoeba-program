@@ -2,7 +2,8 @@
 //!
 //! The runtime needs index-zero SPL-interface creation and checked token movement between classic
 //! SPL and Light token accounts. Encoding those fixed cases directly avoids linking the SDK's
-//! general transfer router while preserving the exact target program, metas, and data bytes.
+//! general transfer router while preserving the exact target program and data bytes. Light-to-SPL
+//! additionally forwards the System Program for the cToken program's nested rent top-up CPI.
 
 use solana_program::{
     instruction::{AccountMeta, Instruction},
@@ -360,6 +361,10 @@ pub(crate) fn transfer_interface(
                 AccountMeta::new_readonly(*authority, true),
                 AccountMeta::new(*spl_interface, false),
                 AccountMeta::new_readonly(*spl_token_program, false),
+                // cToken may top up a compressible account with a System Program CPI. The SDK's
+                // 0.23 TransferToSpl builder omits this meta, although the outer instruction
+                // already provides the account. Append it after all indexed token accounts.
+                AccountMeta::new_readonly(Pubkey::default(), false),
             ],
             data: transfer2_data(amount, spl_interface_bump, decimals, false),
         }),

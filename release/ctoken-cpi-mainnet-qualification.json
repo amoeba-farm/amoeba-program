@@ -1,0 +1,109 @@
+{
+  "schema": "ameba-mainnet-ctoken-cpi-qualification-v1",
+  "artifactSha256": "78fe11bf361d7b9096d5d4f455f2a3a31ec74398941006d07b369daeac7df3ec",
+  "artifactBytes": 1446848,
+  "profileSha256": "e51c6850d1dd262f152a4d2171ded32c7c2ca874da511009b1ac8cbec14977d0",
+  "generatedProfileRsSha256": "fbf6fc9c54f6b66ca344e8352b37ef39568ce9c9e4eeb21bc1c50bd4a8c23637",
+  "sourceInputInventorySha256": "2d0da6d53654661c38d493feb4b23746362ae12c948c742a8801f95c05773f4f",
+  "sourceBaseCommit": "00362ebd53f82d92ae77430c95f6f373de30c3fb",
+  "contractSourceCommit": "3cb40d6cba4f936a15e2afdcf0cd9c76750e0934",
+  "sourcePatchSha256": "85de424ac08a21f4f7435c5a5fe48842f3db342f904b4fa0fd749bd814c6d524",
+  "unchangedBuildInputsVerified": true,
+  "independentMatchingBuilds": 2,
+  "nativeDefaultAllTargetsPassed": 409,
+  "nativeDefaultSuites": 39,
+  "nativeMainnetLibraryPassed": 318,
+  "typescript": {
+    "reusedFrom": "output/shared-reserve-mainnet/logs",
+    "priorQualifiedSourceCommit": "0aa2ef9ef7efb8ac9e362cceffe653b44f2bf33a",
+    "trackedInputsUnchanged": true,
+    "trackedInputsCompared": [
+      "clients/ts",
+      "tools/typescript-build",
+      "tools/link-typescript-build-dependencies.mjs",
+      "package and lockfiles",
+      "tsconfig files"
+    ],
+    "installedDependencyLockSha256": "1890f0f3f8b6ba465292b4c1267d416baa6ea35779526da87b6f859e54d2cb2",
+    "installedDependencyFilesNewerThanPriorQualification": 0,
+    "passed": 360,
+    "skipped": 1,
+    "failed": 0,
+    "typecheckPassed": true
+  },
+  "actualSbfPassed": 30,
+  "actualSbfSuites": {
+    "g3_compressed_sbf": {
+      "passed": 13,
+      "failed": 0
+    },
+    "g3_council_sbf": {
+      "passed": 3,
+      "failed": 0
+    },
+    "g3_focused_sbf": {
+      "passed": 5,
+      "failed": 0
+    },
+    "g3_individual_writer_sbf": {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 1
+    },
+    "g3_mainnet_profile_sbf": {
+      "passed": 1,
+      "failed": 0
+    },
+    "g3_writer_sbf": {
+      "passed": 2,
+      "failed": 0
+    },
+    "writer_relocation_sbf": {
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "ignoredTest": {
+    "name": "export_individual_localnet_genesis",
+    "reason": "Explicit Localnet sandbox export utility; not a lifecycle test."
+  },
+  "realMainnetCtokenRegression": {
+    "programId": "cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m",
+    "programData": "GZ569jyYVcXnC6CLhA1ahfgNVZfSLtcMzrbcpjR438fy",
+    "lastDeployedSlot": 405926389,
+    "sbfSha256": "4d4575df77a266135f4d4fd4b5063007a24d4a1b86c4b4af073b70fdc1450efe",
+    "withdrawnFeature": "HcW8ZjBezYYgvcbxNJwqv1t484Y2556qJsfNDWvJGZRH",
+    "featureAbsentAtFinalizedSlot": 450316854,
+    "testOperationCount": 2,
+    "patchedPassed": 2,
+    "oldArtifactExpectedMissingAccount": 2,
+    "operations": [
+      "managed writer RemoveLiquidity after shared-reserve sale and buyback",
+      "individual writer FundSettlement after partial fill and cancellation"
+    ],
+    "oldArtifactSha256": "efb2e7cbe6722ab6a7c29c6a7d0b5c0919b4102ca1c91117bb3bde68ab695481",
+    "rentTopUpSetup": "Local Light quote-vault source lamports set to Rent::minimum_balance(data.len()) before each Light-to-SPL transfer; no Mainnet account was modified."
+  },
+  "mainnetAllTargetsLimitation": {
+    "status": "failed outside the release SBF baseline",
+    "test": "oracle_settlement_source_manifest::canonical_bucket_walk_creates_and_finalizes_the_source_manifest",
+    "observedError": "InvalidGovernanceTail (6256)",
+    "scope": "Unchanged legacy native fixture submits an ungoverned instruction in the Mainnet profile. Its source predates this CPI patch; a matching baseline rerun was not performed."
+  },
+  "logSha256": {
+    "build-1.log": "b992b2dbc987e18f11e2a126a0a9d0d871dc0fdcec947af9c27e30f521592209",
+    "build-2.log": "323c7a2d44ce7acfa8b5f948c1ab6dd359d446ac302fd584b053f6370caf0599",
+    "cargo-fmt-all-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-default-all-targets.log": "2c4fafafe803ac3416e4c5cd59d2639c1d77a1a764bbb7b08aa5abdc25c19a83",
+    "native-all-ts-tests-reused.log": "b762785a8b2b0fd57e7639875a28cf3928e2e6b22582eb38e5815b20a05c2496",
+    "native-typecheck-reused.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mainnet-sbf.log": "e255c076b908de7f572e80b186b7c9b0d873177145fd93ca91a85504b707fa0e",
+    "mainnet-real-ctoken-regressions.log": "1becb32f41f606a61d51f56438b2d33c488572d0c5b770d23879339f0749ead8",
+    "old-writer-remove-negative-control.log": "4bca2ceb161cf36a5e1cb6e3e2b8ba9d83982b0d7988bd87731dfe63f7156c40",
+    "old-individual-fund-negative-control.log": "bb492282e5dc8b5e09832c79e7d58668a35078ad5059ef8f9bd0602738850ccd",
+    "mainnet-all-targets-known-legacy-failure.log": "fb21f0117b69a446b57cc001bdb7022571abff471d6177dba395309024508a20"
+  },
+  "deployed": false,
+  "deploymentPaused": true,
+  "automaticResumeAuthorized": false
+}
