@@ -31,15 +31,16 @@ cargo check --manifest-path programs/light_token_minter/Cargo.toml \
 
 ## Deployment and verification
 
-The published deployment is on **Solana Devnet**. Its program ID is
-`2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw`.
-See the [integration manifest](release/current-integration.json) and
+This source tree supports Devnet and Mainnet profiles. The latest attested Mainnet
+artifact, deployment slot, build inputs, and gate snapshot are recorded in
+[`MAINNET_BUILD.json`](MAINNET_BUILD.json); the Devnet integration remains in
+[the integration manifest](release/current-integration.json) and
 [Devnet configuration](deployments/devnet-v3.json).
 
 [Source provenance](PUBLIC_SOURCE_PROVENANCE.json) identifies the source revision
-and exported file digest. [Build verification](deployment-evidence/writer-dlmm-verified-build-20260910.json)
-records the published artifact's build configuration and hashes. Deployment
-records describe the revisions they attest; they do not establish current chain state.
+and exported file digest. [Historical build verification](deployment-evidence/writer-dlmm-verified-build-20260910.json)
+records an earlier artifact. Deployment records describe the revisions they
+attest; they do not establish current chain state or gate activation.
 
 ## License
 
