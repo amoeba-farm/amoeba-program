@@ -366,7 +366,7 @@ impl FixedField for WriterSeriesRecordV1 {
     }
 }
 
-impl FixedField for [WriterSeriesRecordV1; WRITER_SERIES_STORAGE_CAPACITY] {
+impl FixedField for [WriterSeriesRecordV1; crate::constants::WRITER_MAX_LIVE_SERIES] {
     #[inline(always)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
         core::array::from_fn(|_| WriterSeriesRecordV1::read(input))
@@ -380,10 +380,10 @@ impl FixedField for [WriterSeriesRecordV1; WRITER_SERIES_STORAGE_CAPACITY] {
     }
 }
 
-impl FixedField for Box<[WriterSeriesRecordV1; WRITER_SERIES_STORAGE_CAPACITY]> {
+impl FixedField for Box<[WriterSeriesRecordV1; crate::constants::WRITER_MAX_LIVE_SERIES]> {
     #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
-        (0..WRITER_SERIES_STORAGE_CAPACITY)
+        (0..crate::constants::WRITER_MAX_LIVE_SERIES)
             .map(|_| WriterSeriesRecordV1::read(input))
             .collect::<Vec<_>>()
             .into_boxed_slice()

@@ -337,7 +337,9 @@ fixed_state_deserialize!(WriterSettlementGroupV1, 558, {
     sleeve: Pubkey,
     status: WriterSettlementGroupStatus,
     series_count: u8,
-    reserved: [u8; 6],
+    full_collateral_capacity: bool,
+    shared_reserve: bool,
+    reserved: [u8; 4],
     last_updated_slot: u64,
 });
 
@@ -354,5 +356,6 @@ fixed_state_deserialize!(WriterSeriesBookV1, 8312, {
     reserved: [u8; 7],
     book_digest: [u8; 32],
     last_updated_slot: u64,
-    records: Box<[WriterSeriesRecordV1; WRITER_SERIES_STORAGE_CAPACITY]>,
+    records: Box<[WriterSeriesRecordV1; crate::constants::WRITER_MAX_LIVE_SERIES]>,
+    individual: crate::individual_writer::IndividualTotals,
 });

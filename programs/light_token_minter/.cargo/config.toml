@@ -1,6 +1,3 @@
-[env]
-AMEBA_MAINNET_PROFILE_RS = { value = "src/mainnet_profile.rs", relative = true }
-
 [target.sbpf-solana-solana]
 rustflags = [
     "-Z",

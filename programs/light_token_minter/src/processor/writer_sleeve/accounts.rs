@@ -298,7 +298,11 @@ pub(super) fn load_writer_series_book(
             || record.total_physical_supply_atoms
                 != record
                     .issuer_controlled_atoms
-                    .checked_add(record.external_open_interest_atoms)
+                    .checked_add(
+                        value
+                            .external_total(index)
+                            .ok_or(VaultError::ArithmeticOverflow)?,
+                    )
                     .ok_or(VaultError::ArithmeticOverflow)?
             || (index != 0 && value.records[index - 1].series_id >= record.series_id)
         {

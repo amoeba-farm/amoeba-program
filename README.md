@@ -31,36 +31,15 @@ cargo check --manifest-path programs/light_token_minter/Cargo.toml \
 
 ## Deployment and verification
 
-The program is deployed on **Solana Mainnet Beta and Devnet** at
+The published deployment is on **Solana Devnet**. Its program ID is
 `2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw`.
-The two networks have separate state and build profiles. The
-[integration manifest](release/current-integration.json) and
-[Devnet configuration](deployments/devnet-v3.json) describe Devnet.
+See the [integration manifest](release/current-integration.json) and
+[Devnet configuration](deployments/devnet-v3.json).
 
-[Mainnet build evidence](MAINNET_BUILD.json) records the deployed artifact and
-the exact public build recipe. Its generated profile contains public identities
-only; no RPC credentials or signing keys are needed to build.
-The Mainnet build enables `mainnet-four-hour-launch` for the September/October
-cohorts and rejects the Devnet backfill feature.
-
-With solana-verify 0.5.1, run from this repository's root:
-
-```sh
-solana-verify build "$PWD/programs/light_token_minter" \
-  --workspace-path "$PWD/programs/light_token_minter" \
-  --library-name light_token_minter \
-  --base-image solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68 \
-  --arch v1 -- --no-default-features --features mainnet-v3
-```
-
-[Source provenance](PUBLIC_SOURCE_PROVENANCE.json) identifies the private source
-revision and the public reproducibility additions. The current build evidence
-records two matching private-source native SBF builds. This sanitized public
-export has not yet been independently rebuilt; public native, Docker and hosted
-verification are not claimed. Hosted verification remains a
-separate result; check the [verifier status](https://verify.osec.io/status/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw).
-The upgraded Mainnet program's gate is Active at epoch 9. Market and oracle
-bootstrap readiness is separate from executable identity.
+[Source provenance](PUBLIC_SOURCE_PROVENANCE.json) identifies the source revision
+and exported file digest. [Build verification](deployment-evidence/writer-dlmm-verified-build-20260910.json)
+records the published artifact's build configuration and hashes. Deployment
+records describe the revisions they attest; they do not establish current chain state.
 
 ## License
 

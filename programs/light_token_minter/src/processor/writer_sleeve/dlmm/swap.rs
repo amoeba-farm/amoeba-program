@@ -19,6 +19,7 @@ pub(in crate::processor) struct WriterSwapState {
     before_mint_supply: u64,
     before_retirement: u64,
     round_trip_fee: u64,
+    risk: crate::writer_dlmm_math::WriterDlmmRiskLimits,
 }
 
 impl WriterSwapState {
@@ -40,8 +41,9 @@ impl WriterSwapState {
                 principal_atoms: self.context.sleeve.writer_principal_atoms,
                 allocated_lp_quote_atoms: self.policy.total_pool_quote_atoms
                     - self.policy.total_uncommitted_quote_atoms,
+                pooled_quote_atoms: self.policy.total_pool_quote_atoms,
             },
-            risk: risk_limits(&self.context.snapshot, &self.context.group),
+            risk: self.risk,
             buyback: WriterDlmmBuybackLimits {
                 monthly_buyback_cap_atoms: self.policy.monthly_buyback_cap_atoms,
                 transaction_buyback_cap_atoms: self.policy.transaction_buyback_cap_atoms,
@@ -171,16 +173,17 @@ pub(in crate::processor) fn load_swap_state(
         && context.group.status == WriterSettlementGroupStatus::Active
         && mint.supply == record.total_physical_supply_atoms
         && issuer == record.issuer_controlled_atoms
-        && mint.supply.checked_sub(issuer) == Some(record.external_open_interest_atoms)
+        && mint.supply.checked_sub(issuer) == context.book.external_total(index)
         && context
             .sleeve
             .accounted_asset_atoms
             .checked_sub(policy.total_pool_quote_atoms)
             .is_some_and(|cash| before_cash >= cash)
         && market_outstanding_contract_amount(&market)?
-            == record
-                .external_open_interest_atoms
-                .checked_add(position.option_inventory_atoms)
+            == context
+                .book
+                .external_total(index)
+                .and_then(|v| v.checked_add(position.option_inventory_atoms))
                 .ok_or(VaultError::ArithmeticOverflow)?;
     let round_trip_fee = match crate::writer_dlmm_math::writer_dlmm_price_bounds(
         policy.series[index].seller_floor_quote_atoms,
@@ -195,6 +198,7 @@ pub(in crate::processor) fn load_swap_state(
     };
     advance_spending_month(&mut policy, current_unix_timestamp()?)?;
     let series = writer_book_math_series(&context.book)?;
+    let risk = risk_limits(&context.snapshot, &context.group);
     let series_limits = policy.series[..usize::from(policy.series_count)]
         .iter()
         .map(|terms| WriterDlmmSeriesLimits {
@@ -218,6 +222,7 @@ pub(in crate::processor) fn load_swap_state(
         before_mint_supply: mint.supply,
         before_retirement: retired,
         round_trip_fee,
+        risk,
     }))
 }
 
@@ -465,7 +470,8 @@ pub(in crate::processor) fn finish_swap(
         || market_outstanding_contract_amount(&state.market)?
             != record
                 .external_open_interest_atoms
-                .checked_add(state.position.option_inventory_atoms)
+                .checked_add(state.context.book.individual.series[state.series_index].outstanding)
+                .and_then(|v| v.checked_add(state.position.option_inventory_atoms))
                 .ok_or(VaultError::ArithmeticOverflow)?
     {
         return Err(VaultError::WriterSupplyMismatch.into());

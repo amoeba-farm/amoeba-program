@@ -94,7 +94,9 @@ pub(in crate::processor) fn process_initialize_settlement_group(
         sleeve,
         status: WriterSettlementGroupStatus::Anchored,
         series_count: 0,
-        reserved: [0; 6],
+        full_collateral_capacity: false,
+        shared_reserve: false,
+        reserved: [0; 4],
         last_updated_slot: Clock::get()?.slot,
     };
     let _ = signer_registry;
@@ -207,13 +209,11 @@ pub(in crate::processor) fn process_initialize_sleeve(
         reserved: [0; 7],
         book_digest: [0; 32],
         last_updated_slot: slot,
-        records: vec![
-            WriterSeriesRecordV1::EMPTY;
-            crate::constants::WRITER_SERIES_STORAGE_CAPACITY
-        ]
-        .into_boxed_slice()
-        .try_into()
-        .map_err(|_| VaultError::ArithmeticOverflow)?,
+        records: vec![WriterSeriesRecordV1::EMPTY; crate::constants::WRITER_MAX_LIVE_SERIES]
+            .into_boxed_slice()
+            .try_into()
+            .map_err(|_| VaultError::ArithmeticOverflow)?,
+        individual: Default::default(),
     };
     book.book_digest = writer_book_digest(&book);
     let sleeve = WriterSleeveV1 {

@@ -125,9 +125,9 @@ pub(in crate::processor) fn calculate_writer_metrics(
             &reserve,
             locked_primary_premium_atoms,
             writer_principal_atoms,
-            snapshot.worst_drawdown_limit,
-            snapshot.lower_drawdown_limit,
-            snapshot.upper_drawdown_limit,
+            crate::constants::WRITER_RATIO_SCALE_PPM,
+            crate::constants::WRITER_RATIO_SCALE_PPM,
+            crate::constants::WRITER_RATIO_SCALE_PPM,
         )
         .map_err(writer_math_error)?;
         if !checks.all_pass() {

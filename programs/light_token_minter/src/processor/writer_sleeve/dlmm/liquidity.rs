@@ -6,6 +6,8 @@ use crate::processor::ameba_dlmm::{
 };
 use crate::state::{WriterDlmmBinV1, WRITER_DLMM_POSITION_BINS, WRITER_DLMM_POSITION_SEED};
 
+mod relocation;
+
 fn validate_privileges(
     accounts: &[AccountInfo],
     count: usize,
@@ -213,6 +215,14 @@ pub(in crate::processor) fn process_liquidity_action(
         27,
         &[0, 2, 4, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 21, 22, 26],
     )?;
+    let relocation = match &action {
+        ManageWriterDlmmV1Params::RelocateLiquidity {
+            expected_position_hash,
+            moves,
+            ..
+        } => Some((*expected_position_hash, moves.clone())),
+        _ => None,
+    };
     let (series_index, issue_amount, entries, add, sweep) = match action {
         ManageWriterDlmmV1Params::AddLiquidity {
             series_index,
@@ -225,6 +235,9 @@ pub(in crate::processor) fn process_liquidity_action(
         } => (series_index, 0, entries, false, false),
         ManageWriterDlmmV1Params::SweepCash { series_index } => {
             (series_index, 0, Vec::new(), false, true)
+        }
+        ManageWriterDlmmV1Params::RelocateLiquidity { series_index, .. } => {
+            (series_index, 0, Vec::new(), true, false)
         }
         _ => return Err(VaultError::InvalidInstructionData.into()),
     };
@@ -387,15 +400,36 @@ pub(in crate::processor) fn process_liquidity_action(
         .ok_or(VaultError::ArithmeticOverflow)?;
     if mint_before.supply != book.records[index].total_physical_supply_atoms
         || observed_issuer != book.records[index].issuer_controlled_atoms
-        || mint_before.supply.checked_sub(observed_issuer)
-            != Some(book.records[index].external_open_interest_atoms)
+        || mint_before.supply.checked_sub(observed_issuer) != book.external_total(index)
         || market_outstanding_contract_amount(&market)?
-            != book.records[index]
-                .external_open_interest_atoms
-                .checked_add(position.option_inventory_atoms)
+            != book
+                .external_total(index)
+                .and_then(|v| v.checked_add(position.option_inventory_atoms))
                 .ok_or(VaultError::ArithmeticOverflow)?
     {
         return Err(VaultError::WriterSupplyMismatch.into());
+    }
+    if let Some((expected_hash, moves)) = relocation {
+        if solana_program::hash::hash(&position_info.try_borrow_data()?).to_bytes() != expected_hash
+        {
+            return Err(VaultError::InvalidInstructionData.into());
+        }
+        let (minimum_ask, maximum_bid, _) = crate::writer_dlmm_math::writer_dlmm_price_bounds(
+            policy.series[index].seller_floor_quote_atoms,
+            pool.tick_size_quote_atomic,
+            policy.price_separation_ticks,
+        )
+        .map_err(|_| VaultError::InvalidWriterPolicySnapshot)?;
+        relocation::relocate(
+            &mut position,
+            &moves,
+            pool.maximum_bin_id,
+            pool.tick_size_quote_atomic,
+            minimum_ask,
+            maximum_bid,
+        )?;
+        position.last_updated_slot = Clock::get()?.slot;
+        return store_state(position_info, position.as_ref());
     }
     let (option_amount, quote_amount) = if sweep {
         let quote = position.uncommitted_quote_atoms;
@@ -690,9 +724,9 @@ pub(in crate::processor) fn process_liquidity_action(
         || Some(after_cash) != expected_cash
         || after_mint.supply != book.records[index].total_physical_supply_atoms
         || market_outstanding_contract_amount(&market)?
-            != book.records[index]
-                .external_open_interest_atoms
-                .checked_add(position.option_inventory_atoms)
+            != book
+                .external_total(index)
+                .and_then(|v| v.checked_add(position.option_inventory_atoms))
                 .ok_or(VaultError::ArithmeticOverflow)?
     {
         return Err(VaultError::WriterSupplyMismatch.into());

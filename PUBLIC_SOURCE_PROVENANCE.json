@@ -1,26 +1,12 @@
 {
   "binaryIncluded": false,
   "channel": "source-preview",
-  "exportedFileCount": 187,
-  "exportedTreeSha256": "c08b8495e95e8c1d32342e0188e4d56ce9d15136be7ef15fcc40850d5903f3e8",
+  "exportedFileCount": 189,
+  "exportedTreeSha256": "37a805586c6098cc3fae6ae39ca2fa193976121628b5828450cd7c36359bd5f9",
   "policySha256": "5af65e289f869a5465a2c30306b42c014aa571fc950c3afb667b470174f7f323",
   "schemaVersion": 1,
-  "sourceCommit": "fc2cf05393f6b5dec493cbcd9b5173c56c802ade",
-  "sourceDirty": true,
+  "sourceCommit": "2628433b305b144f00bb8961f963020467574a7d",
+  "sourceDirty": false,
   "treeDigestExcludesThisProvenanceFile": true,
-  "treeDigestIncludesNormalizedModes": true,
-  "publicReproducibilityOverlay": {
-    "basePublicCommit": "cc75e8b45b62ffaa8e96aff0f3c4c0e197ca99f1",
-    "baseExportedTreeSha256": "9558b637be314c454cdcc3d99390c31124a8014bd3d3cebcd7240f5290ce29c6",
-    "policySha256Scope": "current sanitized private-source export",
-    "paths": [
-      ".github/workflows/ci.yml",
-      "MAINNET_BUILD.json",
-      "README.md",
-      "programs/light_token_minter/.cargo/config.toml",
-      "programs/light_token_minter/src/mainnet_profile.rs"
-    ],
-    "purpose": "Bind the deployed Mainnet four-hour launch artifact to public source and a self-contained build recipe"
-  },
-  "sourceInputInventorySha256": "968f5eb8a4542b680fbbe6d8c669f35bd0e7b406077f8f3a45f8329d069829d4"
+  "treeDigestIncludesNormalizedModes": true
 }

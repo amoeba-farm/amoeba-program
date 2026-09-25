@@ -21,6 +21,7 @@ use crate::{
 
 mod accounts;
 pub(super) mod dlmm;
+mod individual;
 mod participation;
 mod reconcile;
 mod settlement;

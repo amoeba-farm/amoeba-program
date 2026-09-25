@@ -31,6 +31,13 @@ fn process_dlmm_action(
     let action = crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::decode_exact(payload)
         .map_err(|_| VaultError::InvalidInstructionData)?;
     match action {
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::Individual(action) => individual::process(program_id, accounts, action),
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::EnableFullCollateralCapacity {
+            expected_policy_hash,
+        } => dlmm::process_enable_full_collateral_capacity(program_id, accounts, expected_policy_hash),
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::EnableSharedReserve {
+            expected_policy_hash,
+        } => dlmm::process_enable_shared_reserve(program_id, accounts, expected_policy_hash),
         crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::BeginPolicy(_)
         | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::AppendPolicySeries { .. }
         | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::SealPolicy => {

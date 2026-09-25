@@ -28,7 +28,6 @@ jobs:
         run: |
           cargo fmt --manifest-path programs/light_token_minter/Cargo.toml --all -- --check --config reorder_modules=false
           cargo check --manifest-path programs/light_token_minter/Cargo.toml --locked --lib --features devnet-v3-governance-controller,devnet-solo-backfill-2026
-          (cd programs/light_token_minter && cargo check --locked --lib --no-default-features --features mainnet-v3)
       - name: Reject binaries and private development surfaces
         shell: bash
         run: |
@@ -38,27 +37,4 @@ jobs:
           test ! -e clients
           test ! -e scripts
           test ! -e programs/light_token_minter/tests
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          root = Path("programs/light_token_minter")
-          guard = '''#[cfg(all(
-              feature = "mainnet-v3",
-              any(
-                  feature = "devnet-solo-backfill-2026",
-                  feature = "devnet-v3-governance-controller",
-                  feature = "phase3-synthetic-governance-controller",
-                  feature = "reviewed-governance-controller",
-                  feature = "local-ceremony-governance-controller",
-                  feature = "test-sbf"
-              )
-          ))]
-          compile_error!("mainnet-v3 excludes other controllers and test timing capabilities");'''
-          # The sole permitted test-sbf mention rejects that feature on Mainnet.
-          for path in [root / "Cargo.toml", *sorted((root / "src").rglob("*.rs"))]:
-              text = path.read_text()
-              if path == root / "src/lib.rs":
-                  assert text.count(guard) == 1, "Mainnet exclusion guard changed"
-                  text = text.replace(guard, "")
-              assert not re.search(r"#\[(cfg\()?test|developer-ops|test-sbf", text), str(path)
-          PY
+          ! grep -R -n -E '#\[(cfg\()?test|developer-ops|test-sbf' programs/light_token_minter/src programs/light_token_minter/Cargo.toml

@@ -265,7 +265,23 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
     validate_vault_token_account(sleeve_vault_info, &sleeve.settlement_mint, sleeve_info.key)?;
-    if validate_token_account(sleeve_vault_info)?.amount < sleeve.accounted_asset_atoms {
+    let individual_funding = book
+        .individual
+        .funded_long_liability
+        .checked_add(book.individual.funded_stranded)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    if (book
+        .individual
+        .series
+        .iter()
+        .any(|series| series.issued > 0)
+        && !book.individual.funded)
+        || validate_token_account(sleeve_vault_info)?.amount
+            < sleeve
+                .accounted_asset_atoms
+                .checked_add(individual_funding)
+                .ok_or(VaultError::ArithmeticOverflow)?
+    {
         return Err(VaultError::WriterSolvencyViolation.into());
     }
     let count = usize::from(book.series_count);
@@ -282,7 +298,7 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
             || mint.mint_authority != COption::Some(record.market)
             || mint.freeze_authority != COption::None
             || mint.supply != record.total_physical_supply_atoms
-            || record.total_physical_supply_atoms != record.external_open_interest_atoms
+            || Some(record.total_physical_supply_atoms) != book.external_total(index)
             || record.issuer_controlled_atoms != 0
             || record.custody_status == WriterSeriesCustodyStatus::Open
             || record.settlement_status != WriterSeriesSettlementStatus::Open
@@ -294,16 +310,45 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
         }
     }
     let series = writer_book_math_series(&book)?;
-    let (liabilities, long_total) =
-        settlement_series_liabilities(&series, group.settlement_price_atomic)
-            .map_err(writer_math_error)?;
-    if long_total > sleeve.accounted_asset_atoms {
+    let (_, managed_total) = settlement_series_liabilities(&series, group.settlement_price_atomic)
+        .map_err(writer_math_error)?;
+    if managed_total > sleeve.accounted_asset_atoms {
         return Err(VaultError::WriterSolvencyViolation.into());
     }
     let mut writer_residual = sleeve
         .accounted_asset_atoms
-        .checked_sub(long_total)
+        .checked_sub(managed_total)
         .ok_or(VaultError::ArithmeticOverflow)?;
+    participation::admit_time_participation(&sleeve, sleeve.accounted_asset_atoms, managed_total)?;
+    // All holders share the canonical mint. Only the actual extra long liability
+    // enters pooled assets; individual forfeitures and rounding never become pool P&L.
+    for index in 0..count {
+        book.records[index].external_open_interest_atoms = book
+            .external_total(index)
+            .ok_or(VaultError::ArithmeticOverflow)?;
+        book.individual.series[index].outstanding = 0;
+    }
+    let (liabilities, long_total) = settlement_series_liabilities(
+        &writer_book_math_series(&book)?,
+        group.settlement_price_atomic,
+    )
+    .map_err(writer_math_error)?;
+    let extra_liability = long_total
+        .checked_sub(managed_total)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    let stranded = individual_funding
+        .checked_sub(extra_liability)
+        .ok_or(VaultError::WriterSolvencyViolation)?;
+    sleeve.accounted_asset_atoms = sleeve
+        .accounted_asset_atoms
+        .checked_add(extra_liability)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    sleeve.stranded_surplus_atoms = sleeve
+        .stranded_surplus_atoms
+        .checked_add(stranded)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    book.individual.funded_long_liability = extra_liability;
+    book.individual.funded_stranded = stranded;
     for index in 0..count {
         let record = &mut book.records[index];
         record.settlement_external_oi_snapshot_atoms = record.external_open_interest_atoms;
@@ -317,7 +362,6 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
     }
     sleeve.long_liability_initial_atoms = long_total;
     sleeve.long_liability_remaining_atoms = long_total;
-    participation::admit_time_participation(&sleeve, sleeve.accounted_asset_atoms, long_total)?;
     let entitlement_principal = sleeve.writer_principal_atoms;
     sleeve.settlement_principal_atoms = entitlement_principal;
     sleeve.unclaimed_principal_atoms = entitlement_principal;
@@ -483,11 +527,8 @@ fn claim_collective_long<'a>(
     if mint.supply != stored.total_physical_supply_atoms {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    validate_light_associated_token_account(
-        holder_info.key,
-        contract_mint_info.key,
-        claim_source_info,
-    )?;
+    // The scoped holder loader also checks the canonical ATA. Do not first use
+    // the custody-only validator, which rejects the authorized settlement delegate.
     let source_before = super::super::scoped_settlement::load_scoped_holder_token_account(
         program_id,
         claim_source_info,
@@ -713,6 +754,8 @@ pub(super) fn process_close_writer_sleeve(
         )
         || sleeve.policy_snapshot != *snapshot_info.key
         || sleeve.policy_hash != snapshot.policy_hash
+        || book.individual.cash_obligations != 0
+        || book.individual.open_positions != 0
         || sleeve.accounted_asset_atoms != 0
         || sleeve.exact_reserve_atoms != 0
         || sleeve.long_liability_remaining_atoms != 0

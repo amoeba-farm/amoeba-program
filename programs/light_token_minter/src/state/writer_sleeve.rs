@@ -255,7 +255,12 @@ pub struct WriterSettlementGroupV1 {
     pub sleeve: Pubkey,
     pub status: WriterSettlementGroupStatus,
     pub series_count: u8,
-    pub reserved: [u8; 6],
+    /// Explicit, one-way managed-pool risk amendment. Zero preserves the sealed policy.
+    /// This consumes one formerly reserved byte without changing any account offsets.
+    pub full_collateral_capacity: bool,
+    /// One-way opt-in to overlapping managed writer reserve and pool quote.
+    pub shared_reserve: bool,
+    pub reserved: [u8; 4],
     pub last_updated_slot: u64,
 }
 
@@ -291,7 +296,9 @@ impl Default for WriterSettlementGroupV1 {
             sleeve: Pubkey::default(),
             status: WriterSettlementGroupStatus::default(),
             series_count: 0,
-            reserved: [0; 6],
+            full_collateral_capacity: false,
+            shared_reserve: false,
+            reserved: [0; 4],
             last_updated_slot: 0,
         }
     }
@@ -305,7 +312,7 @@ impl WriterSettlementGroupV1 {
     pub fn has_current_layout(&self) -> bool {
         self.account_discriminator == Self::ACCOUNT_DISCRIMINATOR
             && self.account_version == Self::ACCOUNT_VERSION
-            && self.reserved == [0; 6]
+            && self.reserved == [0; 4]
     }
 }
 
@@ -489,7 +496,8 @@ pub struct WriterSeriesBookV1 {
     pub reserved: [u8; 7],
     pub book_digest: [u8; 32],
     pub last_updated_slot: u64,
-    pub records: Box<[WriterSeriesRecordV1; WRITER_SERIES_STORAGE_CAPACITY]>,
+    pub records: Box<[WriterSeriesRecordV1; WRITER_LIVE_SERIES_LIMIT]>,
+    pub individual: crate::individual_writer::IndividualTotals,
 }
 
 impl Default for WriterSeriesBookV1 {
@@ -507,15 +515,21 @@ impl Default for WriterSeriesBookV1 {
             reserved: [0; 7],
             book_digest: [0; 32],
             last_updated_slot: 0,
-            records: vec![WriterSeriesRecordV1::EMPTY; WRITER_SERIES_STORAGE_CAPACITY]
+            records: vec![WriterSeriesRecordV1::EMPTY; WRITER_LIVE_SERIES_LIMIT]
                 .into_boxed_slice()
                 .try_into()
                 .expect("fixed writer series capacity"),
+            individual: Default::default(),
         }
     }
 }
 
 impl WriterSeriesBookV1 {
+    pub fn external_total(&self, index: usize) -> Option<u64> {
+        self.records[index]
+            .external_open_interest_atoms
+            .checked_add(self.individual.series[index].outstanding)
+    }
     pub const LEN: usize = 8_312;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"WSB";
     pub const ACCOUNT_VERSION: u8 = 1;
@@ -526,6 +540,19 @@ impl WriterSeriesBookV1 {
             && self.max_series == WRITER_LIVE_SERIES_LIMIT as u8
             && usize::from(self.series_count) <= WRITER_LIVE_SERIES_LIMIT
             && self.reserved == [0; 7]
+            && self.individual.reserved == [0; 2719]
+            && (self.individual.open_positions != 0 || self.individual.cash_obligations == 0)
+            && (self.individual.funded
+                || (self.individual.funded_long_liability == 0
+                    && self.individual.funded_stranded == 0))
+            && self
+                .individual
+                .series
+                .iter()
+                .all(|series| series.outstanding <= series.issued)
+            && self.individual.series[usize::from(self.series_count)..]
+                .iter()
+                .all(|series| series.issued == 0)
             && self.records[usize::from(self.series_count)..]
                 .iter()
                 .all(WriterSeriesRecordV1::is_canonical_empty)

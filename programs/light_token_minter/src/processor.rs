@@ -6,7 +6,6 @@ mod ameba_dlmm;
 mod ameba_dlmm_light;
 mod bucket_medians;
 mod cfm_parent_proxy;
-mod september_bootstrap;
 mod collateral_accounts;
 mod compressed_state;
 #[cfg(feature = "devnet-solo-backfill-2026")]
@@ -25,6 +24,7 @@ mod oracle_economics;
 mod oracle_evidence;
 mod oracle_membership;
 mod oracle_rules;
+mod september_bootstrap;
 use oracle_core::*;
 mod oracle_schedule_validation;
 use launch_schedule::*;

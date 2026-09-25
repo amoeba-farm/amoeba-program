@@ -98,7 +98,7 @@ fn recompute_reconciled_writer_metrics(
     // Receipt principal is unchanged by long-holder forfeiture.
     // Reapplying admission-only solvency/drawdown gates here could reject the accounting update
     // and permanently leave physical supply below its recorded value. Exact reserve, tails, and
-    // the aggregate security cap are still recomputed, while later issuance/close flows continue
+    // aggregate exposure are still recomputed, while later issuance/close flows continue
     // to enforce all admission gates against the reconciled state.
     recompute_writer_metrics(sleeve, book, snapshot, Some(security_cap_atoms), false)
 }
@@ -243,11 +243,14 @@ pub(super) fn process_reconcile_writer_supply(
                 .supply
                 .checked_sub(observed_issuer)
                 .ok_or(VaultError::ArithmeticOverflow)?;
-            if new_external > record.external_open_interest_atoms {
+            let old_external = record
+                .external_open_interest_atoms
+                .checked_add(book.individual.series[index].outstanding)
+                .ok_or(VaultError::ArithmeticOverflow)?;
+            if new_external > old_external {
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
-            let external_decrease = record
-                .external_open_interest_atoms
+            let external_decrease = old_external
                 .checked_sub(new_external)
                 .ok_or(VaultError::ArithmeticOverflow)?;
             let physical_decrease = record
@@ -262,8 +265,7 @@ pub(super) fn process_reconcile_writer_supply(
                     .checked_add(custody_increase)
                     .ok_or(VaultError::ArithmeticOverflow)?
                 || market_outstanding_contract_amount(&market)?
-                    != record
-                        .external_open_interest_atoms
+                    != old_external
                         .checked_add(lp_policy.as_ref().map_or(0, |policy| {
                             policy.series_pool_inventory_atoms[usize::from(params.series_index)]
                         }))
@@ -291,7 +293,12 @@ pub(super) fn process_reconcile_writer_supply(
                 .ok_or(VaultError::ArithmeticOverflow)?;
             record.total_physical_supply_atoms = mint.supply;
             record.issuer_controlled_atoms = observed_issuer;
-            record.external_open_interest_atoms = new_external;
+            let individual_decrease =
+                external_decrease.min(book.individual.series[index].outstanding);
+            book.individual.series[index].outstanding -= individual_decrease;
+            record.external_open_interest_atoms = new_external
+                .checked_sub(book.individual.series[index].outstanding)
+                .ok_or(VaultError::ArithmeticOverflow)?;
             reconcile_series_settlement_status(sleeve.status, record)?;
             record.custody_status = if observed_issuer == 0 {
                 WriterSeriesCustodyStatus::Absent
@@ -435,11 +442,14 @@ pub(super) fn process_cleanup_writer_custody(
         || market_outstanding_contract_amount(&market)?
             != record
                 .external_open_interest_atoms
-                .checked_add(
-                    lp_policy
-                        .as_ref()
-                        .map_or(0, |policy| policy.series_pool_inventory_atoms[index]),
-                )
+                .checked_add(book.individual.series[index].outstanding)
+                .and_then(|value| {
+                    value.checked_add(
+                        lp_policy
+                            .as_ref()
+                            .map_or(0, |policy| policy.series_pool_inventory_atoms[index]),
+                    )
+                })
                 .ok_or(VaultError::ArithmeticOverflow)?
         || market
             .mint_accounting

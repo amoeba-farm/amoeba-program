@@ -6,8 +6,12 @@ use crate::state::{
 };
 use crate::writer_dlmm_instruction::ManageWriterDlmmV1Params;
 
+mod capacity;
 mod liquidity;
 mod swap;
+pub(in crate::processor) use capacity::{
+    process_enable_full_collateral_capacity, process_enable_shared_reserve,
+};
 pub(in crate::processor) use liquidity::{process_initialize_position, process_liquidity_action};
 pub(in crate::processor) use swap::{finish_swap, load_swap_state, WriterSwapState};
 
@@ -17,9 +21,12 @@ pub(in crate::processor) fn risk_limits(
 ) -> crate::writer_dlmm_math::WriterDlmmRiskLimits {
     crate::writer_dlmm_math::WriterDlmmRiskLimits {
         operational_buffer_atoms: snapshot.operational_buffer_atoms,
-        worst_drawdown_ppm: snapshot.worst_drawdown_limit,
-        lower_drawdown_ppm: snapshot.lower_drawdown_limit,
-        upper_drawdown_ppm: snapshot.upper_drawdown_limit,
+        shared_reserve: group.shared_reserve,
+        // Historical signed limits remain authenticated in the snapshot; managed
+        // writer admission now always permits the full principal drawdown.
+        worst_drawdown_ppm: crate::constants::WRITER_RATIO_SCALE_PPM,
+        lower_drawdown_ppm: crate::constants::WRITER_RATIO_SCALE_PPM,
+        upper_drawdown_ppm: crate::constants::WRITER_RATIO_SCALE_PPM,
         lower_tail_max_settlement_atomic: snapshot.lower_tail_max_settlement_atomic,
         upper_tail_min_settlement_atomic: snapshot.upper_tail_min_settlement_atomic,
         security_mode: match snapshot.security_mode {
@@ -54,6 +61,7 @@ pub(in crate::processor) fn update_cash_metrics(
                     .total_pool_quote_atoms
                     .checked_sub(policy.total_uncommitted_quote_atoms)
                     .ok_or(VaultError::WriterSolvencyViolation)?,
+                pooled_quote_atoms: policy.total_pool_quote_atoms,
             },
             &limits,
         )

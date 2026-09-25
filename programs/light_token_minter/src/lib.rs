@@ -11,6 +11,7 @@ pub mod error;
 mod fixed_codec;
 pub mod governance_gate;
 pub mod governance_manifest;
+pub mod individual_writer;
 pub mod instruction;
 mod light_token_instruction;
 mod local_direct_address;

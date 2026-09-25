@@ -28,6 +28,7 @@ type Result<T> = core::result::Result<T, WriterDlmmAdmissionError>;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WriterDlmmRiskLimits {
     pub operational_buffer_atoms: u64,
+    pub shared_reserve: bool,
     pub worst_drawdown_ppm: u64,
     pub lower_drawdown_ppm: u64,
     pub upper_drawdown_ppm: u64,
@@ -65,6 +66,8 @@ pub struct WriterDlmmCash {
     pub principal_atoms: u64,
     /// Writer quote actively committed to bids; uncommitted cash is included only in A.
     pub allocated_lp_quote_atoms: u64,
+    /// All writer-owned quote held in DLMM pools, including uncommitted quote.
+    pub pooled_quote_atoms: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -160,12 +163,22 @@ pub fn admit_writer_dlmm_cash(
     limits: &WriterDlmmRiskLimits,
 ) -> Result<(WriterReserveSummary, u64, u64)> {
     let summary = reserve(book, limits)?;
-    let protected = add(summary.reserve_atoms, limits.operational_buffer_atoms)?;
+    if cash.allocated_lp_quote_atoms > cash.pooled_quote_atoms {
+        return Err(WriterDlmmAdmissionError::InvalidBook);
+    }
+    let protected = add(
+        if limits.shared_reserve {
+            summary.reserve_atoms.max(cash.pooled_quote_atoms)
+        } else {
+            summary.reserve_atoms
+        },
+        limits.operational_buffer_atoms,
+    )?;
     let free_cash = cash
         .assets_atoms
         .checked_sub(protected)
         .ok_or(WriterDlmmAdmissionError::Insolvent)?;
-    if cash.allocated_lp_quote_atoms > free_cash {
+    if !limits.shared_reserve && cash.allocated_lp_quote_atoms > free_cash {
         return Err(WriterDlmmAdmissionError::Insolvent);
     }
     check_drawdown(
@@ -295,6 +308,10 @@ pub fn admit_writer_dlmm_retirement(
             assets_atoms: assets_after,
             principal_atoms: cash.principal_atoms,
             allocated_lp_quote_atoms: allocated_lp_quote_after_atoms,
+            pooled_quote_atoms: cash
+                .pooled_quote_atoms
+                .checked_sub(total_cost)
+                .ok_or(WriterDlmmAdmissionError::Insolvent)?,
         },
         risk,
     )?;
