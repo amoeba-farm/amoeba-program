@@ -10,9 +10,10 @@
 //! use light_token_minter::governance_gate::GateValidated;
 //! ```
 
+use crate::ProgramError;
 #[cfg(feature = "governance-gate-v1")]
 use solana_program::account_info::AccountInfo;
-use solana_program::{program_error::ProgramError, pubkey::Pubkey};
+use solana_program::pubkey::Pubkey;
 use solana_sdk_ids::bpf_loader_upgradeable;
 
 use crate::error::VaultError;

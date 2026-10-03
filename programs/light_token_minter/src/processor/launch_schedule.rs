@@ -6,7 +6,7 @@ pub(super) const LAUNCH_PHASE_SECONDS: u64 = 3_600;
 /// Written only by the consumed September council bootstrap. Original launch
 /// timestamps remain in its receipt; no historical review phases are invented.
 pub(super) const COUNCIL_BOOTSTRAP_SCHEDULE_VERSION: u8 = 4;
-const SEED: &[u8] = b"g3-launch-clock-v1";
+pub(super) const OCTOBER_BOOTSTRAP_PENDING_SCHEDULE_VERSION: u8 = 5;
 
 pub(super) fn schedule_windows(month: &OracleMonthState) -> Result<[u64; 4], ProgramError> {
     match month.schedule_version {
@@ -17,12 +17,7 @@ pub(super) fn schedule_windows(month: &OracleMonthState) -> Result<[u64; 4], Pro
             ORACLE_RESOLUTION_FREEZE_WINDOW_SECONDS,
             ORACLE_OPENING_WINDOW_SECONDS,
         ]),
-        LAUNCH_SCHEDULE_VERSION
-            if cfg!(all(
-                feature = "mainnet-v3",
-                feature = "mainnet-four-hour-launch"
-            )) =>
-        {
+        LAUNCH_SCHEDULE_VERSION if cfg!(all(feature = "mainnet-v3")) => {
             Ok([LAUNCH_PHASE_SECONDS; 4])
         }
         _ => Err(VaultError::InvalidOracleState.into()),
@@ -69,10 +64,8 @@ pub(super) fn validate_launch_market(market: &Market) -> ProgramResult {
         crate::state::OptionKind::PutSpread => "PUT",
     };
     let id = format!("{product}-{month}-{side}-01");
-    if !cfg!(all(
-        feature = "mainnet-v3",
-        feature = "mainnet-four-hour-launch"
-    )) || !padded_ascii_underlying_matches(&market.market_id, id.as_bytes())
+    if !cfg!(all(feature = "mainnet-v3"))
+        || !padded_ascii_underlying_matches(&market.market_id, id.as_bytes())
     {
         return Err(VaultError::InvalidOracleState.into());
     }
@@ -90,69 +83,9 @@ pub(super) fn initialize_launch_clock<'a>(
     system: &AccountInfo<'a>,
     now: u64,
 ) -> Result<(u64, u64), ProgramError> {
-    validate_launch_market(market)?;
-    if !market.paused
-        || market.long_contract_mint.is_none()
-        || market.mint_accounting != MarketMintAccounting::canonical_empty()
-    {
-        return Err(VaultError::InvalidOracleState.into());
-    }
-    let expiry = market.instrument.expiry_ts.to_le_bytes();
-    let underlying = &market.instrument.underlying_id;
-    let (key, bump) = Pubkey::find_program_address(
-        &[CURRENT_STATE_NAMESPACE_SEED, SEED, underlying, &expiry],
-        program_id,
-    );
-    if *clock_info.key != key || clock_info.executable {
-        return Err(VaultError::InvalidPda.into());
-    }
-    let start = if clock_info.owner == program_id {
-        let d = clock_info.try_borrow_data()?;
-        if d.len() != 54
-            || d[..6] != [b'L', b'C', b'K', 1, 1, bump]
-            || d[6..38] != underlying[..]
-            || d[38..46] != expiry
-        {
-            return Err(VaultError::InvalidOracleState.into());
-        }
-        u64::from_le_bytes(
-            d[46..54]
-                .try_into()
-                .map_err(|_| VaultError::InvalidOracleState)?,
-        )
-    } else {
-        now
-    };
-    let listing = start
-        .checked_add(4 * LAUNCH_PHASE_SECONDS)
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    if start == 0
-        || start > now
-        || listing >= market.instrument.expiry_ts
-        || now
-            >= start
-                .checked_add(LAUNCH_PHASE_SECONDS)
-                .ok_or(VaultError::ArithmeticOverflow)?
-    {
-        return Err(VaultError::OracleTimingWindowClosed.into());
-    }
-    if clock_info.owner != program_id {
-        validate_create_only_program_account_target(program_id, clock_info)?;
-        create_program_account(
-            payer,
-            clock_info,
-            system,
-            program_id,
-            54,
-            &[SEED, underlying, &expiry, &[bump]],
-        )?;
-        let mut d = clock_info.try_borrow_mut_data()?;
-        d[..6].copy_from_slice(&[b'L', b'C', b'K', 1, 1, bump]);
-        d[6..38].copy_from_slice(underlying);
-        d[38..46].copy_from_slice(&expiry);
-        d[46..54].copy_from_slice(&start.to_le_bytes());
-    }
-    Ok((start, listing))
+    // Historical clocks remain readable; new four-hour cohorts are retired.
+    let _ = (program_id, market, payer, clock_info, system, now);
+    Err(VaultError::InvalidOracleState.into())
 }
 
 /// No new placement/reopening after a launch deadline. Existing dispute settlement remains required.

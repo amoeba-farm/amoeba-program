@@ -359,7 +359,7 @@ fn process_scan_checkpoint_readonly(
     }
     if core_accounts
         .iter()
-        .any(|account| account.key == fee_payer.key)
+        .any(|account| crate::pubkey_eq(account.key, fee_payer.key))
     {
         return Err(VaultError::InvalidAccountList.into());
     }

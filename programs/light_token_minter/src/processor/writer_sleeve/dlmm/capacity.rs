@@ -37,7 +37,7 @@ fn process_capacity_amendment(
             || account.is_writable != matches!(index, 0 | 4)
             || accounts[..index]
                 .iter()
-                .any(|prior| prior.key == account.key)
+                .any(|prior| crate::pubkey_eq(prior.key, account.key))
         {
             return Err(VaultError::InvalidAccountList.into());
         }

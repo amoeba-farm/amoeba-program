@@ -3,14 +3,16 @@ use crate::state::{WriterDlmmBinV1, WriterDlmmSeriesPolicyV1, WRITER_DLMM_ACTION
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct BeginWriterDlmmPolicyV1Params {
-    pub management_authority: Pubkey,
-    pub expected_policy_hash: [u8; 32],
-    pub monthly_buyback_cap_atoms: u64,
-    pub transaction_buyback_cap_atoms: u64,
-    pub reserve_release_spend_ratio_ppm: u64,
-    pub price_separation_ticks: u16,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct BeginWriterDlmmPolicyV1Params {
+        pub management_authority: Pubkey,
+        pub expected_policy_hash: [u8; 32],
+        pub monthly_buyback_cap_atoms: u64,
+        pub transaction_buyback_cap_atoms: u64,
+        pub reserve_release_spend_ratio_ppm: u64,
+        pub price_separation_ticks: u16,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

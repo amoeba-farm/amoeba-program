@@ -1,6 +1,7 @@
+use crate::ProgramError;
 use borsh::{BorshDeserialize, BorshSerialize};
 use light_sdk::LightDiscriminator;
-use solana_program::{hash::hashv, program_error::ProgramError, pubkey::Pubkey};
+use solana_program::{hash::hashv, pubkey::Pubkey};
 
 use crate::constants::{
     CURRENT_STATE_NAMESPACE_SEED, MARKET_PAGE_EXPIRY_ID_MAX_BYTES,
@@ -50,7 +51,10 @@ fn deserialize_bounded_string<R: std::io::Read>(
 /// Borsh derives encode fieldless enums by declaration order. Current state uses explicit bytes so
 /// reordering source code cannot reinterpret current accounts.
 macro_rules! stable_borsh_enum {
-    ($name:ident { $($variant:ident = $value:expr),+ $(,)? }) => {
+    ($name:ident { $first:ident = $first_value:expr $(, $variant:ident = $value:expr)* $(,)? }) => {
+        stable_borsh_enum!(@impl $name, $first, { $first = $first_value $(, $variant = $value)* });
+    };
+    (@impl $name:ident, $fallback:ident, { $($variant:ident = $value:expr),+ }) => {
         impl BorshSerialize for $name {
             #[inline(always)]
             fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
@@ -65,6 +69,20 @@ macro_rules! stable_borsh_enum {
                 match u8::deserialize_reader(reader)? {
                     $($value => Ok(Self::$variant),)+
                     _ => Err(std::io::ErrorKind::InvalidData.into()),
+                }
+            }
+        }
+
+        impl crate::fixed_codec::CursorField for $name {
+            /// Same tag mapping as `deserialize_reader`; an unknown tag poisons the cursor.
+            #[inline(never)]
+            fn read(input: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
+                match input.u8() {
+                    $($value => Self::$variant,)+
+                    _ => {
+                        input.invalid = true;
+                        Self::$fallback
+                    }
                 }
             }
         }

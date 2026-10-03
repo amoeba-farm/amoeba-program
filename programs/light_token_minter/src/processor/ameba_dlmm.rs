@@ -1,10 +1,10 @@
 //! Native in-program additive-grid DLMM.
 
+use crate::compact_error::cpi::invoke_signed;
+use crate::ProgramError;
+use crate::ProgramResult;
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
-    entrypoint::ProgramResult,
-    program::invoke_signed,
-    program_error::ProgramError,
     pubkey::Pubkey,
     sysvar::{clock::Clock, Sysvar},
 };
@@ -15,8 +15,8 @@ use crate::{
         decode_exact, AddAmoebaDlmmLiquidityV1Params, AmoebaDlmmDecode, AmoebaDlmmInstructionTag,
         AmoebaDlmmSwapDirection as WireSwapDirection, InitializeAmoebaDlmmBinPageV1Params,
         InitializeAmoebaDlmmPoolV1Params, InitializeAmoebaDlmmPositionV1Params,
-        RemoveAmoebaDlmmLiquidityV1Params, SetAmoebaDlmmPoolStatusV1Params,
-        SwapAmoebaDlmmExactInV1Params,
+        RemoveAmoebaDlmmLiquidityV1Params, RemoveCompressedLiquidityV1Params,
+        SetAmoebaDlmmPoolStatusV1Params, SwapAmoebaDlmmExactInV1Params,
     },
     ameba_dlmm_math::{
         bin_to_page, calculate_share_deposit, calculate_share_withdrawal, page_first_bin,
@@ -468,6 +468,38 @@ fn process_collective_swap_exact_in_payload(
     process_collective_swap_exact_in(program_id, accounts, params)
 }
 
+fn process_collective_compressed_swap_exact_in_payload(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    payload: &[u8],
+) -> ProgramResult {
+    use borsh::BorshDeserialize;
+    let params =
+        crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params::try_from_slice(
+            payload,
+        )
+        .map_err(|_| VaultError::InvalidInstructionData)?;
+    collective::process_collective_compressed_swap_exact_in(program_id, accounts, params)
+}
+
+fn process_remove_compressed_liquidity_payload(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    payload: &[u8],
+) -> ProgramResult {
+    use borsh::BorshDeserialize;
+    // Bound the variable entry vector before Borsh allocates it.
+    if payload.len() < 12
+        || u32::from_le_bytes(payload[8..12].try_into().unwrap()) as usize
+            > crate::constants::MAX_AMOEBA_DLMM_LIQUIDITY_ENTRIES
+    {
+        return Err(VaultError::InvalidInstructionData.into());
+    }
+    let params = RemoveCompressedLiquidityV1Params::try_from_slice(payload)
+        .map_err(|_| VaultError::InvalidInstructionData)?;
+    liquidity::process_remove_compressed_liquidity(program_id, accounts, params)
+}
+
 #[inline(always)]
 fn process_settle_collective_pool_payload(
     program_id: &Pubkey,
@@ -499,6 +531,9 @@ pub fn process_instruction(
         AmoebaDlmmInstructionTag::RemoveLiquidityV1 => {
             process_liquidity_payload(program_id, accounts, payload, false)
         }
+        AmoebaDlmmInstructionTag::RemoveCompressedLiquidityV1 => {
+            process_remove_compressed_liquidity_payload(program_id, accounts, payload)
+        }
         AmoebaDlmmInstructionTag::ClosePoolV1 => {
             process_close_pool_payload(program_id, accounts, payload)
         }
@@ -511,6 +546,9 @@ pub fn process_instruction(
         AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1 => {
             process_collective_swap_exact_in_payload(program_id, accounts, payload)
         }
+        AmoebaDlmmInstructionTag::SwapCollectiveCompressedExactInV1 => {
+            process_collective_compressed_swap_exact_in_payload(program_id, accounts, payload)
+        }
         AmoebaDlmmInstructionTag::SettleCollectiveDlmmPoolV1 => {
             process_settle_collective_pool_payload(program_id, accounts, payload)
         }
@@ -520,6 +558,8 @@ pub fn process_instruction(
 
 mod accounts;
 mod collective;
+pub(in crate::processor) mod compressed_delivery;
+mod compressed_swap;
 mod initialization;
 mod lifecycle;
 mod liquidity;

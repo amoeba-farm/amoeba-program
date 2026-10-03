@@ -471,8 +471,54 @@ impl WriterSeriesRecordV1 {
         payoff_digest: [0; 32],
     };
 
+    /// `self == &Self::EMPTY`, field by field. Exhaustive destructuring keeps it in sync with the
+    /// struct; 32-byte fields use the word compare instead of a `memcmp` syscall each.
     pub fn is_canonical_empty(&self) -> bool {
-        self == &Self::EMPTY
+        let Self {
+            active,
+            option_kind,
+            custody_status,
+            settlement_status,
+            reserved,
+            series_id,
+            market,
+            contract_mint,
+            retirement_custody,
+            strike_price_atomic,
+            cap_or_floor_price_atomic,
+            contract_size_atoms,
+            max_payout_per_contract_atoms,
+            total_physical_supply_atoms,
+            issuer_controlled_atoms,
+            external_open_interest_atoms,
+            primary_premium_collected_atoms,
+            settlement_external_oi_snapshot_atoms,
+            settlement_liability_initial_atoms,
+            settlement_liability_remaining_atoms,
+            payoff_digest,
+        } = self;
+        !*active
+            && *option_kind == Self::EMPTY.option_kind
+            && *custody_status == Self::EMPTY.custody_status
+            && *settlement_status == Self::EMPTY.settlement_status
+            && *reserved == [0; 4]
+            && (*strike_price_atomic
+                | *cap_or_floor_price_atomic
+                | *contract_size_atoms
+                | *max_payout_per_contract_atoms
+                | *total_physical_supply_atoms
+                | *issuer_controlled_atoms
+                | *external_open_interest_atoms
+                | *primary_premium_collected_atoms
+                | *settlement_external_oi_snapshot_atoms
+                | *settlement_liability_initial_atoms
+                | *settlement_liability_remaining_atoms)
+                == 0
+            && crate::bytes32_is_zero(series_id)
+            && crate::pubkey_is_default(market)
+            && crate::pubkey_is_default(contract_mint)
+            && crate::pubkey_is_default(retirement_custody)
+            && crate::bytes32_is_zero(payoff_digest)
     }
 }
 
@@ -540,11 +586,38 @@ impl WriterSeriesBookV1 {
             && self.max_series == WRITER_LIVE_SERIES_LIMIT as u8
             && usize::from(self.series_count) <= WRITER_LIVE_SERIES_LIMIT
             && self.reserved == [0; 7]
-            && self.individual.reserved == [0; 2719]
+            && self.individual.reserved == [0; 2013]
+            && self.individual.compressed_retired_atoms[usize::from(self.series_count)..]
+                .iter()
+                .all(|v| *v == 0)
+            && self.individual.forfeited_atoms[usize::from(self.series_count)..]
+                .iter()
+                .all(|v| *v == 0)
+            && self.individual.active_locked[usize::from(self.series_count)..]
+                .iter()
+                .all(|v| *v == 0)
+            && self.individual.hedge_retired[usize::from(self.series_count)..]
+                .iter()
+                .all(|v| *v == 0)
+            && self
+                .individual
+                .hedge_retired
+                .iter()
+                .zip(self.individual.active_locked.iter())
+                .all(|(retired, locked)| retired <= locked)
+            && self.individual.remaining_portfolio_credit <= self.individual.total_portfolio_credit
+            && (!self.individual.hedges_consolidated
+                || self
+                    .individual
+                    .series
+                    .iter()
+                    .all(|series| series.outstanding == 0))
             && (self.individual.open_positions != 0 || self.individual.cash_obligations == 0)
             && (self.individual.funded
                 || (self.individual.funded_long_liability == 0
-                    && self.individual.funded_stranded == 0))
+                    && self.individual.funded_stranded == 0
+                    && self.individual.total_portfolio_credit == 0)
+                || self.individual.funding_base_initialized)
             && self
                 .individual
                 .series

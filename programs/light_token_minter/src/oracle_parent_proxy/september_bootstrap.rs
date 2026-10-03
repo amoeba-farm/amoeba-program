@@ -1,13 +1,16 @@
 //! Exact September council-bootstrap commitment. No account writes, synthetic
 //! escrows or writes are exposed by this codec; processor::september_bootstrap
 //! owns the consumed council-authorized transition into ordinary Game state.
-use solana_program::{hash::hashv, program_error::ProgramError, pubkey::Pubkey};
+use crate::ProgramError;
+use solana_program::{hash::hashv, pubkey::Pubkey};
 
 use super::{invalid, NANDX_REGISTRY_HASH, RAMX_REGISTRY_HASH};
 
 pub const DOMAIN: &[u8] = b"amoeba-september-cfm-bootstrap-v1";
 pub const PROGRAM: Pubkey = solana_program::pubkey!("2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw");
 pub const EXPIRY: u64 = 1_790_812_800;
+pub const OCTOBER_EXPIRY: u64 = 1_793_491_200;
+pub const OCTOBER_DOMAIN: &[u8] = b"amoeba-october-cfm-bootstrap-v1";
 pub const MAX_PAYOUT_PER_CONTRACT_ATOMS: u64 = 12_000_000;
 pub const LEN: usize = 702;
 const ROWS_OFFSET: usize = 142;
@@ -21,15 +24,36 @@ pub struct SeptemberBootstrapPlan {
 
 impl SeptemberBootstrapPlan {
     pub fn decode(program: &Pubkey, bytes: &[u8]) -> Result<Self, ProgramError> {
+        Self::decode_cohort(program, bytes, false)
+    }
+
+    pub fn decode_october(program: &Pubkey, bytes: &[u8], now: u64) -> Result<Self, ProgramError> {
+        let plan = Self::decode_cohort(program, bytes, true)?;
+        for index in 0..35 {
+            if number(&plan.bytes, ROWS_OFFSET + index * 16 + 8) > now {
+                return invalid();
+            }
+        }
+        Ok(plan)
+    }
+
+    fn decode_cohort(program: &Pubkey, bytes: &[u8], october: bool) -> Result<Self, ProgramError> {
+        let expiry = if october { OCTOBER_EXPIRY } else { EXPIRY };
+        let domain = if october { OCTOBER_DOMAIN } else { DOMAIN };
         if *program != PROGRAM || bytes.len() != LEN {
             return invalid();
         }
         let data: [u8; LEN] = bytes
             .try_into()
             .map_err(|_| crate::error::VaultError::InvalidOracleState)?;
-        if &data[..6] != b"SCB1\x01\x02"
+        if &data[..6]
+            != if october {
+                b"OCB1\x01\x02"
+            } else {
+                b"SCB1\x01\x02"
+            }
             || data[6..38] == [0; 32]
-            || number(&data, 38) != EXPIRY
+            || number(&data, 38) != expiry
             || data[46..78] != RAMX_REGISTRY_HASH
             || data[78..110] != NANDX_REGISTRY_HASH
         {
@@ -45,12 +69,12 @@ impl SeptemberBootstrapPlan {
             let offset = ROWS_OFFSET + index * 16;
             let value = number(&data, offset);
             let timestamp = number(&data, offset + 8);
-            if value == 0 || !(1_788_220_800..EXPIRY).contains(&timestamp) {
+            if value == 0 || !(1_788_220_800..expiry).contains(&timestamp) {
                 return invalid();
             }
         }
         Ok(Self {
-            digest: hashv(&[DOMAIN, program.as_ref(), &data]).to_bytes(),
+            digest: hashv(&[domain, program.as_ref(), &data]).to_bytes(),
             bytes: data,
         })
     }

@@ -33,12 +33,44 @@ pub(super) fn load(
     book: &mut DlmmOrderBook,
     pool: &AmoebaDlmmPoolV1,
 ) -> ProgramResult {
+    load_with_funding_mode(program, a, book, pool, false)
+}
+
+/// Classic bytes are admitted only by the owner recovery entrypoint. The
+/// trading loader remains compressed-only, including all supplied witnesses.
+pub(super) fn load_classic_recovery(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    book: &mut DlmmOrderBook,
+    pool: &AmoebaDlmmPoolV1,
+) -> ProgramResult {
+    load_with_funding_mode(program, a, book, pool, true)
+}
+
+fn funding_flags_valid(order: &DlmmOrder, classic_recovery: bool) -> bool {
+    if classic_recovery {
+        order.side <= 1
+    } else {
+        order.valid_side_flags()
+    }
+}
+
+fn load_with_funding_mode(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    book: &mut DlmmOrderBook,
+    pool: &AmoebaDlmmPoolV1,
+    classic_recovery: bool,
+) -> ProgramResult {
     let end = witness_end(a)?;
     for info in &a[ORDER_SWAP_FIXED_ACCOUNTS..end] {
         if !info.is_writable
             || info.is_signer
             || info.executable
-            || a.iter().filter(|other| other.key == info.key).count() != 1
+            || a.iter()
+                .filter(|other| crate::pubkey_eq(other.key, info.key))
+                .count()
+                != 1
         {
             return Err(VaultError::InvalidAccountList.into());
         }
@@ -64,7 +96,7 @@ pub(super) fn load(
             || record.book != *a[31].key
             || order.sequence == 0
             || order.sequence >= book.header.next_sequence
-            || order.side > 1
+            || !funding_flags_valid(order, classic_recovery)
             || order.limit_bin == 0
             || order.limit_bin > pool.maximum_bin_id
             || order.original_quantity == 0
@@ -74,7 +106,7 @@ pub(super) fn load(
             || order.next == order.sequence
             || order.previous >= book.header.next_sequence
             || order.next >= book.header.next_sequence
-            || (order.side == 1 && order.remaining_input != order.remaining_quantity)
+            || (order.order_side() == 1 && order.remaining_input != order.remaining_quantity)
             || (order.remaining_quantity == 0 && order.remaining_input != 0)
         {
             return Err(VaultError::InvalidAmoebaDlmmPool.into());
@@ -112,7 +144,7 @@ pub(super) fn require_heads(book: &DlmmOrderBook) -> ProgramResult {
 }
 
 fn before(a: &DlmmOrder, b: &DlmmOrder) -> bool {
-    (if a.side == 0 {
+    (if a.order_side() == 0 {
         a.limit_bin > b.limit_bin
     } else {
         a.limit_bin < b.limit_bin
@@ -125,7 +157,7 @@ pub(super) fn insert(book: &mut DlmmOrderBook, mut order: DlmmOrder) -> ProgramR
         .iter()
         .enumerate()
         .filter(|(_, candidate)| {
-            candidate.side == order.side
+            candidate.order_side() == order.order_side()
                 && candidate.remaining_quantity > 0
                 && candidate.remaining_input > 0
         })
@@ -147,7 +179,7 @@ pub(super) fn insert(book: &mut DlmmOrderBook, mut order: DlmmOrder) -> ProgramR
         .iter()
         .copied()
         .find(|i| before(&order, &book.orders[*i]));
-    let head = if order.side == 0 {
+    let head = if order.order_side() == 0 {
         book.header.bid_head
     } else {
         book.header.ask_head
@@ -164,7 +196,7 @@ pub(super) fn insert(book: &mut DlmmOrderBook, mut order: DlmmOrder) -> ProgramR
     order.next = next_sequence;
     if let Some(i) = previous {
         book.orders[i].next = order.sequence;
-    } else if order.side == 0 {
+    } else if order.order_side() == 0 {
         book.header.bid_head = order.sequence;
     } else {
         book.header.ask_head = order.sequence;
@@ -183,7 +215,7 @@ pub(super) fn insert(book: &mut DlmmOrderBook, mut order: DlmmOrder) -> ProgramR
 
 fn unlink(book: &mut DlmmOrderBook, index: usize) -> ProgramResult {
     let order = book.orders[index].clone();
-    let head = if order.side == 0 {
+    let head = if order.order_side() == 0 {
         book.header.bid_head
     } else {
         book.header.ask_head
@@ -197,7 +229,7 @@ fn unlink(book: &mut DlmmOrderBook, index: usize) -> ProgramResult {
             .iter_mut()
             .find(|other| other.sequence == order.previous)
             .ok_or(VaultError::InvalidAccountList)?;
-        if prev.next != order.sequence || prev.side != order.side {
+        if prev.next != order.sequence || prev.order_side() != order.order_side() {
             return Err(VaultError::AmoebaDlmmInvariantViolation.into());
         }
         prev.next = order.next;
@@ -205,7 +237,7 @@ fn unlink(book: &mut DlmmOrderBook, index: usize) -> ProgramResult {
         if head != order.sequence {
             return Err(VaultError::AmoebaDlmmInvariantViolation.into());
         }
-        if order.side == 0 {
+        if order.order_side() == 0 {
             book.header.bid_head = order.next;
         } else {
             book.header.ask_head = order.next;
@@ -217,7 +249,7 @@ fn unlink(book: &mut DlmmOrderBook, index: usize) -> ProgramResult {
             .iter_mut()
             .find(|other| other.sequence == order.next)
             .ok_or(VaultError::InvalidAccountList)?;
-        if next.previous != order.sequence || next.side != order.side {
+        if next.previous != order.sequence || next.order_side() != order.order_side() {
             return Err(VaultError::AmoebaDlmmInvariantViolation.into());
         }
         next.previous = order.previous;
@@ -231,6 +263,17 @@ pub(super) fn persist(
     program: &Pubkey,
     a: &[AccountInfo],
     book: &mut DlmmOrderBook,
+) -> ProgramResult {
+    persist_with_payer(program, a, book, &a[0])
+}
+
+/// The record owner remains account zero. Compressed placement can use a
+/// separate signed sponsor as the rent payer for a newly created record.
+pub(super) fn persist_with_payer<'a>(
+    program: &Pubkey,
+    a: &[AccountInfo<'a>],
+    book: &mut DlmmOrderBook,
+    payer: &AccountInfo<'a>,
 ) -> ProgramResult {
     for index in 0..book.orders.len() {
         if book.orders[index].remaining_quantity == 0 || book.orders[index].remaining_input == 0 {
@@ -251,7 +294,7 @@ pub(super) fn persist(
                 }
                 validate_create_only_program_account_target(program, info)?;
                 create_program_account(
-                    &a[0],
+                    payer,
                     info,
                     &a[20],
                     program,

@@ -1,44 +1,48 @@
 use super::*;
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
 pub const CASE_SEED: &[u8] = b"g3-council-case-v1";
 pub const ROUND_SEED: &[u8] = b"g3-council-round-v1";
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub struct CouncilCase {
-    pub discriminator: [u8; 3],
-    pub version: u8,
-    pub initialized: bool,
-    pub bump: u8,
-    pub month: Pubkey,
-    pub target: Pubkey,
-    pub target_id: [u8; 32],
-    pub case_hash: [u8; 32],
-    pub evidence_hash: [u8; 32],
-    pub kind: OracleEmergencyDisputeKind,
-    pub choices: u8,
-    pub fallback: u8,
-    pub snapshot_slot: u64,
-    pub opened_slot: u64,
-    pub deadline: u64,
-    pub finalized: bool,
-    pub outcome: u8,
-    pub reason: u8,
-    pub decision_epoch: u64,
-    pub seat_mask: u8,
-    pub resolved_slot: u64,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, BorshSerialize)]
+    pub struct CouncilCase {
+        pub discriminator: [u8; 3],
+        pub version: u8,
+        pub initialized: bool,
+        pub bump: u8,
+        pub month: Pubkey,
+        pub target: Pubkey,
+        pub target_id: [u8; 32],
+        pub case_hash: [u8; 32],
+        pub evidence_hash: [u8; 32],
+        pub kind: OracleEmergencyDisputeKind,
+        pub choices: u8,
+        pub fallback: u8,
+        pub snapshot_slot: u64,
+        pub opened_slot: u64,
+        pub deadline: u64,
+        pub finalized: bool,
+        pub outcome: u8,
+        pub reason: u8,
+        pub decision_epoch: u64,
+        pub seat_mask: u8,
+        pub resolved_slot: u64,
+    }
 }
 impl CouncilCase {
     pub const LEN: usize = 213;
 }
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub struct CouncilRound {
-    pub discriminator: [u8; 3],
-    pub version: u8,
-    pub initialized: bool,
-    pub bump: u8,
-    pub case: Pubkey,
-    pub epoch: u64,
-    pub seats_hash: [u8; 32],
-    pub ballots: [u8; 5],
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, BorshSerialize)]
+    pub struct CouncilRound {
+        pub discriminator: [u8; 3],
+        pub version: u8,
+        pub initialized: bool,
+        pub bump: u8,
+        pub case: Pubkey,
+        pub epoch: u64,
+        pub seats_hash: [u8; 32],
+        pub ballots: [u8; 5],
+    }
 }
 impl CouncilRound {
     pub const LEN: usize = 83;

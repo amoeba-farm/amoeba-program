@@ -37,6 +37,7 @@ use crate::{
 };
 
 mod accounts;
+mod compact_borsh;
 mod cursor;
 mod fields;
 mod flat;
@@ -46,6 +47,7 @@ mod state_macros;
 mod variable;
 mod writer_dlmm;
 
+pub(crate) use compact_borsh::*;
 pub(crate) use cursor::*;
 pub(crate) use fields::*;
 pub(crate) use flat::*;

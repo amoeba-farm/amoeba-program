@@ -470,10 +470,6 @@ pub enum VaultInstruction {
     PublishWriterGroupSettlementWithHandoffV3,
     /// Freeze the long-reserve and Flat-residual ledgers at the shared settlement value.
     FinalizeWriterSleeveSettlementV1,
-    /// Burn/deliver collective long claims and pay from the frozen long-reserve ledger.
-    ClaimCollectiveLongV1 {
-        params: ClaimCollectiveLongV1Params,
-    },
     /// Burn Flat and pay pro rata from the independently frozen residual ledger.
     /// Close a fully exhausted collective sleeve and its terminal companion state.
     CloseWriterSleeveV1,

@@ -146,17 +146,32 @@ pub(super) fn load_valid_oracle_month(
     }
     if matches!(
         month.schedule_version,
-        LAUNCH_SCHEDULE_VERSION | COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
+        LAUNCH_SCHEDULE_VERSION
+            | COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
+            | OCTOBER_BOOTSTRAP_PENDING_SCHEDULE_VERSION
     ) {
         validate_launch_market(market)?;
-        rulebook_schedule_boundaries(&month)?;
+        if month.schedule_version == OCTOBER_BOOTSTRAP_PENDING_SCHEDULE_VERSION {
+            if market.instrument.expiry_ts
+                != crate::oracle_parent_proxy::september_bootstrap::OCTOBER_EXPIRY
+                || month.phase != OraclePhase::Opening
+                || month.scramble_start_ts != 0
+                || month.listing_ts != 0
+            {
+                return Err(VaultError::InvalidOracleState.into());
+            }
+        } else {
+            rulebook_schedule_boundaries(&month)?;
+        }
         if month.schedule_version == COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
-            && (market.instrument.expiry_ts
-                != crate::oracle_parent_proxy::september_bootstrap::EXPIRY
-                || !matches!(
-                    month.phase,
-                    OraclePhase::Game | OraclePhase::Settled | OraclePhase::Closed
-                ))
+            && (!matches!(
+                market.instrument.expiry_ts,
+                crate::oracle_parent_proxy::september_bootstrap::EXPIRY
+                    | crate::oracle_parent_proxy::september_bootstrap::OCTOBER_EXPIRY
+            ) || !matches!(
+                month.phase,
+                OraclePhase::Game | OraclePhase::Settled | OraclePhase::Closed
+            ))
         {
             return Err(VaultError::InvalidOracleState.into());
         }

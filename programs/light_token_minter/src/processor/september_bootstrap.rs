@@ -5,7 +5,8 @@
 use super::*;
 use crate::constants::*;
 use crate::oracle_parent_proxy::september_bootstrap::{
-    SeptemberBootstrapPlan, DOMAIN, EXPIRY, MAX_PAYOUT_PER_CONTRACT_ATOMS, PROGRAM,
+    SeptemberBootstrapPlan, DOMAIN, EXPIRY, MAX_PAYOUT_PER_CONTRACT_ATOMS, OCTOBER_DOMAIN,
+    OCTOBER_EXPIRY, PROGRAM,
 };
 use crate::oracle_parent_proxy::{
     CfmRegistry, NANDX_REGISTRY_HASH, NANDX_TERMINAL_ROOT, RAMX_REGISTRY_HASH, RAMX_TERMINAL_ROOT,
@@ -16,35 +17,60 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 const SEED: &[u8] = b"g3-september-bootstrap-v1";
 const RECEIPT_LEN: usize = 242;
+const OCTOBER_SEED: &[u8] = b"g3-october-bootstrap-v1";
+mod settlement_timing;
+pub(super) use settlement_timing::validate_settlement_council_cohort;
+fn seed(october: bool) -> &'static [u8] {
+    if october {
+        OCTOBER_SEED
+    } else {
+        SEED
+    }
+}
+fn validate_bootstrap_window(october: bool, now: u64) -> ProgramResult {
+    if now >= expiry(october) || (october && now < EXPIRY) {
+        return invalid();
+    }
+    Ok(())
+}
+fn expiry(october: bool) -> u64 {
+    if october {
+        OCTOBER_EXPIRY
+    } else {
+        EXPIRY
+    }
+}
 
-#[derive(BorshSerialize, BorshDeserialize)]
-struct Receipt {
-    magic: [u8; 4],
-    version: u8,
-    bump: u8,
-    market_index: u8,
-    cursor: u8,
-    finished: bool,
-    month: Pubkey,
-    plan_hash: [u8; 32],
-    registry_hash: [u8; 32],
-    initial_month_hash: [u8; 32],
-    proposer: Pubkey,
-    council_epoch: u64,
-    seats_hash: [u8; 32],
-    approving_seats: u8,
-    begun_at: u64,
-    original_scramble: u64,
-    original_listing: u64,
-    finished_at: u64,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(BorshSerialize)]
+    struct Receipt {
+        magic: [u8; 4],
+        version: u8,
+        bump: u8,
+        market_index: u8,
+        cursor: u8,
+        finished: bool,
+        month: Pubkey,
+        plan_hash: [u8; 32],
+        registry_hash: [u8; 32],
+        initial_month_hash: [u8; 32],
+        proposer: Pubkey,
+        council_epoch: u64,
+        seats_hash: [u8; 32],
+        approving_seats: u8,
+        begun_at: u64,
+        original_scramble: u64,
+        original_listing: u64,
+        finished_at: u64,
+    }
 }
 
 fn invalid<T>() -> Result<T, ProgramError> {
     Err(VaultError::InvalidOracleState.into())
 }
-fn address(program: &Pubkey, month: &Pubkey) -> (Pubkey, u8) {
+fn address(program: &Pubkey, month: &Pubkey, october: bool) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[CURRENT_STATE_NAMESPACE_SEED, SEED, month.as_ref()],
+        &[CURRENT_STATE_NAMESPACE_SEED, seed(october), month.as_ref()],
         program,
     )
 }
@@ -68,8 +94,9 @@ fn receipt(
     month: &Pubkey,
     market: u8,
     digest: &[u8; 32],
+    october: bool,
 ) -> Result<Receipt, ProgramError> {
-    let (key, bump) = address(program, month);
+    let (key, bump) = address(program, month, october);
     if info.owner != program
         || info.executable
         || info.key != &key
@@ -79,7 +106,9 @@ fn receipt(
     }
     let r = Receipt::try_from_slice(&info.try_borrow_data()?)
         .map_err(|_| VaultError::InvalidOracleState)?;
-    if r.magic != *b"SCBR"
+    if market > 3
+        || *digest == [0; 32]
+        || r.magic != if october { *b"OCBR" } else { *b"SCBR" }
         || r.version != 1
         || r.bump != bump
         || r.month != *month
@@ -96,11 +125,42 @@ fn receipt(
     Ok(r)
 }
 
+fn validate_bootstrap_market(market: &Market, market_index: u8, october: bool) -> ProgramResult {
+    if market_index > 3 {
+        return invalid();
+    }
+    validate_launch_market(market)?;
+    let product = market_index / 2;
+    let underlying: &[u8] = if product == 0 {
+        b"ram-standardized-baskets"
+    } else {
+        b"nand-standardized-baskets"
+    };
+    let side = if market_index % 2 == 0 {
+        OptionKind::CallSpread
+    } else {
+        OptionKind::PutSpread
+    };
+    if market.instrument.expiry_ts != expiry(october)
+        || market.instrument.kind != side
+        || !padded_ascii_underlying_matches(&market.instrument.underlying_id, underlying)
+        || market.instrument.max_payout_per_contract != MAX_PAYOUT_PER_CONTRACT_ATOMS
+        || !market.paused
+        || market.total_position_collateral_locked != 0
+        || market.mint_accounting != MarketMintAccounting::canonical_empty()
+    {
+        return invalid();
+    }
+    Ok(())
+}
+
 fn context(
     program: &Pubkey,
     a: &[AccountInfo],
     market_index: u8,
     digest: &[u8; 32],
+    october: bool,
+    operation: u8,
 ) -> Result<
     (
         Market,
@@ -114,43 +174,52 @@ fn context(
         || *program != PROGRAM
         || *program != crate::id()
         || market_index > 3
-        || current_unix_timestamp()? >= EXPIRY
     {
         return invalid();
     }
+    validate_bootstrap_window(october, current_unix_timestamp()?)?;
     validate_current_account_creation_payer(&a[0])?;
-    let (market, month) = load_valid_market_and_oracle_month(program, &a[1], &a[2])?;
-    validate_launch_market(&market)?;
+    let market = load_valid_market(program, &a[1])?;
+    let month = if october && operation == 0 {
+        let config = load_current_canonical_vault_config(program, &a[11])?;
+        let economics = load_canonical_oracle_economics_config(program, &a[17])?;
+        let (key, bump) = derive_oracle_month_pda(program, a[1].key, OCTOBER_EXPIRY);
+        if a[2].key != &key {
+            return invalid();
+        }
+        validate_create_only_program_account_target(program, &a[2])?;
+        OracleMonthState {
+            is_initialized: true,
+            bump,
+            market: *a[1].key,
+            authority: config.oracle_authority,
+            account_discriminator: OracleMonthState::ACCOUNT_DISCRIMINATOR,
+            account_version: OracleMonthState::ACCOUNT_VERSION,
+            phase: OraclePhase::SourceSubmission,
+            schedule_version: 5,
+            settlement_base_oracle_atomic: 100_000_000,
+            economics: economics.economics,
+            ..OracleMonthState::default()
+        }
+    } else {
+        load_valid_oracle_month(program, &a[1], &a[2], &market)?
+    };
+    validate_bootstrap_market(&market, market_index, october)?;
     let product = market_index / 2;
-    let underlying: &[u8] = if product == 0 {
-        b"ram-standardized-baskets"
-    } else {
-        b"nand-standardized-baskets"
-    };
-    let side = if market_index % 2 == 0 {
-        OptionKind::CallSpread
-    } else {
-        OptionKind::PutSpread
-    };
-    if market.instrument.expiry_ts != EXPIRY
-        || market.instrument.kind != side
-        || !padded_ascii_underlying_matches(&market.instrument.underlying_id, underlying)
-        || market.instrument.max_payout_per_contract != MAX_PAYOUT_PER_CONTRACT_ATOMS
-        || !market.paused
-        || market.total_position_collateral_locked != 0
-        || market.mint_accounting != MarketMintAccounting::canonical_empty()
-        || month.is_cfm_parent_proxy()
-        || month.pending_resolution_count != 0
-    {
+    if month.is_cfm_parent_proxy() || month.pending_resolution_count != 0 {
         return invalid();
     }
     let plan =
         oracle_evidence::with_sealed_definition_preimage(program, &a[4], digest, |preimage| {
             let bytes = preimage
-                .strip_prefix(DOMAIN)
+                .strip_prefix(if october { OCTOBER_DOMAIN } else { DOMAIN })
                 .and_then(|bytes| bytes.strip_prefix(program.as_ref()))
                 .ok_or(VaultError::InvalidOracleState)?;
-            SeptemberBootstrapPlan::decode(program, bytes)
+            if october {
+                SeptemberBootstrapPlan::decode_october(program, bytes, current_unix_timestamp()?)
+            } else {
+                SeptemberBootstrapPlan::decode(program, bytes)
+            }
         })?;
     if plan.digest() != *digest {
         return invalid();
@@ -244,8 +313,38 @@ pub(super) fn process(
     row: u8,
     digest: [u8; 32],
 ) -> ProgramResult {
+    process_cohort(program, a, operation, market, row, digest, false)
+}
+
+pub(super) fn process_october(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    operation: u8,
+    market: u8,
+    row: u8,
+    digest: [u8; 32],
+) -> ProgramResult {
+    process_cohort(program, a, operation, market, row, digest, true)
+}
+
+#[inline(never)]
+fn process_cohort(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    operation: u8,
+    market: u8,
+    row: u8,
+    digest: [u8; 32],
+    october: bool,
+) -> ProgramResult {
     let expected = match operation {
-        0 => 17,
+        0 => {
+            if october {
+                18
+            } else {
+                17
+            }
+        }
         1 => 21,
         2 => 11,
         _ => return invalid(),
@@ -255,15 +354,30 @@ pub(super) fn process(
     }
     // Never let two differently typed writable targets alias, including absent PDAs.
     for (i, info) in a.iter().enumerate() {
-        if a[..i].iter().any(|prior| prior.key == info.key) {
+        if a[..i]
+            .iter()
+            .any(|prior| crate::pubkey_eq(prior.key, info.key))
+        {
             return Err(VaultError::InvalidAccountList.into());
         }
     }
-    let (market_state, month, plan, registry) = context(program, a, market, &digest)?;
+    let (market_state, month, plan, registry) =
+        context(program, a, market, &digest, october, operation)?;
     match operation {
-        0 => begin(program, a, market, digest, market_state, month, registry),
-        1 => append(program, a, market, row, digest, month, plan, registry),
-        2 => finish(program, a, market, digest, month, registry),
+        0 => begin(
+            program,
+            a,
+            market,
+            digest,
+            market_state,
+            month,
+            registry,
+            october,
+        ),
+        1 => append(
+            program, a, market, row, digest, month, plan, registry, october,
+        ),
+        2 => finish(program, a, market, digest, month, registry, october),
         _ => invalid(),
     }
 }
@@ -280,6 +394,7 @@ fn begin(
     market: Market,
     mut month: OracleMonthState,
     registry: CfmRegistry,
+    october: bool,
 ) -> ProgramResult {
     let council = oracle_council::current_council(&a[12])?;
     let mut mask = 0u8;
@@ -302,7 +417,6 @@ fn begin(
     if month.authority != config.oracle_authority {
         return Err(VaultError::Unauthorized.into());
     }
-    let coverage = load_valid_oracle_sku_coverage_manifest(program, a[2].key, &a[9])?;
     let product =
         load_valid_oracle_product_sku_manifest(program, &market.instrument.underlying_id, &a[10])?;
     let (terminal_count, terminal_root) = if market_index < 2 {
@@ -310,8 +424,32 @@ fn begin(
     } else {
         (48, NANDX_TERMINAL_ROOT)
     };
+    let coverage = if october {
+        let (key, bump) = derive_oracle_sku_coverage_manifest_pda(program, a[2].key);
+        if a[9].key != &key {
+            return invalid();
+        }
+        validate_create_only_program_account_target(program, &a[9])?;
+        OracleSkuCoverageManifest {
+            is_initialized: true,
+            bump,
+            account_discriminator: OracleSkuCoverageManifest::ACCOUNT_DISCRIMINATOR,
+            account_version: OracleSkuCoverageManifest::ACCOUNT_VERSION,
+            month: *a[2].key,
+            required_sku_count: terminal_count,
+            required_sku_root: terminal_root,
+            covered_sku_count: 0,
+            planned_scramble_start_ts: 0,
+            planned_listing_ts: 0,
+            coverage_finalized: false,
+            coverage_complete_ts: 0,
+            last_updated_slot: 0,
+        }
+    } else {
+        load_valid_oracle_sku_coverage_manifest(program, a[2].key, &a[9])?
+    };
     if month.phase != OraclePhase::SourceSubmission
-        || month.schedule_version != LAUNCH_SCHEDULE_VERSION
+        || month.schedule_version != if october { 5 } else { LAUNCH_SCHEDULE_VERSION }
         || month.source_count != 0
         || month.frozen_source_count != 0
         || month.opened_source_count != 0
@@ -336,8 +474,34 @@ fn begin(
     let slot = Clock::get()?.slot;
     let count = registry.parent_count() as u16;
     let (manifest_hash, recipe_hash) = hashes(&registry, a[2].key)?;
+    if october {
+        if !a[2].is_writable || !a[9].is_writable {
+            return invalid();
+        }
+        let expiry_bytes = OCTOBER_EXPIRY.to_le_bytes();
+        month.bump = create(
+            program,
+            &a[0],
+            &a[2],
+            &a[16],
+            OracleMonthState::LEN,
+            ORACLE_MONTH_PDA_SEED,
+            &[a[1].key.as_ref(), &expiry_bytes],
+        )?;
+        let mut coverage = coverage;
+        coverage.bump = create(
+            program,
+            &a[0],
+            &a[9],
+            &a[16],
+            OracleSkuCoverageManifest::LEN,
+            ORACLE_SKU_COVERAGE_MANIFEST_PDA_SEED,
+            &[a[2].key.as_ref()],
+        )?;
+        store_state(&a[9], &coverage)?;
+    }
     let r = Receipt {
-        magic: *b"SCBR",
+        magic: if october { *b"OCBR" } else { *b"SCBR" },
         version: 1,
         bump: create(
             program,
@@ -345,7 +509,7 @@ fn begin(
             &a[3],
             &a[16],
             RECEIPT_LEN,
-            SEED,
+            seed(october),
             &[a[2].key.as_ref()],
         )?,
         market_index,
@@ -453,8 +617,9 @@ fn append(
     mut month: OracleMonthState,
     plan: SeptemberBootstrapPlan,
     registry: CfmRegistry,
+    october: bool,
 ) -> ProgramResult {
-    let mut r = receipt(program, &a[3], a[2].key, market_index, &digest)?;
+    let mut r = receipt(program, &a[3], a[2].key, market_index, &digest, october)?;
     if r.finished
         || r.cursor != row
         || r.registry_hash != registry.digest()
@@ -711,8 +876,9 @@ fn finish(
     digest: [u8; 32],
     mut month: OracleMonthState,
     registry: CfmRegistry,
+    october: bool,
 ) -> ProgramResult {
-    let mut r = receipt(program, &a[3], a[2].key, market_index, &digest)?;
+    let mut r = receipt(program, &a[3], a[2].key, market_index, &digest, october)?;
     let count = registry.parent_count() as u16;
     if r.finished
         || u16::from(r.cursor) != count
@@ -753,7 +919,7 @@ fn finish(
     let now = current_unix_timestamp()?;
     let slot = Clock::get()?.slot;
     let game = now.checked_add(1).ok_or(VaultError::ArithmeticOverflow)?;
-    if game >= EXPIRY {
+    if game >= expiry(october) {
         return invalid();
     }
     // The original terminal root remains immutable in the governed product
@@ -786,4 +952,95 @@ fn finish(
     store_state(&a[8], &schedule)?;
     store_state(&a[9], &coverage)?;
     store_oracle_month_state(&a[2], &month)
+}
+
+/// Pending October months are accessible only by their bootstrap or authenticated index construction.
+pub(super) fn reject_pending_october(
+    program: &Pubkey,
+    accounts: &[AccountInfo],
+    tag: u8,
+    payload: &[u8],
+) -> ProgramResult {
+    for info in accounts {
+        if info.owner == program && info.data_len() == OracleMonthState::LEN {
+            let data = info.try_borrow_data()?;
+            if data[2..5] == OracleMonthState::ACCOUNT_DISCRIMINATOR {
+                let month =
+                    crate::fixed_codec::decode_oracle_month(&data, VaultError::InvalidOracleState)?;
+                if month.schedule_version == 5
+                    && !(tag == 30 && payload.first() == Some(&23))
+                    && tag != 200
+                {
+                    // The outer transport reaches this dispatcher before its authenticated
+                    // inner call. Admit only the exact October append wire; the inner
+                    // dispatcher and receipt/manifest checks still run unchanged.
+                    if tag != VaultInstructionTag::ExecuteCompressedStateV1 as u8 {
+                        return invalid();
+                    }
+                    let params: ExecuteCompressedStateParams = decode_instruction_payload(payload)?;
+                    let inner = &params.inner_instruction;
+                    if inner.len() != 41 || inner[..7] != *b"\x1e\x17OCB1\x01" {
+                        return invalid();
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn require_october_membership_receipt(
+    program: &Pubkey,
+    market: &Market,
+    month_key: &Pubkey,
+    month: &OracleMonthState,
+    info: &AccountInfo,
+) -> ProgramResult {
+    if month.schedule_version != 5
+        || month.phase != OraclePhase::Opening
+        || market.instrument.expiry_ts != OCTOBER_EXPIRY
+    {
+        return invalid();
+    }
+    validate_launch_market(market)?;
+    let raw = Receipt::try_from_slice(&info.try_borrow_data()?)
+        .map_err(|_| VaultError::InvalidOracleState)?;
+    let r = receipt(
+        program,
+        info,
+        month_key,
+        raw.market_index,
+        &raw.plan_hash,
+        true,
+    )?;
+    let product = r.market_index / 2;
+    let count = if product == 0 { 13 } else { 22 };
+    let expected = format!(
+        "{}-202610-{}-01",
+        if product == 0 { "RAMX" } else { "NANDX" },
+        if r.market_index % 2 == 0 {
+            "CALL"
+        } else {
+            "PUT"
+        }
+    );
+    if r.finished
+        || r.cursor != count
+        || r.registry_hash
+            != if product == 0 {
+                RAMX_REGISTRY_HASH
+            } else {
+                NANDX_REGISTRY_HASH
+            }
+        || !padded_ascii_underlying_matches(&market.market_id, expected.as_bytes())
+        || month.source_count != u16::from(count)
+        || month.frozen_source_count != u16::from(count)
+        || month.opened_source_count != u16::from(count)
+        || month.opening_resolved_source_count != u16::from(count)
+        || current_unix_timestamp()? < EXPIRY
+        || current_unix_timestamp()? >= OCTOBER_EXPIRY
+    {
+        return invalid();
+    }
+    Ok(())
 }

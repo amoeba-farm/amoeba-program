@@ -1,4 +1,5 @@
-use solana_program::program_error::ProgramError;
+use crate::ProgramError;
+use solana_program::program_error::ProgramError as SolanaProgramError;
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
@@ -384,7 +385,14 @@ pub enum VaultError {
 }
 
 impl From<VaultError> for ProgramError {
+    #[inline(always)]
     fn from(value: VaultError) -> Self {
         ProgramError::Custom(value as u32)
+    }
+}
+
+impl From<VaultError> for SolanaProgramError {
+    fn from(value: VaultError) -> Self {
+        SolanaProgramError::Custom(value as u32)
     }
 }

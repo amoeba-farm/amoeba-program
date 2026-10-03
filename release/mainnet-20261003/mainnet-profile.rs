@@ -1,8 +1,8 @@
 // Generated only from an exact reviewed profile. Do not edit.
 solana_program::declare_id!("2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw");
 pub const LIGHT_CPI_SIGNER: light_sdk::CpiSigner = light_sdk::derive_light_cpi_signer!("2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw");
-pub const MAINNET_PROFILE_SHA256: &str = "e51c6850d1dd262f152a4d2171ded32c7c2ca874da511009b1ac8cbec14977d0";
-pub const MAINNET_PROFILE_RELEASE_MARKER: &str = "AMEBA_MAINNET_G3_V3:e51c6850d1dd262f152a4d2171ded32c7c2ca874da511009b1ac8cbec14977d0";
+pub const MAINNET_PROFILE_SHA256: &str = "e4b6bf203cf9cf7b9a49a7846d51811c734fbe2d15d43e7205aa6cfcc35c3ab7";
+pub const MAINNET_PROFILE_RELEASE_MARKER: &str = "AMEBA_MAINNET_G3_V3:e4b6bf203cf9cf7b9a49a7846d51811c734fbe2d15d43e7205aa6cfcc35c3ab7";
 pub const MAINNET_PROFILE_LOCAL_TEST_ONLY: bool = false;
 pub const MAINNET_GENESIS_HASH: &str = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 pub const MAINNET_CONTROLLER_PROGRAM_ID: solana_program::pubkey::Pubkey = solana_program::pubkey!("8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx");

@@ -85,18 +85,24 @@ pub(super) fn public_locator(url: &str) -> ProgramResult {
     {
         return invalid();
     }
-    let tail = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
+    // Byte-level parsing: every delimiter and credential key is ASCII, so this matches the
+    // previous `str` search exactly without linking UTF-8 search/lossy-conversion code.
+    let input = url.as_bytes();
+    let tail = input
+        .strip_prefix(b"https://")
+        .or_else(|| input.strip_prefix(b"http://"))
         .ok_or(VaultError::InvalidOracleOpeningEvidence)?;
-    let authority = tail.split(['/', '?', '#']).next().unwrap_or("");
-    if authority.is_empty() || authority.contains('@') || authority.starts_with(':') {
+    let authority_len = tail
+        .iter()
+        .position(|b| matches!(b, b'/' | b'?' | b'#'))
+        .unwrap_or(tail.len());
+    let authority = tail.get(..authority_len).unwrap_or(&[]);
+    if authority.is_empty() || authority.contains(&b'@') || authority.first() == Some(&b':') {
         return invalid();
     }
     // Inspect percent-encoded query names without changing the committed bytes.
     let mut scanned = Vec::with_capacity(url.len());
     let mut i = 0;
-    let input = url.as_bytes();
     while i < input.len() {
         if input[i] == b'%' && i + 2 < input.len() {
             let high = (input[i + 1] as char).to_digit(16);
@@ -114,21 +120,27 @@ pub(super) fn public_locator(url: &str) -> ProgramResult {
         scanned.push(input[i].to_ascii_lowercase());
         i += 1;
     }
-    let lower = String::from_utf8_lossy(&scanned);
-    if [
-        "access_token=",
-        "api_key=",
-        "apikey=",
-        "authorization=",
-        "password=",
-        "secret=",
-        "x-amz-signature=",
-        "token=",
-    ]
-    .iter()
-    .any(|key| lower.contains(key))
-    {
-        return invalid();
+    // A lossy UTF-8 view never merges or splits ASCII runs, so searching the raw bytes for
+    // these ASCII keys is equivalent to the former `from_utf8_lossy(..).contains(key)`.
+    // Every key ends in `=`, so an occurrence is exactly a `=` whose prefix ends with the key:
+    // one linear pass, comparing keys only at the (rare) `=` bytes.
+    const CREDENTIAL_KEYS: [&[u8]; 8] = [
+        b"access_token=",
+        b"api_key=",
+        b"apikey=",
+        b"authorization=",
+        b"password=",
+        b"secret=",
+        b"x-amz-signature=",
+        b"token=",
+    ];
+    for (end, byte) in scanned.iter().enumerate() {
+        if *byte == b'=' {
+            let prefix = &scanned[..=end];
+            if CREDENTIAL_KEYS.iter().any(|key| prefix.ends_with(key)) {
+                return invalid();
+            }
+        }
     }
     Ok(())
 }

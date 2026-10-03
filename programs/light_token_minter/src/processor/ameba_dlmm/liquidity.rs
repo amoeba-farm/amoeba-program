@@ -1,5 +1,15 @@
 use super::*;
 
+mod compressed;
+
+pub(super) fn process_remove_compressed_liquidity(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    params: crate::ameba_dlmm_instruction::RemoveCompressedLiquidityV1Params,
+) -> ProgramResult {
+    compressed::process(program_id, accounts, params)
+}
+
 #[derive(Clone)]
 pub(super) struct LoadedPagePair {
     pub(super) page_account_index: usize,
@@ -226,6 +236,7 @@ pub(super) fn validate_liquidity_fixed_accounts(
     accounts: &[AccountInfo],
     pool_info: &AccountInfo,
     pool: &AmoebaDlmmPoolV1,
+    compressed: Option<&crate::compressed_custody::CompressedCustodyV1>,
 ) -> Result<(TokenAccount, TokenAccount), ProgramError> {
     let authority_info = &accounts[3];
     let option_mint_info = &accounts[4];
@@ -253,18 +264,26 @@ pub(super) fn validate_liquidity_fixed_accounts(
     validate_collateral_mint_account(quote_mint_info, &spl_token_program_id())?;
     validate_spl_interface_account(option_mint_info.key, option_interface_info)?;
     validate_spl_interface_account(quote_mint_info.key, quote_interface_info)?;
-    let _ = load_user_transfer_account(
-        program_id,
-        owner_option_info,
-        &pool.liquidity_manager,
-        option_mint_info.key,
-    )?;
-    let _ = load_user_transfer_account(
-        program_id,
-        owner_quote_info,
-        &pool.liquidity_manager,
-        quote_mint_info.key,
-    )?;
+    if compressed.is_some() {
+        if owner_option_info.key != &pool.liquidity_manager
+            || owner_quote_info.key != &pool.liquidity_manager
+        {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+    } else {
+        let _ = load_user_transfer_account(
+            program_id,
+            owner_option_info,
+            &pool.liquidity_manager,
+            option_mint_info.key,
+        )?;
+        let _ = load_user_transfer_account(
+            program_id,
+            owner_quote_info,
+            &pool.liquidity_manager,
+            quote_mint_info.key,
+        )?;
+    }
     let vaults = validate_pool_vaults(
         program_id,
         pool_info,
@@ -273,7 +292,7 @@ pub(super) fn validate_liquidity_fixed_accounts(
         option_vault_info,
         quote_vault_info,
     )?;
-    ensure_custody(pool, &vaults.0, &vaults.1)?;
+    ensure_custody_with(pool, &vaults.0, &vaults.1, compressed)?;
     Ok(vaults)
 }
 
@@ -401,7 +420,7 @@ pub(super) fn process_liquidity_change(
             .chain(accounts[17..].iter())
             .cloned()
             .collect();
-        process_liquidity_change_core(program_id, &normalized, change, None)?;
+        process_liquidity_change_core(program_id, &normalized, change, None, None)?;
         super::scoped_position::process_scoped_position_settlement(
             program_id,
             &[
@@ -414,7 +433,7 @@ pub(super) fn process_liquidity_change(
             0,
         )
     } else {
-        process_liquidity_change_core(program_id, accounts, change, None)
+        process_liquidity_change_core(program_id, accounts, change, None, None)
     }
 }
 
@@ -429,6 +448,7 @@ pub(super) fn process_scoped_liquidity_cleanup<'a>(
         accounts,
         LiquidityChange::Remove(params),
         Some(permit),
+        None,
     )
 }
 
@@ -437,6 +457,7 @@ fn process_liquidity_change_core<'a>(
     accounts: &[AccountInfo<'a>],
     change: LiquidityChange,
     permit: Option<&super::scoped_position::ScopedCleanup<'_, 'a>>,
+    compressed: Option<&compressed::Context<'_, 'a>>,
 ) -> ProgramResult {
     if accounts.len() < 18 {
         return Err(VaultError::InvalidAccountList.into());
@@ -471,7 +492,13 @@ fn process_liquidity_change_core<'a>(
     {
         return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
     }
-    let before_vaults = validate_liquidity_fixed_accounts(program_id, accounts, pool_info, &pool)?;
+    let before_vaults = validate_liquidity_fixed_accounts(
+        program_id,
+        accounts,
+        pool_info,
+        &pool,
+        compressed.map(|context| &context.before),
+    )?;
     let mut pages = load_page_pairs(
         program_id,
         pool_info.key,
@@ -667,6 +694,15 @@ fn process_liquidity_change_core<'a>(
 
     if is_add {
         transfer_owner_to_pool(accounts, total_option, total_quote)?;
+    } else if let Some(context) = compressed {
+        context.settle(
+            program_id,
+            accounts,
+            &pool,
+            &before_vaults,
+            total_option,
+            total_quote,
+        )?;
     } else {
         transfer_pool_to_owner(
             program_id,
@@ -684,7 +720,25 @@ fn process_liquidity_change_core<'a>(
         &accounts[6],
         &accounts[7],
     )?;
-    let physical_delta_ok = if is_add {
+    let physical_delta_ok = if let Some(context) = compressed {
+        let option = crate::compressed_swap_plan::plan_lp_withdrawal(
+            before_vaults.0.amount,
+            context.before.option_atoms,
+            pool.accounted_option_reserve
+                .checked_add(total_option)
+                .ok_or(VaultError::ArithmeticOverflow)?,
+            total_option,
+        )?;
+        let quote = crate::compressed_swap_plan::plan_lp_withdrawal(
+            before_vaults.1.amount,
+            context.before.quote_atoms,
+            pool.accounted_quote_reserve
+                .checked_add(total_quote)
+                .ok_or(VaultError::ArithmeticOverflow)?,
+            total_quote,
+        )?;
+        after_vaults.0.amount == option.hot_after && after_vaults.1.amount == quote.hot_after
+    } else if is_add {
         after_vaults.0.amount
             == before_vaults
                 .0
@@ -714,7 +768,25 @@ fn process_liquidity_change_core<'a>(
     if !physical_delta_ok {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
-    ensure_custody(&pool, &after_vaults.0, &after_vaults.1)?;
+    let sidecar_after = compressed
+        .map(|context| {
+            crate::compressed_custody::load(
+                program_id,
+                Some(context.sidecar),
+                crate::compressed_custody::CustodyKind::Pool,
+                pool_info.key,
+                &pool.option_mint,
+                &pool.quote_mint,
+            )
+        })
+        .transpose()?
+        .flatten();
+    ensure_custody_with(
+        &pool,
+        &after_vaults.0,
+        &after_vaults.1,
+        sidecar_after.as_ref(),
+    )?;
     store_page_pairs(accounts, &pages)?;
     store_light_state(position_info, &position)?;
     store_light_state(pool_info, &pool)?;

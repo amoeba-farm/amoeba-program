@@ -1,21 +1,65 @@
 use super::*;
 #[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct OracleCouncilActionV1 {
-    pub operation: u8,
-    pub kind: OracleEmergencyDisputeKind,
-    pub target_id: [u8; 32],
-    pub expected_case_hash: [u8; 32],
-    pub expected_epoch: u64,
-    pub expected_seats_hash: [u8; 32],
-    pub choice: u8,
+pub enum OracleSponsoredActionV1 {
+    Activate {
+        terms: crate::oracle_sponsorship::SponsorTerms,
+        source: ProposeOracleSourceV3Params,
+    },
+    Reconcile,
+    ClaimBounty,
+    WithdrawReserve {
+        amount: u64,
+    },
+}
+/// Cursor reader with the derive's tags (declaration order 0..=3).
+impl crate::fixed_codec::CursorField for OracleSponsoredActionV1 {
+    #[inline(never)]
+    fn read(input: &mut CheckedCursor<'_>) -> Self {
+        use crate::fixed_codec::CursorField;
+        match input.u8() {
+            0 => Self::Activate {
+                terms: CursorField::read(input),
+                source: CursorField::read(input),
+            },
+            1 => Self::Reconcile,
+            2 => Self::ClaimBounty,
+            3 => Self::WithdrawReserve {
+                amount: input.u64(),
+            },
+            _ => {
+                input.invalid = true;
+                Self::Reconcile
+            }
+        }
+    }
+}
+
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, PartialEq, BorshSerialize)]
+    pub struct OracleCouncilActionV1 {
+        pub operation: u8,
+        pub kind: OracleEmergencyDisputeKind,
+        pub target_id: [u8; 32],
+        pub expected_case_hash: [u8; 32],
+        pub expected_epoch: u64,
+        pub expected_seats_hash: [u8; 32],
+        pub choice: u8,
+    }
 }
 
 /// Bounded carry-forward subactions. The import proof count is one byte, not an
 /// unbounded Borsh Vec prefix; the wire shape matches the client carry builders.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OracleCarryForwardActionV1 {
+    SponsoredSource(OracleSponsoredActionV1),
     /// September-only council bootstrap: begin, append one parent, finish.
     SeptemberBootstrap {
+        operation: u8,
+        market: u8,
+        row: u8,
+        plan_hash: [u8; 32],
+    },
+    OctoberBootstrap {
         operation: u8,
         market: u8,
         row: u8,
@@ -72,9 +116,199 @@ pub enum OracleCarryForwardActionV1 {
     },
 }
 
+impl OracleCarryForwardActionV1 {
+    /// Branch-for-branch mirror of `deserialize_reader` on a [`CheckedCursor`]. A short read
+    /// poisons the cursor (rejected by the caller's `finish`); every value check rejects
+    /// exactly where the reader does.
+    #[inline(never)]
+    fn read_cursor(c: &mut CheckedCursor<'_>) -> io::Result<Self> {
+        use crate::fixed_codec::CursorField;
+        let invalid = || Err(io::Error::from(io::ErrorKind::InvalidData));
+        Ok(match c.u8() {
+            22 => {
+                if c.bytes::<4>() != *b"OSB1" {
+                    return invalid();
+                }
+                Self::SponsoredSource(CursorField::read(c))
+            }
+            tag @ (21 | 23) => {
+                let magic = if tag == 21 { *b"SCB1" } else { *b"OCB1" };
+                if c.bytes::<4>() != magic {
+                    return invalid();
+                }
+                let operation = c.u8();
+                let market = c.u8();
+                let row = c.u8();
+                let plan_hash: [u8; 32] = c.bytes();
+                if operation > 2
+                    || market > 3
+                    || (operation != 1 && row != 0)
+                    || (operation == 1 && row >= if market < 2 { 13 } else { 22 })
+                    || crate::bytes32_is_zero(&plan_hash)
+                {
+                    return invalid();
+                }
+                if tag == 21 {
+                    Self::SeptemberBootstrap {
+                        operation,
+                        market,
+                        row,
+                        plan_hash,
+                    }
+                } else {
+                    Self::OctoberBootstrap {
+                        operation,
+                        market,
+                        row,
+                        plan_hash,
+                    }
+                }
+            }
+            20 => {
+                if c.bytes::<4>() != *b"CFM1" {
+                    return invalid();
+                }
+                let product = c.u8();
+                let settlement_base_oracle_atomic = c.u64();
+                if product > 1 || settlement_base_oracle_atomic == 0 {
+                    return invalid();
+                }
+                Self::InitializeCfmMonth {
+                    product,
+                    settlement_base_oracle_atomic,
+                }
+            }
+            19 => {
+                if c.bytes::<4>() != *b"CFM1" {
+                    return invalid();
+                }
+                let product = c.u8();
+                if product > 1 {
+                    return invalid();
+                }
+                Self::InitializeCfmPolicy { product }
+            }
+            18 => {
+                if c.bytes::<4>() != *b"CV01" {
+                    return invalid();
+                }
+                let action = OracleCouncilActionV1::read(c);
+                if action.operation > 3 || action.choice > 2 || action.expected_epoch == 0 {
+                    return invalid();
+                }
+                Self::Council(action)
+            }
+            0 => Self::RegisterRoot,
+            1 => Self::RegisterSuccessor,
+            2 => {
+                let kind = c.u8();
+                if kind > 2 {
+                    return invalid();
+                }
+                Self::CaptureCurrent {
+                    kind,
+                    previous_hash: c.bytes(),
+                }
+            }
+            3 => {
+                let sku_index = c.u16();
+                let count = usize::from(c.u8());
+                if count > MAX_ORACLE_SKU_MERKLE_PROOF_DEPTH {
+                    return invalid();
+                }
+                let mut proof = Vec::with_capacity(count);
+                for _ in 0..count {
+                    proof.push(c.bytes());
+                }
+                Self::Import { sku_index, proof }
+            }
+            4 => Self::SkipInactive,
+            5 => Self::BeginSelection,
+            6 => Self::ScanCheckpoint,
+            7 => Self::FreezeOpening,
+            8 => {
+                let mode = c.u8();
+                if mode > 1 {
+                    return invalid();
+                }
+                Self::BeginHistoryMedian {
+                    mode,
+                    lower: c.u64(),
+                    upper: c.u64(),
+                }
+            }
+            9 => Self::ScanHistoryMedian,
+            10 => Self::CloseHistoryMedian,
+            11 => {
+                let mode = c.u8();
+                if mode > 2 {
+                    return invalid();
+                }
+                Self::BeginBucketRank {
+                    mode,
+                    lower: c.u64(),
+                    upper: c.u64(),
+                    nonce: c.bytes(),
+                }
+            }
+            12 => Self::ScanBucketRank,
+            13 => Self::CloseBucketRank,
+            14 => {
+                let kind = c.u8();
+                let hash = c.bytes();
+                let total = c.u16();
+                let offset = c.u16();
+                let len = usize::from(c.u8());
+                if !(1..=3).contains(&kind) || len == 0 || len > 192 || total == 0 || total > 4096 {
+                    return invalid();
+                }
+                Self::WriteEvidence {
+                    kind,
+                    hash,
+                    total,
+                    offset,
+                    bytes: c.vec(len),
+                }
+            }
+            15 => Self::CloseEvidenceDraft,
+            16 => Self::BackfillSourceEvidence,
+            17 => {
+                let role = c.u8();
+                if !(2..=5).contains(&role) {
+                    return invalid();
+                }
+                Self::BackfillClaimEvidence { role }
+            }
+            _ => return invalid(),
+        })
+    }
+}
+
 impl BorshDeserialize for OracleCarryForwardActionV1 {
+    fn deserialize(data: &mut &[u8]) -> io::Result<Self> {
+        let mut cursor = CheckedCursor::new(data);
+        let value = Self::read_cursor(&mut cursor);
+        let rest = cursor.finish()?;
+        let value = value?;
+        *data = rest;
+        Ok(value)
+    }
+
+    fn try_from_slice(data: &[u8]) -> io::Result<Self> {
+        let mut cursor = CheckedCursor::new(data);
+        let value = Self::read_cursor(&mut cursor);
+        cursor.finish_exact()?;
+        value
+    }
+
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
+            22 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"OSB1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::SponsoredSource(OracleSponsoredActionV1::deserialize_reader(reader)?)
+            }
             21 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"SCB1" {
                     return Err(io::ErrorKind::InvalidData.into());
@@ -92,6 +326,29 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
                     return Err(io::ErrorKind::InvalidData.into());
                 }
                 Self::SeptemberBootstrap {
+                    operation,
+                    market,
+                    row,
+                    plan_hash,
+                }
+            }
+            23 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"OCB1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                let operation = u8::deserialize_reader(reader)?;
+                let market = u8::deserialize_reader(reader)?;
+                let row = u8::deserialize_reader(reader)?;
+                let plan_hash = <[u8; 32]>::deserialize_reader(reader)?;
+                if operation > 2
+                    || market > 3
+                    || (operation != 1 && row != 0)
+                    || (operation == 1 && row >= if market < 2 { 13 } else { 22 })
+                    || plan_hash == [0; 32]
+                {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::OctoberBootstrap {
                     operation,
                     market,
                     row,
@@ -223,7 +480,9 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
 impl BorshSerialize for OracleCarryForwardActionV1 {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         let tag: u8 = match self {
+            Self::SponsoredSource(_) => 22,
             Self::SeptemberBootstrap { .. } => 21,
+            Self::OctoberBootstrap { .. } => 23,
             Self::InitializeCfmMonth { .. } => 20,
             Self::InitializeCfmPolicy { .. } => 19,
             Self::Council(_) => 18,
@@ -247,6 +506,11 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
             Self::BackfillClaimEvidence { .. } => 17,
         };
         match self {
+            Self::SponsoredSource(action) => {
+                tag.serialize(writer)?;
+                writer.write_all(b"OSB1")?;
+                action.serialize(writer)
+            }
             Self::SeptemberBootstrap {
                 operation,
                 market,
@@ -263,6 +527,27 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
                 }
                 tag.serialize(writer)?;
                 writer.write_all(b"SCB1")?;
+                operation.serialize(writer)?;
+                market.serialize(writer)?;
+                row.serialize(writer)?;
+                plan_hash.serialize(writer)
+            }
+            Self::OctoberBootstrap {
+                operation,
+                market,
+                row,
+                plan_hash,
+            } => {
+                if *operation > 2
+                    || *market > 3
+                    || (*operation != 1 && *row != 0)
+                    || (*operation == 1 && *row >= if *market < 2 { 13 } else { 22 })
+                    || *plan_hash == [0; 32]
+                {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                tag.serialize(writer)?;
+                writer.write_all(b"OCB1")?;
                 operation.serialize(writer)?;
                 market.serialize(writer)?;
                 row.serialize(writer)?;

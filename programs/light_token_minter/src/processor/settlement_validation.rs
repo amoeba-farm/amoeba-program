@@ -481,16 +481,6 @@ pub(super) fn validate_light_token_account(account_info: &AccountInfo) -> Progra
     Ok(())
 }
 
-pub(super) fn validate_light_associated_token_account(
-    owner: &Pubkey,
-    mint: &Pubkey,
-    account_info: &AccountInfo,
-) -> ProgramResult {
-    validate_light_associated_token_address(owner, mint, account_info)?;
-    let _ = load_canonical_light_token_account(account_info, owner, mint)?;
-    Ok(())
-}
-
 pub(super) fn validate_light_associated_token_address(
     owner: &Pubkey,
     mint: &Pubkey,

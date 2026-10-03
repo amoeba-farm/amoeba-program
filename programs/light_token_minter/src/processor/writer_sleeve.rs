@@ -2,10 +2,9 @@ use super::*;
 use crate::{
     constants::{MAX_AMOEBA_DLMM_BINS_PER_SWAP, MAX_AMOEBA_DLMM_BIN_COUNT},
     instruction::{
-        ClaimCollectiveLongV1Params, CleanupWriterCustodyV1Params,
-        InitializeWriterPolicyRegistryV1Params, ManageWriterPolicyAuthorityActionV1,
-        ManageWriterPolicyAuthorityV1Params, ReconcileWriterSupplyV1Params,
-        SealWriterPolicyV1Params, SetCollectiveMarketPausedV1Params,
+        CleanupWriterCustodyV1Params, InitializeWriterPolicyRegistryV1Params,
+        ManageWriterPolicyAuthorityActionV1, ManageWriterPolicyAuthorityV1Params,
+        ReconcileWriterSupplyV1Params, SealWriterPolicyV1Params, SetCollectiveMarketPausedV1Params,
     },
     state::{
         WriterPolicyRegistryV1, WriterPolicySnapshotV1, WriterReserveRoundingMode,
@@ -20,9 +19,13 @@ use crate::{
 };
 
 mod accounts;
+mod buyback_issuance;
+mod compressed_settlement;
 pub(super) mod dlmm;
 mod individual;
+mod individual_buyback;
 mod participation;
+mod portfolio_hedge;
 mod reconcile;
 mod settlement;
 
@@ -40,7 +43,8 @@ const WRITER_BOOK_HASH_MAX_BYTES: usize = WRITER_BOOK_HASH_DOMAIN.len()
     + 32
     + 32
     + 4
-    + crate::constants::WRITER_MAX_LIVE_SERIES * (32 + 32 + 7 * 8);
+    + crate::constants::WRITER_MAX_LIVE_SERIES * (32 + 32 + 7 * 8 + 20)
+    + 8;
 
 pub(super) struct CollectiveDlmmContext {
     pub sleeve_status: WriterSleeveStatus,

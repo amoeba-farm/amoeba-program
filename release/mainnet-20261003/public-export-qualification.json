@@ -1,0 +1,31 @@
+{
+  "status": "passed",
+  "failed": 0,
+  "pending": 0,
+  "blockers": [],
+  "exportedFiles": 210,
+  "exportedTreeSha256": "acfd84a71640ded110803636ca1e44fe74244cc3cfb1e7430576497b64f3926e",
+  "verifiedBuildFeatures": [
+    "mainnet-v3"
+  ],
+  "sourceDirty": false,
+  "hostToolchain": {
+    "rustc": "1.90.0",
+    "cargo": "1.90.0",
+    "rustfmt": "1.8.0-stable"
+  },
+  "checks": [
+    "two deterministic sanitized exports",
+    "locked filtered cargo metadata",
+    "filtered rustfmt",
+    "locked filtered Mainnet cargo check"
+  ],
+  "qualificationScope": "Filtered public source and host compile only; not SBF execution, chain deployment or signer authorization.",
+  "productionRustModules": 188,
+  "kind": "public-export",
+  "sourceCommit": "61d735117c95f131fd1bdb819d9b62b6e21173cb",
+  "sourceInputInventorySha256": "e4916cff4c7a2db44267a224744fd8bbbfdbc3053761965f9f9d12ebce0481fd",
+  "profileSha256": "e4b6bf203cf9cf7b9a49a7846d51811c734fbe2d15d43e7205aa6cfcc35c3ab7",
+  "artifactSha256": "8e9828ec9d20555991813bbc9bde7ee0ca19e300f6114bacb224f7ab4f9f9781",
+  "evidenceBindingNote": "Coordinator review of retained results and unchanged-input reuse where recorded; artifact binding is not a claim that every host test executes the ELF."
+}

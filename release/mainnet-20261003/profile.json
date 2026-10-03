@@ -1,0 +1,35 @@
+{
+  "schema": "ameba-mainnet-g3-controller-v3-profile-v1",
+  "status": "reviewed",
+  "cluster": "mainnet-beta",
+  "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "businessGeneration": 3,
+  "controllerAbi": 3,
+  "sbfArchitecture": "v1",
+  "proposalDomain": "mainnet-beta",
+  "identities": {
+    "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "controllerProgramId": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+    "controllerConfigPda": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+    "protocolGatePda": "Cdym9p7FvtxEAjF8XuCqSrishB7LmBDXaZGDMMgWczu",
+    "targetAuthorityPda": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+    "bootstrapAuthority": "99riHvpFvwfz2tbrWbanEMPz5iyhHHThBbM7eY35vMwL",
+    "configAdmin": "99riHvpFvwfz2tbrWbanEMPz5iyhHHThBbM7eY35vMwL",
+    "oracleAuthority": "C8gpKjnPss4SKpjhBpFGNH7cbD26XCzSWhcjj6gF4dx7",
+    "recoveryAuthority": "5zkGhzjEXYWw15Jy534ZL3UDQ9N2nQ17jcSRZ2B5C28Y",
+    "settlementSignerRegistry": "8aQiBEvYzhtTL3daY5cyzghwJDKcDD9MKokVA3Fk7Jay",
+    "collateralMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "lightAddressTree": "amt2kaJA14v3urZbZvnc5v2np8jqvc4Z8zDep5wbtzx",
+    "lightTokenConfig": "ACXg8a7VaqecBWrSbdu73W4Pg9gsqXJ3EXAqkHyhvVXg",
+    "lightRentSponsor": "r18WwUxfG8kQ69bQPAB2jV6zGNKy3GosFGctjQoV4ti"
+  },
+  "metadata": {
+    "objectSchema": "OEB/v1",
+    "linkSchema": "OEL/v1",
+    "namespace": "ameba-spread-v2",
+    "objectSeed": "g3-evidence-bytes-v1",
+    "linkSeed": "g3-evidence-link-v1",
+    "retention": "sealed-permanent"
+  },
+  "controllerArtifactSha256": "e06bf76acfacbf7e58f9bcdd0637051ea1ca629951e41a7b47738e082e51a8eb"
+}

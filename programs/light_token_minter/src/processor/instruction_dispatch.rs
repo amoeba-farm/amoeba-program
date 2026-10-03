@@ -163,6 +163,7 @@ pub(super) fn process_instruction_with_context(
     ) {
         return Err(VaultError::InvalidInstructionData.into());
     }
+    september_bootstrap::reject_pending_october(program_id, accounts, *tag_bytes, payload)?;
     // Subaction 20 authenticates its immutable CFM policy before activating a
     // reserved month. No other entrypoint may consume a CFM-typed month yet.
     if !(*tag_bytes == VaultInstructionTag::OracleCarryForwardV1 as u8

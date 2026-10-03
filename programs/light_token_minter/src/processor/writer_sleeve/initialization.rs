@@ -339,7 +339,9 @@ pub(in crate::processor) fn process_register_series(
         option_kind: market.instrument.kind,
         custody_status: WriterSeriesCustodyStatus::Absent,
         settlement_status: WriterSeriesSettlementStatus::Open,
-        reserved: [0; 4],
+        // Byte 0 is the 72-hour claim policy; byte 1 irreversibly selects
+        // compressed Book funding for every order on this newly registered series.
+        reserved: [1, 1, 0, 0],
         series_id: market.market_id,
         market: *market_info.key,
         contract_mint: *contract_mint_info.key,

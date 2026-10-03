@@ -1,5 +1,64 @@
 use super::*;
 
+#[allow(clippy::too_many_arguments)]
+pub(super) fn load_or_create_custody<'a>(
+    program_id: &Pubkey,
+    payer: &AccountInfo<'a>,
+    account: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+    kind: crate::compressed_custody::CustodyKind,
+    parent: &Pubkey,
+    option_mint: &Pubkey,
+    quote_mint: &Pubkey,
+) -> Result<crate::compressed_custody::CompressedCustodyV1, ProgramError> {
+    use crate::compressed_custody::{
+        derive_compressed_custody, CompressedCustodyV1, COMPRESSED_CUSTODY_SEED,
+    };
+    let (expected, bump) = derive_compressed_custody(program_id, kind, parent);
+    if account.key != &expected || !account.is_writable {
+        return Err(VaultError::InvalidPda.into());
+    }
+    if account.owner == program_id {
+        return crate::compressed_custody::load(
+            program_id,
+            Some(account),
+            kind,
+            parent,
+            option_mint,
+            quote_mint,
+        )?
+        .ok_or(VaultError::InvalidAccountList.into());
+    }
+    if account.owner != &solana_program::system_program::id()
+        || account.data_len() != 0
+        || account.executable
+        || !payer.is_signer
+        || !payer.is_writable
+    {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    let kind_byte = [kind as u8];
+    let bump_byte = [bump];
+    let seeds: &[&[u8]] = &[
+        CURRENT_STATE_NAMESPACE_SEED,
+        COMPRESSED_CUSTODY_SEED,
+        &kind_byte,
+        parent.as_ref(),
+        &bump_byte,
+    ];
+    invoke_create_or_allocate_account(
+        payer,
+        account,
+        system_program_info,
+        program_id,
+        CompressedCustodyV1::ACCOUNT_LEN,
+        seeds,
+    )?;
+    let state = CompressedCustodyV1::new(kind, *parent, *option_mint, *quote_mint, bump);
+    crate::compressed_custody::store(account, &state)?;
+    Ok(state)
+}
+
 pub(super) fn load_light_state<T: AmoebaDlmmLightState>(
     account_info: &AccountInfo,
     program_id: &Pubkey,
@@ -260,7 +319,7 @@ pub(super) fn assert_program_accounts(
 }
 
 pub(super) fn load_user_transfer_account(
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     account_info: &AccountInfo,
     owner: &Pubkey,
     mint: &Pubkey,
@@ -268,12 +327,8 @@ pub(super) fn load_user_transfer_account(
     if account_info.owner == &spl_token_program_id() {
         validate_vault_token_account(account_info, mint, owner)
     } else {
-        super::super::scoped_settlement::load_scoped_holder_token_account(
-            program_id,
-            account_info,
-            owner,
-            mint,
-        )
+        validate_light_associated_token_address(owner, mint, account_info)?;
+        load_canonical_light_token_account(account_info, owner, mint)
     }
 }
 
@@ -334,9 +389,22 @@ pub(super) fn ensure_custody(
     option_vault: &TokenAccount,
     quote_vault: &TokenAccount,
 ) -> ProgramResult {
-    let option_liability = pool.accounted_option_reserve;
-    let quote_liability = pool.accounted_quote_reserve;
-    if option_vault.amount < option_liability || quote_vault.amount < quote_liability {
+    ensure_custody_with(pool, option_vault, quote_vault, None)
+}
+
+pub(super) fn ensure_custody_with(
+    pool: &AmoebaDlmmPoolV1,
+    option_vault: &TokenAccount,
+    quote_vault: &TokenAccount,
+    sidecar: Option<&crate::compressed_custody::CompressedCustodyV1>,
+) -> ProgramResult {
+    if !crate::compressed_custody::backs(
+        sidecar,
+        option_vault.amount,
+        quote_vault.amount,
+        pool.accounted_option_reserve,
+        pool.accounted_quote_reserve,
+    ) {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
     Ok(())
@@ -351,6 +419,27 @@ pub(super) fn validate_pool_vault_amounts(
     option_vault_info: &AccountInfo,
     quote_vault_info: &AccountInfo,
 ) -> Result<(u64, u64), ProgramError> {
+    validate_pool_vault_amounts_with(
+        program_id,
+        pool_info,
+        pool,
+        authority_info,
+        option_vault_info,
+        quote_vault_info,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn validate_pool_vault_amounts_with(
+    program_id: &Pubkey,
+    pool_info: &AccountInfo,
+    pool: &AmoebaDlmmPoolV1,
+    authority_info: &AccountInfo,
+    option_vault_info: &AccountInfo,
+    quote_vault_info: &AccountInfo,
+    sidecar_info: Option<&AccountInfo>,
+) -> Result<(u64, u64), ProgramError> {
     let (option_vault, quote_vault) = validate_pool_vaults(
         program_id,
         pool_info,
@@ -359,8 +448,25 @@ pub(super) fn validate_pool_vault_amounts(
         option_vault_info,
         quote_vault_info,
     )?;
-    ensure_custody(pool, &option_vault, &quote_vault)?;
-    Ok((option_vault.amount, quote_vault.amount))
+    let sidecar = crate::compressed_custody::load(
+        program_id,
+        sidecar_info,
+        crate::compressed_custody::CustodyKind::Pool,
+        pool_info.key,
+        &pool.option_mint,
+        &pool.quote_mint,
+    )?;
+    ensure_custody_with(pool, &option_vault, &quote_vault, sidecar.as_ref())?;
+    Ok((
+        option_vault
+            .amount
+            .checked_add(sidecar.as_ref().map_or(0, |state| state.option_atoms))
+            .ok_or(VaultError::ArithmeticOverflow)?,
+        quote_vault
+            .amount
+            .checked_add(sidecar.as_ref().map_or(0, |state| state.quote_atoms))
+            .ok_or(VaultError::ArithmeticOverflow)?,
+    ))
 }
 
 pub(super) fn validate_new_token_vault_target(account_info: &AccountInfo) -> ProgramResult {

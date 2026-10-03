@@ -12,13 +12,10 @@ fn load_collective_group_binding(
     sleeve_info: &AccountInfo,
     book_info: &AccountInfo,
     market_key: &Pubkey,
-    context: &WriterBookContext,
+    sleeve: &WriterSleeveV1,
+    group: &WriterSettlementGroupV1,
+    book: &WriterSeriesBookV1,
 ) -> Result<CollectiveGroupBinding, ProgramError> {
-    let WriterBookContext {
-        group,
-        sleeve,
-        book,
-    } = context;
     let record = book.records[..usize::from(book.series_count)]
         .iter()
         .find(|record| record.market == *market_key)
@@ -149,25 +146,56 @@ pub(in crate::processor) fn load_collective_dlmm_context_with_book(
     anchor_month_info: &AccountInfo,
 ) -> Result<(CollectiveDlmmContext, WriterBookContext), ProgramError> {
     let book_context = load_writer_book_context(program_id, sleeve_info, group_info, book_info)?;
-    let binding =
-        load_collective_group_binding(sleeve_info, book_info, market_info.key, &book_context)?;
+    let context = collective_dlmm_context_from_validated_book(
+        program_id,
+        sleeve_info,
+        book_info,
+        market_info,
+        anchor_month_info,
+        &book_context.sleeve,
+        &book_context.group,
+        &book_context.book,
+    )?;
+    Ok((context, book_context))
+}
+
+/// Reuse an already canonically loaded writer context within one instruction.
+/// All market, group membership and anchor-month checks remain the shared path.
+/// The original account loaders must validate these borrowed states first.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+pub(super) fn collective_dlmm_context_from_validated_book(
+    program_id: &Pubkey,
+    sleeve_info: &AccountInfo,
+    book_info: &AccountInfo,
+    market_info: &AccountInfo,
+    anchor_month_info: &AccountInfo,
+    sleeve: &WriterSleeveV1,
+    group: &WriterSettlementGroupV1,
+    book: &WriterSeriesBookV1,
+) -> Result<CollectiveDlmmContext, ProgramError> {
+    let binding = load_collective_group_binding(
+        sleeve_info,
+        book_info,
+        market_info.key,
+        sleeve,
+        group,
+        book,
+    )?;
     let market = load_collective_market_binding(program_id, market_info, &binding)?;
     let anchor_month_settled =
         load_collective_anchor_month_status(program_id, anchor_month_info, &binding)?;
-    Ok((
-        CollectiveDlmmContext {
-            sleeve_status: binding.sleeve_status,
-            group_status: binding.group_status,
-            active_weight_manifest_hash: binding.active_weight_manifest_hash,
-            anchor_month_settled,
-            option_mint: market.option_mint,
-            quote_mint: market.quote_mint,
-            expiry_ts: market.expiry_ts,
-            tick_size_quote_atomic: market.tick_size_quote_atomic,
-            maximum_price_quote_atomic: market.maximum_price_quote_atomic,
-            maximum_bin_id: market.maximum_bin_id,
-            maximum_bins_per_swap: market.maximum_bins_per_swap,
-        },
-        book_context,
-    ))
+    Ok(CollectiveDlmmContext {
+        sleeve_status: binding.sleeve_status,
+        group_status: binding.group_status,
+        active_weight_manifest_hash: binding.active_weight_manifest_hash,
+        anchor_month_settled,
+        option_mint: market.option_mint,
+        quote_mint: market.quote_mint,
+        expiry_ts: market.expiry_ts,
+        tick_size_quote_atomic: market.tick_size_quote_atomic,
+        maximum_price_quote_atomic: market.maximum_price_quote_atomic,
+        maximum_bin_id: market.maximum_bin_id,
+        maximum_bins_per_swap: market.maximum_bins_per_swap,
+    })
 }

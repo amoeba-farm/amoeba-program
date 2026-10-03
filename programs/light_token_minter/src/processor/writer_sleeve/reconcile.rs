@@ -239,14 +239,19 @@ pub(super) fn process_reconcile_writer_supply(
             {
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
-            let new_external = mint
+            let physical_external = mint
                 .supply
                 .checked_sub(observed_issuer)
+                .and_then(|v| v.checked_sub(book.individual.compressed_retired_atoms[index]))
                 .ok_or(VaultError::ArithmeticOverflow)?;
             let old_external = record
                 .external_open_interest_atoms
                 .checked_add(book.individual.series[index].outstanding)
                 .ok_or(VaultError::ArithmeticOverflow)?;
+            let old_forfeited = book.individual.forfeited_atoms[index];
+            let (new_external, new_forfeited) =
+                external_after_terminal_retirement(physical_external, old_external, old_forfeited)?;
+            let terminal_decrease = old_forfeited - new_forfeited;
             if new_external > old_external {
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
@@ -261,6 +266,8 @@ pub(super) fn process_reconcile_writer_supply(
                 .checked_sub(record.issuer_controlled_atoms)
                 .ok_or(VaultError::ArithmeticOverflow)?;
             if external_decrease
+                .checked_add(terminal_decrease)
+                .ok_or(VaultError::ArithmeticOverflow)?
                 != physical_decrease
                     .checked_add(custody_increase)
                     .ok_or(VaultError::ArithmeticOverflow)?
@@ -293,6 +300,7 @@ pub(super) fn process_reconcile_writer_supply(
                 .ok_or(VaultError::ArithmeticOverflow)?;
             record.total_physical_supply_atoms = mint.supply;
             record.issuer_controlled_atoms = observed_issuer;
+            book.individual.forfeited_atoms[index] = new_forfeited;
             let individual_decrease =
                 external_decrease.min(book.individual.series[index].outstanding);
             book.individual.series[index].outstanding -= individual_decrease;
@@ -323,6 +331,7 @@ pub(super) fn process_reconcile_writer_supply(
         let partition_remaining = sleeve
             .long_liability_remaining_atoms
             .checked_add(sleeve.writer_residual_remaining_atoms)
+            .and_then(|value| value.checked_add(book.individual.remaining_portfolio_credit))
             .ok_or(VaultError::ArithmeticOverflow)?;
         if sleeve.accounted_asset_atoms != partition_remaining {
             return Err(VaultError::WriterSolvencyViolation.into());
@@ -330,10 +339,18 @@ pub(super) fn process_reconcile_writer_supply(
         // Settlement removes price uncertainty. The live reserve is now the frozen long-class
         // ledger; tail and oracle-security measures no longer have an unsettled exposure to
         // recompute. Re-running the pre-settlement envelope here would overwrite the partition.
-        sleeve.exact_reserve_atoms = sleeve.long_liability_remaining_atoms;
+        sleeve.exact_reserve_atoms = sleeve
+            .long_liability_remaining_atoms
+            .checked_add(book.individual.remaining_portfolio_credit)
+            .ok_or(VaultError::ArithmeticOverflow)?;
         sleeve.lower_tail_reserve_atoms = 0;
         sleeve.upper_tail_reserve_atoms = 0;
         sleeve.security_exposure_atoms = 0;
+    } else if sleeve.status == WriterSleeveStatus::Expired
+        && book.individual.funding_base_initialized
+    {
+        // Net funding has frozen managed P&L. Holder burns can reduce ordinary
+        // claims, but cannot reinterpret consolidated owner obligations as pool risk.
     } else if let Some(policy) = lp_policy.as_ref() {
         dlmm::update_cash_metrics(&mut sleeve, &group, &book, &snapshot, policy, false)?;
     } else {
@@ -350,6 +367,22 @@ pub(super) fn process_reconcile_writer_supply(
     }
     store_state(book_info, &book)?;
     store_state(sleeve_info, &sleeve)
+}
+
+/// A holder may destroy an already-expired token themselves. That changes physical
+/// supply, but cannot consume entitlement again or release another USDC allocation.
+fn external_after_terminal_retirement(
+    physical_external: u64,
+    outstanding: u64,
+    forfeited: u64,
+) -> Result<(u64, u64), ProgramError> {
+    if forfeited == 0 {
+        return Ok((physical_external, 0));
+    }
+    if outstanding != 0 || physical_external > forfeited {
+        return Err(VaultError::WriterSupplyMismatch.into());
+    }
+    Ok((0, physical_external))
 }
 
 pub(super) fn process_cleanup_writer_custody(

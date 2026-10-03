@@ -304,13 +304,15 @@ impl BorshDeserialize for VaultInstruction {
             VaultInstructionTag::FinalizeWriterSleeveSettlementV1 => {
                 Ok(Self::FinalizeWriterSleeveSettlementV1)
             }
-            VaultInstructionTag::ClaimCollectiveLongV1 => Ok(Self::ClaimCollectiveLongV1 {
-                params: ClaimCollectiveLongV1Params::deserialize_reader(reader)?,
-            }),
             VaultInstructionTag::CloseWriterSleeveV1 => Ok(Self::CloseWriterSleeveV1),
             VaultInstructionTag::ScopedCollectiveSettlementV1 => {
+                let action = ScopedSettlementActionV1::deserialize_reader(reader)?;
+                if matches!(action, ScopedSettlementActionV1::Authorize
+                    | ScopedSettlementActionV1::Execute | ScopedSettlementActionV1::Revoke) {
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid collective settlement action"));
+                }
                 Ok(Self::ScopedCollectiveSettlementV1 {
-                    action: ScopedSettlementActionV1::deserialize_reader(reader)?,
+                    action,
                 })
             }
             VaultInstructionTag::ScopedPositionSettlementV1 => {

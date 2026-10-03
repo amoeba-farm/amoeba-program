@@ -15,6 +15,18 @@ pub(in crate::processor) fn process_propose_oracle_source_v3(
     accounts: &[AccountInfo],
     params: ProposeOracleSourceV3Params,
 ) -> ProgramResult {
+    let proposer = *accounts.first().ok_or(VaultError::InvalidAccountList)?.key;
+    process_propose_oracle_source_v3_for(program_id, accounts, params, &proposer)
+}
+
+/// Internal beneficiary override; only the guarded sponsorship entrypoint may
+/// select a PDA. Rent remains paid by the actual account-zero signer.
+pub(in crate::processor) fn process_propose_oracle_source_v3_for(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    params: ProposeOracleSourceV3Params,
+    proposer: &Pubkey,
+) -> ProgramResult {
     if accounts.len() != 16 {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -46,7 +58,7 @@ pub(in crate::processor) fn process_propose_oracle_source_v3(
             params.source_id,
         )?;
     }
-    process_propose_oracle_source(
+    process_propose_oracle_source_for(
         program_id,
         &accounts[..11],
         ProposeOracleSourceParams {
@@ -58,6 +70,7 @@ pub(in crate::processor) fn process_propose_oracle_source_v3(
             listing_bond: params.listing_bond,
         },
         (params.sku_index, params.sku_proof.as_slice()),
+        proposer,
     )
 }
 
@@ -66,6 +79,17 @@ pub(in crate::processor) fn process_propose_oracle_source(
     accounts: &[AccountInfo],
     params: ProposeOracleSourceParams,
     coverage_membership: (u16, &[[u8; 32]]),
+) -> ProgramResult {
+    let proposer = *accounts.first().ok_or(VaultError::InvalidAccountList)?.key;
+    process_propose_oracle_source_for(program_id, accounts, params, coverage_membership, &proposer)
+}
+
+fn process_propose_oracle_source_for(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    params: ProposeOracleSourceParams,
+    coverage_membership: (u16, &[[u8; 32]]),
+    proposer: &Pubkey,
 ) -> ProgramResult {
     if accounts.len() != 11 {
         return Err(VaultError::InvalidAccountList.into());
@@ -128,8 +152,7 @@ pub(in crate::processor) fn process_propose_oracle_source(
     validate_create_only_program_account_target(program_id, source_info)?;
     validate_create_only_program_account_target(program_id, observations_info)?;
     validate_create_only_program_account_target(program_id, source_reward_info)?;
-    let mut collateral =
-        load_canonical_user_collateral(program_id, collateral_info, proposer_info.key)?;
+    let mut collateral = load_canonical_user_collateral(program_id, collateral_info, proposer)?;
     debit_oracle_usdc_available(&mut collateral, sku.listing_bond)?;
 
     create_program_account(
@@ -181,7 +204,7 @@ pub(in crate::processor) fn process_propose_oracle_source(
         source_type_hash: params.source_type_hash,
         canonical_locator_hash: params.canonical_locator_hash,
         source_definition_hash: params.source_definition_hash,
-        proposer: *proposer_info.key,
+        proposer: *proposer,
         listing_bond_locked: sku.listing_bond,
         status: OracleSourceStatus::Candidate,
         ..OracleSourceState::default()
@@ -206,7 +229,7 @@ pub(in crate::processor) fn process_propose_oracle_source(
         sku_pool: *sku_info.key,
         source: *source_info.key,
         source_id: params.source_id,
-        proposer: *proposer_info.key,
+        proposer: *proposer,
         supporter_count: 0,
         registered: false,
         terminal_status: OracleSourceStatus::Candidate,

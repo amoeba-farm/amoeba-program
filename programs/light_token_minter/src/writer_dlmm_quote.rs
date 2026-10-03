@@ -279,7 +279,7 @@ pub fn quote_dlmm_with_orders(
     }
     let ascending = config.direction == AmoebaDlmmSwapDirection::QuoteForOption;
     if orders.iter().any(|order| {
-        order.side != if ascending { 1 } else { 0 }
+        order.order_side() != if ascending { 1 } else { 0 }
             || order.remaining_input == 0
             || order.remaining_quantity == 0
     }) || orders.windows(2).any(|pair| {

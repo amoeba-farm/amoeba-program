@@ -82,10 +82,10 @@ pub struct ProposeOracleSourceV3Params {
     pub sku_proof: Vec<[u8; 32]>,
 }
 
-impl BorshDeserialize for ProposeOracleSourceV3Params {
-    fn deserialize(data: &mut &[u8]) -> io::Result<Self> {
-        let mut cursor = CheckedCursor::new(data);
-        let value = Self {
+impl crate::fixed_codec::CursorField for ProposeOracleSourceV3Params {
+    #[inline(never)]
+    fn read(cursor: &mut CheckedCursor<'_>) -> Self {
+        Self {
             source_id: cursor.bytes(),
             bucket_id: cursor.bytes(),
             source_type_hash: cursor.bytes(),
@@ -94,12 +94,16 @@ impl BorshDeserialize for ProposeOracleSourceV3Params {
             listing_bond: cursor.u64(),
             sku_index: cursor.u16(),
             sku_proof: deserialize_bounded_bytes32_vec_cursor(
-                &mut cursor,
+                cursor,
                 MAX_ORACLE_SKU_MERKLE_PROOF_DEPTH,
             ),
-        };
-        *data = cursor.finish()?;
-        Ok(value)
+        }
+    }
+}
+
+impl BorshDeserialize for ProposeOracleSourceV3Params {
+    fn deserialize(data: &mut &[u8]) -> io::Result<Self> {
+        crate::fixed_codec::cursor_deserialize(data)
     }
 
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {

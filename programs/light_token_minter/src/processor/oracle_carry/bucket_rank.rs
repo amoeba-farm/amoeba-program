@@ -4,21 +4,23 @@ use crate::oracle_rank::{encode_signed, MedianRank};
 use borsh::BorshSerialize;
 
 const SEED: &[u8] = b"g3-bucket-rank-v1";
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
-pub(super) struct BucketRank {
-    header: Header,
-    root: Pubkey,
-    month: Pubkey,
-    snapshot: [u8; 32],
-    payer: Pubkey,
-    nonce: [u8; 32],
-    last_source: [u8; 32],
-    total: u16,
-    processed: u16,
-    eligible: u16,
-    rank: MedianRank,
-    mode: u8,
-    complete: bool,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, BorshSerialize)]
+    pub(super) struct BucketRank {
+        header: Header,
+        root: Pubkey,
+        month: Pubkey,
+        snapshot: [u8; 32],
+        payer: Pubkey,
+        nonce: [u8; 32],
+        last_source: [u8; 32],
+        total: u16,
+        processed: u16,
+        eligible: u16,
+        rank: MedianRank,
+        mode: u8,
+        complete: bool,
+    }
 }
 impl Record for BucketRank {
     const DISCRIMINATOR: [u8; 3] = *b"OBR";

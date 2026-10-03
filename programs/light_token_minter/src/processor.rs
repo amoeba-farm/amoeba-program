@@ -24,6 +24,7 @@ mod oracle_economics;
 mod oracle_evidence;
 mod oracle_membership;
 mod oracle_rules;
+mod oracle_sponsorship;
 mod september_bootstrap;
 use oracle_core::*;
 mod oracle_schedule_validation;
@@ -33,7 +34,6 @@ mod oracle_usdc;
 mod oracle_usdc_rewards;
 mod oracle_validation;
 mod recipe_weights;
-mod scoped_settlement;
 mod settlement_signers;
 mod settlement_sources;
 mod settlement_validation;
@@ -92,6 +92,9 @@ use sku_coverage_resolution::*;
 use sku_manifest::*;
 use vault_core::*;
 
+use crate::compact_error::cpi::{invoke, invoke_signed};
+use crate::ProgramError;
+use crate::ProgramResult;
 use crate::{
     compression::{
         apply_market_page_leaf_mutations, apply_settlement_leaf_mutations, MarketPageLeafCreate,
@@ -182,11 +185,8 @@ use crate::{
 use borsh::BorshDeserialize;
 use solana_program::{
     account_info::AccountInfo,
-    entrypoint::ProgramResult,
     hash::hashv,
     instruction::Instruction,
-    program::{invoke, invoke_signed},
-    program_error::ProgramError,
     program_option::COption,
     pubkey::Pubkey,
     rent::Rent,
@@ -201,7 +201,17 @@ const ORACLE_UPDATE_CAP_PPM: u64 = 25_000;
 const ORACLE_UPDATE_BASE_BOND: u64 = 1;
 /// Two purported sources are not independent (same operator/upstream feed or provably mirrored).
 const ORACLE_SOURCE_REASON_NON_INDEPENDENT: u8 = 8;
+/// Public processor entry with Solana's error type, for native harnesses and host callers.
 pub fn process_instruction(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> solana_program::entrypoint::ProgramResult {
+    process_instruction_compact(program_id, accounts, instruction_data).map_err(Into::into)
+}
+
+/// On-chain entry: the compact error carries the exact code returned to the runtime.
+pub(crate) fn process_instruction_compact(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
@@ -245,10 +255,11 @@ pub fn process_instruction_with_classic_compression_views_for_tests(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
     _capability: &ClassicCompressionTestCapability,
-) -> ProgramResult {
+) -> solana_program::entrypoint::ProgramResult {
     let gate = crate::governance_gate::disabled_build_capability();
     let context = ExecutionContext::compressed_inner(&gate);
     process_instruction_with_context(program_id, accounts, instruction_data, &context)
+        .map_err(Into::into)
 }
 
 /// Current council ABI: exact codecs and absolute-seat arithmetic.

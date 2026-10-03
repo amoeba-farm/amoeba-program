@@ -6,6 +6,8 @@
 
 use std::io::{Result as IoResult, Write};
 
+use crate::ProgramError;
+use crate::ProgramResult;
 use borsh::{BorshDeserialize, BorshSerialize};
 use light_compressed_account::{
     compressed_account::PackedMerkleContext,
@@ -24,9 +26,7 @@ use light_sdk_types::{
 use solana_program::{
     account_info::AccountInfo,
     clock::Clock,
-    entrypoint::ProgramResult,
     keccak::hashv as keccak_hashv,
-    program_error::ProgramError,
     pubkey::Pubkey,
     sysvar::{rent::Rent, Sysvar},
 };
@@ -426,6 +426,10 @@ pub fn process_lifecycle_instruction(
             process_compress(program_id, accounts, payload)
         }
         AmoebaDlmmInstructionTag::DecompressLightState => {
+            if payload.starts_with(&[255, b'H', b'R', 1]) {
+                // Retired holder restoration is never a state-page operation.
+                return Err(VaultError::InvalidInstructionData.into());
+            }
             if payload.starts_with(&crate::ameba_dlmm_instruction::RESTORE_AMOEBA_DLMM_VAULT_V3) {
                 return super::ameba_dlmm::process_restore_vault(
                     program_id,

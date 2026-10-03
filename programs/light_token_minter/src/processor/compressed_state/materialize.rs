@@ -394,7 +394,7 @@ pub(in crate::processor) fn capture_leaf(
     target: &AccountInfo,
     domain: CompressedStateDomain,
     revision: u64,
-) -> Result<CompressedAmebaStateLeaf, solana_program::program_error::ProgramError> {
+) -> Result<CompressedAmebaStateLeaf, crate::ProgramError> {
     if target.owner != program_id || target.executable {
         return Err(VaultError::InvalidCompressionWitness.into());
     }

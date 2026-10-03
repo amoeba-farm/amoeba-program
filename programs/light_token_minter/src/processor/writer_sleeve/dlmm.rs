@@ -13,7 +13,9 @@ pub(in crate::processor) use capacity::{
     process_enable_full_collateral_capacity, process_enable_shared_reserve,
 };
 pub(in crate::processor) use liquidity::{process_initialize_position, process_liquidity_action};
-pub(in crate::processor) use swap::{finish_swap, load_swap_state, WriterSwapState};
+pub(in crate::processor) use swap::{
+    finish_swap_with_cash, load_swap_state, load_swap_state_with_cash, WriterSwapState,
+};
 
 pub(in crate::processor) fn risk_limits(
     snapshot: &WriterPolicySnapshotV1,
@@ -439,7 +441,7 @@ pub(in crate::processor) fn process_policy_action(
             || account.is_writable != matches!(index, 0 | 7)
             || accounts[..index]
                 .iter()
-                .any(|earlier| earlier.key == account.key)
+                .any(|earlier| crate::pubkey_eq(earlier.key, account.key))
         {
             return Err(VaultError::InvalidAccountList.into());
         }

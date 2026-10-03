@@ -1,4 +1,5 @@
-//! Individually collateralized asks. No pooled receipt, manager authority or fee.
+//! Owner-portfolio collateralized asks. Each record is a price/quantity witness;
+//! its `collateral` wire field records only that Open's initial cash top-up.
 use crate::fixed_codec::{
     fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
     FixedStateEncode, FixedWriter,
@@ -8,6 +9,56 @@ use solana_program::pubkey::Pubkey;
 
 pub const POSITION_SEED: &[u8] = b"individual-writer-v1";
 pub const SCALE: u64 = 1_000_000;
+pub const MAX_BUYBACK_LEGS: usize = 8;
+
+/// Fixed-size payload: malformed lengths cannot allocate an unbounded leg list.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct IndividualBuybackLegV1 {
+    pub series_index: u8,
+    pub quantity: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct IndividualBuybackV1 {
+    pub leg_count: u8,
+    pub legs: [IndividualBuybackLegV1; MAX_BUYBACK_LEGS],
+    pub maximum_payment: u64,
+    pub minimum_refund: u64,
+    pub deadline_ts: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct IndividualHedgeLeafWitnessV1 {
+    pub amount: u64,
+    pub leaf_index: u32,
+    pub root_index: u16,
+    pub prove_by_index: bool,
+    pub tree_index: u8,
+    pub queue_index: u8,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct IndividualHedgeTransferV1 {
+    pub series_index: u8,
+    pub quantity: u64,
+    pub input: IndividualHedgeLeafWitnessV1,
+    pub input_has_delegate: bool,
+    pub output_queue_index: u8,
+    pub merkle_account_count: u8,
+    pub maximum_topup: u64,
+    pub proof: Option<[u8; 128]>,
+}
+
+/// Optional whole WriterCash leaf consumed when its compressed custody backs
+/// a deferred owner credit. The same proof covers one input and its change.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+pub struct IndividualPortfolioCashWitnessV1 {
+    pub amount: u64,
+    pub leaf_index: u32,
+    pub root_index: u16,
+    pub prove_by_index: bool,
+    pub proof: Option<[u8; 128]>,
+}
 
 pub fn derive_position(
     program: &Pubkey,
@@ -60,7 +111,22 @@ pub struct IndividualTotals {
     pub funded_long_liability: u64,
     pub funded_stranded: u64,
     pub series: [IndividualSeries; 20],
-    pub reserved: [u8; 2719],
+    /// Filled once when the sleeve's payout becomes redeemable, never at oracle submission.
+    pub settlement_finalized_ts: u64,
+    /// Tokens permanently retired in compressed custody; no token account is allocated.
+    pub compressed_retired_atoms: [u64; 20],
+    /// Expired entitlement whose token may remain in its holder's wallet.
+    pub forfeited_atoms: [u64; 20],
+    pub pending_portfolio_funding: u64,
+    pub funding_base_initialized: bool,
+    pub hedges_consolidated: bool,
+    pub funding_managed_numerator_le: [u8; 16],
+    pub funding_prefix_numerator_le: [u8; 16],
+    pub active_locked: [u64; 20],
+    pub hedge_retired: [u64; 20],
+    pub total_portfolio_credit: u64,
+    pub remaining_portfolio_credit: u64,
+    pub reserved: [u8; 2013],
 }
 impl Default for IndividualTotals {
     fn default() -> Self {
@@ -71,13 +137,30 @@ impl Default for IndividualTotals {
             funded_long_liability: 0,
             funded_stranded: 0,
             series: [IndividualSeries::default(); 20],
-            reserved: [0; 2719],
+            settlement_finalized_ts: 0,
+            compressed_retired_atoms: [0; 20],
+            forfeited_atoms: [0; 20],
+            pending_portfolio_funding: 0,
+            funding_base_initialized: false,
+            hedges_consolidated: false,
+            funding_managed_numerator_le: [0; 16],
+            funding_prefix_numerator_le: [0; 16],
+            active_locked: [0; 20],
+            hedge_retired: [0; 20],
+            total_portfolio_credit: 0,
+            remaining_portfolio_credit: 0,
+            reserved: [0; 2013],
         }
     }
 }
 fixed_state_deserialize!(IndividualTotals, 3072, {
     cash_obligations: u64, open_positions: u64, funded: bool, funded_long_liability: u64, funded_stranded: u64,
-    series: [IndividualSeries; 20], reserved: [u8; 2719],
+    series: [IndividualSeries; 20], settlement_finalized_ts: u64,
+    compressed_retired_atoms: [u64; 20], forfeited_atoms: [u64; 20],
+    pending_portfolio_funding: u64, funding_base_initialized: bool, hedges_consolidated: bool,
+    funding_managed_numerator_le: [u8; 16], funding_prefix_numerator_le: [u8; 16],
+    active_locked: [u64; 20], hedge_retired: [u64; 20],
+    total_portfolio_credit: u64, remaining_portfolio_credit: u64, reserved: [u8; 2013],
 });
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -95,6 +178,7 @@ pub struct IndividualWriterPosition {
     pub price: u64,
     pub quantity: u64,
     pub filled: u64,
+    /// Informational initial deposit; portfolio.cash_atoms alone authorizes refunds.
     pub collateral: u64,
     pub premium: u64,
     pub cancelled: bool,
@@ -118,35 +202,6 @@ impl IndividualWriterPosition {
         self.filled = filled;
         self.premium = total;
         Some(premium)
-    }
-    /// Cancel releases only unsold backing and already-earned premiums.
-    pub fn cancel(&mut self, max_payout: u64) -> Option<u64> {
-        if self.claimed {
-            return None;
-        }
-        let retained = amount(self.filled, max_payout)?;
-        let refund = self
-            .collateral
-            .checked_sub(retained)?
-            .checked_add(self.premium)?;
-        self.cancelled = true;
-        self.collateral = retained;
-        self.premium = 0;
-        Some(refund)
-    }
-    pub fn claim(&mut self, payout: u64) -> Option<u64> {
-        if self.claimed {
-            return None;
-        }
-        let residual = self
-            .collateral
-            .checked_sub(amount(self.filled, payout)?)?
-            .checked_add(self.premium)?;
-        self.claimed = true;
-        self.cancelled = true;
-        self.collateral = 0;
-        self.premium = 0;
-        Some(residual)
     }
 }
 fixed_state_deserialize!(IndividualWriterPosition, IndividualWriterPosition::LEN, {
@@ -173,4 +228,17 @@ pub enum IndividualWriterAction {
     FundSettlement,
     Claim,
     Close,
+    /// Buyer signs for a regular wallet-owned compressed leaf carrying the
+    /// deterministic expiry delegate. Existing Fill stays undelegated.
+    FillCompressed {
+        quantity: u64,
+        maximum_payment: u64,
+    },
+    LockHedge(IndividualHedgeTransferV1),
+    UnlockHedge(IndividualHedgeTransferV1),
+    RetireHedge(IndividualHedgeTransferV1),
+    ClaimPortfolio(Option<IndividualPortfolioCashWitnessV1>),
+    /// Buy exact matching options from funded asks using only this owner's
+    /// portfolio cash. Delivery into portfolio custody and refund are atomic.
+    BuybackFromAsks(IndividualBuybackV1),
 }

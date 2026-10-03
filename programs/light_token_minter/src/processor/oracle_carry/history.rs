@@ -8,23 +8,25 @@ use borsh::BorshSerialize;
 
 const SEED: &[u8] = b"g3-history-median-v1";
 
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
-pub(super) struct HistoryMedian {
-    header: Header,
-    source: Pubkey,
-    snapshot: [u8; 32],
-    cursor: Pubkey,
-    payer: Pubkey,
-    total: u32,
-    remaining: u32,
-    start: u64,
-    end: u64,
-    last_time: u64,
-    standing: u64,
-    rank: MedianRank,
-    mode: u8,
-    inherited: bool,
-    complete: bool,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, BorshSerialize)]
+    pub(super) struct HistoryMedian {
+        header: Header,
+        source: Pubkey,
+        snapshot: [u8; 32],
+        cursor: Pubkey,
+        payer: Pubkey,
+        total: u32,
+        remaining: u32,
+        start: u64,
+        end: u64,
+        last_time: u64,
+        standing: u64,
+        rank: MedianRank,
+        mode: u8,
+        inherited: bool,
+        complete: bool,
+    }
 }
 impl Record for HistoryMedian {
     const DISCRIMINATOR: [u8; 3] = *b"OHM";

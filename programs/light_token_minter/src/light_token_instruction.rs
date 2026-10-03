@@ -5,9 +5,9 @@
 //! general transfer router while preserving the exact target program and data bytes. Light-to-SPL
 //! additionally forwards the System Program for the cToken program's nested rent top-up CPI.
 
+use crate::ProgramError;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
-    program_error::ProgramError,
     pubkey::Pubkey,
 };
 
@@ -26,37 +26,6 @@ const CREATE_TOKEN_POOL: [u8; 8] = [23, 169, 27, 122, 147, 169, 209, 152];
 const CREATE_ASSOCIATED_TOKEN_ACCOUNT_IDEMPOTENT: u8 = 102;
 const TRANSFER2: u8 = 101;
 const LIGHT_CANNOT_DETERMINE_ACCOUNT_TYPE: u32 = 17_503;
-
-/// Byte-exact Light Token 0.23 Approve; the scoped program PDA is the only delegate.
-pub(crate) fn approve(
-    source: &Pubkey,
-    delegate: &Pubkey,
-    owner: &Pubkey,
-    amount: u64,
-) -> Instruction {
-    let mut data = vec![4];
-    data.extend_from_slice(&amount.to_le_bytes());
-    Instruction {
-        program_id: light_token_program_id(),
-        data,
-        accounts: vec![
-            AccountMeta::new(*source, false),
-            AccountMeta::new_readonly(*delegate, false),
-            AccountMeta::new_readonly(*owner, true),
-        ],
-    }
-}
-
-pub(crate) fn revoke(source: &Pubkey, owner: &Pubkey) -> Instruction {
-    Instruction {
-        program_id: light_token_program_id(),
-        data: vec![5],
-        accounts: vec![
-            AccountMeta::new(*source, false),
-            AccountMeta::new_readonly(*owner, true),
-        ],
-    }
-}
 
 pub(crate) const fn light_token_program_id() -> Pubkey {
     LIGHT_TOKEN_PROGRAM_ID
@@ -382,4 +351,191 @@ pub(crate) fn transfer_interface(
         }
         _ => Err(ProgramError::Custom(LIGHT_CANNOT_DETERMINE_ACCOUNT_TYPE)),
     }
+}
+
+/// Proof-free payout from a hot vault into one wallet-owned compressed token leaf.
+/// The recipient is a wallet pubkey, never a token account that needs rent funding.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compress_to_wallet(
+    amount: u64,
+    decimals: u8,
+    source: &Pubkey,
+    source_owner: &Pubkey,
+    authority: &Pubkey,
+    payer: &Pubkey,
+    mint: &Pubkey,
+    recipient: &Pubkey,
+    spl_interface: &Pubkey,
+    compression: [&Pubkey; 5],
+) -> Result<Instruction, ProgramError> {
+    compress_to_wallet_with_delegate(
+        amount,
+        decimals,
+        source,
+        source_owner,
+        authority,
+        payer,
+        mint,
+        recipient,
+        spl_interface,
+        compression,
+        None,
+    )
+}
+
+/// A proof-free regular compressed output. No recipient ATA or rent sponsor is used.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compress_to_wallet_with_delegate(
+    amount: u64,
+    decimals: u8,
+    source: &Pubkey,
+    source_owner: &Pubkey,
+    authority: &Pubkey,
+    payer: &Pubkey,
+    mint: &Pubkey,
+    recipient: &Pubkey,
+    spl_interface: &Pubkey,
+    compression: [&Pubkey; 5],
+    delegate: Option<&Pubkey>,
+) -> Result<Instruction, ProgramError> {
+    let spl = token_instruction::id();
+    let from_spl = *source_owner == spl;
+    if !from_spl && *source_owner != light_token_program_id() {
+        return Err(ProgramError::Custom(LIGHT_CANNOT_DETERMINE_ACCOUNT_TYPE));
+    }
+    let mut data = vec![TRANSFER2, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+    data.extend_from_slice(&1u32.to_le_bytes());
+    // Packed accounts: queue, mint, source, authority, recipient, SPL pool, SPL program.
+    append_compression(
+        &mut data,
+        CompressionMode::Compress,
+        amount,
+        1,
+        2,
+        3,
+        if from_spl { 5 } else { 0 },
+        0,
+        if from_spl {
+            get_spl_interface_pda_and_bump(mint).1
+        } else {
+            0
+        },
+        if from_spl { decimals } else { 0 },
+    );
+    data.push(0); // no input proof: only hot tokens are consumed
+    data.extend_from_slice(&0u32.to_le_bytes()); // no compressed inputs
+    data.extend_from_slice(&1u32.to_le_bytes()); // one compressed output
+    data.push(4); // recipient wallet
+    data.extend_from_slice(&amount.to_le_bytes());
+    data.extend_from_slice(&[
+        u8::from(delegate.is_some()),
+        if delegate.is_some() { 7 } else { 0 },
+        1,
+        3,
+    ]);
+    data.extend_from_slice(&[0, 0, 0, 0]); // no lamports or extensions
+    let mut instruction = Instruction {
+        program_id: light_token_program_id(),
+        accounts: vec![
+            AccountMeta::new_readonly(*compression[0], false),
+            AccountMeta::new(*payer, true),
+            AccountMeta::new_readonly(cpi_authority(), false),
+            AccountMeta::new_readonly(*compression[1], false),
+            AccountMeta::new_readonly(*compression[2], false),
+            AccountMeta::new_readonly(*compression[3], false),
+            AccountMeta::new_readonly(Pubkey::default(), false),
+            AccountMeta::new(*compression[4], false),
+            AccountMeta::new_readonly(*mint, false),
+            AccountMeta::new(*source, false),
+            AccountMeta::new_readonly(*authority, true),
+            AccountMeta::new_readonly(*recipient, false),
+            AccountMeta::new(*spl_interface, false),
+            AccountMeta::new_readonly(spl, false),
+        ],
+        data,
+    };
+    if let Some(delegate) = delegate {
+        instruction
+            .accounts
+            .push(AccountMeta::new_readonly(*delegate, false));
+    }
+    Ok(instruction)
+}
+
+/// Validated SPL staging entries used only by atomic individual buybacks.
+pub(crate) struct BuybackCompression<'a> {
+    pub amount: u64,
+    pub mint: &'a Pubkey,
+    pub source: &'a Pubkey,
+    pub authority: &'a Pubkey,
+    pub interface: &'a Pubkey,
+}
+
+pub(crate) fn compress_buyback_basket(
+    payer: &Pubkey,
+    recipient: &Pubkey,
+    compression: [&Pubkey; 5],
+    entries: &[BuybackCompression],
+) -> Result<Instruction, ProgramError> {
+    if entries.is_empty()
+        || entries.len() > crate::individual_writer::MAX_BUYBACK_LEGS
+        || entries.iter().enumerate().any(|(i, item)| {
+            item.amount == 0 || entries[..i].iter().any(|prior| prior.mint == item.mint)
+        })
+    {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let mut data = Vec::with_capacity(27 + 29 * entries.len());
+    data.extend_from_slice(&[TRANSFER2, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+    data.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+    for (i, item) in entries.iter().enumerate() {
+        let mint = (3 + 4 * i) as u8;
+        append_compression(
+            &mut data,
+            CompressionMode::Compress,
+            item.amount,
+            mint,
+            mint + 1,
+            mint + 2,
+            mint + 3,
+            0,
+            get_spl_interface_pda_and_bump(item.mint).1,
+            6,
+        );
+    }
+    data.push(0);
+    data.extend_from_slice(&0u32.to_le_bytes());
+    data.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+    for (i, item) in entries.iter().enumerate() {
+        data.push(1);
+        data.extend_from_slice(&item.amount.to_le_bytes());
+        data.extend_from_slice(&[0, 0, (3 + 4 * i) as u8, 3]);
+    }
+    data.extend_from_slice(&[0, 0, 0, 0]); // instruction-level lamport/TLV options
+    let mut accounts = Vec::with_capacity(10 + 4 * entries.len());
+    accounts.extend([
+        AccountMeta::new_readonly(*compression[0], false),
+        AccountMeta::new(*payer, true),
+        AccountMeta::new_readonly(cpi_authority(), false),
+        AccountMeta::new_readonly(*compression[1], false),
+        AccountMeta::new_readonly(*compression[2], false),
+        AccountMeta::new_readonly(*compression[3], false),
+        AccountMeta::new_readonly(Pubkey::default(), false),
+        AccountMeta::new(*compression[4], false),
+        AccountMeta::new_readonly(*recipient, false),
+        AccountMeta::new_readonly(token_instruction::id(), false),
+    ]);
+    for item in entries {
+        accounts.extend([
+            AccountMeta::new_readonly(*item.mint, false),
+            AccountMeta::new(*item.source, false),
+            AccountMeta::new_readonly(*item.authority, true),
+            AccountMeta::new(*item.interface, false),
+        ]);
+    }
+    Ok(Instruction {
+        program_id: light_token_program_id(),
+        accounts,
+        data,
+    })
 }

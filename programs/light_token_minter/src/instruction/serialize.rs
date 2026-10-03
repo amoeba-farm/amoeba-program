@@ -386,9 +386,6 @@ impl BorshSerialize for VaultInstruction {
                 writer,
                 VaultInstructionTag::FinalizeWriterSleeveSettlementV1,
             ),
-            Self::ClaimCollectiveLongV1 { params } => {
-                serialize_tagged_payload(writer, VaultInstructionTag::ClaimCollectiveLongV1, params)
-            }
             Self::CloseWriterSleeveV1 => {
                 serialize_tag(writer, VaultInstructionTag::CloseWriterSleeveV1)
             }

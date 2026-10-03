@@ -100,6 +100,34 @@ fn writer_book_digest_inner(book: &WriterSeriesBookV1, economic_only: bool) -> [
             &record.settlement_liability_remaining_atoms.to_le_bytes(),
         );
     }
+    if book.individual.settlement_finalized_ts != 0
+        || book.records[..count].iter().any(|r| r.reserved != [0; 4])
+        || book
+            .individual
+            .compressed_retired_atoms
+            .iter()
+            .any(|v| *v != 0)
+        || book.individual.forfeited_atoms.iter().any(|v| *v != 0)
+    {
+        append_hash_bytes(
+            &mut bytes,
+            &mut len,
+            &book.individual.settlement_finalized_ts.to_le_bytes(),
+        );
+        for index in 0..count {
+            append_hash_bytes(&mut bytes, &mut len, &book.records[index].reserved);
+            append_hash_bytes(
+                &mut bytes,
+                &mut len,
+                &book.individual.compressed_retired_atoms[index].to_le_bytes(),
+            );
+            append_hash_bytes(
+                &mut bytes,
+                &mut len,
+                &book.individual.forfeited_atoms[index].to_le_bytes(),
+            );
+        }
+    }
     hashv(&[&bytes[..len]]).to_bytes()
 }
 

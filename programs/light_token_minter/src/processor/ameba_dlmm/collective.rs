@@ -116,9 +116,11 @@ pub(super) fn process_collective_swap_exact_in(
     accounts: &[AccountInfo],
     params: SwapAmoebaDlmmExactInV1Params,
 ) -> ProgramResult {
-    if accounts.len() < COLLECTIVE_SWAP_FIXED_ACCOUNTS {
+    if accounts.len() < COLLECTIVE_SWAP_FIXED_ACCOUNTS + compressed_delivery::COMPRESSION_ACCOUNTS {
         return Err(VaultError::InvalidAccountList.into());
     }
+    let (accounts, compression) =
+        accounts.split_at(accounts.len() - compressed_delivery::COMPRESSION_ACCOUNTS);
     // Existing trader/config/Market/month prefix, then sleeve/group/book before pool.
     let (context, book_context) =
         super::super::writer_sleeve::load_collective_dlmm_context_with_book(
@@ -159,92 +161,57 @@ pub(super) fn process_collective_swap_exact_in(
         params,
         &mut writer,
         accounts,
+        compression,
     )?;
-    // The original trade signature also grants the exact owner/mint settlement capability.
-    super::super::scoped_settlement::authorize_collective_settlement(
-        program_id,
-        &[
-            accounts[0].clone(),
-            accounts[2].clone(),
-            accounts[9].clone(),
-            accounts[13].clone(),
-            accounts[23].clone(),
-            accounts[15].clone(),
-            accounts[21].clone(),
-            accounts[22].clone(),
-            accounts[20].clone(),
-        ],
-        false,
-    )
+    Ok(())
 }
 
 #[inline(never)]
-pub(super) fn process_collective_order_swap(
+pub(super) fn process_collective_compressed_swap_exact_in<'a>(
     program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    params: SwapAmoebaDlmmExactInV1Params,
-    orders: &mut orders::OrderSwapState,
+    accounts: &[AccountInfo<'a>],
+    params: crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params,
 ) -> ProgramResult {
-    if accounts.len() < orders::ORDER_SWAP_FIXED_ACCOUNTS {
-        return Err(VaultError::InvalidAccountList.into());
-    }
+    let compressed = super::compressed_swap::parse(program_id, accounts, &params)?;
+    let base = compressed.base;
     let (context, book_context) =
         super::super::writer_sleeve::load_collective_dlmm_context_with_book(
-            program_id,
-            &accounts[4],
-            &accounts[5],
-            &accounts[6],
-            &accounts[2],
-            &accounts[3],
+            program_id, &base[4], &base[5], &base[6], &base[2], &base[3],
         )?;
-    let config = load_canonical_vault_config(program_id, &accounts[1])?;
-    let pool = load_pool(program_id, &accounts[7])?;
-    validate_collective_pool_binding(&config, &accounts[2], &accounts[3], &context, &pool)?;
+    let config = load_canonical_vault_config(program_id, &base[1])?;
+    let pool = load_pool(program_id, &base[7])?;
+    if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    validate_collective_pool_binding(&config, &base[2], &base[3], &context, &pool)?;
     if context.group_status != WriterSettlementGroupStatus::Active
         || !matches!(context.sleeve_status, WriterSleeveStatus::Active)
         || context.anchor_month_settled
     {
         return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
     }
-    let mut writer = super::super::writer_sleeve::dlmm::load_swap_state(
+    let mut writer = super::super::writer_sleeve::dlmm::load_swap_state_with_cash(
         program_id,
-        accounts,
+        base,
         &pool,
         book_context,
+        super::compressed_swap::existing_sidecar(program_id, compressed.writer_cash_custody)?,
     )?;
-    let normalized: Vec<_> = accounts[..4]
+    let normalized: Vec<_> = base[..4]
         .iter()
-        .chain(accounts[7..23].iter())
-        .chain(accounts[orders::witness_end(accounts)?..].iter())
+        .chain(base[7..23].iter())
+        .chain(base[31..].iter())
         .cloned()
         .collect();
-    let direct = orders.taker_sequence.is_none();
-    process_collective_swap_with_orders_core(
+    super::swap::process_collective_swap_mode(
         program_id,
         &normalized,
-        params,
+        params.swap,
         &mut writer,
-        accounts,
-        Some(orders),
-    )?;
-    if direct {
-        super::super::scoped_settlement::authorize_collective_settlement(
-            program_id,
-            &[
-                accounts[0].clone(),
-                accounts[2].clone(),
-                accounts[9].clone(),
-                accounts[13].clone(),
-                accounts[23].clone(),
-                accounts[15].clone(),
-                accounts[21].clone(),
-                accounts[22].clone(),
-                accounts[20].clone(),
-            ],
-            false,
-        )?;
-    }
-    Ok(())
+        base,
+        &[],
+        Some((&compressed, &params)),
+    )
 }
 
 #[inline(never)]

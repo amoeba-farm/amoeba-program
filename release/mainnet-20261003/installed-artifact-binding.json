@@ -1,0 +1,13 @@
+{
+  "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "deployedSlot": 452844697,
+  "artifactBytes": 1453584,
+  "artifactSha256": "8e9828ec9d20555991813bbc9bde7ee0ca19e300f6114bacb224f7ab4f9f9781",
+  "programDataAccountBytes": 1457117,
+  "programDataAccountSha256": "f21ae081ec06bdcdb6b1ed55d9ca13f613caccc5ef70755303b92716a34e1ec8",
+  "programDataPayloadBytes": 1457072,
+  "programDataPayloadSha256": "861f2f6d256d3970a2c47e80c543f9a78d01c37afa12b7f833aef200ba9b5b41",
+  "mandatoryZeroPaddingBytes": 3488,
+  "minimumContextSlot": 452844785
+}

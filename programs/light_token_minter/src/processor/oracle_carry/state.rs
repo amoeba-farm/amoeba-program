@@ -8,12 +8,14 @@ pub(super) const SOURCE_SEED: &[u8] = b"g3-oracle-carry-source";
 pub(super) const JOURNAL_SEED: &[u8] = b"g3-oracle-knowledge";
 pub(super) const CHECKPOINT_SEED: &[u8] = b"g3-oracle-checkpoint";
 
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
-pub(super) struct Header {
-    pub(super) discriminator: [u8; 3],
-    pub(super) version: u8,
-    pub(super) initialized: bool,
-    pub(super) bump: u8,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, BorshSerialize)]
+    pub(super) struct Header {
+        pub(super) discriminator: [u8; 3],
+        pub(super) version: u8,
+        pub(super) initialized: bool,
+        pub(super) bump: u8,
+    }
 }
 
 pub(super) trait Record: BorshDeserialize + BorshSerialize {
@@ -25,10 +27,12 @@ pub(super) trait Record: BorshDeserialize + BorshSerialize {
 
 macro_rules! record {
     ($name:ident, $disc:literal, $len:expr, {$($field:ident: $ty:ty),* $(,)?}) => {
-        #[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
-        pub(super) struct $name {
-            pub header: Header,
-            $(pub $field: $ty,)*
+        crate::fixed_codec::compact_borsh_struct! {
+            #[derive(Clone, Debug, BorshSerialize)]
+            pub(super) struct $name {
+                pub header: Header,
+                $(pub $field: $ty,)*
+            }
         }
         impl Record for $name {
             const DISCRIMINATOR: [u8; 3] = *$disc;
@@ -46,14 +50,16 @@ record!(Period, b"OCP", 32 * 4 + 8 * 2 + 2 * 2, {
     predecessor_recipe: [u8; 32], expiry: u64, registered_at: u64,
     expected_imports: u16, next_import: u16,
 });
-#[derive(Clone, Debug, BorshDeserialize, BorshSerialize)]
-pub(super) struct Journal {
-    pub header: Header,
-    pub source: Pubkey,
-    pub head: Pubkey,
-    pub rolling_observation_hash: [u8; 32],
-    pub count: u32,
-    pub observation_count: u32,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, BorshSerialize)]
+    pub(super) struct Journal {
+        pub header: Header,
+        pub source: Pubkey,
+        pub head: Pubkey,
+        pub rolling_observation_hash: [u8; 32],
+        pub count: u32,
+        pub observation_count: u32,
+    }
 }
 impl Record for Journal {
     const DISCRIMINATOR: [u8; 3] = *b"OKJ";

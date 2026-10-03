@@ -5,10 +5,6 @@ pub(crate) fn invalid_fixed_borsh() -> std::io::Error {
     std::io::ErrorKind::InvalidData.into()
 }
 
-/// Generates a one-bounds-check slice decoder while retaining a field-for-field generic-reader
-/// fallback for Borsh tooling. Runtime account loaders call `deserialize(&mut &[u8])`, so only the
-/// compact fixed decoder is linked into the SBF artifact.
-
 macro_rules! fixed_state_deserialize {
     ($type:ident, $serialized_len:expr, { $($field:ident: $field_type:ty),+ $(,)? }) => {
         impl FixedField for $type {

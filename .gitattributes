@@ -1,0 +1,2 @@
+# Preserve the exact bytes covered by source and release SHA-256 inventories.
+* -text

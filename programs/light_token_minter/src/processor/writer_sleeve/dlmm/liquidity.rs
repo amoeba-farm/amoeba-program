@@ -21,7 +21,7 @@ fn validate_privileges(
             || account.is_writable != writable.contains(&index)
             || accounts[..index]
                 .iter()
-                .any(|earlier| earlier.key == account.key)
+                .any(|earlier| crate::pubkey_eq(earlier.key, account.key))
         {
             return Err(VaultError::InvalidAccountList.into());
         }

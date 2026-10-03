@@ -236,7 +236,10 @@ pub(super) fn store_state(
     if value.maximum_encoded_len() > data.len() {
         return Err(ProgramError::AccountDataTooSmall);
     }
-    data.fill(0);
+    // `slice::fill` compiles to a byte loop on SBF (~4 CU per byte); the memset syscall zeroes
+    // the same bytes for a small fixed cost.
+    let len = data.len();
+    solana_program::program_memory::sol_memset(&mut data, 0, len);
     value.encode_fixed(&mut data);
     Ok(())
 }

@@ -1,0 +1,31 @@
+{
+  "schema": "ameba-mainnet-g3-build-v1",
+  "profileSha256": "e4b6bf203cf9cf7b9a49a7846d51811c734fbe2d15d43e7205aa6cfcc35c3ab7",
+  "localTestOnly": false,
+  "productionUseAuthorized": true,
+  "deployed": false,
+  "runtimeQualified": false,
+  "features": [
+    "mainnet-v3"
+  ],
+  "defaultFeatures": true,
+  "architecture": "v1",
+  "sourceInputInventorySha256": "e4916cff4c7a2db44267a224744fd8bbbfdbc3053761965f9f9d12ebce0481fd",
+  "toolVersions": {
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo-build-sbf": "cargo-build-sbf 4.0.0\nplatform-tools v1.53\nrustc 1.89.0"
+  },
+  "builds": [
+    {
+      "artifactBytes": 1453584,
+      "artifactSha256": "8e9828ec9d20555991813bbc9bde7ee0ca19e300f6114bacb224f7ab4f9f9781",
+      "stackDiagnostics": 0
+    },
+    {
+      "artifactBytes": 1453584,
+      "artifactSha256": "8e9828ec9d20555991813bbc9bde7ee0ca19e300f6114bacb224f7ab4f9f9781",
+      "stackDiagnostics": 0
+    }
+  ]
+}

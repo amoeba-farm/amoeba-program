@@ -293,7 +293,10 @@ pub(super) fn load_writer_series_book(
         .enumerate()
     {
         if !record.active
-            || record.reserved != [0; 4]
+            // Existing Mainnet series retain their sealed policy. New compressed
+            // series opt into funding and a claim deadline; loading must not
+            // retroactively amend the legacy policy or strand its liabilities.
+            || !matches!(record.reserved, [0, 0, 0, 0] | [1, 1, 0, 0])
             || record.contract_size_atoms != MarketMintAccounting::CANONICAL_ATOMIC_SCALE
             || record.total_physical_supply_atoms
                 != record
@@ -303,6 +306,8 @@ pub(super) fn load_writer_series_book(
                             .external_total(index)
                             .ok_or(VaultError::ArithmeticOverflow)?,
                     )
+                    .and_then(|v| v.checked_add(value.individual.compressed_retired_atoms[index]))
+                    .and_then(|v| v.checked_add(value.individual.forfeited_atoms[index]))
                     .ok_or(VaultError::ArithmeticOverflow)?
             || (index != 0 && value.records[index - 1].series_id >= record.series_id)
         {

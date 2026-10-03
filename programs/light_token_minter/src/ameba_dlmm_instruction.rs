@@ -20,6 +20,8 @@ pub enum AmoebaDlmmInstructionTag {
     InitializePositionV1 = 208,
     AddLiquidityV1 = 209,
     RemoveLiquidityV1 = 210,
+    SwapCollectiveCompressedExactInV1 = 125,
+    RemoveCompressedLiquidityV1 = 126,
     ClosePoolV1 = 215,
     InitializeLightConfig = 216,
     UpdateLightConfig = 217,
@@ -33,6 +35,12 @@ pub enum AmoebaDlmmInstructionTag {
 
 impl AmoebaDlmmInstructionTag {
     pub fn from_byte(value: u8) -> Option<Self> {
+        if value == Self::SwapCollectiveCompressedExactInV1 as u8 {
+            return Some(Self::SwapCollectiveCompressedExactInV1);
+        }
+        if value == Self::RemoveCompressedLiquidityV1 as u8 {
+            return Some(Self::RemoveCompressedLiquidityV1);
+        }
         const VALID_TAGS: u64 = 0xf000_0000_0f87_8000;
         if value < 192 || VALID_TAGS & (1u64 << (value - 192)) == 0 {
             None
@@ -119,6 +127,24 @@ pub struct RemoveAmoebaDlmmLiquidityV1Params {
     pub close_position_when_empty: bool,
 }
 
+/// Tag 126 withdraws LP reserves into regular compressed wallet leaves. The
+/// optional witnesses spend whole authenticated Pool custody leaves; any hot
+/// pool remainder is compressed in the same Transfer2. No holder hot account
+/// or decompression instruction is part of this packet.
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+pub struct RemoveCompressedLiquidityV1Params {
+    pub position_nonce: u64,
+    pub entries: Vec<AmoebaDlmmRemoveEntry>,
+    pub close_position_when_empty: bool,
+    pub page_count: u8,
+    pub merkle_account_count: u8,
+    pub output_tree_index: u8,
+    pub output_queue_index: u8,
+    pub pool_option_input: Option<CompressedSwapLeafWitnessV1>,
+    pub pool_quote_input: Option<CompressedSwapLeafWitnessV1>,
+    pub proof: Option<[u8; 128]>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 #[repr(u8)]
 pub enum AmoebaDlmmSwapDirection {
@@ -133,6 +159,35 @@ pub struct SwapAmoebaDlmmExactInV1Params {
     pub minimum_amount_out: u64,
     pub limit_bin_id: u16,
     pub deadline_ts: u64,
+}
+
+/// A regular v3 leaf authenticated by the one aggregate Light proof. Tree and
+/// queue indices address only the unique Merkle-account suffix after the fixed
+/// compressed-swap tail, not arbitrary DLMM accounts or route pages.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct CompressedSwapLeafWitnessV1 {
+    pub leaf_index: u32,
+    pub root_index: u16,
+    pub prove_by_index: bool,
+    pub tree_index: u8,
+    pub queue_index: u8,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct SwapCollectiveCompressedExactInV1Params {
+    pub swap: SwapAmoebaDlmmExactInV1Params,
+    pub page_count: u8,
+    pub merkle_account_count: u8,
+    pub output_tree_index: u8,
+    pub output_queue_index: u8,
+    pub user_input_amount: u64,
+    pub sponsor_fee_atoms: u64,
+    pub user_input_has_delegate: bool,
+    pub user_input: CompressedSwapLeafWitnessV1,
+    pub pool_option_input: Option<CompressedSwapLeafWitnessV1>,
+    pub pool_quote_input: Option<CompressedSwapLeafWitnessV1>,
+    pub writer_quote_input: Option<CompressedSwapLeafWitnessV1>,
+    pub proof: Option<[u8; 128]>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
@@ -375,8 +430,10 @@ impl AmoebaDlmmDecode for SetAmoebaDlmmPoolStatusV1Params {
     }
 }
 
-fn invalid_data(message: &'static str) -> Error {
-    Error::new(ErrorKind::InvalidData, message)
+/// The message documents the rejection at the call site only. Every decode failure maps to the
+/// same program error, so the error carries no text (avoiding a boxed custom `io::Error`).
+fn invalid_data(_message: &'static str) -> Error {
+    Error::from(ErrorKind::InvalidData)
 }
 
 fn read_bounded_entries<T: BorshDeserialize, R: Read>(reader: &mut R) -> IoResult<Vec<T>> {

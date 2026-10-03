@@ -269,7 +269,7 @@ pub(super) fn process_index_oracle_recipe_source(
     accounts: &[AccountInfo],
     params: IndexOracleRecipeSourceV1Params,
 ) -> ProgramResult {
-    if accounts.len() != 8 {
+    if !matches!(accounts.len(), 8 | 9) {
         return Err(VaultError::InvalidAccountList.into());
     }
     for (position, account) in accounts.iter().enumerate() {
@@ -285,7 +285,21 @@ pub(super) fn process_index_oracle_recipe_source(
     let bucket_info = &accounts[5];
     let system_info = &accounts[6];
     validate_system_program(system_info)?;
-    let (_, month) = load_valid_market_and_oracle_month(program_id, &accounts[1], month_info)?;
+    let (market, month) = load_valid_market_and_oracle_month(program_id, &accounts[1], month_info)?;
+    if month.schedule_version == 5 {
+        if accounts.len() != 9 {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        super::september_bootstrap::require_october_membership_receipt(
+            program_id,
+            &market,
+            month_info.key,
+            &month,
+            &accounts[8],
+        )?;
+    } else if accounts.len() != 8 {
+        return Err(VaultError::InvalidAccountList.into());
+    }
     ensure_oracle_canonical_weight_scheme(&month)?;
     let recipe =
         load_valid_oracle_recipe_weight_manifest(program_id, month_info.key, &accounts[3])?;

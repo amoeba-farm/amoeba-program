@@ -138,8 +138,12 @@ pub(in crate::processor) fn required_accesses(
     use RequiredAccessKind::{Initialize, Mutable, MutableOrInitialize, ReadOnly as Read};
     let s = RequiredAccessSpec::new;
     let (expected, specs): (usize, Vec<RequiredAccessSpec>) = match decode(payload)? {
-        Action::SeptemberBootstrap { operation, .. } => match operation {
-            0 => (17, vec![]),
+        Action::SponsoredSource(action) => {
+            return super::oracle_sponsorship::required_accesses(&action, account_count)
+        }
+        Action::SeptemberBootstrap { operation, .. }
+        | Action::OctoberBootstrap { operation, .. } => match operation {
+            0 => (if payload.first() == Some(&23) { 18 } else { 17 }, vec![]),
             1 => (
                 21,
                 vec![
@@ -253,12 +257,23 @@ pub(in crate::processor) fn process(
     // The wrapper already verifies every logical read remains unchanged. All source
     // views are physically writable during materialization, including logical reads.
     match decode(payload)? {
+        Action::SponsoredSource(action) => {
+            super::oracle_sponsorship::process(program, accounts, action)
+        }
         Action::SeptemberBootstrap {
             operation,
             market,
             row,
             plan_hash,
         } => super::september_bootstrap::process(
+            program, accounts, operation, market, row, plan_hash,
+        ),
+        Action::OctoberBootstrap {
+            operation,
+            market,
+            row,
+            plan_hash,
+        } => super::september_bootstrap::process_october(
             program, accounts, operation, market, row, plan_hash,
         ),
         Action::InitializeCfmMonth {

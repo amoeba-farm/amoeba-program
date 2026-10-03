@@ -1,12 +1,71 @@
 use super::*;
 use crate::state::{WriterReserveRoundingMode, WriterSecurityMode};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ScopedSettlementActionV1 {
     Authorize = 0,
     Execute = 1,
     Revoke = 2,
+    ExpireUnredeemed {
+        series_index: u8,
+    } = 5,
+    RedeemCompressedCash(crate::compressed_option_settlement::CompressedCashOptionClaim) = 8,
+    SettleCompressedCash(crate::compressed_option_settlement::CompressedCashOptionClaim) = 9,
+    RedeemCompressedCashSponsored(crate::compressed_option_settlement::CompressedCashOptionClaim) =
+        10,
+}
+
+// Explicit encoding preserves the existing selectors after deleting retired paths.
+impl BorshSerialize for ScopedSettlementActionV1 {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        match self {
+            Self::Authorize => 0u8.serialize(writer),
+            Self::Execute => 1u8.serialize(writer),
+            Self::Revoke => 2u8.serialize(writer),
+            Self::ExpireUnredeemed { series_index } => {
+                5u8.serialize(writer)?;
+                series_index.serialize(writer)
+            }
+            Self::RedeemCompressedCash(claim) => {
+                8u8.serialize(writer)?;
+                claim.serialize(writer)
+            }
+            Self::SettleCompressedCash(claim) => {
+                9u8.serialize(writer)?;
+                claim.serialize(writer)
+            }
+            Self::RedeemCompressedCashSponsored(claim) => {
+                10u8.serialize(writer)?;
+                claim.serialize(writer)
+            }
+        }
+    }
+}
+
+impl BorshDeserialize for ScopedSettlementActionV1 {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        use crate::compressed_option_settlement::CompressedCashOptionClaim;
+        Ok(match u8::deserialize_reader(reader)? {
+            0 => Self::Authorize,
+            1 => Self::Execute,
+            2 => Self::Revoke,
+            5 => Self::ExpireUnredeemed {
+                series_index: u8::deserialize_reader(reader)?,
+            },
+            8 => Self::RedeemCompressedCash(CompressedCashOptionClaim::deserialize_reader(reader)?),
+            9 => Self::SettleCompressedCash(CompressedCashOptionClaim::deserialize_reader(reader)?),
+            10 => Self::RedeemCompressedCashSponsored(
+                CompressedCashOptionClaim::deserialize_reader(reader)?,
+            ),
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid settlement action",
+                ))
+            }
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
@@ -118,13 +177,4 @@ pub struct CleanupWriterCustodyV1Params {
 
 crate::fixed_codec::fixed_instruction_deserialize!(CleanupWriterCustodyV1Params, 1, {
     series_index: u8,
-});
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
-pub struct ClaimCollectiveLongV1Params {
-    pub claim_atoms: u64,
-}
-
-crate::fixed_codec::fixed_instruction_deserialize!(ClaimCollectiveLongV1Params, 8, {
-    claim_atoms: u64,
 });

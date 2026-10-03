@@ -86,7 +86,6 @@ pub enum VaultInstructionTag {
     CleanupWriterCustodyV1 = 232,
     PublishWriterGroupSettlementV1 = 244,
     FinalizeWriterSleeveSettlementV1 = 245,
-    ClaimCollectiveLongV1 = 246,
     CloseWriterSleeveV1 = 248,
     ScopedCollectiveSettlementV1 = 250,
     ScopedPositionSettlementV1 = 251,
@@ -98,7 +97,7 @@ impl VaultInstructionTag {
             0x800000040000e0d,
             0x161260017ed30800,
             0xdfe06ffffc001003,
-            0xd7001e7f0002bfd,
+            0xd3001e7f0002bfd,
         ];
         let bit = 1u64 << (tag & 63);
         if VALID_TAGS[usize::from(tag >> 6)] & bit == 0 {

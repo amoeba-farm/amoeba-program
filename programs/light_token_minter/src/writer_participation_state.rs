@@ -119,10 +119,19 @@ pub enum WriterParticipationActionV2 {
         nonce: u64,
         principal_atoms: u64,
     },
-    Claim,
     Close,
     /// G3 selector 6: expire a sleeve that has never activated or issued.
     ExpireUnactivatedV3,
+    /// Owner receipt exit to regular compressed USDC. The cash witness is a
+    /// whole WriterCash leaf; zero selects a hot-vault-only payout.
+    ClaimCompressed {
+        cash_amount: u64,
+        cash_leaf_index: u32,
+        cash_root_index: u16,
+        cash_prove_by_index: bool,
+        proof: Option<[u8; 128]>,
+        sponsor_fee_atoms: u64,
+    },
 }
 
 // Selector zero is permanently retired. Explicit encoding preserves all current selectors.
@@ -138,9 +147,17 @@ impl BorshDeserialize for WriterParticipationActionV2 {
                 nonce: u64::deserialize_reader(reader)?,
                 principal_atoms: u64::deserialize_reader(reader)?,
             },
-            4 => Self::Claim,
+            4 => return Err(invalid_fixed_borsh()),
             5 => Self::Close,
             6 => Self::ExpireUnactivatedV3,
+            7 => Self::ClaimCompressed {
+                cash_amount: u64::deserialize_reader(reader)?,
+                cash_leaf_index: u32::deserialize_reader(reader)?,
+                cash_root_index: u16::deserialize_reader(reader)?,
+                cash_prove_by_index: bool::deserialize_reader(reader)?,
+                proof: Option::<[u8; 128]>::deserialize_reader(reader)?,
+                sponsor_fee_atoms: u64::deserialize_reader(reader)?,
+            },
             _ => return Err(invalid_fixed_borsh()),
         })
     }
@@ -165,9 +182,24 @@ impl BorshSerialize for WriterParticipationActionV2 {
                 nonce.serialize(writer)?;
                 principal_atoms.serialize(writer)
             }
-            Self::Claim => 4u8.serialize(writer),
             Self::Close => 5u8.serialize(writer),
             Self::ExpireUnactivatedV3 => 6u8.serialize(writer),
+            Self::ClaimCompressed {
+                cash_amount,
+                cash_leaf_index,
+                cash_root_index,
+                cash_prove_by_index,
+                proof,
+                sponsor_fee_atoms,
+            } => {
+                7u8.serialize(writer)?;
+                cash_amount.serialize(writer)?;
+                cash_leaf_index.serialize(writer)?;
+                cash_root_index.serialize(writer)?;
+                cash_prove_by_index.serialize(writer)?;
+                proof.serialize(writer)?;
+                sponsor_fee_atoms.serialize(writer)
+            }
         }
     }
 }

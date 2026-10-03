@@ -4,6 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 mod authority;
 mod effects;
 mod helpers;
+mod settlement_timing;
 mod state;
 mod targets;
 use crate::instruction::OracleCouncilActionV1;
@@ -79,7 +80,7 @@ pub(super) fn process(
         return Err(VaultError::InvalidAccountList.into());
     }
     for (i, a) in accounts.iter().enumerate() {
-        if accounts[..i].iter().any(|b| a.key == b.key)
+        if accounts[..i].iter().any(|b| crate::pubkey_eq(a.key, b.key))
             && !(action.operation == 1 && i == 8 && a.key == accounts[0].key && a.is_signer)
             && !(action.operation == 2
                 && action.kind == OracleEmergencyDisputeKind::Update
@@ -270,11 +271,20 @@ pub(super) fn process(
             round.ballots[seat] = action.choice;
         }
         2 => {
-            if slot <= case.deadline {
-                return Err(VaultError::OracleTimingWindowClosed.into());
-            }
             let (choice, mask, majority) =
                 council_decision(&round.ballots, case.choices, case.fallback)?;
+            let remaining = settlement_timing::application_accounts(
+                program,
+                &market,
+                accounts[2].key,
+                &month,
+                kind,
+                remaining,
+                slot,
+                case.opened_slot,
+                case.deadline,
+                majority,
+            )?;
             let (core, coverage, merge, checkpoints) = resolution_accounts(kind, remaining)?;
             ensure_emergency_resolver_coverage_lane(&month, kind, coverage.is_some())?;
             let packet = validate_cash_emergency_target(
@@ -527,7 +537,8 @@ pub(super) fn required_accesses(
                 ));
             }
         }
-        OracleEmergencyDisputeKind::BucketMedian if a.operation <= 2 && n == 0 => {}
+        OracleEmergencyDisputeKind::BucketMedian
+            if (a.operation <= 2 && n == 0) || (a.operation == 2 && n == 1) => {}
         _ => return Err(VaultError::InvalidAccountList.into()),
     }
     Ok(RequiredAccesses::from_slice(&v))

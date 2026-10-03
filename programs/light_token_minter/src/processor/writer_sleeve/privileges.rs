@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) fn validate_pack_writer_account_privileges(
+    program_id: &Pubkey,
     tag: VaultInstructionTag,
     accounts: &[AccountInfo],
     payload: &[u8],
@@ -13,10 +14,9 @@ pub(super) fn validate_pack_writer_account_privileges(
             _ => return Err(ProgramError::InvalidInstructionData),
         },
         VaultInstructionTag::SetCollectiveMarketPausedV1 => count == 9,
-        VaultInstructionTag::ClaimCollectiveLongV1 => count == 20,
         VaultInstructionTag::ReconcileWriterSupplyV1 => count == 16,
         VaultInstructionTag::FinalizeWriterSleeveSettlementV1 => {
-            (9..=8 + crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
+            (9..=9 + crate::constants::WRITER_MAX_LIVE_SERIES).contains(&count)
         }
         _ => return Ok(()),
     };
@@ -30,11 +30,19 @@ pub(super) fn validate_pack_writer_account_privileges(
                 matches!(index, 2 | 3) || (count == 15 && matches!(index, 0 | 13))
             }
             VaultInstructionTag::SetCollectiveMarketPausedV1 => index == 5,
-            VaultInstructionTag::ClaimCollectiveLongV1 => {
-                matches!(index, 0 | 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 13 | 19)
-            }
             VaultInstructionTag::ReconcileWriterSupplyV1 => {
                 matches!(index, 2 | 4 | 6 | 7 | 8 | 9 | 10)
+            }
+            VaultInstructionTag::FinalizeWriterSleeveSettlementV1 => {
+                matches!(index, 2 | 4)
+                    || (index == count - 1
+                        && account.key
+                            == &crate::compressed_custody::derive_compressed_custody(
+                                program_id,
+                                crate::compressed_custody::CustodyKind::WriterCash,
+                                accounts[6].key,
+                            )
+                            .0)
             }
             _ => matches!(index, 2 | 4),
         };
@@ -42,7 +50,7 @@ pub(super) fn validate_pack_writer_account_privileges(
             || (account.is_writable != writable && !(signer && account.is_writable))
             || accounts[..index]
                 .iter()
-                .any(|other| other.key == account.key)
+                .any(|other| crate::pubkey_eq(other.key, account.key))
         {
             return Err(VaultError::InvalidAccountList.into());
         }

@@ -1,8 +1,7 @@
+use crate::ProgramError;
+use crate::ProgramResult;
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, program_error::ProgramError,
-    pubkey::Pubkey,
-};
+use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 use solana_sdk_ids::system_program;
 use std::mem::MaybeUninit;
 

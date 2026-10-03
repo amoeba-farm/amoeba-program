@@ -61,22 +61,17 @@ pub(in crate::processor) fn process_instruction(
     if compressed_state_transport {
         return Err(VaultError::InvalidInstructionData.into());
     }
-    validate_pack_writer_account_privileges(tag, accounts, payload)?;
-    if matches!(
-        tag,
-        VaultInstructionTag::ScopedCollectiveSettlementV1
-            | VaultInstructionTag::ScopedPositionSettlementV1
-    ) {
+    validate_pack_writer_account_privileges(program_id, tag, accounts, payload)?;
+    if tag == VaultInstructionTag::ScopedCollectiveSettlementV1 {
+        return compressed_settlement::process(program_id, accounts, payload);
+    }
+    if tag == VaultInstructionTag::ScopedPositionSettlementV1 {
         if payload.len() != 1 || payload[0] > 2 {
             return Err(VaultError::InvalidInstructionData.into());
         }
-        return if tag == VaultInstructionTag::ScopedCollectiveSettlementV1 {
-            settlement::process_scoped_collective_settlement(program_id, accounts, payload[0])
-        } else {
-            crate::processor::ameba_dlmm::process_scoped_position_settlement(
-                program_id, accounts, payload[0],
-            )
-        };
+        return crate::processor::ameba_dlmm::process_scoped_position_settlement(
+            program_id, accounts, payload[0],
+        );
     }
     match tag {
         VaultInstructionTag::ManageDlmmOrdersV1 => {
@@ -173,13 +168,6 @@ pub(in crate::processor) fn process_instruction(
             accounts,
             payload,
             settlement::process_finalize_writer_sleeve_settlement,
-        ),
-        VaultInstructionTag::ClaimCollectiveLongV1 => settlement::process_claim_collective_long(
-            program_id,
-            accounts,
-            ClaimCollectiveLongV1Params {
-                claim_atoms: decode_u64_payload(payload)?,
-            },
         ),
         VaultInstructionTag::CloseWriterSleeveV1 => empty_and_process(
             program_id,

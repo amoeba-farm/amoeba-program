@@ -2,17 +2,19 @@
 //! Candidate values are untrusted. Every value must pass through `observe`, and
 //! the caller must authenticate completeness before consuming `median`.
 use crate::error::VaultError;
-use solana_program::program_error::ProgramError;
+use crate::ProgramError;
 
-#[derive(Clone, Debug, Default, borsh::BorshDeserialize, borsh::BorshSerialize)]
-pub struct MedianRank {
-    pub lower: u64,
-    pub upper: u64,
-    pub count: u32,
-    pub less_lower: u32,
-    pub equal_lower: u32,
-    pub less_upper: u32,
-    pub equal_upper: u32,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, Default, borsh::BorshSerialize)]
+    pub struct MedianRank {
+        pub lower: u64,
+        pub upper: u64,
+        pub count: u32,
+        pub less_lower: u32,
+        pub equal_lower: u32,
+        pub less_upper: u32,
+        pub equal_upper: u32,
+    }
 }
 
 impl MedianRank {

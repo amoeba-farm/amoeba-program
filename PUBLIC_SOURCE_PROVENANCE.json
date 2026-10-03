@@ -1,12 +1,16 @@
 {
   "binaryIncluded": false,
   "channel": "source-preview",
-  "exportedFileCount": 189,
-  "exportedTreeSha256": "8492751c4a85f8e1b66452d1658c256f2f7385c247ff20cbbd528885d0d7f2eb",
-  "policySha256": "5af65e289f869a5465a2c30306b42c014aa571fc950c3afb667b470174f7f323",
+  "exportedFileCount": 210,
+  "exportedTreeSha256": "acfd84a71640ded110803636ca1e44fe74244cc3cfb1e7430576497b64f3926e",
+  "policySha256": "597b44125e645d36da67d8b09783cd8708aa4b29072930e96f64c12534fc4a47",
   "schemaVersion": 1,
-  "sourceCommit": "67a22c9b31600347c9f926ab9f5163c1106676d9",
+  "sourceCommit": "61d735117c95f131fd1bdb819d9b62b6e21173cb",
   "sourceDirty": false,
   "treeDigestExcludesThisProvenanceFile": true,
-  "treeDigestIncludesNormalizedModes": true
+  "treeDigestIncludesNormalizedModes": true,
+  "verifiedBuildFeatures": [
+    "mainnet-v3"
+  ],
+  "verifiedMainnetProfileSha256": "e4b6bf203cf9cf7b9a49a7846d51811c734fbe2d15d43e7205aa6cfcc35c3ab7"
 }

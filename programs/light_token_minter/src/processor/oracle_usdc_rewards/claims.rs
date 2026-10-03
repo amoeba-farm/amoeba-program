@@ -138,8 +138,9 @@ pub(in crate::processor) fn compute_source_family_reward(
                 let lineage_source_info = &trailing[pair_index];
                 let lineage_reward_info = &trailing[pair_index + 1];
                 if lineage_source_info.key == source_info.key
-                    || (0..hop)
-                        .any(|prior_hop| trailing[3 + 2 * prior_hop].key == lineage_source_info.key)
+                    || (0..hop).any(|prior_hop| {
+                        crate::pubkey_eq(trailing[3 + 2 * prior_hop].key, lineage_source_info.key)
+                    })
                 {
                     return Err(VaultError::InvalidOracleUsdcSourceReward.into());
                 }
@@ -303,6 +304,20 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
     accounts: &[AccountInfo],
     params: ClaimOracleUsdcRewardParams,
 ) -> ProgramResult {
+    let recipient = *accounts.first().ok_or(VaultError::InvalidAccountList)?.key;
+    process_claim_oracle_usdc_reward_for(program_id, accounts, params, &recipient, false)
+        .map(|_| ())
+}
+
+/// Claims the existing funded entitlement for an internally authenticated PDA.
+/// The public signer path retains its original ownership and zero-claim rules.
+pub(in crate::processor) fn process_claim_oracle_usdc_reward_for(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    params: ClaimOracleUsdcRewardParams,
+    recipient: &Pubkey,
+    allow_zero: bool,
+) -> Result<u64, ProgramError> {
     if accounts.len() < 13 {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -356,7 +371,7 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
             program_id,
             month_info.key,
             schedule_info.key,
-            recipient_info.key,
+            recipient,
             params.kind,
             trailing,
         )?,
@@ -364,7 +379,7 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
             program_id,
             month_info.key,
             schedule_info.key,
-            recipient_info.key,
+            recipient,
             trailing,
         )?,
     };
@@ -380,13 +395,13 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
         schedule_info.key,
         params.kind,
         &computed.subject,
-        recipient_info.key,
+        recipient,
     );
     if *receipt_info.key != expected_receipt {
         return Err(VaultError::InvalidOracleUsdcRewardReceipt.into());
     }
     validate_create_only_program_account_target(program_id, receipt_info)?;
-    if computed.amount == 0 {
+    if computed.amount == 0 && !allow_zero {
         return Err(VaultError::NoOracleBountyClaimable.into());
     }
     let kind_seed = [params.kind as u8];
@@ -401,27 +416,28 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
             schedule_info.key.as_ref(),
             &kind_seed,
             computed.subject.as_ref(),
-            recipient_info.key.as_ref(),
+            recipient.as_ref(),
             &[receipt_bump],
         ],
     )?;
 
-    let mut collateral =
-        load_canonical_user_collateral(program_id, collateral_info, recipient_info.key)?;
-    invoke_token_transfer_checked(
-        token_program_info,
-        reward_token_info,
-        mint_info,
-        primary_vault_token_info,
-        reward_vault_info,
-        computed.amount,
-        mint.decimals,
-        &[&[
-            CURRENT_STATE_NAMESPACE_SEED,
-            ORACLE_USDC_REWARD_VAULT_PDA_SEED,
-            &[reward_vault.bump],
-        ]],
-    )?;
+    let mut collateral = load_canonical_user_collateral(program_id, collateral_info, recipient)?;
+    if computed.amount > 0 {
+        invoke_token_transfer_checked(
+            token_program_info,
+            reward_token_info,
+            mint_info,
+            primary_vault_token_info,
+            reward_vault_info,
+            computed.amount,
+            mint.decimals,
+            &[&[
+                CURRENT_STATE_NAMESPACE_SEED,
+                ORACLE_USDC_REWARD_VAULT_PDA_SEED,
+                &[reward_vault.bump],
+            ]],
+        )?;
+    }
 
     let slot = Clock::get()?.slot;
     collateral.available_balance = collateral
@@ -455,7 +471,7 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
         account_version: OracleUsdcRewardReceipt::ACCOUNT_VERSION,
         month: *month_info.key,
         schedule: *schedule_info.key,
-        recipient: *recipient_info.key,
+        recipient: *recipient,
         kind: params.kind,
         subject: computed.subject,
         amount: computed.amount,
@@ -464,5 +480,6 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward(
     store_state(receipt_info, &receipt)?;
     store_state(collateral_info, &collateral)?;
     store_state(reward_vault_info, &reward_vault)?;
-    store_state(schedule_info, &schedule)
+    store_state(schedule_info, &schedule)?;
+    Ok(computed.amount)
 }

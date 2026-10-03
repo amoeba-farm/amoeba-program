@@ -391,9 +391,10 @@ pub(super) fn process_initialize_oracle_month_with_registry(
     {
         return Err(VaultError::InvalidOracleSkuCoverageManifest.into());
     }
-    let launch = cfg!(feature = "mainnet-four-hour-launch")
-        && params.scramble_start_ts == 0
-        && params.listing_ts == 0;
+    let launch = false;
+    if params.scramble_start_ts == 0 || params.listing_ts == 0 {
+        return Err(VaultError::InvalidOracleState.into());
+    }
     if let Some(registry) = cfm {
         cfm_parent_proxy::require_pending_month(program_id, market_info.key, month_info)?;
         if !launch

@@ -1,0 +1,19 @@
+{
+  "slot": 452844785,
+  "gate": {
+    "bump": 254,
+    "status": 2,
+    "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+    "targetProgram": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "programdata": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+    "epoch": "20",
+    "activeProposal": "11111111111111111111111111111111",
+    "freezeSlot": "452844697",
+    "reason": 2,
+    "lastCompletedProposal": "EbU6LdXbtVU6jrqSpJfeFoKQo47kX3y35oZ1ehthqxpU"
+  },
+  "gateDataSha256": "4f3ac2d80d765d735cc117c6771d0169a80c467395faa210e5fe508c90c4522a",
+  "deployedSlot": "452844697",
+  "programDataSha256": "f21ae081ec06bdcdb6b1ed55d9ca13f613caccc5ef70755303b92716a34e1ec8",
+  "capacity": 1457072
+}

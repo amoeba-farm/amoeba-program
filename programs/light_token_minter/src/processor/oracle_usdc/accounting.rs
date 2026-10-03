@@ -99,10 +99,6 @@ pub(in crate::processor) fn oracle_source_challenge_bond_backing(
         .unwrap_or(primary_backing)
 }
 
-/// Returns both the winning principal and losing bond to the canonical winner.
-/// This is a closed, zero-sum ordinary challenge; it never draws from the
-/// reward schedule.
-
 pub(in crate::processor) fn debit_oracle_usdc_available(
     collateral: &mut UserCollateral,
     exact_bond: u64,

@@ -3,8 +3,9 @@
 //! These are not transaction handlers. A caller must authenticate the governed
 //! month policy, source accounts and accepted observations before using them.
 //! No existing month/account is reinterpreted by adding this module.
+use crate::ProgramError;
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::{hash::hashv, program_error::ProgramError};
+use solana_program::hash::hashv;
 
 use crate::error::VaultError;
 
@@ -18,24 +19,28 @@ pub const REGISTRY_HEADER_LEN: usize = 72;
 pub const PARENT_ROW_LEN: usize = 107;
 pub const MAX_PARENT_ROWS: usize = 22;
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-struct ParentRow {
-    source_id: [u8; 32],
-    locator_hash: [u8; 32],
-    definition_hash: [u8; 32],
-    weight_bps: u16,
-    terminal_mask: u64,
-    direct_assessment: bool,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize)]
+    struct ParentRow {
+        source_id: [u8; 32],
+        locator_hash: [u8; 32],
+        definition_hash: [u8; 32],
+        weight_bps: u16,
+        terminal_mask: u64,
+        direct_assessment: bool,
+    }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-struct RegistryWire {
-    version: u8,
-    product: u8,
-    terminal_count: u16,
-    terminal_root: [u8; 32],
-    publisher: [u8; 32],
-    rows: Vec<ParentRow>,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize)]
+    struct RegistryWire {
+        version: u8,
+        product: u8,
+        terminal_count: u16,
+        terminal_root: [u8; 32],
+        publisher: [u8; 32],
+        rows: Vec<ParentRow>,
+    }
 }
 
 /// Private fields prevent callers from mutating a validated commitment.

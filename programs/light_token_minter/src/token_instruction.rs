@@ -3,9 +3,9 @@
 //! Keeping these five canonical layouts and the program id local avoids linking the
 //! general-purpose token client into the SBF artifact.
 
+use crate::ProgramError;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
-    program_error::ProgramError,
     pubkey::Pubkey,
 };
 

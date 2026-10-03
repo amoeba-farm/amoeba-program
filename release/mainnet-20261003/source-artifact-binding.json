@@ -1,0 +1,22 @@
+{
+  "schema": "ameba-coordinator-build-review-v1",
+  "sourceCommit": "61d735117c95f131fd1bdb819d9b62b6e21173cb",
+  "compilerInputs": 226,
+  "trackedRawFilesCompared": 2107,
+  "rawBytesExact": true,
+  "artifact": {
+    "artifactBytes": 1453584,
+    "artifactSha256": "8e9828ec9d20555991813bbc9bde7ee0ca19e300f6114bacb224f7ab4f9f9781",
+    "stackDiagnostics": 0
+  },
+  "independentBuilds": 2,
+  "allArtifactsEqual": true,
+  "sourceInputInventorySha256": "e4916cff4c7a2db44267a224744fd8bbbfdbc3053761965f9f9d12ebce0481fd",
+  "profileSha256": "e4b6bf203cf9cf7b9a49a7846d51811c734fbe2d15d43e7205aa6cfcc35c3ab7",
+  "runtimeQualificationPending": true,
+  "noProgramDataExtension": true,
+  "existingCapacityBytes": 1457072,
+  "spareAllocationBytes": 3488,
+  "signingAuthorized": false,
+  "deployed": false
+}

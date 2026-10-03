@@ -1,7 +1,8 @@
 //! Exact companion-account codec for the prospective September oracle-only mode.
 //! Creation/dispatch integration is intentionally not exposed by this codec.
+use crate::ProgramError;
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
+use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
 use super::{invalid, CfmRegistry, CFM_PUBLISHER};
 use crate::{constants::CURRENT_STATE_NAMESPACE_SEED, error::VaultError};
@@ -9,19 +10,21 @@ use crate::{constants::CURRENT_STATE_NAMESPACE_SEED, error::VaultError};
 pub const CFM_MONTH_POLICY_SEED: &[u8] = b"g3-cfm-month-policy-v1";
 pub const SEPTEMBER_EXPIRY_TS: u64 = 1_790_812_800;
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-struct PolicyWire {
-    discriminator: [u8; 3],
-    version: u8,
-    initialized: bool,
-    bump: u8,
-    market: Pubkey,
-    month: Pubkey,
-    registry_hash: [u8; 32],
-    publisher: [u8; 32],
-    expiry_ts: u64,
-    /// Reserved legacy wire field. Zero is canonical, not an issuance limit.
-    publisher_exposure_cap: u64,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize)]
+    struct PolicyWire {
+        discriminator: [u8; 3],
+        version: u8,
+        initialized: bool,
+        bump: u8,
+        market: Pubkey,
+        month: Pubkey,
+        registry_hash: [u8; 32],
+        publisher: [u8; 32],
+        expiry_ts: u64,
+        /// Reserved legacy wire field. Zero is canonical, not an issuance limit.
+        publisher_exposure_cap: u64,
+    }
 }
 
 /// Validated immutable policy; no public mutation or permissive fallback.
