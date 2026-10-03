@@ -2,8 +2,16 @@
   "binaryIncluded": false,
   "channel": "source-preview",
   "exportedFileCount": 210,
+  "exportedTreeScope": "Canonical generated export before the listed public CI metadata override.",
   "exportedTreeSha256": "acfd84a71640ded110803636ca1e44fe74244cc3cfb1e7430576497b64f3926e",
   "policySha256": "597b44125e645d36da67d8b09783cd8708aa4b29072930e96f64c12534fc4a47",
+  "publicMetadataOverrides": {
+    ".github/workflows/ci.yml": {
+      "exportedSha256": "0096262b7124de929df2884442870eddeeb6040f75a62d26dfb749dca1a1e9e3",
+      "publishedSha256": "c7562f45ce9a147620fd2f64a5c94da95ffeb5a4371736937531fbfd3bc28368",
+      "reason": "The privacy scan permits only the exact existing Mainnet compile_error guard in lib.rs; private test features and executable test items remain rejected. Contract source bytes are unchanged."
+    }
+  },
   "schemaVersion": 1,
   "sourceCommit": "61d735117c95f131fd1bdb819d9b62b6e21173cb",
   "sourceDirty": false,

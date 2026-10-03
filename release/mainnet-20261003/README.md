@@ -43,7 +43,10 @@ ProgramData and gate observations. [publication-inventory.json](publication-inve
 identifies the 210 generated source files separately from the reviewed public
 build inputs, evidence and retained historical records. The generated-tree hash
 in [PUBLIC_SOURCE_PROVENANCE.json](../../PUBLIC_SOURCE_PROVENANCE.json) covers
-those 210 files only; it excludes provenance and supplemental release records.
+the original 210-file canonical export. Its `publicMetadataOverrides` records
+the later public CI correction and both workflow hashes. Contract source files
+retain their original generated hashes. Provenance and supplemental release
+records are outside that generated-tree hash.
 
 The paired build and source-binding receipts retain their original preparation
 status fields. The later upgrade and activation observations record deployment.

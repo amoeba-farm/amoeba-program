@@ -37,4 +37,77 @@ jobs:
           test ! -e clients
           test ! -e scripts
           test ! -e programs/light_token_minter/tests
-          ! grep -R -n -E '#\[(cfg\()?test|developer-ops|test-sbf' programs/light_token_minter/src programs/light_token_minter/Cargo.toml
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          # Only this exact production exclusion in lib.rs may mention test-sbf.
+          mainnet_guard = (
+              '#[cfg(all(\n'
+              '    feature = "mainnet-v3",\n'
+              '    any(\n'
+              '        feature = "devnet-solo-backfill-2026",\n'
+              '        feature = "devnet-v3-governance-controller",\n'
+              '        feature = "phase3-synthetic-governance-controller",\n'
+              '        feature = "reviewed-governance-controller",\n'
+              '        feature = "local-ceremony-governance-controller",\n'
+              '        feature = "test-sbf"\n'
+              '    )\n'
+              '))]\n'
+              'compile_error!("mainnet-v3 excludes other controllers and test timing capabilities");\n'
+          )
+
+          def has_private_rust(source, allow_mainnet_guard=False):
+              if allow_mainnet_guard:
+                  if source.count(mainnet_guard) != 1:
+                      return True
+                  source = source.replace(mainnet_guard, "", 1)
+              return re.search(
+                  r'developer-ops|test-sbf|#\[\s*(?:'
+                  r'(?:[A-Za-z_]\w*::)*test\b|cfg\s*\([^\]]*\btest\b|'
+                  r'cfg_attr\s*\([^\]]*,\s*(?:[A-Za-z_]\w*::)*test\s*[,\)])',
+                  source,
+              ) is not None
+
+          def has_private_manifest(source):
+              return re.search(r'developer-ops|test-sbf|\[[^\]]*\bdev-dependencies\b', source) is not None
+
+          cases = [
+              (mainnet_guard, True, False),
+              (mainnet_guard, False, True),
+              (mainnet_guard + mainnet_guard, True, True),
+              (mainnet_guard.replace('feature = "mainnet-v3"', 'feature = "other"'), True, True),
+              (mainnet_guard.replace('compile_error!', 'executable!'), True, True),
+              ('pub fn production() {}', False, False),
+              ('pub fn missing_guard() {}', True, True),
+              ('#[test]\nfn test_case() {}', False, True),
+              ('#[ tokio::test ]\nasync fn test_case() {}', False, True),
+              ('#[cfg(test)]\nmod test_code {}', False, True),
+              ('#[cfg(all(feature = "x",\n test))]\nmod test_code {}', False, True),
+              ('#[cfg_attr(feature = "x", test)]\nfn test_case() {}', False, True),
+              ('#[cfg_attr(test, derive(borsh::BorshSerialize))]\nstruct Params {}', False, False),
+              ('#[cfg(feature = "test-sbf")]\nfn test_runtime() {}', False, True),
+              (mainnet_guard + '#[test]\nfn leaked_test() {}', True, True),
+              (mainnet_guard + '#[cfg(feature = "test-sbf")]\nfn leaked_runtime() {}', True, True),
+              ('#[cfg(test)]\ncompile_error!("still a test item");', False, True),
+              ('#[cfg(feature = "developer-ops")]\ncompile_error!("private");', False, True),
+          ]
+          for index, (source, allow_guard, expected) in enumerate(cases):
+              if has_private_rust(source, allow_guard) != expected:
+                  raise SystemExit(f"Rust privacy scan regression {index}")
+          for source in ('[features]\ntest-sbf = []', '[features]\ndeveloper-ops = []', '[dev-dependencies]\ntest-helper = "1"'):
+              if not has_private_manifest(source):
+                  raise SystemExit("Cargo privacy scan regression")
+          if has_private_manifest('[features]\ndefault = []'):
+              raise SystemExit("Cargo privacy scan rejected production features")
+
+          root = Path("programs/light_token_minter")
+          rejected = [str(path) for path in sorted((root / "src").rglob("*")) if path.is_file()
+                      if has_private_rust(path.read_text(encoding="utf-8"), path == root / "src/lib.rs")]
+          manifest = root / "Cargo.toml"
+          if has_private_manifest(manifest.read_text(encoding="utf-8")):
+              rejected.append(str(manifest))
+          if rejected:
+              raise SystemExit("Private development surfaces: " + ", ".join(rejected))
+          print(f"Privacy scan passed; {len(cases) + 4} regression cases passed.")
+          PY

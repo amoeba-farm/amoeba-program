@@ -216,10 +216,10 @@
     "release/intents/v0.1.0-devnet.json": "0775732f9e49f5e6dcf3f2d09cf181d3aa2be1bf38a68c7b70007ba6a7b8ce99",
     "rust-toolchain.toml": "4a0a7590572c5859a0487da76cddeffd17d175e34b7338914d2915ce18bc0d3d"
   },
-  "sourceProvenanceSha256": "198bd98424694452c0d7dd05ee15e370593f69350388fe03da07f152960e86ee",
+  "sourceProvenanceSha256": "ef0f297f33e67555680c7bbb4855f8b3a2d8fa73f9acd92a32757a022ab4c604",
   "supplementalFiles": {
     "MAINNET_BUILD.json": "5ad65a8dbf1d22568f8e7839aa01e6597d636aca706742dc86d2f7cc3eab50de",
-    "release/mainnet-20261003/README.md": "a95a9e6dd865760f87786a5189ff4a34b9a0fddca42ca6a2f02b8c707fb4679c",
+    "release/mainnet-20261003/README.md": "328b0a4c42cb7e2586c9ffa901753182597959fee76974d912353567c4c81529",
     "release/mainnet-20261003/activation-observation.json": "577d57ee2e48d8a538711209448d6ff46cb5b39bd0aaa034297f459f1d9004a8",
     "release/mainnet-20261003/installed-artifact-binding.json": "a9ef11105a3bf8389f38217908a7ebff64b47986bd38b3ee5dab162ecb5f62c4",
     "release/mainnet-20261003/mainnet-profile.rs": "3d4facf1f6aa7bddb0b6737d8d8913f3268fcb65249785c914b24fe5b257383e",
@@ -242,5 +242,12 @@
   },
   "inventoryExcludesItself": true,
   "binaryIncluded": false,
-  "privateHistoryIncluded": false
+  "privateHistoryIncluded": false,
+  "publicMetadataOverrides": {
+    ".github/workflows/ci.yml": {
+      "exportedSha256": "0096262b7124de929df2884442870eddeeb6040f75a62d26dfb749dca1a1e9e3",
+      "publishedSha256": "c7562f45ce9a147620fd2f64a5c94da95ffeb5a4371736937531fbfd3bc28368",
+      "reason": "The privacy scan permits only the exact existing Mainnet compile_error guard in lib.rs; private test features and executable test items remain rejected. Contract source bytes are unchanged."
+    }
+  }
 }
