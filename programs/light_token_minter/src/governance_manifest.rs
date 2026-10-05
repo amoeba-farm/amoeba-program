@@ -12,6 +12,13 @@ pub const RESERVED_INSTRUCTION_TAGS: [u8; 35] = [
     213, 227, 228, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 247, 249,
 ];
 
+/// Bytes the `mainnet-v3` artifact does not dispatch: one-time launch setup whose create-once
+/// Mainnet state already exists (0 vault config, 90 settlement signer registry and set, 128
+/// oracle-role split, 216 Light config, 220 writer policy registry). Every other build keeps
+/// them. In `mainnet-v3` they classify as `Unknown`, so they fail exactly like an unassigned
+/// byte: before the governance envelope, the payload or any account is examined.
+pub const MAINNET_V3_RETIRED_INSTRUCTION_TAGS: [u8; 5] = [0, 90, 128, 216, 220];
+
 pub const DEVNET_SOLO_BACKFILL_INITIALIZE_SIDECAR_TAG: u8 = 29;
 pub const DEVNET_SOLO_BACKFILL_INITIALIZE_COHORT_TAG: u8 = 31;
 pub const DEVNET_SOLO_BACKFILL_CREATE_SUPPORTED_SOURCE_TAG: u8 = 34;
@@ -124,6 +131,10 @@ pub fn is_devnet_solo_backfill_2026_instruction_tag(tag: u8) -> bool {
     DEVNET_SOLO_BACKFILL_2026_TAG_BYTES.contains(&tag)
 }
 
+pub fn is_mainnet_v3_retired_instruction_tag(tag: u8) -> bool {
+    MAINNET_V3_RETIRED_INSTRUCTION_TAGS.contains(&tag)
+}
+
 /// Classify one byte for an explicitly selected supported build shape.
 ///
 /// The two ordinary `from_byte` decoders run first because they are the executable registries.
@@ -145,25 +156,48 @@ pub fn classify_instruction_tag_for_build(
     }
 }
 
+/// Classify one byte for a build shape that may also be the `mainnet-v3` artifact, which leaves
+/// [`MAINNET_V3_RETIRED_INSTRUCTION_TAGS`] unassigned.
+pub fn classify_instruction_tag_for_shape(
+    tag: u8,
+    devnet_solo_backfill_2026: bool,
+    mainnet_v3: bool,
+) -> InstructionGovernanceClass {
+    if mainnet_v3 && is_mainnet_v3_retired_instruction_tag(tag) {
+        InstructionGovernanceClass::Unknown
+    } else {
+        classify_instruction_tag_for_build(tag, devnet_solo_backfill_2026)
+    }
+}
+
 /// Classify one byte exactly as the currently compiled feature build routes it.
 pub fn classify_active_instruction_tag(tag: u8) -> InstructionGovernanceClass {
-    classify_instruction_tag_for_build(tag, cfg!(feature = "devnet-solo-backfill-2026"))
+    classify_instruction_tag_for_shape(
+        tag,
+        cfg!(feature = "devnet-solo-backfill-2026"),
+        cfg!(feature = "mainnet-v3"),
+    )
 }
 
 #[cfg(not(target_os = "solana"))]
 fn tag_identity(tag: u8) -> (String, &'static str, &'static str) {
+    let condition = if is_mainnet_v3_retired_instruction_tag(tag) {
+        "not-mainnet-v3"
+    } else {
+        "always"
+    };
     if let Some(vault_tag) = VaultInstructionTag::from_byte(tag) {
         return (
             format!("{vault_tag:?}"),
             "VaultInstructionTag::from_byte",
-            "always",
+            condition,
         );
     }
     if let Some(dlmm_tag) = AmoebaDlmmInstructionTag::from_byte(tag) {
         return (
             format!("{dlmm_tag:?}"),
             "AmoebaDlmmInstructionTag::from_byte",
-            "always",
+            condition,
         );
     }
     if let Some(metadata) = DEVNET_SOLO_BACKFILL_2026_TAGS
@@ -187,16 +221,17 @@ fn tag_identity(tag: u8) -> (String, &'static str, &'static str) {
 }
 
 #[cfg(not(target_os = "solana"))]
-fn class_counts(devnet_solo_backfill_2026: bool) -> [usize; 5] {
+fn class_counts(devnet_solo_backfill_2026: bool, mainnet_v3: bool) -> [usize; 5] {
     let mut counts = [0usize; 5];
     for tag in 0u8..=u8::MAX {
-        let index = match classify_instruction_tag_for_build(tag, devnet_solo_backfill_2026) {
-            InstructionGovernanceClass::Unknown => 0,
-            InstructionGovernanceClass::Reserved => 1,
-            InstructionGovernanceClass::RecognizedReadOnly => 2,
-            InstructionGovernanceClass::RecognizedMutating => 3,
-            InstructionGovernanceClass::FeatureGatedMutating => 4,
-        };
+        let index =
+            match classify_instruction_tag_for_shape(tag, devnet_solo_backfill_2026, mainnet_v3) {
+                InstructionGovernanceClass::Unknown => 0,
+                InstructionGovernanceClass::Reserved => 1,
+                InstructionGovernanceClass::RecognizedReadOnly => 2,
+                InstructionGovernanceClass::RecognizedMutating => 3,
+                InstructionGovernanceClass::FeatureGatedMutating => 4,
+            };
         counts[index] += 1;
     }
     counts
@@ -208,8 +243,9 @@ fn class_counts(devnet_solo_backfill_2026: bool) -> [usize; 5] {
 pub fn phase3_instruction_manifest_json() -> String {
     use core::fmt::Write as _;
 
-    let default = class_counts(false);
-    let feature = class_counts(true);
+    let default = class_counts(false, false);
+    let feature = class_counts(true, false);
+    let mainnet = class_counts(false, true);
     let mut output = String::new();
     writeln!(output, "{{").unwrap();
     writeln!(
@@ -236,8 +272,14 @@ pub fn phase3_instruction_manifest_json() -> String {
     .unwrap();
     writeln!(
         output,
-        "    \"devnet-solo-backfill-2026\": {{\"Unknown\": {}, \"Reserved\": {}, \"RecognizedReadOnly\": {}, \"RecognizedMutating\": {}, \"FeatureGatedMutating\": {}}}",
+        "    \"devnet-solo-backfill-2026\": {{\"Unknown\": {}, \"Reserved\": {}, \"RecognizedReadOnly\": {}, \"RecognizedMutating\": {}, \"FeatureGatedMutating\": {}}},",
         feature[0], feature[1], feature[2], feature[3], feature[4]
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "    \"mainnet-v3\": {{\"Unknown\": {}, \"Reserved\": {}, \"RecognizedReadOnly\": {}, \"RecognizedMutating\": {}, \"FeatureGatedMutating\": {}}}",
+        mainnet[0], mainnet[1], mainnet[2], mainnet[3], mainnet[4]
     )
     .unwrap();
     writeln!(output, "  }},").unwrap();
@@ -247,9 +289,10 @@ pub fn phase3_instruction_manifest_json() -> String {
         let trailing = if tag == u8::MAX { "" } else { "," };
         writeln!(
             output,
-            "    {{\"byte\": {tag}, \"name\": \"{name}\", \"registry_source\": \"{registry_source}\", \"feature_condition\": \"{feature_condition}\", \"default_class\": \"{}\", \"devnet_backfill_class\": \"{}\"}}{trailing}",
+            "    {{\"byte\": {tag}, \"name\": \"{name}\", \"registry_source\": \"{registry_source}\", \"feature_condition\": \"{feature_condition}\", \"default_class\": \"{}\", \"devnet_backfill_class\": \"{}\", \"mainnet_v3_class\": \"{}\"}}{trailing}",
             classify_instruction_tag_for_build(tag, false).as_str(),
             classify_instruction_tag_for_build(tag, true).as_str(),
+            classify_instruction_tag_for_shape(tag, false, true).as_str(),
         )
         .unwrap();
     }

@@ -143,6 +143,7 @@ pub(super) fn initial_vault_config(
     }
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 pub(super) fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     if accounts.len() < 6 {
         return Err(VaultError::InvalidAccountList.into());
@@ -339,6 +340,7 @@ pub(super) fn process_rotate_vault_authorities_v2(
     store_state(config_info, &config)
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 pub(super) fn process_bootstrap_vault_governance_v2(
     program_id: &Pubkey,
     accounts: &[AccountInfo],

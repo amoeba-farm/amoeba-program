@@ -29,7 +29,8 @@ struct Prepared {
     index: usize,
     leg: usize,
     quantity: u64,
-    market: Market,
+    market_bump: u8,
+    market_id: [u8; 32],
     supply_before: u64,
     staged: u64,
 }
@@ -65,7 +66,8 @@ pub(super) fn issue(
             index,
             leg,
             quantity: quantities[index],
-            market,
+            market_bump: market.bump,
+            market_id: market.market_id,
             supply_before: mint.supply,
             staged,
         });
@@ -81,18 +83,12 @@ pub(super) fn issue(
             .outstanding
             .checked_add(item.quantity)
             .ok_or(VaultError::ArithmeticOverflow)?;
+        let market = load_valid_market(program, &view[16])?;
         custody::load_or_create_market_staging(
-            program,
-            &a[0],
-            &view[16],
-            &item.market,
-            &view[20],
-            &view[18],
-            &a[12],
-            &a[13],
+            program, &a[0], &view[16], &market, &view[20], &view[18], &a[12], &a[13],
         )?;
-        let bump = [item.market.bump];
-        let seeds = custody::market_signer_seeds(&item.market, &bump);
+        let bump = [market.bump];
+        let seeds = custody::market_signer_seeds(&market, &bump);
         if item.staged > 0 {
             load_or_create_writer_retirement_custody(
                 program, &a[0], &a[2], &view[16], &view[21], &view[18], &a[12], &a[13],
@@ -121,6 +117,7 @@ pub(super) fn issue(
     compress(a, &prepared)?;
     for item in &mut prepared {
         let view = individual_buyback::fill_accounts(a, item.leg);
+        let mut market = load_valid_market(program, &view[16])?;
         let supply = item
             .supply_before
             .checked_add(item.quantity)
@@ -130,20 +127,19 @@ pub(super) fn issue(
         {
             return Err(VaultError::WriterSupplyMismatch.into());
         }
-        let bump = [item.market.bump];
-        let seeds = custody::market_signer_seeds(&item.market, &bump);
+        let bump = [market.bump];
+        let seeds = custody::market_signer_seeds(&market, &bump);
         invoke_token_close_account(&a[12], &view[20], &a[0], &view[16], &[&seeds])?;
         book.records[item.index].total_physical_supply_atoms = supply;
         book.individual.active_locked[item.index] = book.individual.active_locked[item.index]
             .checked_add(item.quantity)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        item.market.mint_accounting.total_issued = item
-            .market
+        market.mint_accounting.total_issued = market
             .mint_accounting
             .total_issued
             .checked_add(item.quantity)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        store_state(&view[16], &item.market)?;
+        store_state(&view[16], &market)?;
     }
     Ok(())
 }
@@ -181,13 +177,18 @@ fn compress(a: &[AccountInfo], prepared: &[Prepared]) -> ProgramResult {
         for (j, role) in [n + 3, n + 4, n + 2, n + 6].iter().enumerate() {
             infos[10 + 4 * i + j] = a[*role].clone();
         }
-        bumps[i][0] = item.market.bump;
+        bumps[i][0] = item.market_bump;
     }
     let info_len = 10 + 4 * prepared.len();
     infos[info_len] = a[10].clone();
     let mut seed_arrays = [[&[][..]; 4]; MAX_BUYBACK_LEGS];
     for (i, item) in prepared.iter().enumerate() {
-        seed_arrays[i] = custody::market_signer_seeds(&item.market, &bumps[i]);
+        seed_arrays[i] = [
+            CURRENT_STATE_NAMESPACE_SEED,
+            MARKET_PDA_SEED,
+            &item.market_id,
+            &bumps[i],
+        ];
     }
     let signers: [&[&[u8]]; MAX_BUYBACK_LEGS] = std::array::from_fn(|i| &seed_arrays[i][..]);
     invoke_signed(&ix, &infos[..=info_len], &signers[..prepared.len()])

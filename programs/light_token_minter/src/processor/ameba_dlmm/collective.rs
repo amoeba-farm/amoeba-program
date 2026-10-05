@@ -121,6 +121,22 @@ pub(super) fn process_collective_swap_exact_in(
     }
     let (accounts, compression) =
         accounts.split_at(accounts.len() - compressed_delivery::COMPRESSION_ACCOUNTS);
+    // Optional canonical WriterCash observation follows pages, before delivery.
+    // This supports the shared sleeve cash without moving or recounting it.
+    let expected_cash = crate::compressed_custody::derive_compressed_custody(
+        program_id,
+        crate::compressed_custody::CustodyKind::WriterCash,
+        accounts[27].key,
+    )
+    .0;
+    let (accounts, cash_sidecar) = match accounts.split_last() {
+        Some((last, prefix))
+            if prefix.len() >= COLLECTIVE_SWAP_FIXED_ACCOUNTS && *last.key == expected_cash =>
+        {
+            (prefix, Some(last))
+        }
+        _ => (accounts, None),
+    };
     // Existing trader/config/Market/month prefix, then sleeve/group/book before pool.
     let (context, book_context) =
         super::super::writer_sleeve::load_collective_dlmm_context_with_book(
@@ -131,8 +147,8 @@ pub(super) fn process_collective_swap_exact_in(
             &accounts[2],
             &accounts[3],
         )?;
-    let config = load_canonical_vault_config(program_id, &accounts[1])?;
-    let pool = load_pool(program_id, &accounts[7])?;
+    let config = super::swap::load_swap_config(program_id, &accounts[1])?;
+    let pool = super::swap::load_swap_pool(program_id, &accounts[7])?;
     if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -143,12 +159,21 @@ pub(super) fn process_collective_swap_exact_in(
     {
         return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
     }
-    let mut writer = super::super::writer_sleeve::dlmm::load_swap_state(
-        program_id,
-        accounts,
-        &pool,
-        book_context,
-    )?;
+    let ordinary_only = [2, 4, 6, 24, 26, 27, 28, 29]
+        .iter()
+        .all(|index| !accounts[*index].is_writable);
+    let mut writer = if ordinary_only {
+        None
+    } else {
+        super::super::writer_sleeve::dlmm::load_swap_state_with_cash(
+            program_id,
+            accounts,
+            &pool,
+            book_context,
+            cash_sidecar,
+            &context.market,
+        )?
+    };
     let normalized: Vec<_> = accounts[..4]
         .iter()
         .chain(accounts[7..23].iter())
@@ -162,6 +187,12 @@ pub(super) fn process_collective_swap_exact_in(
         &mut writer,
         accounts,
         compression,
+        super::swap::LoadedSwapState {
+            config,
+            pool,
+            market: context.market,
+            month: context.anchor_month,
+        },
     )?;
     Ok(())
 }
@@ -172,14 +203,38 @@ pub(super) fn process_collective_compressed_swap_exact_in<'a>(
     accounts: &[AccountInfo<'a>],
     params: crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params,
 ) -> ProgramResult {
-    let compressed = super::compressed_swap::parse(program_id, accounts, &params)?;
+    process_collective_compressed_swap_with_authority(program_id, accounts, params, None)
+}
+
+pub(in crate::processor) fn process_trading_session_compressed_swap<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    params: crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params,
+    owner: Pubkey,
+) -> ProgramResult {
+    if accounts.first().map(|i| *i.key)
+        != Some(crate::trading_session::derive(program_id, &owner).0)
+    {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    process_collective_compressed_swap_with_authority(program_id, accounts, params, Some(owner))
+}
+
+fn process_collective_compressed_swap_with_authority<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    params: crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params,
+    trading_owner: Option<Pubkey>,
+) -> ProgramResult {
+    let mut compressed = super::compressed_swap::parse(program_id, accounts, &params)?;
+    compressed.trading_owner = trading_owner;
     let base = compressed.base;
     let (context, book_context) =
         super::super::writer_sleeve::load_collective_dlmm_context_with_book(
             program_id, &base[4], &base[5], &base[6], &base[2], &base[3],
         )?;
-    let config = load_canonical_vault_config(program_id, &base[1])?;
-    let pool = load_pool(program_id, &base[7])?;
+    let config = super::swap::load_swap_config(program_id, &base[1])?;
+    let pool = super::swap::load_swap_pool(program_id, &base[7])?;
     if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -196,6 +251,7 @@ pub(super) fn process_collective_compressed_swap_exact_in<'a>(
         &pool,
         book_context,
         super::compressed_swap::existing_sidecar(program_id, compressed.writer_cash_custody)?,
+        &context.market,
     )?;
     let normalized: Vec<_> = base[..4]
         .iter()
@@ -211,6 +267,12 @@ pub(super) fn process_collective_compressed_swap_exact_in<'a>(
         base,
         &[],
         Some((&compressed, &params)),
+        super::swap::LoadedSwapState {
+            config,
+            pool,
+            market: context.market,
+            month: context.anchor_month,
+        },
     )
 }
 

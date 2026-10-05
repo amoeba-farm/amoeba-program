@@ -1,5 +1,90 @@
 use super::*;
 
+/// Internal evidence of the canonical, empty staging account. No wire input can
+/// supply its bump or bindings; creation rechecks the actual account state.
+pub(super) struct PreparedEmptyStaging {
+    market: Pubkey,
+    staging: Pubkey,
+    mint: Pubkey,
+    token_program: Pubkey,
+    bump: u8,
+}
+
+pub(super) fn prepare_empty_market_staging(
+    program: &Pubkey,
+    market: &AccountInfo,
+    staging: &AccountInfo,
+    mint: &AccountInfo,
+    token_program: &AccountInfo,
+) -> Result<PreparedEmptyStaging, ProgramError> {
+    let (expected, bump) = derive_contract_mint_staging_pda(program, market.key);
+    if *staging.key != expected {
+        return Err(VaultError::InvalidPda.into());
+    }
+    if staging.owner == token_program.key {
+        validate_vault_token_account(staging, mint.key, market.key)?;
+        if validate_token_account(staging)?.amount != 0 {
+            return Err(VaultError::WriterSupplyMismatch.into());
+        }
+    } else {
+        validate_create_only_program_account_target(program, staging)?;
+    }
+    Ok(PreparedEmptyStaging {
+        market: *market.key,
+        staging: *staging.key,
+        mint: *mint.key,
+        token_program: *token_program.key,
+        bump,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn create_prepared_market_staging<'a>(
+    program: &Pubkey,
+    payer: &AccountInfo<'a>,
+    market: &AccountInfo<'a>,
+    staging: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
+    token_program: &AccountInfo<'a>,
+    system: &AccountInfo<'a>,
+    prepared: &PreparedEmptyStaging,
+) -> ProgramResult {
+    if prepared.market != *market.key
+        || prepared.staging != *staging.key
+        || prepared.mint != *mint.key
+        || prepared.token_program != *token_program.key
+    {
+        return Err(VaultError::InvalidPda.into());
+    }
+    if staging.owner == token_program.key {
+        validate_vault_token_account(staging, mint.key, market.key)?;
+        return if validate_token_account(staging)?.amount == 0 {
+            Ok(())
+        } else {
+            Err(VaultError::WriterSupplyMismatch.into())
+        };
+    }
+    validate_create_only_program_account_target(program, staging)?;
+    create_program_account(
+        payer,
+        staging,
+        system,
+        token_program.key,
+        TokenAccount::LEN,
+        &[
+            CONTRACT_MINT_STAGING_PDA_SEED,
+            market.key.as_ref(),
+            &[prepared.bump],
+        ],
+    )?;
+    invoke_token_initialize_account3(token_program, staging, mint, market.key)?;
+    validate_vault_token_account(staging, mint.key, market.key)?;
+    if validate_token_account(staging)?.amount != 0 {
+        return Err(VaultError::WriterSupplyMismatch.into());
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn create_classic_token_pda<'a>(
     program_id: &Pubkey,
@@ -166,6 +251,7 @@ pub(in crate::processor::writer_sleeve) fn observe_writer_retirement_custody_amo
     Ok(0)
 }
 
+#[inline(never)]
 pub(in crate::processor::writer_sleeve) fn market_signer_seeds<'a>(
     market: &'a Market,
     bump: &'a [u8; 1],

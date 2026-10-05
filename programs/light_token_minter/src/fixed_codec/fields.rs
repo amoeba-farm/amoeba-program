@@ -227,6 +227,24 @@ impl<const LENGTH: usize> FixedField for [u128; LENGTH] {
     }
 }
 
+impl<const LENGTH: usize> FixedField for [u16; LENGTH] {
+    #[inline(never)]
+    fn read(input: &mut FixedCursor<'_>) -> Self {
+        let mut value = [0; LENGTH];
+        for item in &mut value {
+            *item = input.u16();
+        }
+        value
+    }
+
+    #[inline(always)]
+    fn write(&self, output: &mut FixedWriter<'_>) {
+        for item in self {
+            output.u16(*item);
+        }
+    }
+}
+
 impl FixedField for [u32; 3] {
     #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {

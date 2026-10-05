@@ -165,12 +165,8 @@ pub const ORACLE_ROLLING_MATURITY_MONTHS: i64 = 3;
 /// Every rolling monthly series lists and expires at the protocol-wide UTC roll boundary.
 /// V1 uses exactly midnight UTC; individual markets cannot choose a private time of day.
 pub const ORACLE_MONTH_ROLL_SECOND_UTC: u64 = 0;
-/// Canonical governed terminal-SKU count for the RAMX product manifest.
-pub const RAMX_ORACLE_PRODUCT_SKU_COUNT: u16 = 52;
-/// Canonical governed terminal-MPN count for the NANDX v1 product manifest.
-pub const NANDX_ORACLE_PRODUCT_SKU_COUNT: u16 = 48;
 /// Terminal-SKU manifests are deliberately bounded so membership proofs and account work remain
-/// deterministic. Product-specific counts remain explicit and release-attested above.
+/// deterministic. Each product registers its own count (1..=256) with its manifest.
 pub const MAX_ORACLE_REQUIRED_SKUS: u16 = 256;
 pub const MAX_ORACLE_SKU_MERKLE_PROOF_DEPTH: usize = 8;
 /// A tag-190 chunk with two governance signatures and all six required accounts remains below

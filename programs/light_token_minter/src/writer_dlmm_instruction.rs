@@ -17,6 +17,15 @@ crate::fixed_codec::compact_borsh_struct! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ManageWriterDlmmV1Params {
+    CleanupSharedStripRetirement(crate::capped_strip::Cleanup),
+    InitializeSharedStripLane {
+        expected_policy_hash: [u8; 32],
+    },
+    SetSharedStripLiquidity {
+        expected_policy_hash: [u8; 32],
+        series_index: u8,
+        entries: Vec<WriterDlmmBinV1>,
+    },
     Individual(crate::individual_writer::IndividualWriterAction),
     BeginPolicy(BeginWriterDlmmPolicyV1Params),
     AppendPolicySeries {
@@ -51,6 +60,20 @@ pub enum ManageWriterDlmmV1Params {
     EnableSharedReserve {
         expected_policy_hash: [u8; 32],
     },
+    AmendPolicy(AmendWriterDlmmPolicyV1Params),
+}
+
+/// Selector 11: the Begin header then the Append body, rewriting a sealed
+/// fund-only policy's operational terms. `header` carries the current
+/// management authority (not amendable), the hash chain of the amended
+/// policy, and the new sleeve caps, release ratio and separation; series
+/// `start_index .. start_index + entries.len()` take `entries` (1..=8); other
+/// series keep their terms.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AmendWriterDlmmPolicyV1Params {
+    pub header: BeginWriterDlmmPolicyV1Params,
+    pub start_index: u8,
+    pub entries: Vec<WriterDlmmSeriesPolicyV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
@@ -64,6 +87,9 @@ pub struct WriterDlmmMoveV1 {
 impl ManageWriterDlmmV1Params {
     pub fn selector(&self) -> u8 {
         match self {
+            Self::CleanupSharedStripRetirement(_) => 14,
+            Self::InitializeSharedStripLane { .. } => 12,
+            Self::SetSharedStripLiquidity { .. } => 13,
             Self::Individual(_) => 9,
             Self::BeginPolicy(_) => 0,
             Self::AppendPolicySeries { .. } => 1,
@@ -75,17 +101,115 @@ impl ManageWriterDlmmV1Params {
             Self::RelocateLiquidity { .. } => 7,
             Self::EnableFullCollateralCapacity { .. } => 8,
             Self::EnableSharedReserve { .. } => 10,
+            Self::AmendPolicy(_) => 11,
         }
     }
 
+    /// The program's decoder: the same tags, fields, bounds and order as
+    /// `deserialize_reader` (the tested reference) read from a
+    /// `CheckedCursor`. Rejects any unread byte.
     pub fn decode_exact(payload: &[u8]) -> std::io::Result<Self> {
-        let mut bytes = payload;
-        let value = Self::deserialize(&mut bytes)?;
-        if !bytes.is_empty() {
-            return Err(std::io::ErrorKind::InvalidData.into());
-        }
+        let mut c = crate::fixed_codec::CheckedCursor::new(payload);
+        let value = match c.u8() {
+            // Cleanup and Individual actions use their own cursor readers, which
+            // mirror their reference readers; `finish_exact` below keeps the
+            // exact-tail rejection.
+            14 => Self::CleanupSharedStripRetirement(crate::fixed_codec::CursorField::read(&mut c)),
+            12 => Self::InitializeSharedStripLane {
+                expected_policy_hash: c.bytes(),
+            },
+            13 => Self::SetSharedStripLiquidity {
+                expected_policy_hash: c.bytes(),
+                series_index: c.u8(),
+                entries: cursor_entries(&mut c, cursor_bin),
+            },
+            9 => Self::Individual(crate::fixed_codec::CursorField::read(&mut c)),
+            0 => Self::BeginPolicy(crate::fixed_codec::CursorField::read(&mut c)),
+            1 => Self::AppendPolicySeries {
+                start_index: c.u8(),
+                entries: cursor_entries(&mut c, cursor_terms),
+            },
+            11 => Self::AmendPolicy(AmendWriterDlmmPolicyV1Params {
+                header: crate::fixed_codec::CursorField::read(&mut c),
+                start_index: c.u8(),
+                entries: cursor_entries(&mut c, cursor_terms),
+            }),
+            2 => Self::SealPolicy,
+            3 => Self::InitializePosition {
+                series_index: c.u8(),
+            },
+            4 => Self::AddLiquidity {
+                series_index: c.u8(),
+                issue_amount_atoms: c.u64(),
+                entries: cursor_entries(&mut c, cursor_bin),
+            },
+            5 => Self::RemoveLiquidity {
+                series_index: c.u8(),
+                entries: cursor_entries(&mut c, cursor_bin),
+            },
+            6 => Self::SweepCash {
+                series_index: c.u8(),
+            },
+            8 => Self::EnableFullCollateralCapacity {
+                expected_policy_hash: c.bytes(),
+            },
+            10 => Self::EnableSharedReserve {
+                expected_policy_hash: c.bytes(),
+            },
+            7 => Self::RelocateLiquidity {
+                series_index: c.u8(),
+                expected_position_hash: c.bytes(),
+                moves: cursor_entries(&mut c, |c| WriterDlmmMoveV1 {
+                    source_bin_id: c.u16(),
+                    destination_bin_id: c.u16(),
+                    option_atoms: c.u64(),
+                    quote_atoms: c.u64(),
+                }),
+            },
+            _ => {
+                c.invalid = true;
+                Self::SealPolicy
+            }
+        };
+        c.finish_exact()?;
         Ok(value)
     }
+}
+
+fn cursor_terms(c: &mut crate::fixed_codec::CheckedCursor) -> WriterDlmmSeriesPolicyV1 {
+    WriterDlmmSeriesPolicyV1 {
+        conservative_claim_value_atoms: c.u64(),
+        seller_floor_quote_atoms: c.u64(),
+        monthly_buyback_cap_atoms: c.u64(),
+        transaction_buyback_cap_atoms: c.u64(),
+    }
+}
+
+fn cursor_bin(c: &mut crate::fixed_codec::CheckedCursor) -> WriterDlmmBinV1 {
+    WriterDlmmBinV1 {
+        bin_id: c.u16(),
+        option_atoms: c.u64(),
+        quote_atoms: c.u64(),
+    }
+}
+
+/// `read_entries` on a cursor: a `u32` count in `1..=WRITER_DLMM_ACTION_ENTRIES`
+/// (the same up-front capacity), then the entries.
+#[inline(never)]
+fn cursor_entries<T>(
+    c: &mut crate::fixed_codec::CheckedCursor,
+    read: fn(&mut crate::fixed_codec::CheckedCursor) -> T,
+) -> Vec<T> {
+    let count = c.u32() as usize;
+    if c.invalid || count == 0 || count > WRITER_DLMM_ACTION_ENTRIES {
+        c.invalid = true;
+        return Vec::new();
+    }
+    let mut entries = Vec::with_capacity(count);
+    for _ in 0..count {
+        entries.push(read(c));
+    }
+    entries
 }
 
 fn read_entries<R: std::io::Read, T: BorshDeserialize>(reader: &mut R) -> std::io::Result<Vec<T>> {
@@ -117,6 +241,17 @@ fn write_entries<W: std::io::Write, T: BorshSerialize>(
 impl BorshDeserialize for ManageWriterDlmmV1Params {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
+            14 => Self::CleanupSharedStripRetirement(
+                crate::capped_strip::Cleanup::deserialize_reader(reader)?,
+            ),
+            12 => Self::InitializeSharedStripLane {
+                expected_policy_hash: <[u8; 32]>::deserialize_reader(reader)?,
+            },
+            13 => Self::SetSharedStripLiquidity {
+                expected_policy_hash: <[u8; 32]>::deserialize_reader(reader)?,
+                series_index: u8::deserialize_reader(reader)?,
+                entries: read_entries(reader)?,
+            },
             9 => Self::Individual(
                 crate::individual_writer::IndividualWriterAction::deserialize_reader(reader)?,
             ),
@@ -152,6 +287,11 @@ impl BorshDeserialize for ManageWriterDlmmV1Params {
                 expected_position_hash: <[u8; 32]>::deserialize_reader(reader)?,
                 moves: read_entries(reader)?,
             },
+            11 => Self::AmendPolicy(AmendWriterDlmmPolicyV1Params {
+                header: BeginWriterDlmmPolicyV1Params::deserialize_reader(reader)?,
+                start_index: u8::deserialize_reader(reader)?,
+                entries: read_entries(reader)?,
+            }),
             _ => return Err(std::io::ErrorKind::InvalidData.into()),
         })
     }
@@ -161,6 +301,19 @@ impl BorshSerialize for ManageWriterDlmmV1Params {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         BorshSerialize::serialize(&self.selector(), writer)?;
         match self {
+            Self::CleanupSharedStripRetirement(v) => BorshSerialize::serialize(v, writer),
+            Self::InitializeSharedStripLane {
+                expected_policy_hash,
+            } => BorshSerialize::serialize(expected_policy_hash, writer),
+            Self::SetSharedStripLiquidity {
+                expected_policy_hash,
+                series_index,
+                entries,
+            } => {
+                BorshSerialize::serialize(expected_policy_hash, writer)?;
+                BorshSerialize::serialize(series_index, writer)?;
+                write_entries(entries, writer)
+            }
             Self::Individual(action) => BorshSerialize::serialize(action, writer),
             Self::BeginPolicy(params) => BorshSerialize::serialize(params, writer),
             Self::AppendPolicySeries {
@@ -169,6 +322,11 @@ impl BorshSerialize for ManageWriterDlmmV1Params {
             } => {
                 BorshSerialize::serialize(start_index, writer)?;
                 write_entries(entries, writer)
+            }
+            Self::AmendPolicy(amend) => {
+                BorshSerialize::serialize(&amend.header, writer)?;
+                BorshSerialize::serialize(&amend.start_index, writer)?;
+                write_entries(&amend.entries, writer)
             }
             Self::SealPolicy => Ok(()),
             Self::EnableFullCollateralCapacity {

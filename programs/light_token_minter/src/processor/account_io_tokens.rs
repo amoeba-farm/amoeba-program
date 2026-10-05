@@ -460,7 +460,17 @@ pub(super) fn validate_spl_interface_account(
     mint: &Pubkey,
     interface_info: &AccountInfo,
 ) -> Result<TokenAccount, ProgramError> {
-    let expected = light_token_instruction::get_spl_interface_pda_and_bump(mint).0;
+    validate_spl_interface_account_with_bump(mint, interface_info).map(|(token, _)| token)
+}
+
+/// Return the bump established by the same canonical interface validation.
+/// Internal callers may reuse it later in this instruction's compression CPI.
+#[inline(never)]
+pub(super) fn validate_spl_interface_account_with_bump(
+    mint: &Pubkey,
+    interface_info: &AccountInfo,
+) -> Result<(TokenAccount, u8), ProgramError> {
+    let (expected, bump) = light_token_instruction::get_spl_interface_pda_and_bump(mint);
     if *interface_info.key != expected {
         return Err(VaultError::InvalidSplInterfaceAccount.into());
     }
@@ -475,5 +485,5 @@ pub(super) fn validate_spl_interface_account(
     {
         return Err(VaultError::InvalidSplInterfaceAccount.into());
     }
-    Ok(token)
+    Ok((token, bump))
 }

@@ -382,6 +382,26 @@ pub enum VaultError {
     GovernanceBridgeIdentityUnavailable = 6265,
     #[error("no bounty is claimable for this authenticated entitlement")]
     NoOracleBountyClaimable = 6266,
+    #[error("invalid Earn Fund account")]
+    EarnFundInvalidAccount = 6267,
+    #[error("invalid Earn Fund parameters")]
+    EarnFundInvalidParams = 6268,
+    #[error("Earn Fund is paused")]
+    EarnFundPaused = 6269,
+    #[error("Earn Fund epoch is not ready")]
+    EarnFundNotReady = 6270,
+    #[error("instant Earn Fund withdrawal is unavailable")]
+    EarnFundInstantUnavailable = 6271,
+    #[error("invalid Earn Fund allocation")]
+    EarnFundInvalidAllocation = 6272,
+    #[error("invalid Earn Fund amount")]
+    EarnFundInvalidAmount = 6273,
+    #[error("Earn Fund accounting mismatch")]
+    EarnFundAccounting = 6274,
+    #[error("Earn Fund buy-back mark cannot be sampled now")]
+    EarnFundMarkUnavailable = 6275,
+    #[error("Earn Fund position already has a redemption in progress")]
+    EarnFundQueueBusy = 6276,
 }
 
 impl From<VaultError> for ProgramError {

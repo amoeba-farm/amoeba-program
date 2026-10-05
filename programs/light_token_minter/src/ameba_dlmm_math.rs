@@ -97,7 +97,7 @@ pub struct AmoebaDlmmShareWithdrawal {
     pub quote_amount: u64,
 }
 
-#[inline]
+#[inline(never)]
 pub fn floor_mul_div(a: u64, b: u64, denominator: u64) -> MathResult<u64> {
     if denominator == 0 {
         return Err(AmoebaDlmmMathError::DivisionByZero);
@@ -109,7 +109,7 @@ pub fn floor_mul_div(a: u64, b: u64, denominator: u64) -> MathResult<u64> {
     u64::try_from(value).map_err(|_| AmoebaDlmmMathError::ArithmeticOverflow)
 }
 
-#[inline]
+#[inline(never)]
 pub fn ceil_mul_div(a: u64, b: u64, denominator: u64) -> MathResult<u64> {
     if denominator == 0 {
         return Err(AmoebaDlmmMathError::DivisionByZero);
@@ -124,7 +124,7 @@ pub fn ceil_mul_div(a: u64, b: u64, denominator: u64) -> MathResult<u64> {
     u64::try_from(value).map_err(|_| AmoebaDlmmMathError::ArithmeticOverflow)
 }
 
-#[inline]
+#[inline(never)]
 pub fn floor_mul_div_u128(a: u128, b: u128, denominator: u128) -> MathResult<u128> {
     if denominator == 0 {
         return Err(AmoebaDlmmMathError::DivisionByZero);
@@ -134,7 +134,7 @@ pub fn floor_mul_div_u128(a: u128, b: u128, denominator: u128) -> MathResult<u12
         .map(|value| value / denominator)
 }
 
-#[inline]
+#[inline(never)]
 pub fn ceil_mul_div_u128(a: u128, b: u128, denominator: u128) -> MathResult<u128> {
     if denominator == 0 {
         return Err(AmoebaDlmmMathError::DivisionByZero);

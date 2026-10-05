@@ -110,16 +110,14 @@ impl WriterSleeveV1 {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum WriterParticipationActionV2 {
-    Contribute {
-        nonce: u64,
-        amount_atoms: u64,
-    },
     Transfer,
     Split {
         nonce: u64,
         principal_atoms: u64,
     },
     Close,
+    /// Permissionless rent refund after the receipt's complete payout.
+    ClosePaid,
     /// G3 selector 6: expire a sleeve that has never activated or issued.
     ExpireUnactivatedV3,
     /// Owner receipt exit to regular compressed USDC. The cash witness is a
@@ -132,16 +130,24 @@ pub enum WriterParticipationActionV2 {
         proof: Option<[u8; 128]>,
         sponsor_fee_atoms: u64,
     },
+    /// Permissionless final payout to the authenticated receipt's current owner.
+    /// The transaction payer sponsors SOL; no USDC fee may be deducted.
+    SettleContributionCompressed {
+        cash_amount: u64,
+        cash_leaf_index: u32,
+        cash_root_index: u16,
+        cash_prove_by_index: bool,
+        proof: Option<[u8; 128]>,
+    },
 }
 
-// Selector zero is permanently retired. Explicit encoding preserves all current selectors.
+// Selectors zero and four are permanently retired. Selector one (direct
+// pooled Contribute) is retired too: pooled writer capital now enters a sleeve
+// only through the Earn Fund (tag 12 Allocate). Existing receipts keep every
+// exit below. Explicit encoding preserves all current selectors.
 impl BorshDeserialize for WriterParticipationActionV2 {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
-            1 => Self::Contribute {
-                nonce: u64::deserialize_reader(reader)?,
-                amount_atoms: u64::deserialize_reader(reader)?,
-            },
             2 => Self::Transfer,
             3 => Self::Split {
                 nonce: u64::deserialize_reader(reader)?,
@@ -149,6 +155,7 @@ impl BorshDeserialize for WriterParticipationActionV2 {
             },
             4 => return Err(invalid_fixed_borsh()),
             5 => Self::Close,
+            9 => Self::ClosePaid,
             6 => Self::ExpireUnactivatedV3,
             7 => Self::ClaimCompressed {
                 cash_amount: u64::deserialize_reader(reader)?,
@@ -158,21 +165,67 @@ impl BorshDeserialize for WriterParticipationActionV2 {
                 proof: Option::<[u8; 128]>::deserialize_reader(reader)?,
                 sponsor_fee_atoms: u64::deserialize_reader(reader)?,
             },
+            8 => Self::SettleContributionCompressed {
+                cash_amount: u64::deserialize_reader(reader)?,
+                cash_leaf_index: u32::deserialize_reader(reader)?,
+                cash_root_index: u16::deserialize_reader(reader)?,
+                cash_prove_by_index: bool::deserialize_reader(reader)?,
+                proof: Option::<[u8; 128]>::deserialize_reader(reader)?,
+            },
             _ => return Err(invalid_fixed_borsh()),
         })
+    }
+
+    #[inline]
+    fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
+        crate::fixed_codec::cursor_deserialize(buf)
+    }
+
+    #[inline]
+    fn try_from_slice(data: &[u8]) -> std::io::Result<Self> {
+        crate::fixed_codec::cursor_from_slice(data)
+    }
+}
+
+/// `deserialize_reader` above on a cursor, selector for selector; retired and unknown selectors
+/// mark the cursor invalid exactly where the reader returns its error.
+impl crate::fixed_codec::CursorField for WriterParticipationActionV2 {
+    #[inline(never)]
+    fn read(c: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
+        match c.u8() {
+            2 => Self::Transfer,
+            3 => Self::Split {
+                nonce: c.u64(),
+                principal_atoms: c.u64(),
+            },
+            5 => Self::Close,
+            9 => Self::ClosePaid,
+            6 => Self::ExpireUnactivatedV3,
+            7 => Self::ClaimCompressed {
+                cash_amount: c.u64(),
+                cash_leaf_index: c.u32(),
+                cash_root_index: c.u16(),
+                cash_prove_by_index: c.boolean(),
+                proof: Option::<[u8; 128]>::read(c),
+                sponsor_fee_atoms: c.u64(),
+            },
+            8 => Self::SettleContributionCompressed {
+                cash_amount: c.u64(),
+                cash_leaf_index: c.u32(),
+                cash_root_index: c.u16(),
+                cash_prove_by_index: c.boolean(),
+                proof: Option::<[u8; 128]>::read(c),
+            },
+            _ => {
+                c.invalid = true;
+                Self::Transfer
+            }
+        }
     }
 }
 impl BorshSerialize for WriterParticipationActionV2 {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         match self {
-            Self::Contribute {
-                nonce,
-                amount_atoms,
-            } => {
-                1u8.serialize(writer)?;
-                nonce.serialize(writer)?;
-                amount_atoms.serialize(writer)
-            }
             Self::Transfer => 2u8.serialize(writer),
             Self::Split {
                 nonce,
@@ -183,6 +236,7 @@ impl BorshSerialize for WriterParticipationActionV2 {
                 principal_atoms.serialize(writer)
             }
             Self::Close => 5u8.serialize(writer),
+            Self::ClosePaid => 9u8.serialize(writer),
             Self::ExpireUnactivatedV3 => 6u8.serialize(writer),
             Self::ClaimCompressed {
                 cash_amount,
@@ -199,6 +253,20 @@ impl BorshSerialize for WriterParticipationActionV2 {
                 cash_prove_by_index.serialize(writer)?;
                 proof.serialize(writer)?;
                 sponsor_fee_atoms.serialize(writer)
+            }
+            Self::SettleContributionCompressed {
+                cash_amount,
+                cash_leaf_index,
+                cash_root_index,
+                cash_prove_by_index,
+                proof,
+            } => {
+                8u8.serialize(writer)?;
+                cash_amount.serialize(writer)?;
+                cash_leaf_index.serialize(writer)?;
+                cash_root_index.serialize(writer)?;
+                cash_prove_by_index.serialize(writer)?;
+                proof.serialize(writer)
             }
         }
     }

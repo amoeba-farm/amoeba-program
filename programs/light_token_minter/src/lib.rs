@@ -2,7 +2,11 @@ pub mod ameba_dlmm_instruction;
 pub mod ameba_dlmm_math;
 pub mod ameba_dlmm_state;
 pub mod associated_token;
+mod bounded_heap;
 pub mod business_generation;
+pub mod buyback_mark_math;
+pub mod buyback_mark_state;
+pub mod capped_strip;
 pub mod compressed_custody;
 pub mod compressed_option_settlement;
 pub mod compressed_swap_plan;
@@ -10,6 +14,8 @@ pub mod compression;
 pub mod constants;
 pub mod dlmm_order_math;
 pub mod dlmm_order_state;
+pub mod earn_fund_math;
+pub mod earn_fund_state;
 pub mod error;
 mod fixed_codec;
 pub mod governance_gate;
@@ -29,6 +35,7 @@ pub mod state;
 mod system_instruction;
 mod token_instruction;
 mod token_state;
+pub mod trading_session;
 pub mod writer_dlmm_instruction;
 pub mod writer_dlmm_math;
 pub mod writer_dlmm_quote;
@@ -168,11 +175,7 @@ pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
     }
 }
 
-#[cfg(not(feature = "no-entrypoint"))]
-solana_program::custom_heap_default!();
-
-/// Expected validation failures return typed `ProgramError`s before reaching this handler. Avoid
-/// linking full panic formatting into the SBF artifact for unreachable internal bug paths.
+/// Expected validation failures return typed errors before reaching this handler.
 #[cfg(all(not(feature = "no-entrypoint"), target_os = "solana"))]
 #[no_mangle]
 fn custom_panic(_: &core::panic::PanicInfo<'_>) {}

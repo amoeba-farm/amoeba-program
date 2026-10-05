@@ -7,7 +7,7 @@ rustflags = [
     "-Z",
     "mir-opt-level=1",
     "-C",
-    "llvm-args=-ir-outliner -outliner-benefit-threshold=0 -min-region-size-ratio=0 -enable-global-merge-func -enable-merge-functions",
+    "llvm-args=-enable-global-merge-func -enable-merge-functions",
     "-C",
     "link-arg=--icf=all",
 ]
@@ -21,7 +21,11 @@ rustflags = [
     "-Z",
     "mir-opt-level=1",
     "-C",
-    "llvm-args=-ir-outliner -outliner-benefit-threshold=0 -min-region-size-ratio=0 -enable-global-merge-func -enable-merge-functions",
+    "llvm-args=-enable-global-merge-func -enable-merge-functions",
     "-C",
     "link-arg=--icf=all",
 ]
+
+# The verified build mounts this program directory as a self-contained crate.
+[env]
+AMEBA_MAINNET_PROFILE_RS = { value = "mainnet-profile.rs", relative = true }

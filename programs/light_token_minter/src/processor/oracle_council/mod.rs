@@ -17,6 +17,51 @@ use state::*;
 pub use state::{council_decision, CouncilCase, CouncilRound};
 use targets::*;
 
+pub(super) fn validate_cleanup_case(
+    program: &Pubkey,
+    month: &Pubkey,
+    info: &AccountInfo,
+) -> ProgramResult {
+    let case = load_case(program, info)?;
+    if case.month != *month
+        || !case.finalized
+        || case.kind != OracleEmergencyDisputeKind::BucketMedian
+        || case.target != derive_oracle_bucket_median_pda(program, month, &case.target_id).0
+    {
+        return Err(VaultError::InvalidOracleEmergencyDispute.into());
+    }
+    Ok(())
+}
+
+pub(super) fn validate_cleanup_round(
+    program: &Pubkey,
+    month: &Pubkey,
+    info: &AccountInfo,
+    case: &AccountInfo,
+) -> ProgramResult {
+    validate_cleanup_case(program, month, case)?;
+    let round: CouncilRound = load_council_state(
+        info,
+        program,
+        CouncilRound::LEN,
+        VaultError::InvalidOracleEmergencyDispute,
+    )?;
+    if !round.initialized
+        || round.discriminator != *b"OCR"
+        || round.version != 1
+        || round.case != *case.key
+        || round_address(program, case.key, round.epoch) != (*info.key, round.bump)
+        || round.seats_hash == [0; 32]
+        || round
+            .ballots
+            .iter()
+            .any(|choice| *choice != 255 && *choice > 2)
+    {
+        return Err(VaultError::InvalidOracleEmergencyDispute.into());
+    }
+    Ok(())
+}
+
 fn evidence(target: &AccountInfo) -> Result<[u8; 32], ProgramError> {
     Ok(hashv(&[
         b"amoeba-council-evidence-v1",
@@ -556,6 +601,7 @@ fn load_council_state<T: BorshDeserialize>(
     T::try_from_slice(&info.try_borrow_data()?)
         .map_err(|_| VaultError::InvalidOracleEmergencyDispute.into())
 }
+#[inline(never)]
 fn save_council_state<T: BorshSerialize>(
     program: &Pubkey,
     info: &AccountInfo,

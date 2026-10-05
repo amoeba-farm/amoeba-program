@@ -123,6 +123,12 @@ pub struct ConfigureOracleProductSkuManifestParams {
     pub draft_nonce: u64,
     /// Must equal the number of identifiers already stored in the canonical draft.
     pub expected_start_index: u16,
+    /// Declared number of terminal SKUs in this product (1..=MAX_ORACLE_REQUIRED_SKUS). The first
+    /// chunk stores it in the draft; every later chunk must repeat the same value.
+    pub sku_count: u16,
+    /// Declared SKU Merkle root. The draft finalizes only when the program's own root over all
+    /// `sku_count` identifiers equals it. Every chunk repeats it, like `sku_count`.
+    pub expected_root: [u8; 32],
     /// Nonempty, strictly ascending continuation of the canonical terminal-SKU identifiers.
     pub sku_id_chunk: Vec<[u8; 32]>,
 }
@@ -134,6 +140,8 @@ impl BorshDeserialize for ConfigureOracleProductSkuManifestParams {
             underlying_id: cursor.bytes(),
             draft_nonce: cursor.u64(),
             expected_start_index: cursor.u16(),
+            sku_count: cursor.u16(),
+            expected_root: cursor.bytes(),
             sku_id_chunk: deserialize_bounded_bytes32_vec_cursor(
                 &mut cursor,
                 MAX_ORACLE_PRODUCT_SKU_CHUNK_IDS,
@@ -148,6 +156,8 @@ impl BorshDeserialize for ConfigureOracleProductSkuManifestParams {
             underlying_id: <[u8; 32]>::deserialize_reader(reader)?,
             draft_nonce: u64::deserialize_reader(reader)?,
             expected_start_index: u16::deserialize_reader(reader)?,
+            sku_count: u16::deserialize_reader(reader)?,
+            expected_root: <[u8; 32]>::deserialize_reader(reader)?,
             sku_id_chunk: deserialize_bounded_vec(
                 reader,
                 MAX_ORACLE_PRODUCT_SKU_CHUNK_IDS,

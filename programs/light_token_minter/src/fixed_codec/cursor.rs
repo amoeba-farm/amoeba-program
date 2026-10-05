@@ -85,7 +85,7 @@ impl<'a> CheckedCursor<'a> {
         Pubkey::new_from_array(self.bytes())
     }
 
-    #[inline(always)]
+    #[inline(never)]
     pub(crate) fn boolean(&mut self) -> bool {
         match self.u8() {
             0 => false,

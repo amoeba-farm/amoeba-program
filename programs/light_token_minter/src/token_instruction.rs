@@ -12,6 +12,7 @@ use solana_program::{
 pub(crate) const TOKEN_PROGRAM_ID: Pubkey =
     solana_program::pubkey!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
+#[inline(never)]
 pub(crate) const fn id() -> Pubkey {
     TOKEN_PROGRAM_ID
 }

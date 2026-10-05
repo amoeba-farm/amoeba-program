@@ -194,7 +194,7 @@ pub enum WriterSecurityMode {
     ExactExternalEnvelope = 1,
 }
 
-#[inline]
+#[inline(never)]
 fn checked_ceil_div(numerator: u128, denominator: u128) -> WriterMathResult<u128> {
     if denominator == 0 {
         return Err(WriterMathError::DivisionByZero);
@@ -298,7 +298,7 @@ pub fn aggregate_liability_numerator(
     aggregate_liability_numerator_unchecked(series, settlement_price_atomic)
 }
 
-#[inline]
+#[inline(never)]
 fn liability_atoms_from_numerator(numerator: u128) -> WriterMathResult<u64> {
     u64::try_from(checked_ceil_div(
         numerator,
@@ -394,6 +394,303 @@ pub fn exact_reserve(
         return Err(WriterMathError::InvalidTailBoundaries);
     }
     Ok(result)
+}
+
+/// Frozen geometry and other-series numerators for repeated changes to one OI.
+/// The complete-book numerator is still rounded once, exactly as `exact_reserve`.
+pub(crate) struct PreparedWriterReserve {
+    points: Vec<(u64, u128, u64)>,
+    lower: u64,
+    upper: u64,
+    target_max: u64,
+    other_gross: u64,
+    pub(crate) target: usize,
+    pub(crate) initial_oi: u64,
+}
+
+/// One immutable payoff grid for a progressive, internally authenticated strip.
+/// Numerators retain whole-book rounding; every update is an exact OI delta.
+pub(crate) struct PreparedWriterStrip {
+    book: Vec<WriterSeries>,
+    points: Vec<(u64, u128)>,
+    payouts: Vec<u64>,
+    columns: [u8; WRITER_MAX_SERIES],
+    column_count: usize,
+    lower: u64,
+    upper: u64,
+    gross: u64,
+}
+
+impl PreparedWriterStrip {
+    pub(crate) fn for_targets(
+        book: &[WriterSeries],
+        lower: u64,
+        upper: u64,
+        targets: &[usize],
+    ) -> WriterMathResult<Self> {
+        let candidates = canonical_candidate_points(book, lower, upper)?;
+        if targets.is_empty() || targets.len() > book.len() {
+            return Err(WriterMathError::InvalidSeries);
+        }
+        let mut columns = [u8::MAX; WRITER_MAX_SERIES];
+        for (column, &target) in targets.iter().enumerate() {
+            if target >= book.len() || columns[target] != u8::MAX {
+                return Err(WriterMathError::InvalidSeries);
+            }
+            columns[target] = column as u8;
+        }
+        let mut points = Vec::with_capacity(candidates.len());
+        let mut payouts = Vec::with_capacity(candidates.len() * targets.len());
+        for &settlement in candidates.as_slice() {
+            let mut numerator = 0u128;
+            let row_start = payouts.len();
+            for &target in targets {
+                payouts.push(payout_per_contract_unchecked(&book[target], settlement));
+            }
+            // Every existing liability remains in the full-book numerator.
+            // Zero OI contributes exactly zero and needs no multiplication.
+            for (index, item) in book
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| item.external_oi_atoms != 0)
+            {
+                let column = usize::from(columns[index]);
+                let payout = if column < targets.len() {
+                    payouts[row_start + column]
+                } else {
+                    payout_per_contract_unchecked(item, settlement)
+                };
+                numerator = numerator
+                    .checked_add(u128::from(item.external_oi_atoms) * u128::from(payout))
+                    .ok_or(WriterMathError::ArithmeticOverflow)?;
+            }
+            points.push((settlement, numerator));
+        }
+        Ok(Self {
+            book: book.to_vec(),
+            points,
+            payouts,
+            columns,
+            column_count: targets.len(),
+            lower,
+            upper,
+            gross: gross_external_maximum_payout(book)?,
+        })
+    }
+
+    pub(crate) fn prepare(
+        &self,
+        book: &[WriterSeries],
+        target: usize,
+    ) -> WriterMathResult<PreparedWriterReserve> {
+        if book != self.book {
+            return Err(WriterMathError::InvalidSeries);
+        }
+        let item = book.get(target).ok_or(WriterMathError::InvalidSeries)?;
+        let column = usize::from(self.columns[target]);
+        if column >= self.column_count {
+            return Err(WriterMathError::InvalidSeries);
+        }
+        let points = self
+            .points
+            .iter()
+            .enumerate()
+            .map(|(point, (settlement, total))| {
+                let payout = self.payouts[point * self.column_count + column];
+                let other = total
+                    .checked_sub(u128::from(item.external_oi_atoms) * u128::from(payout))
+                    .ok_or(WriterMathError::ArithmeticOverflow)?;
+                Ok((*settlement, other, payout))
+            })
+            .collect::<WriterMathResult<Vec<_>>>()?;
+        let own_gross = liability_atoms_from_numerator(
+            u128::from(item.external_oi_atoms) * u128::from(item.max_payout_per_contract_atoms),
+        )?;
+        Ok(PreparedWriterReserve {
+            points,
+            lower: self.lower,
+            upper: self.upper,
+            target_max: item.max_payout_per_contract_atoms,
+            other_gross: self
+                .gross
+                .checked_sub(own_gross)
+                .ok_or(WriterMathError::ArithmeticOverflow)?,
+            target,
+            initial_oi: item.external_oi_atoms,
+        })
+    }
+
+    pub(crate) fn update(&mut self, target: usize, oi: u64) -> WriterMathResult<()> {
+        let item = self
+            .book
+            .get(target)
+            .ok_or(WriterMathError::InvalidSeries)?;
+        let old = item.external_oi_atoms;
+        let column = usize::from(self.columns[target]);
+        if column >= self.column_count {
+            return Err(WriterMathError::InvalidSeries);
+        }
+        let old_gross = liability_atoms_from_numerator(
+            u128::from(old) * u128::from(item.max_payout_per_contract_atoms),
+        )?;
+        let new_gross = liability_atoms_from_numerator(
+            u128::from(oi) * u128::from(item.max_payout_per_contract_atoms),
+        )?;
+        let gross = self
+            .gross
+            .checked_sub(old_gross)
+            .and_then(|v| v.checked_add(new_gross))
+            .ok_or(WriterMathError::ArithmeticOverflow)?;
+        let totals = self
+            .points
+            .iter()
+            .enumerate()
+            .map(|(point, (_, total))| {
+                let payout = self.payouts[point * self.column_count + column];
+                total
+                    .checked_sub(u128::from(old) * u128::from(payout))
+                    .and_then(|v| v.checked_add(u128::from(oi) * u128::from(payout)))
+                    .ok_or(WriterMathError::ArithmeticOverflow)
+            })
+            .collect::<WriterMathResult<Vec<_>>>()?;
+        for (point, total) in self.points.iter_mut().zip(totals) {
+            point.1 = total;
+        }
+        self.book[target].external_oi_atoms = oi;
+        self.gross = gross;
+        Ok(())
+    }
+}
+
+impl PreparedWriterReserve {
+    pub(crate) fn matches_bounds(&self, lower: u64, upper: u64) -> bool {
+        self.lower == lower && self.upper == upper
+    }
+    pub(crate) fn new(
+        book: &[WriterSeries],
+        target: usize,
+        lower: u64,
+        upper: u64,
+    ) -> WriterMathResult<Self> {
+        let candidates = canonical_candidate_points(book, lower, upper)?;
+        let selected = book.get(target).ok_or(WriterMathError::InvalidSeries)?;
+        let mut other_gross = 0u64;
+        for (index, item) in book
+            .iter()
+            .enumerate()
+            .filter(|(index, item)| *index != target && item.external_oi_atoms != 0)
+        {
+            let _ = index;
+            other_gross = other_gross
+                .checked_add(liability_atoms_from_numerator(
+                    u128::from(item.external_oi_atoms)
+                        * u128::from(item.max_payout_per_contract_atoms),
+                )?)
+                .ok_or(WriterMathError::ArithmeticOverflow)?;
+        }
+        let mut points = Vec::with_capacity(candidates.len());
+        for &settlement in candidates.as_slice() {
+            let mut other = 0u128;
+            for (index, item) in book.iter().enumerate() {
+                if index != target && item.external_oi_atoms != 0 {
+                    other = other
+                        .checked_add(
+                            u128::from(item.external_oi_atoms)
+                                * u128::from(payout_per_contract_unchecked(item, settlement)),
+                        )
+                        .ok_or(WriterMathError::ArithmeticOverflow)?;
+                }
+            }
+            points.push((
+                settlement,
+                other,
+                payout_per_contract_unchecked(selected, settlement),
+            ));
+        }
+        Ok(Self {
+            points,
+            lower,
+            upper,
+            target_max: selected.max_payout_per_contract_atoms,
+            other_gross,
+            target,
+            initial_oi: selected.external_oi_atoms,
+        })
+    }
+
+    pub(crate) fn reserve(&self, target_oi: u64) -> WriterMathResult<WriterReserveSummary> {
+        let mut maxima = [0u128; 3];
+        let mut saw_lower = false;
+        let mut saw_upper = false;
+        for &(settlement, other, payout) in &self.points {
+            let numerator = other
+                .checked_add(u128::from(target_oi) * u128::from(payout))
+                .ok_or(WriterMathError::ArithmeticOverflow)?;
+            maxima[0] = maxima[0].max(numerator);
+            if settlement <= self.lower {
+                saw_lower = true;
+                maxima[1] = maxima[1].max(numerator);
+            }
+            if settlement >= self.upper {
+                saw_upper = true;
+                maxima[2] = maxima[2].max(numerator);
+            }
+        }
+        if !saw_lower || !saw_upper {
+            return Err(WriterMathError::InvalidTailBoundaries);
+        }
+        let reserves = [
+            liability_atoms_from_numerator(maxima[0])?,
+            liability_atoms_from_numerator(maxima[1])?,
+            liability_atoms_from_numerator(maxima[2])?,
+        ];
+        let thresholds = reserves.map(|reserve| {
+            u128::from(reserve.saturating_sub(1)) * u128::from(WRITER_CONTRACT_ATOMIC_SCALE)
+        });
+        let mut result = WriterReserveSummary {
+            candidate_count: self.points.len() as u16,
+            reserve_atoms: reserves[0],
+            lower_tail_reserve_atoms: reserves[1],
+            upper_tail_reserve_atoms: reserves[2],
+            ..Default::default()
+        };
+        // Ceil ties need the earliest candidate attaining the rounded maximum,
+        // not necessarily the candidate with the largest unrounded numerator.
+        let mut found = [reserves[0] == 0, false, false];
+        for &(settlement, other, payout) in &self.points {
+            // The immutable first pass already checked every addition.
+            let numerator = other + u128::from(target_oi) * u128::from(payout);
+            if !found[0] && numerator > thresholds[0] {
+                found[0] = true;
+                result.reserve_settlement_atomic = settlement;
+            }
+            if !found[1]
+                && settlement <= self.lower
+                && (reserves[1] == 0 || numerator > thresholds[1])
+            {
+                found[1] = true;
+                result.lower_tail_settlement_atomic = settlement;
+            }
+            if !found[2]
+                && settlement >= self.upper
+                && (reserves[2] == 0 || numerator > thresholds[2])
+            {
+                found[2] = true;
+                result.upper_tail_settlement_atomic = settlement;
+            }
+            if found == [true; 3] {
+                break;
+            }
+        }
+        Ok(result)
+    }
+    pub(crate) fn gross(&self, target_oi: u64) -> WriterMathResult<u64> {
+        self.other_gross
+            .checked_add(liability_atoms_from_numerator(
+                u128::from(target_oi) * u128::from(self.target_max),
+            )?)
+            .ok_or(WriterMathError::ArithmeticOverflow)
+    }
 }
 
 #[inline]

@@ -19,8 +19,17 @@ use crate::{
 };
 
 mod accounts;
+mod capped_strip;
+pub(super) use capped_strip::trade as process_shared_strip_trade;
+mod october_ladder;
+pub(super) use october_ladder::process_install_october_ladder;
+mod october_outer_ladder;
+pub(super) use october_outer_ladder::process_extend_october_ladder;
 mod buyback_issuance;
+mod classic_order_settlement;
 mod compressed_settlement;
+pub(in crate::processor) use classic_order_settlement::settle as settle_classic_order;
+pub(super) use compressed_settlement::process_trading_session_close;
 pub(super) mod dlmm;
 mod individual;
 mod individual_buyback;
@@ -28,6 +37,8 @@ mod participation;
 mod portfolio_hedge;
 mod reconcile;
 mod settlement;
+mod terminal_cleanup;
+pub(super) use terminal_cleanup::require_paid_terminal_market;
 
 use accounts::*;
 
@@ -47,6 +58,9 @@ const WRITER_BOOK_HASH_MAX_BYTES: usize = WRITER_BOOK_HASH_DOMAIN.len()
     + 8;
 
 pub(super) struct CollectiveDlmmContext {
+    /// Canonically decoded once; callers may reuse these during this instruction.
+    pub market: Box<Market>,
+    pub anchor_month: Box<OracleMonthState>,
     pub sleeve_status: WriterSleeveStatus,
     pub group_status: WriterSettlementGroupStatus,
     pub active_weight_manifest_hash: [u8; 32],
@@ -74,6 +88,7 @@ struct CollectiveGroupBinding {
 }
 
 struct CollectiveMarketBinding {
+    market: Box<Market>,
     option_mint: Pubkey,
     quote_mint: Pubkey,
     expiry_ts: u64,
@@ -87,6 +102,7 @@ mod collective_binding;
 mod commitments;
 mod custody;
 mod dispatch;
+pub(super) mod earn_fund;
 mod initialization;
 mod lifecycle;
 mod metrics;
@@ -114,7 +130,7 @@ pub(super) use lifecycle::{
 };
 pub(super) use metrics::{recompute_writer_metrics, writer_book_math_series};
 use metrics::{writer_activation_assets_are_sufficient, writer_math_error};
-pub(super) use policy::{
-    process_initialize_policy_registry, process_manage_policy_authority, process_seal_policy,
-};
+#[cfg(not(feature = "mainnet-v3"))]
+pub(super) use policy::process_initialize_policy_registry;
+pub(super) use policy::{process_manage_policy_authority, process_seal_policy};
 use privileges::validate_pack_writer_account_privileges;

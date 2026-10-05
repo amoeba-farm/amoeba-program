@@ -6,8 +6,14 @@ impl BorshDeserialize for VaultInstruction {
         let tag = VaultInstructionTag::from_byte(tag_byte)
             .ok_or_else(|| invalid_instruction_tag_error(tag_byte))?;
         match tag {
+            VaultInstructionTag::ManageTradingSessionV1 => Ok(Self::ManageTradingSessionV1 {
+                action: crate::trading_session::Action::deserialize_reader(reader)?,
+            }),
             VaultInstructionTag::ManageDlmmOrdersV1 => Ok(Self::ManageDlmmOrdersV1 {
                 params: crate::dlmm_order_state::DlmmOrderAction::deserialize_reader(reader)?,
+            }),
+            VaultInstructionTag::ManageEarnFundV1 => Ok(Self::ManageEarnFundV1 {
+                params: crate::earn_fund_state::EarnFundActionV1::deserialize_reader(reader)?,
             }),
             VaultInstructionTag::ManageWriterParticipationV2 => Ok(Self::ManageWriterParticipationV2 {
                 params: crate::writer_participation_state::WriterParticipationActionV2::deserialize_reader(reader)?,

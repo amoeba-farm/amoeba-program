@@ -41,31 +41,38 @@ pub(super) fn schedule_review_seconds(month: &OracleMonthState) -> Result<u64, P
 }
 
 pub(super) fn validate_launch_market(market: &Market) -> ProgramResult {
-    let product = if padded_ascii_underlying_matches(
+    let product: &[u8] = if padded_ascii_underlying_matches(
         &market.instrument.underlying_id,
         b"ram-standardized-baskets",
     ) {
-        "RAMX"
+        b"RAMX"
     } else if padded_ascii_underlying_matches(
         &market.instrument.underlying_id,
         b"nand-standardized-baskets",
     ) {
-        "NANDX"
+        b"NANDX"
     } else {
         return Err(VaultError::InvalidOracleState.into());
     };
-    let month = match market.instrument.expiry_ts {
-        1_790_812_800 => "202609",
-        1_793_491_200 => "202610",
+    let month: &[u8] = match market.instrument.expiry_ts {
+        1_790_812_800 => b"202609",
+        1_793_491_200 => b"202610",
         _ => return Err(VaultError::InvalidOracleState.into()),
     };
-    let side = match market.instrument.kind {
-        crate::state::OptionKind::CallSpread => "CALL",
-        crate::state::OptionKind::PutSpread => "PUT",
+    let side: &[u8] = match market.instrument.kind {
+        crate::state::OptionKind::CallSpread => b"CALL",
+        crate::state::OptionKind::PutSpread => b"PUT",
     };
-    let id = format!("{product}-{month}-{side}-01");
+    // `{product}-{month}-{side}-01` assembled in place (at most 20 ASCII bytes) instead of
+    // through `format!`, which linked the core formatting machinery into the artifact.
+    let mut id = [0u8; 32];
+    let mut len = 0usize;
+    for part in [product, b"-", month, b"-", side, b"-01"] {
+        id[len..len + part.len()].copy_from_slice(part);
+        len += part.len();
+    }
     if !cfg!(all(feature = "mainnet-v3"))
-        || !padded_ascii_underlying_matches(&market.market_id, id.as_bytes())
+        || !padded_ascii_underlying_matches(&market.market_id, &id[..len])
     {
         return Err(VaultError::InvalidOracleState.into());
     }

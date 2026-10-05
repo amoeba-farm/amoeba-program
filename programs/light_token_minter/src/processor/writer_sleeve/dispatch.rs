@@ -31,6 +31,9 @@ fn process_dlmm_action(
     let action = crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::decode_exact(payload)
         .map_err(|_| VaultError::InvalidInstructionData)?;
     match action {
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::CleanupSharedStripRetirement(v) => capped_strip::cleanup(program_id,accounts,v),
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::InitializeSharedStripLane { .. }
+        | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::SetSharedStripLiquidity { .. } => capped_strip::manage(program_id,accounts,action),
         crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::Individual(action) => individual::process(program_id, accounts, action),
         crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::EnableFullCollateralCapacity {
             expected_policy_hash,
@@ -38,6 +41,9 @@ fn process_dlmm_action(
         crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::EnableSharedReserve {
             expected_policy_hash,
         } => dlmm::process_enable_shared_reserve(program_id, accounts, expected_policy_hash),
+        crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::AmendPolicy(amend) => {
+            dlmm::process_amend_policy(program_id, accounts, amend)
+        }
         crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::BeginPolicy(_)
         | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::AppendPolicySeries { .. }
         | crate::writer_dlmm_instruction::ManageWriterDlmmV1Params::SealPolicy => {
@@ -90,6 +96,7 @@ pub(in crate::processor) fn process_instruction(
                 participation::process,
             )
         }
+        #[cfg(not(feature = "mainnet-v3"))]
         VaultInstructionTag::InitializeWriterPolicyRegistryV1 => {
             decode_and_process::<InitializeWriterPolicyRegistryV1Params>(
                 program_id,

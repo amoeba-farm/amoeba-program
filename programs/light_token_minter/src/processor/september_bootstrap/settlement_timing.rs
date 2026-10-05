@@ -55,6 +55,16 @@ pub(in crate::processor) fn validate_settlement_council_cohort(
         .finished_at
         .checked_add(1)
         .ok_or(VaultError::ArithmeticOverflow)?;
+    let amended_october_anchor = october
+        && market.instrument.contract_size == 1_000_000
+        && market.instrument.strike_price == 100_000_000
+        && market.instrument.cap_price
+            == if kind == OptionKind::CallSpread {
+                105_000_000
+            } else {
+                95_000_000
+            }
+        && market.instrument.max_payout_per_contract == 5_000_000;
     if !r.finished
         || r.cursor != count
         || r.registry_hash != registry_hash
@@ -66,7 +76,8 @@ pub(in crate::processor) fn validate_settlement_council_cohort(
         || (october && r.begun_at < EXPIRY)
         || market.instrument.kind != kind
         || !padded_ascii_underlying_matches(&market.instrument.underlying_id, underlying)
-        || market.instrument.max_payout_per_contract != MAX_PAYOUT_PER_CONTRACT_ATOMS
+        || (market.instrument.max_payout_per_contract != MAX_PAYOUT_PER_CONTRACT_ATOMS
+            && !amended_october_anchor)
         || month.phase != OraclePhase::Game
         || month.schedule_version != COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
         || month.scramble_start_ts != game

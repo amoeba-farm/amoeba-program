@@ -60,6 +60,7 @@ pub fn deterministic_temporal_median(values: &mut [u64]) -> Result<u64, ProgramE
     Ok((lower & upper) + ((lower ^ upper) >> 1))
 }
 
+#[inline(never)]
 pub fn bucket_index_contribution_bps(
     bucket_weight_bps: u16,
     bucket_delta_bps: i64,

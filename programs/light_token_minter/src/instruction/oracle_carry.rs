@@ -1,4 +1,44 @@
 use super::*;
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, PartialEq, BorshSerialize)]
+    pub struct ExtendOctoberLadderParams {
+        pub product: u8,
+        pub next_policy_version: u64,
+        pub expected_book_digest: [u8; 32],
+        pub expected_policy_hash: [u8; 32],
+        pub beta_ppm: u32,
+        pub lambda_ppm: u64,
+        pub model_margin_vector_hash: [u8; 32],
+        pub execution_cost_vector_hash: [u8; 32],
+        /// Eight new price pairs: CALL06..09 then PUT06..09.
+        pub series_prices: [u8; 128],
+    }
+}
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, PartialEq, BorshSerialize)]
+    pub struct InstallOctoberLadderParams {
+        pub product: u8,
+        pub next_policy_version: u64,
+        pub expected_book_digest: [u8; 32],
+        pub expected_policy_hash: [u8; 32],
+        pub beta_ppm: u32,
+        pub lambda_ppm: u64,
+        pub model_margin_vector_hash: [u8; 32],
+        pub execution_cost_vector_hash: [u8; 32],
+        /// Ten pairs of little-endian u64 claim values and seller floors, in
+        /// CALL01..05, PUT01..05 order. Buyback caps retain each old side's caps.
+        pub series_prices: [u8; 160],
+    }
+}
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, PartialEq, BorshSerialize)]
+    pub struct TerminalCleanupParams {
+        pub kind: u8,
+        pub bucket_id: [u8; 32],
+        pub expected_data_hash: [u8; 32],
+        pub expected_lamports: u64,
+    }
+}
 #[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum OracleSponsoredActionV1 {
     Activate {
@@ -51,14 +91,22 @@ crate::fixed_codec::compact_borsh_struct! {
 /// unbounded Borsh Vec prefix; the wire shape matches the client carry builders.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OracleCarryForwardActionV1 {
+    ExtendOctoberLadder(ExtendOctoberLadderParams),
+    InstallOctoberLadder(InstallOctoberLadderParams),
+    TerminalCleanup(TerminalCleanupParams),
     SponsoredSource(OracleSponsoredActionV1),
-    /// September-only council bootstrap: begin, append one parent, finish.
+    /// September-only council bootstrap: begin, append one parent, finish. Not part of the
+    /// mainnet-v3 artifact: the window closed 2026-10-01.
+    #[cfg(not(feature = "mainnet-v3"))]
     SeptemberBootstrap {
         operation: u8,
         market: u8,
         row: u8,
         plan_hash: [u8; 32],
     },
+    /// October council bootstrap. Not part of the mainnet-v3 artifact: all four cohorts finished
+    /// on Mainnet on 2026-10-03 and the window closes 2026-11-01.
+    #[cfg(not(feature = "mainnet-v3"))]
     OctoberBootstrap {
         operation: u8,
         market: u8,
@@ -125,12 +173,31 @@ impl OracleCarryForwardActionV1 {
         use crate::fixed_codec::CursorField;
         let invalid = || Err(io::Error::from(io::ErrorKind::InvalidData));
         Ok(match c.u8() {
+            26 => {
+                if c.bytes::<4>() != *b"OCE1" {
+                    return invalid();
+                }
+                Self::ExtendOctoberLadder(CursorField::read(c))
+            }
+            25 => {
+                if c.bytes::<4>() != *b"OCL1" {
+                    return invalid();
+                }
+                Self::InstallOctoberLadder(CursorField::read(c))
+            }
+            24 => {
+                if c.bytes::<4>() != *b"TRC1" {
+                    return invalid();
+                }
+                Self::TerminalCleanup(CursorField::read(c))
+            }
             22 => {
                 if c.bytes::<4>() != *b"OSB1" {
                     return invalid();
                 }
                 Self::SponsoredSource(CursorField::read(c))
             }
+            #[cfg(not(feature = "mainnet-v3"))]
             tag @ (21 | 23) => {
                 let magic = if tag == 21 { *b"SCB1" } else { *b"OCB1" };
                 if c.bytes::<4>() != magic {
@@ -303,12 +370,31 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
 
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
+            26 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"OCE1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::ExtendOctoberLadder(ExtendOctoberLadderParams::deserialize_reader(reader)?)
+            }
+            25 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"OCL1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::InstallOctoberLadder(InstallOctoberLadderParams::deserialize_reader(reader)?)
+            }
+            24 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"TRC1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::TerminalCleanup(TerminalCleanupParams::deserialize_reader(reader)?)
+            }
             22 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"OSB1" {
                     return Err(io::ErrorKind::InvalidData.into());
                 }
                 Self::SponsoredSource(OracleSponsoredActionV1::deserialize_reader(reader)?)
             }
+            #[cfg(not(feature = "mainnet-v3"))]
             21 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"SCB1" {
                     return Err(io::ErrorKind::InvalidData.into());
@@ -332,6 +418,7 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
                     plan_hash,
                 }
             }
+            #[cfg(not(feature = "mainnet-v3"))]
             23 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"OCB1" {
                     return Err(io::ErrorKind::InvalidData.into());
@@ -480,8 +567,13 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
 impl BorshSerialize for OracleCarryForwardActionV1 {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         let tag: u8 = match self {
+            Self::ExtendOctoberLadder(_) => 26,
+            Self::InstallOctoberLadder(_) => 25,
+            Self::TerminalCleanup(_) => 24,
             Self::SponsoredSource(_) => 22,
+            #[cfg(not(feature = "mainnet-v3"))]
             Self::SeptemberBootstrap { .. } => 21,
+            #[cfg(not(feature = "mainnet-v3"))]
             Self::OctoberBootstrap { .. } => 23,
             Self::InitializeCfmMonth { .. } => 20,
             Self::InitializeCfmPolicy { .. } => 19,
@@ -506,11 +598,27 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
             Self::BackfillClaimEvidence { .. } => 17,
         };
         match self {
+            Self::ExtendOctoberLadder(params) => {
+                tag.serialize(writer)?;
+                writer.write_all(b"OCE1")?;
+                params.serialize(writer)
+            }
+            Self::InstallOctoberLadder(params) => {
+                tag.serialize(writer)?;
+                writer.write_all(b"OCL1")?;
+                params.serialize(writer)
+            }
+            Self::TerminalCleanup(params) => {
+                tag.serialize(writer)?;
+                writer.write_all(b"TRC1")?;
+                params.serialize(writer)
+            }
             Self::SponsoredSource(action) => {
                 tag.serialize(writer)?;
                 writer.write_all(b"OSB1")?;
                 action.serialize(writer)
             }
+            #[cfg(not(feature = "mainnet-v3"))]
             Self::SeptemberBootstrap {
                 operation,
                 market,
@@ -532,6 +640,7 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
                 row.serialize(writer)?;
                 plan_hash.serialize(writer)
             }
+            #[cfg(not(feature = "mainnet-v3"))]
             Self::OctoberBootstrap {
                 operation,
                 market,

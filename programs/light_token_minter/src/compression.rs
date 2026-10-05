@@ -765,3 +765,105 @@ fn validate_compressed_state_leaf(leaf: &CompressedAmebaStateLeaf) -> Result<(),
     }
     Ok(())
 }
+
+/// What a program-owned compressed account consumed before its transition.
+pub(crate) enum ProgramLeafPrior<'a> {
+    /// The address was never created: create it (non-inclusion proof).
+    New(&'a CompressionOutput),
+    /// The address holds Light's closed placeholder (no data, zero
+    /// discriminator and data hash): reopen it.
+    Closed(&'a CompressedAccountMeta),
+    /// A live account with these exact serialized bytes.
+    Live(&'a CompressedAccountMeta, &'a [u8]),
+}
+
+/// One atomic transition of a single program-owned compressed account at a
+/// canonical address on the default V2 address tree: create, reopen, update,
+/// or close (`new_data == None` writes Light's closed placeholder so the
+/// address can be reopened later). Light nullifies every consumed input, so a
+/// second transaction built from the same input fails without effect.
+#[inline(never)]
+pub(crate) fn apply_program_leaf_transition<'a>(
+    fee_payer: &AccountInfo<'a>,
+    remaining_accounts: &[AccountInfo<'a>],
+    proof: Option<[u8; 128]>,
+    discriminator: [u8; 8],
+    address: [u8; 32],
+    seed: AddressSeed,
+    prior: ProgramLeafPrior<'_>,
+    new_data: Option<Vec<u8>>,
+) -> Result<(), ProgramError> {
+    use light_compressed_account::instruction_data::compressed_proof::{
+        CompressedProof, ValidityProof as RawValidityProof,
+    };
+    let proof = RawValidityProof(proof.map(|bytes| {
+        let mut proof = CompressedProof::default();
+        proof.a.copy_from_slice(&bytes[..32]);
+        proof.b.copy_from_slice(&bytes[32..96]);
+        proof.c.copy_from_slice(&bytes[96..]);
+        proof
+    }));
+    let mut instruction = new_light_system_cpi(proof);
+    match prior {
+        ProgramLeafPrior::New(output) => {
+            let data = new_data.ok_or(VaultError::InvalidCompressionWitness)?;
+            let tree = packed_tree_pubkey(
+                remaining_accounts,
+                output.address_tree_info.address_merkle_tree_pubkey_index,
+            )?;
+            if tree != LIGHT_DEFAULT_ADDRESS_TREE_V2 {
+                return Err(VaultError::InvalidCompressionWitness.into());
+            }
+            instruction.account_infos.push(init_leaf_account_info(
+                address,
+                output.output_state_tree_index,
+                discriminator,
+                data,
+            )?);
+            instruction.new_address_params.push(
+                output
+                    .address_tree_info
+                    .into_new_address_params_assigned_packed(seed, Some(0)),
+            );
+        }
+        ProgramLeafPrior::Closed(meta) => {
+            let data = new_data.ok_or(VaultError::InvalidCompressionWitness)?;
+            if meta.address != address {
+                return Err(VaultError::InvalidCompressionWitness.into());
+            }
+            instruction.account_infos.push(CompressedAccountInfo {
+                address: Some(address),
+                input: Some(InAccountInfo {
+                    discriminator: [0; 8],
+                    data_hash: [0; 32],
+                    merkle_context: meta.tree_info.into(),
+                    root_index: if meta.tree_info.prove_by_index {
+                        0
+                    } else {
+                        meta.tree_info.root_index
+                    },
+                    lamports: 0,
+                }),
+                output: Some(OutAccountInfo {
+                    discriminator,
+                    data_hash: hash_leaf_data(&data)?,
+                    output_merkle_tree_index: meta.output_state_tree_index,
+                    lamports: 0,
+                    data,
+                }),
+            });
+        }
+        ProgramLeafPrior::Live(meta, old_data) => {
+            if meta.address != address {
+                return Err(VaultError::InvalidCompressionWitness.into());
+            }
+            instruction.account_infos.push(write_leaf_account_info(
+                meta,
+                discriminator,
+                old_data,
+                new_data,
+            )?);
+        }
+    }
+    invoke_light_cpi(instruction, fee_payer, remaining_accounts)
+}

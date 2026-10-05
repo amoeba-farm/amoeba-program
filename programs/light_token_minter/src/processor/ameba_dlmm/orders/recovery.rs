@@ -21,10 +21,8 @@ pub(super) fn process(
     if a.len() != witness_end {
         return Err(VaultError::InvalidAccountList.into());
     }
-    validate_pack_dlmm_account_privileges(
-        AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1,
-        &a[..31],
-    )?;
+    // Owner recovery authenticates the core swap roles, without a delivery tail.
+    validate_collective_swap_base_privileges(program, &a[..31])?;
     for index in 31..34 {
         if !a[index].is_writable
             || a[index].is_signer

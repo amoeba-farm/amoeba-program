@@ -460,6 +460,7 @@ pub(super) fn ensure_settlement_timestamp_matches_expiry(
     Ok(())
 }
 
+#[inline(never)]
 pub(super) fn ensure_settlement_finalization_ready_at(
     expiry_ts: u64,
     current_timestamp: u64,

@@ -9,6 +9,52 @@ use crate::state::{
 const PAGE_SEED: &[u8] = b"g3-oracle-members-page";
 const PAGE_LEN: usize = 233;
 
+pub(super) fn validate_cleanup_bucket_index(
+    program: &Pubkey,
+    month_key: &Pubkey,
+    month: &OracleMonthState,
+    recipe_info: &AccountInfo,
+    target: &AccountInfo,
+) -> ProgramResult {
+    let recipe = load_recipe_index(program, month_key, month, recipe_info)?;
+    if !recipe.complete {
+        return Err(VaultError::OracleWeightManifestIncomplete.into());
+    }
+    if target.data_len() != OracleBucketSourceIndex::LEN {
+        return Err(VaultError::InvalidOracleWeightManifest.into());
+    }
+    let data = target.try_borrow_data()?;
+    let bucket_id = data[70..102]
+        .try_into()
+        .map_err(|_| VaultError::InvalidOracleWeightManifest)?;
+    drop(data);
+    load_bucket_index(program, &recipe, &bucket_id, target)?;
+    Ok(())
+}
+
+pub(super) fn validate_cleanup_member_page(
+    program: &Pubkey,
+    month: &Pubkey,
+    bucket_id: &[u8; 32],
+    target: &AccountInfo,
+) -> ProgramResult {
+    if target.data_len() != PAGE_LEN {
+        return Err(VaultError::InvalidOracleWeightManifest.into());
+    }
+    let data = target.try_borrow_data()?;
+    let page = u16::from_le_bytes([data[38], data[39]]);
+    drop(data);
+    if usize::from(page)
+        >= crate::constants::MAX_ORACLE_BUCKET_SOURCES
+            .div_ceil(crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE)
+    {
+        return Err(VaultError::InvalidOracleWeightManifest.into());
+    }
+    let root = derive_oracle_bucket_source_index_pda(program, month, bucket_id).0;
+    load_member_page(program, &root, page, target)?;
+    Ok(())
+}
+
 fn member_page_address(program: &Pubkey, bucket: &Pubkey, page: u16) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
@@ -286,6 +332,9 @@ pub(super) fn process_index_oracle_recipe_source(
     let system_info = &accounts[6];
     validate_system_program(system_info)?;
     let (market, month) = load_valid_market_and_oracle_month(program_id, &accounts[1], month_info)?;
+    if month.phase == OraclePhase::Closed {
+        return Err(VaultError::InvalidOraclePhase.into());
+    }
     if month.schedule_version == 5 {
         if accounts.len() != 9 {
             return Err(VaultError::InvalidAccountList.into());

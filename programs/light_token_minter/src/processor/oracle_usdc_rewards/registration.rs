@@ -54,6 +54,7 @@ pub(in crate::processor) fn release_aborted_reward_reservation(
     Ok(())
 }
 
+#[inline(never)]
 pub(in crate::processor) fn credit_cash_collateral_at_slot(
     collateral: &mut UserCollateral,
     amount: u64,

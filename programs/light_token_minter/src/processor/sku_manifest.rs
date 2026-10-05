@@ -8,24 +8,12 @@ pub(super) fn padded_ascii_underlying_matches(underlying_id: &[u8; 32], expected
             .all(|byte| *byte == 0)
 }
 
-pub(super) fn expected_oracle_product_sku_count(underlying_id: &[u8; 32]) -> Option<u16> {
-    if padded_ascii_underlying_matches(underlying_id, b"ram-standardized-baskets") {
-        Some(RAMX_ORACLE_PRODUCT_SKU_COUNT)
-    } else if padded_ascii_underlying_matches(underlying_id, b"nand-standardized-baskets") {
-        Some(NANDX_ORACLE_PRODUCT_SKU_COUNT)
-    } else {
-        None
-    }
-}
-
 pub(super) fn load_valid_oracle_product_sku_draft(
     program_id: &Pubkey,
     underlying_id: &[u8; 32],
     draft_nonce: u64,
     draft_info: &AccountInfo,
 ) -> Result<OracleProductSkuDraft, ProgramError> {
-    let expected_count = expected_oracle_product_sku_count(underlying_id)
-        .ok_or(VaultError::InvalidOracleProductSkuDraft)?;
     let draft: OracleProductSkuDraft = load_exact_zero_padded_state(
         draft_info,
         program_id,
@@ -40,7 +28,6 @@ pub(super) fn load_valid_oracle_product_sku_draft(
         || !draft.has_canonical_layout()
         || draft.underlying_id != *underlying_id
         || draft.draft_nonce != draft_nonce
-        || draft.expected_sku_count != expected_count
     {
         return Err(VaultError::InvalidOracleProductSkuDraft.into());
     }
@@ -59,15 +46,16 @@ pub(super) fn load_valid_oracle_product_sku_manifest(
         VaultError::InvalidOracleSkuCoverageManifest,
     )?;
     let (expected, bump) = derive_oracle_product_sku_manifest_pda(program_id, underlying_id);
-    let expected_count = expected_oracle_product_sku_count(underlying_id)
-        .ok_or(VaultError::InvalidOracleSkuCoverageManifest)?;
+    // The registered count and root are authoritative: creation stored them only after the
+    // program computed this root over exactly that many identifiers. The count must still
+    // describe a valid SKU tree (1..=MAX_ORACLE_REQUIRED_SKUS leaves).
     if *manifest_info.key != expected
         || !manifest.is_initialized
         || manifest.bump != bump
         || !manifest.has_canonical_layout()
         || manifest.underlying_id != *underlying_id
         || crate::bytes32_is_zero(&manifest.required_sku_root)
-        || manifest.required_sku_count != expected_count
+        || oracle_sku_merkle_proof_depth(manifest.required_sku_count).is_err()
     {
         return Err(VaultError::InvalidOracleSkuCoverageManifest.into());
     }
@@ -165,8 +153,7 @@ pub(super) fn append_oracle_product_sku_chunk(
     expected_start_index: u16,
     sku_id_chunk: &[[u8; 32]],
 ) -> Result<Option<[u8; 32]>, ProgramError> {
-    let expected_count = expected_oracle_product_sku_count(&draft.underlying_id)
-        .ok_or(VaultError::InvalidOracleProductSkuDraft)?;
+    let expected_count = draft.expected_sku_count;
     let stored_count = draft.appended_sku_count;
     let chunk_count =
         u16::try_from(sku_id_chunk.len()).map_err(|_| VaultError::InvalidOracleProductSkuDraft)?;
@@ -175,7 +162,6 @@ pub(super) fn append_oracle_product_sku_chunk(
         .ok_or(VaultError::ArithmeticOverflow)?;
     if !draft.is_initialized
         || !draft.has_canonical_layout()
-        || draft.expected_sku_count != expected_count
         || stored_count == expected_count
         || expected_start_index != stored_count
         || sku_id_chunk.is_empty()
@@ -242,8 +228,13 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
         return Err(VaultError::Unauthorized.into());
     }
 
-    let expected_count = expected_oracle_product_sku_count(&params.underlying_id)
-        .ok_or(VaultError::InvalidOracleProductSkuDraft)?;
+    // The product is registered as data: its declared size and root. Every chunk repeats them.
+    if params.sku_count == 0
+        || params.sku_count > MAX_ORACLE_REQUIRED_SKUS
+        || crate::bytes32_is_zero(&params.expected_root)
+    {
+        return Err(VaultError::InvalidOracleProductSkuDraft.into());
+    }
     let (expected_draft, draft_bump) =
         derive_oracle_product_sku_draft_pda(program_id, &params.underlying_id, params.draft_nonce);
     if *draft_info.key != expected_draft {
@@ -269,7 +260,8 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
             account_version: OracleProductSkuDraft::ACCOUNT_VERSION,
             underlying_id: params.underlying_id,
             draft_nonce: params.draft_nonce,
-            expected_sku_count: expected_count,
+            expected_sku_count: params.sku_count,
+            expected_sku_root: params.expected_root,
             appended_sku_count: 0,
             frontier_mask: 0,
             last_sku_id: [0; 32],
@@ -277,12 +269,18 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
             last_updated_slot: 0,
         }
     } else {
-        load_valid_oracle_product_sku_draft(
+        let draft = load_valid_oracle_product_sku_draft(
             program_id,
             &params.underlying_id,
             params.draft_nonce,
             draft_info,
-        )?
+        )?;
+        if draft.expected_sku_count != params.sku_count
+            || draft.expected_sku_root != params.expected_root
+        {
+            return Err(VaultError::InvalidOracleProductSkuDraft.into());
+        }
+        draft
     };
 
     let finalized_root = append_oracle_product_sku_chunk(
@@ -310,7 +308,7 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
     }
 
     if let Some(required_sku_root) = finalized_root {
-        if crate::bytes32_is_zero(&required_sku_root) {
+        if required_sku_root != draft.expected_sku_root {
             return Err(VaultError::InvalidOracleSkuCoverageManifest.into());
         }
         create_oracle_manifest_account(
@@ -330,7 +328,7 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
             account_version: OracleProductSkuManifest::ACCOUNT_VERSION,
             underlying_id: params.underlying_id,
             required_sku_root,
-            required_sku_count: expected_count,
+            required_sku_count: draft.expected_sku_count,
             reserved: [0; 6],
             last_updated_slot: slot,
         };

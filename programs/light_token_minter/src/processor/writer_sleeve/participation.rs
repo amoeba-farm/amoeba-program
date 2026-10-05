@@ -138,15 +138,35 @@ pub(super) fn process(
             cash_prove_by_index,
             proof,
             sponsor_fee_atoms,
+            false,
+        );
+    }
+    if let SettleContributionCompressed {
+        cash_amount,
+        cash_leaf_index,
+        cash_root_index,
+        cash_prove_by_index,
+        proof,
+    } = action
+    {
+        return claim_compressed(
+            program,
+            accounts,
+            cash_amount,
+            cash_leaf_index,
+            cash_root_index,
+            cash_prove_by_index,
+            proof,
+            0,
+            true,
         );
     }
     let expected = match action {
-        Contribute { .. } => 13,
         Transfer => 4,
         Split { .. } => 6,
-        Close => 4,
+        Close | ClosePaid => 4,
         ExpireUnactivatedV3 => 8,
-        ClaimCompressed { .. } => unreachable!(),
+        ClaimCompressed { .. } | SettleContributionCompressed { .. } => unreachable!(),
     };
     if accounts.len() != expected || !accounts[0].is_signer {
         return Err(VaultError::InvalidAccountList.into());
@@ -157,12 +177,11 @@ pub(super) fn process(
         let signer = owner_alias;
         let writable = owner_alias
             || match action {
-                Contribute { .. } => matches!(index, 2 | 7 | 8 | 10),
                 Transfer => index == 2,
                 Split { .. } => matches!(index, 2 | 3),
-                Close => matches!(index, 2 | 3),
+                Close | ClosePaid => matches!(index, 2 | 3),
                 ExpireUnactivatedV3 => matches!(index, 2..=4),
-                ClaimCompressed { .. } => unreachable!(),
+                ClaimCompressed { .. } | SettleContributionCompressed { .. } => unreachable!(),
             };
         if info.is_signer != signer
             || (info.is_writable != writable && !(signer && info.is_writable))
@@ -175,24 +194,72 @@ pub(super) fn process(
         {
             return Err(VaultError::InvalidAccountList.into());
         }
-        if accounts[..index]
+        if accounts
             .iter()
+            .take(index)
             .any(|previous| crate::pubkey_eq(previous.key, info.key))
-            && !(matches!(action, Close) && index == 3 && info.key == accounts[0].key)
+            && !(matches!(action, Close | ClosePaid) && index == 3 && info.key == accounts[0].key)
             && !(matches!(action, Split { .. }) && index == 4 && info.key == accounts[0].key)
         {
             return Err(VaultError::InvalidAccountList.into());
         }
     }
     match action {
-        Contribute {
-            nonce,
-            amount_atoms,
-        } => contribute(program, accounts, nonce, amount_atoms),
-        Transfer | Split { .. } | Close => position_action(program, accounts, action),
+        Transfer | Split { .. } | Close | ClosePaid => position_action(program, accounts, action),
         ExpireUnactivatedV3 => expire_unactivated(program, accounts),
-        ClaimCompressed { .. } => unreachable!(),
+        ClaimCompressed { .. } | SettleContributionCompressed { .. } => unreachable!(),
     }
+}
+
+/// Funding-stage emptiness of everything except the series records: the
+/// sleeve never activated (Funding with an Anchored group and a frozen book),
+/// was never settled, and has sold, reserved, owed and spent nothing. Shared
+/// by `ExpireUnactivatedV3` and Earn Fund entry; with
+/// `book_has_no_exposure` it is the complete zero-exposure predicate.
+pub(super) fn funding_has_no_exposure(
+    sleeve: &WriterSleeveV1,
+    group: &WriterSettlementGroupV1,
+    book: &WriterSeriesBookV1,
+    policy: &crate::state::WriterDlmmPolicyV1,
+) -> bool {
+    sleeve.status == WriterSleeveStatus::Funding
+        && group.status == WriterSettlementGroupStatus::Anchored
+        && book.frozen
+        && crate::pubkey_is_default(&group.signer_set)
+        && group.signer_set_version == 0
+        && group.finalized_slot == 0
+        && crate::bytes32_is_zero(&group.final_settlement_commitment)
+        && sleeve.locked_primary_premium_atoms == 0
+        && sleeve.accounted_asset_atoms == sleeve.writer_principal_atoms
+        && sleeve.exact_reserve_atoms == 0
+        && sleeve.upper_tail_reserve_atoms == 0
+        && sleeve.lower_tail_reserve_atoms == 0
+        && sleeve.security_exposure_atoms == 0
+        && sleeve.long_liability_initial_atoms == 0
+        && sleeve.long_liability_remaining_atoms == 0
+        && sleeve.settlement_finalized_slot == 0
+        && policy.monthly_spent_atoms == 0
+        && policy
+            .series_monthly_spent_atoms
+            .iter()
+            .all(|value| *value == 0)
+}
+
+/// No series record has ever issued, sold, collected premium or settled.
+pub(super) fn book_has_no_exposure(book: &WriterSeriesBookV1) -> bool {
+    book.records[..usize::from(book.series_count)]
+        .iter()
+        .all(|record| {
+            record.total_physical_supply_atoms == 0
+                && record.issuer_controlled_atoms == 0
+                && record.external_open_interest_atoms == 0
+                && record.primary_premium_collected_atoms == 0
+                && record.settlement_external_oi_snapshot_atoms == 0
+                && record.settlement_liability_initial_atoms == 0
+                && record.settlement_liability_remaining_atoms == 0
+                && record.custody_status == WriterSeriesCustodyStatus::Absent
+                && record.settlement_status == WriterSeriesSettlementStatus::Open
+        })
 }
 
 fn expire_unactivated(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
@@ -211,44 +278,14 @@ fn expire_unactivated(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
         u64::try_from(clock.unix_timestamp).map_err(|_| VaultError::InvalidWriterLifecycle)?;
     let policy = dlmm::load_funding_policy(program, &a[7], &a[2], &sleeve, &snapshot)?;
     validate_vault_token_account(&a[6], &sleeve.settlement_mint, a[2].key)?;
+    // Every pure condition precedes the one fallible balance read, exactly as
+    // in the original single expression, so error precedence is unchanged.
     if sleeve.vault_config != *a[1].key
         || sleeve.usdc_vault != *a[6].key
-        || sleeve.status != WriterSleeveStatus::Funding
-        || group.status != WriterSettlementGroupStatus::Anchored
         || now < sleeve.expiry_ts
-        || !book.frozen
-        || !crate::pubkey_is_default(&group.signer_set)
-        || group.signer_set_version != 0
-        || group.finalized_slot != 0
-        || !crate::bytes32_is_zero(&group.final_settlement_commitment)
-        || sleeve.locked_primary_premium_atoms != 0
-        || sleeve.accounted_asset_atoms != sleeve.writer_principal_atoms
-        || sleeve.exact_reserve_atoms != 0
-        || sleeve.upper_tail_reserve_atoms != 0
-        || sleeve.lower_tail_reserve_atoms != 0
-        || sleeve.security_exposure_atoms != 0
-        || sleeve.long_liability_initial_atoms != 0
-        || sleeve.long_liability_remaining_atoms != 0
-        || sleeve.settlement_finalized_slot != 0
-        || policy.monthly_spent_atoms != 0
-        || policy
-            .series_monthly_spent_atoms
-            .iter()
-            .any(|value| *value != 0)
+        || !funding_has_no_exposure(&sleeve, &group, &book, &policy)
         || validate_token_account(&a[6])?.amount < sleeve.accounted_asset_atoms
-        || book.records[..usize::from(book.series_count)]
-            .iter()
-            .any(|record| {
-                record.total_physical_supply_atoms != 0
-                    || record.issuer_controlled_atoms != 0
-                    || record.external_open_interest_atoms != 0
-                    || record.primary_premium_collected_atoms != 0
-                    || record.settlement_external_oi_snapshot_atoms != 0
-                    || record.settlement_liability_initial_atoms != 0
-                    || record.settlement_liability_remaining_atoms != 0
-                    || record.custody_status != WriterSeriesCustodyStatus::Absent
-                    || record.settlement_status != WriterSeriesSettlementStatus::Open
-            })
+        || !book_has_no_exposure(&book)
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
@@ -272,15 +309,57 @@ fn expire_unactivated(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     store_state(&a[4], book.as_ref())
 }
 
-fn contribute(program: &Pubkey, a: &[AccountInfo], nonce: u64, amount: u64) -> ProgramResult {
-    // owner, config, sleeve, group, book, snapshot, DLMM policy, writer USDC,
-    // owner USDC, USDC mint, new receipt, system, classic SPL Token.
-    let config = load_canonical_vault_config(program, &a[1])?;
-    let mut context = load_writer_policy_context(program, &a[2], &a[3], &a[4], &a[5], None)?;
+/// The accounts of one Earn Fund contribution: the fund PDA is the receipt
+/// owner and creator, the allocator-approved keeper pays receipt rent.
+pub(super) struct ContributeAccounts<'a, 'b> {
+    pub payer: &'b AccountInfo<'a>,
+    pub owner: &'b AccountInfo<'a>,
+    pub config: &'b AccountInfo<'a>,
+    pub sleeve: &'b AccountInfo<'a>,
+    pub group: &'b AccountInfo<'a>,
+    pub book: &'b AccountInfo<'a>,
+    pub snapshot: &'b AccountInfo<'a>,
+    pub policy: &'b AccountInfo<'a>,
+    pub writer_usdc: &'b AccountInfo<'a>,
+    /// The canonical WriterCash sidecar of `writer_usdc`, or the system
+    /// program when the sleeve has none.
+    pub cash_custody: &'b AccountInfo<'a>,
+    pub source_usdc: &'b AccountInfo<'a>,
+    pub mint: &'b AccountInfo<'a>,
+    pub receipt: &'b AccountInfo<'a>,
+    pub system: &'b AccountInfo<'a>,
+    pub token: &'b AccountInfo<'a>,
+}
+
+/// Who may enter a sleeve: the sleeve must be empty of exposure, or every
+/// pooled atom but at most `max_third_party_bps` must already be the fund's.
+pub(super) struct FundEntry<'p> {
+    pub params: &'p crate::earn_fund_math::FundParams,
+    /// Principal of the fund's open lots in this sleeve.
+    pub fund_principal: u64,
+}
+
+/// The pooled contribution core, reachable only through Earn Fund Allocate
+/// since the direct user selector was retired: the exact validation,
+/// accounting, receipt creation and source transfer of a contribution.
+/// `authority_seeds` sign the source transfer for the fund PDA. Returns the
+/// created receipt.
+#[inline(never)]
+pub(super) fn contribute_core<'a>(
+    program: &Pubkey,
+    a: &ContributeAccounts<'a, '_>,
+    nonce: u64,
+    amount: u64,
+    entry: &FundEntry,
+    authority_seeds: &[&[&[u8]]],
+) -> Result<WriterContributionV2, ProgramError> {
+    let config = load_canonical_vault_config(program, a.config)?;
+    let mut context =
+        load_writer_policy_context(program, a.sleeve, a.group, a.book, a.snapshot, None)?;
     let policy = dlmm::load_policy(
         program,
-        &a[6],
-        &a[2],
+        a.policy,
+        a.sleeve,
         &context.snapshot,
         &context.book,
         true,
@@ -299,33 +378,67 @@ fn contribute(program: &Pubkey, a: &[AccountInfo], nonce: u64, amount: u64) -> P
             WriterSettlementGroupStatus::Anchored | WriterSettlementGroupStatus::Active
         )
         || now >= sleeve.expiry_ts
-        || sleeve.vault_config != *a[1].key
-        || sleeve.usdc_vault != *a[7].key
-        || sleeve.settlement_mint != *a[9].key
-        || config.usdc_mint != *a[9].key
-        || *a[12].key != spl_token_program_id()
-        || !a[2].is_writable
-        || !a[7].is_writable
-        || !a[8].is_writable
+        || sleeve.vault_config != *a.config.key
+        || sleeve.usdc_vault != *a.writer_usdc.key
+        || sleeve.settlement_mint != *a.mint.key
+        || config.usdc_mint != *a.mint.key
+        || *a.token.key != spl_token_program_id()
+        || !a.sleeve.is_writable
+        || !a.writer_usdc.is_writable
+        || !a.source_usdc.is_writable
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    validate_collateral_mint_account(&a[9], a[12].key)?;
-    validate_vault_token_account(&a[7], a[9].key, a[2].key)?;
-    let source = validate_token_account(&a[8])?;
-    if source.owner != *a[0].key
-        || source.mint != *a[9].key
+    // Entry before any option is sold never inherits P&L. Otherwise the fund
+    // must already be (all but a bounded share of) the pooled writers, so a
+    // par top-up can move at most the third parties' share of embedded P&L.
+    let zero_exposure = funding_has_no_exposure(sleeve, &context.group, &context.book, &policy)
+        && book_has_no_exposure(&context.book);
+    if !zero_exposure
+        && !entry
+            .params
+            .sole_writer_admissible(sleeve.writer_principal_atoms, entry.fund_principal)
+        || !entry.params.sleeve_priceable(context.book.series_count)
+    {
+        return Err(VaultError::EarnFundInvalidAllocation.into());
+    }
+    validate_collateral_mint_account(a.mint, a.token.key)?;
+    validate_vault_token_account(a.writer_usdc, a.mint.key, a.sleeve.key)?;
+    let source = validate_token_account(a.source_usdc)?;
+    if source.owner != *a.owner.key
+        || source.mint != *a.mint.key
         || source.state != AccountState::Initialized
         || source.amount < amount
     {
         return Err(VaultError::InvalidTokenAccount.into());
     }
-    let before = validate_token_account(&a[7])?.amount;
+    let before = validate_token_account(a.writer_usdc)?.amount;
+    // Writer cash is the hot vault plus the canonical WriterCash sidecar,
+    // exactly the backing the writer DLMM swap lane admits; a compressed-mode
+    // sale credits accounted assets while its premium sits in the sidecar.
+    let sidecar = if *a.cash_custody.key == system_program::id() {
+        None
+    } else {
+        crate::compressed_custody::load(
+            program,
+            Some(a.cash_custody),
+            crate::compressed_custody::CustodyKind::WriterCash,
+            a.writer_usdc.key,
+            &Pubkey::default(),
+            a.mint.key,
+        )?
+    };
+    if sidecar.as_ref().is_some_and(|cash| cash.option_atoms != 0) {
+        return Err(VaultError::WriterSupplyMismatch.into());
+    }
+    let cash = before
+        .checked_add(sidecar.as_ref().map_or(0, |cash| cash.quote_atoms))
+        .ok_or(VaultError::ArithmeticOverflow)?;
     let required_cash = sleeve
         .accounted_asset_atoms
         .checked_sub(policy.total_pool_quote_atoms)
         .ok_or(VaultError::WriterSolvencyViolation)?;
-    if before < required_cash {
+    if cash < required_cash {
         return Err(VaultError::WriterSolvencyViolation.into());
     }
     let (totals, interval) = sleeve
@@ -351,10 +464,10 @@ fn contribute(program: &Pubkey, a: &[AccountInfo], nonce: u64, amount: u64) -> P
         sleeve.exact_reserve_atoms,
     )?;
     let mut lot = WriterContributionV2 {
-        sleeve: *a[2].key,
-        creator: *a[0].key,
-        owner: *a[0].key,
-        rent_payer: *a[0].key,
+        sleeve: *a.sleeve.key,
+        creator: *a.owner.key,
+        owner: *a.owner.key,
+        rent_payer: *a.payer.key,
         nonce,
         policy_version: sleeve.policy_version,
         policy_hash: sleeve.policy_hash,
@@ -365,27 +478,31 @@ fn contribute(program: &Pubkey, a: &[AccountInfo], nonce: u64, amount: u64) -> P
         weight_offset: interval.weight_offset,
         ..WriterContributionV2::default()
     };
-    create_lot(program, &a[0], &a[2], &a[10], &a[11], &mut lot)?;
+    create_lot(program, a.payer, a.sleeve, a.receipt, a.system, &mut lot)?;
     invoke_token_transfer_checked(
-        &a[12],
-        &a[8],
-        &a[9],
-        &a[7],
-        &a[0],
+        a.token,
+        a.source_usdc,
+        a.mint,
+        a.writer_usdc,
+        a.owner,
         amount,
         MarketMintAccounting::CANONICAL_DECIMALS,
-        &[],
+        authority_seeds,
     )?;
-    if validate_token_account(&a[7])?.amount.checked_sub(before) != Some(amount)
+    if validate_token_account(a.writer_usdc)?
+        .amount
+        .checked_sub(before)
+        != Some(amount)
         || source
             .amount
-            .checked_sub(validate_token_account(&a[8])?.amount)
+            .checked_sub(validate_token_account(a.source_usdc)?.amount)
             != Some(amount)
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
     sleeve.last_updated_slot = Clock::get()?.slot;
-    store_state(&a[2], sleeve.as_ref())
+    store_state(a.sleeve, sleeve.as_ref())?;
+    Ok(lot)
 }
 
 fn position_action(
@@ -396,10 +513,13 @@ fn position_action(
     // All position actions begin with owner, sleeve, receipt.
     let sleeve = load_writer_sleeve_without_group_meta(program, &a[1])?;
     let mut lot = load_lot(program, &a[2], &a[1], &sleeve)?;
-    if lot.owner != *a[0].key {
+    if !matches!(action, WriterParticipationActionV2::ClosePaid) && lot.owner != *a[0].key {
         return Err(VaultError::Unauthorized.into());
     }
-    if let WriterParticipationActionV2::Close = action {
+    if matches!(
+        action,
+        WriterParticipationActionV2::Close | WriterParticipationActionV2::ClosePaid
+    ) {
         if !lot.claimed || lot.rent_payer != *a[3].key {
             return Err(VaultError::InvalidWriterLifecycle.into());
         }
@@ -458,6 +578,7 @@ fn claim_compressed<'a>(
     cash_prove_by_index: bool,
     proof: Option<[u8; 128]>,
     sponsor_fee_atoms: u64,
+    permissionless: bool,
 ) -> ProgramResult {
     use crate::compressed_custody::{self as custody, CustodyKind};
     use crate::compressed_option_settlement::SPONSORED_REDEMPTION_FEE_ATOMS;
@@ -471,7 +592,7 @@ fn claim_compressed<'a>(
     if a.len() != 20
         || !a[0].is_signer
         || !a[0].is_writable
-        || !a[1].is_signer
+        || (!permissionless && !a[1].is_signer)
         || !a[2].is_writable
         || !a[3].is_writable
         || !a[4].is_writable
@@ -489,7 +610,8 @@ fn claim_compressed<'a>(
         || *a[16].key
             != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
         || !matches!(sponsor_fee_atoms, 0 | SPONSORED_REDEMPTION_FEE_ATOMS)
-        || (sponsor_fee_atoms == 0 && a[0].key != a[1].key)
+        || (permissionless && sponsor_fee_atoms != 0)
+        || (!permissionless && sponsor_fee_atoms == 0 && a[0].key != a[1].key)
         || (sponsor_fee_atoms != 0 && a[0].key == a[1].key)
         || (cash_amount == 0
             && (cash_leaf_index != 0
@@ -506,104 +628,36 @@ fn claim_compressed<'a>(
     {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let config = load_canonical_vault_config(program, &a[6])?;
-    let mut sleeve = load_writer_sleeve_without_group_meta(program, &a[2])?;
-    let mut lot = load_lot(program, &a[3], &a[2], &sleeve)?;
-    if lot.owner != *a[1].key
-        || lot.claimed
-        || !matches!(
-            sleeve.status,
-            WriterSleeveStatus::SettlementFinalized | WriterSleeveStatus::FundingRefunds
-        )
-        || sleeve.vault_config != *a[6].key
-        || sleeve.usdc_vault != *a[4].key
-        || sleeve.settlement_mint != *a[5].key
-        || config.usdc_mint != *a[5].key
-    {
-        return Err(VaultError::InvalidWriterLifecycle.into());
+    // Earn Fund receipts settle only through the fund's Collect, which credits
+    // the fund vault and frees the fund slot. Any wallet payout to the fund PDA
+    // would strand the cash and leave the slot permanently open.
+    if *a[1].key == crate::earn_fund_state::derive_earn_fund(program).0 {
+        return Err(VaultError::Unauthorized.into());
     }
-    validate_collateral_mint_account(&a[5], a[11].key)?;
-    validate_vault_token_account(&a[4], a[5].key, a[2].key)?;
-    validate_spl_interface_account(a[5].key, &a[8])?;
-    let (cash_key, cash_bump) =
-        custody::derive_compressed_custody(program, CustodyKind::WriterCash, a[4].key);
-    let create_cash_custody = a[7].owner != program;
-    let mut cash_custody = if create_cash_custody {
-        // Original native contribution lots can have entirely hot backing and no
-        // sidecar. A signed claim creates only their exact empty canonical PDA.
-        if cash_amount != 0 || a[7].is_signer {
-            return Err(VaultError::InvalidAccountList.into());
-        }
-        validate_canonical_system_zero_pda_proof(&cash_key, &a[7])?;
-        custody::CompressedCustodyV1::new(
-            CustodyKind::WriterCash,
-            *a[4].key,
-            Pubkey::default(),
-            *a[5].key,
-            cash_bump,
-        )
-    } else {
-        custody::load(
-            program,
-            Some(&a[7]),
-            CustodyKind::WriterCash,
-            a[4].key,
-            &Pubkey::default(),
-            a[5].key,
-        )?
-        .ok_or(VaultError::WriterSolvencyViolation)?
+    let accounts = ClaimAccounts {
+        payer: &a[0],
+        owner: a[1].key,
+        sleeve: &a[2],
+        receipt: &a[3],
+        hot_vault: &a[4],
+        mint: &a[5],
+        config: &a[6],
+        cash_custody: &a[7],
+        spl_interface: &a[8],
+        token_program: &a[11],
+        system_program: &a[12],
     };
-    let hot_before = validate_token_account(&a[4])?.amount;
-    if cash_custody.option_atoms != 0
-        || !custody::backs(
-            Some(&cash_custody),
-            0,
-            hot_before,
-            0,
-            sleeve.accounted_asset_atoms,
-        )
-        || cash_amount > cash_custody.quote_atoms
-    {
-        return Err(VaultError::WriterSolvencyViolation.into());
-    }
-    let payout = final_payout(
-        lot.interval(),
-        sleeve.settlement_principal_atoms,
-        sleeve.participation_totals().capital_seconds,
-        sleeve.writer_residual_initial_atoms,
-    )
-    .map_err(|_| VaultError::WriterSolvencyViolation)?;
-    if payout > sleeve.writer_residual_remaining_atoms
-        || payout > sleeve.accounted_asset_atoms
-        || lot.principal > sleeve.unclaimed_principal_atoms
-    {
-        return Err(VaultError::WriterSolvencyViolation.into());
-    }
+    let mut plan = claim_prepare(program, &accounts, cash_amount)?;
+    let payout = plan.payout;
     let owner_payout = payout
         .checked_sub(sponsor_fee_atoms)
         .ok_or(ProgramError::InsufficientFunds)?;
     let compressed_draw = payout.min(cash_amount);
     let hot_draw = payout - compressed_draw;
-    if hot_before < hot_draw {
+    if plan.hot_before < hot_draw {
         return Err(ProgramError::InsufficientFunds);
     }
-    if create_cash_custody {
-        // Lifecycle, ownership, canonical lot/mint, exact payout and full hot
-        // backing were checked above before allocating or transferring rent.
-        create_program_account(
-            &a[0],
-            &a[7],
-            &a[12],
-            program,
-            custody::CompressedCustodyV1::ACCOUNT_LEN,
-            &[
-                custody::COMPRESSED_CUSTODY_SEED,
-                &[CustodyKind::WriterCash as u8],
-                a[4].key.as_ref(),
-                &[cash_bump],
-            ],
-        )?;
-    }
+    claim_create_custody(program, &accounts, &plan)?;
     let compressed_owner = owner_payout.min(compressed_draw);
     let compressed_fee = compressed_draw - compressed_owner;
     if cash_amount != 0 {
@@ -650,7 +704,7 @@ fn claim_compressed<'a>(
         let ix = transfer::instruction(*a[9].key, metas, 0, proof, &[input], &outputs)?;
         let mut infos: Vec<_> = indices.iter().map(|&i| a[i].clone()).collect();
         infos.push(a[9].clone());
-        let bump = [cash_custody.bump];
+        let bump = [plan.cash_custody.bump];
         let kind = [CustodyKind::WriterCash as u8];
         let seeds: &[&[u8]] = &[
             CURRENT_STATE_NAMESPACE_SEED,
@@ -661,8 +715,8 @@ fn claim_compressed<'a>(
         ];
         invoke_signed(&ix, &infos, &[seeds])?;
     }
-    let bump = [sleeve.bump];
-    let sleeve_seeds = writer_sleeve_signer_seeds(&sleeve.settlement_group, &bump);
+    let bump = [plan.sleeve.bump];
+    let sleeve_seeds = writer_sleeve_signer_seeds(&plan.sleeve.settlement_group, &bump);
     for (recipient, amount) in [
         (1usize, owner_payout - compressed_owner),
         (0usize, sponsor_fee_atoms - compressed_fee),
@@ -686,22 +740,184 @@ fn claim_compressed<'a>(
         let infos: Vec<_> = indices.iter().map(|&i| a[i].clone()).collect();
         invoke_signed(&ix, &infos, &[&sleeve_seeds])?;
     }
-    if hot_before.checked_sub(validate_token_account(&a[4])?.amount) != Some(hot_draw) {
+    claim_commit(&accounts, &mut plan, compressed_draw, hot_draw)
+}
+
+/// The accounts a receipt claim reads and writes, independent of where the
+/// payout goes. `owner` is the receipt owner the caller has authenticated.
+pub(super) struct ClaimAccounts<'a, 'b> {
+    pub payer: &'b AccountInfo<'a>,
+    pub owner: &'b Pubkey,
+    pub sleeve: &'b AccountInfo<'a>,
+    pub receipt: &'b AccountInfo<'a>,
+    pub hot_vault: &'b AccountInfo<'a>,
+    pub mint: &'b AccountInfo<'a>,
+    pub config: &'b AccountInfo<'a>,
+    pub cash_custody: &'b AccountInfo<'a>,
+    pub spl_interface: &'b AccountInfo<'a>,
+    pub token_program: &'b AccountInfo<'a>,
+    pub system_program: &'b AccountInfo<'a>,
+}
+
+/// A validated claim: the exact `final_payout` and the state it will update.
+pub(super) struct ClaimPlan {
+    pub sleeve: Box<WriterSleeveV1>,
+    pub lot: WriterContributionV2,
+    pub cash_custody: crate::compressed_custody::CompressedCustodyV1,
+    pub create_cash_custody: bool,
+    pub hot_before: u64,
+    pub payout: u64,
+}
+
+/// Shared claim validation: lifecycle, ownership, canonical custody, backing
+/// and the exact payout. Performs no writes.
+#[inline(never)]
+pub(super) fn claim_prepare(
+    program: &Pubkey,
+    a: &ClaimAccounts,
+    cash_amount: u64,
+) -> Result<ClaimPlan, ProgramError> {
+    use crate::compressed_custody::{self as custody, CustodyKind};
+    let config = load_canonical_vault_config(program, a.config)?;
+    let sleeve = load_writer_sleeve_without_group_meta(program, a.sleeve)?;
+    let lot = load_lot(program, a.receipt, a.sleeve, &sleeve)?;
+    if lot.owner != *a.owner
+        || lot.claimed
+        || !matches!(
+            sleeve.status,
+            WriterSleeveStatus::SettlementFinalized | WriterSleeveStatus::FundingRefunds
+        )
+        || sleeve.vault_config != *a.config.key
+        || sleeve.usdc_vault != *a.hot_vault.key
+        || sleeve.settlement_mint != *a.mint.key
+        || config.usdc_mint != *a.mint.key
+    {
+        return Err(VaultError::InvalidWriterLifecycle.into());
+    }
+    validate_collateral_mint_account(a.mint, a.token_program.key)?;
+    validate_vault_token_account(a.hot_vault, a.mint.key, a.sleeve.key)?;
+    validate_spl_interface_account(a.mint.key, a.spl_interface)?;
+    let (cash_key, cash_bump) =
+        custody::derive_compressed_custody(program, CustodyKind::WriterCash, a.hot_vault.key);
+    let create_cash_custody = a.cash_custody.owner != program;
+    let cash_custody = if create_cash_custody {
+        // Original native contribution lots can have entirely hot backing and no
+        // sidecar. A signed claim creates only their exact empty canonical PDA.
+        if cash_amount != 0 || a.cash_custody.is_signer {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        validate_canonical_system_zero_pda_proof(&cash_key, a.cash_custody)?;
+        custody::CompressedCustodyV1::new(
+            CustodyKind::WriterCash,
+            *a.hot_vault.key,
+            Pubkey::default(),
+            *a.mint.key,
+            cash_bump,
+        )
+    } else {
+        custody::load(
+            program,
+            Some(a.cash_custody),
+            CustodyKind::WriterCash,
+            a.hot_vault.key,
+            &Pubkey::default(),
+            a.mint.key,
+        )?
+        .ok_or(VaultError::WriterSolvencyViolation)?
+    };
+    let hot_before = validate_token_account(a.hot_vault)?.amount;
+    if cash_custody.option_atoms != 0
+        || !custody::backs(
+            Some(&cash_custody),
+            0,
+            hot_before,
+            0,
+            sleeve.accounted_asset_atoms,
+        )
+        || cash_amount > cash_custody.quote_atoms
+    {
+        return Err(VaultError::WriterSolvencyViolation.into());
+    }
+    let payout = final_payout(
+        lot.interval(),
+        sleeve.settlement_principal_atoms,
+        sleeve.participation_totals().capital_seconds,
+        sleeve.writer_residual_initial_atoms,
+    )
+    .map_err(|_| VaultError::WriterSolvencyViolation)?;
+    if payout > sleeve.writer_residual_remaining_atoms
+        || payout > sleeve.accounted_asset_atoms
+        || lot.principal > sleeve.unclaimed_principal_atoms
+    {
+        return Err(VaultError::WriterSolvencyViolation.into());
+    }
+    Ok(ClaimPlan {
+        sleeve,
+        lot,
+        cash_custody,
+        create_cash_custody,
+        hot_before,
+        payout,
+    })
+}
+
+/// Create the empty canonical WriterCash sidecar a hot-only lot may lack.
+pub(super) fn claim_create_custody<'a>(
+    program: &Pubkey,
+    a: &ClaimAccounts<'a, '_>,
+    plan: &ClaimPlan,
+) -> ProgramResult {
+    use crate::compressed_custody::{self as custody, CustodyKind};
+    if plan.create_cash_custody {
+        // Lifecycle, ownership, canonical lot/mint, exact payout and full hot
+        // backing were checked above before allocating or transferring rent.
+        create_program_account(
+            a.payer,
+            a.cash_custody,
+            a.system_program,
+            program,
+            custody::CompressedCustodyV1::ACCOUNT_LEN,
+            &[
+                custody::COMPRESSED_CUSTODY_SEED,
+                &[CustodyKind::WriterCash as u8],
+                a.hot_vault.key.as_ref(),
+                &[plan.cash_custody.bump],
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+/// Shared claim commit after the payout transfers: exact hot-vault delta, then
+/// identical custody, sleeve and receipt accounting.
+pub(super) fn claim_commit(
+    a: &ClaimAccounts,
+    plan: &mut ClaimPlan,
+    compressed_draw: u64,
+    hot_draw: u64,
+) -> ProgramResult {
+    if plan
+        .hot_before
+        .checked_sub(validate_token_account(a.hot_vault)?.amount)
+        != Some(hot_draw)
+    {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    cash_custody.quote_atoms = cash_custody
+    plan.cash_custody.quote_atoms = plan
+        .cash_custody
         .quote_atoms
         .checked_sub(compressed_draw)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    custody::store(&a[7], &cash_custody)?;
-    sleeve.writer_residual_remaining_atoms -= payout;
-    sleeve.unclaimed_principal_atoms -= lot.principal;
+    crate::compressed_custody::store(a.cash_custody, &plan.cash_custody)?;
+    let sleeve = &mut plan.sleeve;
+    sleeve.writer_residual_remaining_atoms -= plan.payout;
+    sleeve.unclaimed_principal_atoms -= plan.lot.principal;
     sleeve.accounted_asset_atoms = sleeve
         .accounted_asset_atoms
-        .checked_sub(payout)
+        .checked_sub(plan.payout)
         .ok_or(VaultError::ArithmeticOverflow)?;
     sleeve.last_updated_slot = Clock::get()?.slot;
-    lot.claimed = true;
-    store_state(&a[2], sleeve.as_ref())?;
-    store_state(&a[3], &lot)
+    plan.lot.claimed = true;
+    store_state(a.sleeve, sleeve.as_ref())?;
+    store_state(a.receipt, &plan.lot)
 }

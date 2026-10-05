@@ -185,7 +185,7 @@ fixed_state_deserialize_flat!(SettlementSignerSet, 393, {
     proposer: Pubkey,
 });
 
-fixed_state_deserialize_flat!(OracleProductSkuDraft, 380, {
+fixed_state_deserialize_flat!(OracleProductSkuDraft, 412, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -193,6 +193,7 @@ fixed_state_deserialize_flat!(OracleProductSkuDraft, 380, {
     underlying_id: [u8; 32],
     draft_nonce: u64,
     expected_sku_count: u16,
+    expected_sku_root: [u8; 32],
     appended_sku_count: u16,
     frontier_mask: u16,
     last_sku_id: [u8; 32],

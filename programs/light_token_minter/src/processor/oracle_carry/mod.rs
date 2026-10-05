@@ -25,6 +25,7 @@ pub(in crate::processor) use checkpoints::{record_fresh_accept, AcceptedEvent};
 pub(in crate::processor) use openings::{
     inherited_reward_opening, require_carry_resolved_before_expiry,
 };
+pub(in crate::processor) use periods::require_cleanup_dependencies;
 pub(in crate::processor) use periods::{require_fresh_discovery, require_import_complete};
 
 pub(in crate::processor) fn journal_address_for_transport(
@@ -138,9 +139,15 @@ pub(in crate::processor) fn required_accesses(
     use RequiredAccessKind::{Initialize, Mutable, MutableOrInitialize, ReadOnly as Read};
     let s = RequiredAccessSpec::new;
     let (expected, specs): (usize, Vec<RequiredAccessSpec>) = match decode(payload)? {
+        Action::ExtendOctoberLadder(_) => (59, vec![]),
+        Action::InstallOctoberLadder(_) => (45, vec![]),
+        Action::TerminalCleanup(params) => {
+            (super::terminal_cleanup::account_count(&params)?, vec![])
+        }
         Action::SponsoredSource(action) => {
             return super::oracle_sponsorship::required_accesses(&action, account_count)
         }
+        #[cfg(not(feature = "mainnet-v3"))]
         Action::SeptemberBootstrap { operation, .. }
         | Action::OctoberBootstrap { operation, .. } => match operation {
             0 => (if payload.first() == Some(&23) { 18 } else { 17 }, vec![]),
@@ -257,9 +264,28 @@ pub(in crate::processor) fn process(
     // The wrapper already verifies every logical read remains unchanged. All source
     // views are physically writable during materialization, including logical reads.
     match decode(payload)? {
+        Action::ExtendOctoberLadder(params) => {
+            if compressed_inner {
+                return invalid();
+            }
+            super::writer_sleeve::process_extend_october_ladder(program, accounts, params)
+        }
+        Action::InstallOctoberLadder(params) => {
+            if compressed_inner {
+                return invalid();
+            }
+            super::writer_sleeve::process_install_october_ladder(program, accounts, params)
+        }
+        Action::TerminalCleanup(params) => {
+            if compressed_inner {
+                return invalid();
+            }
+            super::terminal_cleanup::process(program, accounts, params)
+        }
         Action::SponsoredSource(action) => {
             super::oracle_sponsorship::process(program, accounts, action)
         }
+        #[cfg(not(feature = "mainnet-v3"))]
         Action::SeptemberBootstrap {
             operation,
             market,
@@ -268,6 +294,7 @@ pub(in crate::processor) fn process(
         } => super::september_bootstrap::process(
             program, accounts, operation, market, row, plan_hash,
         ),
+        #[cfg(not(feature = "mainnet-v3"))]
         Action::OctoberBootstrap {
             operation,
             market,

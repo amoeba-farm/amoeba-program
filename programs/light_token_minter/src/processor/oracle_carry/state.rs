@@ -169,6 +169,7 @@ pub(super) fn save<T: Record>(program: &Pubkey, info: &AccountInfo, value: &T) -
     Ok(())
 }
 
+#[inline(never)]
 pub(super) fn create<'a, T: Record>(
     program: &Pubkey,
     payer: &AccountInfo<'a>,

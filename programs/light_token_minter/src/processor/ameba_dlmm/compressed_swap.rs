@@ -26,6 +26,7 @@ pub(super) fn existing_sidecar<'a, 'info>(
 }
 
 pub(super) struct CompressedSwapAccounts<'a, 'info> {
+    pub(super) trading_owner: Option<Pubkey>,
     pub(super) base: &'a [AccountInfo<'info>],
     pub(super) pool_custody: &'a AccountInfo<'info>,
     pub(super) writer_cash_custody: &'a AccountInfo<'info>,
@@ -103,10 +104,7 @@ pub(super) fn parse<'a, 'info>(
         return Err(VaultError::InvalidAccountList.into());
     }
     let base = &a[..FIXED + page_count];
-    validate_pack_dlmm_account_privileges(
-        AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1,
-        base,
-    )?;
+    validate_collective_swap_base_privileges(program, base)?;
     let tail = &a[FIXED + page_count..];
     let merkle = &tail[TAIL..];
     let scope = crate::scoped_settlement::derive_collective_settlement_delegate(
@@ -156,6 +154,7 @@ pub(super) fn parse<'a, 'info>(
         return Err(VaultError::InvalidAccountList.into());
     }
     Ok(CompressedSwapAccounts {
+        trading_owner: None,
         base,
         pool_custody: &tail[0],
         writer_cash_custody: &tail[1],
@@ -570,7 +569,22 @@ pub(super) fn settle<'a>(
         a[27].key.as_ref(),
         &cash_bump,
     ];
-    invoke_signed(&ix, &infos, &[pool_seeds, cash_seeds])?;
+    if let Some(owner) = context.trading_owner {
+        let (expected, bump) = crate::trading_session::derive(program, &owner);
+        if expected != *trader.key {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        let bump = [bump];
+        let trading_seeds: &[&[u8]] = &[
+            CURRENT_STATE_NAMESPACE_SEED,
+            crate::trading_session::SEED,
+            owner.as_ref(),
+            &bump,
+        ];
+        invoke_signed(&ix, &infos, &[pool_seeds, cash_seeds, trading_seeds])?;
+    } else {
+        invoke_signed(&ix, &infos, &[pool_seeds, cash_seeds])?;
+    }
     if context.pool_custody.owner == program {
         let mut pool_after = pool_before;
         pool_after.option_atoms = split.pool_option_after;

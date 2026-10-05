@@ -269,3 +269,107 @@ pub fn instruction(
         data,
     })
 }
+
+/// One SPL-pool decompression of regular leaves into a classic token account.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SplDecompression {
+    pub amount: u64,
+    pub mint: u8,
+    pub recipient: u8,
+    pub pool_account_index: u8,
+    pub pool_index: u8,
+    pub bump: u8,
+    pub decimals: u8,
+}
+
+/// Build one Light Transfer2 that consumes authenticated regular leaves and
+/// decompresses `decompression.amount` into a classic SPL account through the
+/// mint's SPL interface pool. Outputs carry change; per-mint debit equals
+/// outputs plus the decompression. The caller authenticates every account and
+/// checks the recipient's exact balance delta.
+pub fn decompress_to_spl_instruction(
+    program: Pubkey,
+    accounts: Vec<AccountMeta>,
+    output_queue: u8,
+    proof: Option<[u8; 128]>,
+    inputs: &[InputLeaf],
+    decompression: SplDecompression,
+    outputs: &[OutputLeaf],
+) -> Result<Instruction, ProgramError> {
+    let count = accounts
+        .len()
+        .checked_sub(7)
+        .ok_or(ProgramError::InvalidInstructionData)?;
+    if count == 0
+        || count > 248
+        || usize::from(output_queue) >= count
+        || inputs.is_empty()
+        || decompression.amount == 0
+        || [
+            decompression.mint,
+            decompression.recipient,
+            decompression.pool_account_index,
+        ]
+        .iter()
+        .any(|index| usize::from(*index) >= count)
+        || inputs.iter().any(|x| {
+            x.amount == 0
+                || x.mint != decompression.mint
+                || [x.owner, x.mint, x.tree, x.queue]
+                    .iter()
+                    .any(|index| usize::from(*index) >= count)
+                || x.has_delegate && usize::from(x.delegate) >= count
+        })
+        || outputs.iter().any(|x| {
+            x.amount == 0
+                || x.mint != decompression.mint
+                || usize::from(x.owner) >= count
+                || x.has_delegate && usize::from(x.delegate) >= count
+        })
+        || (proof.is_none() && inputs.iter().any(|x| !x.prove_by_index))
+    {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let debit: u128 = inputs.iter().map(|x| u128::from(x.amount)).sum();
+    let credit: u128 = outputs.iter().map(|x| u128::from(x.amount)).sum::<u128>()
+        + u128::from(decompression.amount);
+    if debit != credit {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let mut data = Vec::with_capacity(
+        32 + 16 + proof.map_or(0, |_| 128) + 22 * inputs.len() + 13 * outputs.len(),
+    );
+    data.extend_from_slice(&[TRANSFER2, 0, 0, 0, 0, output_queue, 0, 0, 0, 1]);
+    data.extend_from_slice(&1u32.to_le_bytes());
+    data.push(1); // CompressionMode::Decompress
+    data.extend_from_slice(&decompression.amount.to_le_bytes());
+    data.extend_from_slice(&[
+        decompression.mint,
+        decompression.recipient,
+        0,
+        decompression.pool_account_index,
+        decompression.pool_index,
+        decompression.bump,
+        decompression.decimals,
+    ]);
+    if let Some(proof) = proof {
+        data.push(1);
+        data.extend_from_slice(&proof);
+    } else {
+        data.push(0);
+    }
+    data.extend_from_slice(&(inputs.len() as u32).to_le_bytes());
+    for leaf in inputs {
+        push_input(&mut data, leaf);
+    }
+    data.extend_from_slice(&(outputs.len() as u32).to_le_bytes());
+    for leaf in outputs {
+        push_output(&mut data, leaf);
+    }
+    data.extend_from_slice(&[0, 0, 0, 0]);
+    Ok(Instruction {
+        program_id: program,
+        accounts,
+        data,
+    })
+}

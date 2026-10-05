@@ -17,7 +17,7 @@ fn writer_security_mode_byte(value: WriterSecurityMode) -> u8 {
     }
 }
 
-#[inline(always)]
+#[inline(never)]
 pub(in crate::processor) fn writer_series_family_hash(book: &WriterSeriesBookV1) -> [u8; 32] {
     let count = usize::from(book.series_count);
     let mut bytes = [0u8; WRITER_SERIES_FAMILY_HASH_MAX_BYTES];

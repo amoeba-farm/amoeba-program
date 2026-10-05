@@ -66,6 +66,40 @@ impl BorshDeserialize for ScopedSettlementActionV1 {
             }
         })
     }
+
+    #[inline]
+    fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
+        crate::fixed_codec::cursor_deserialize(buf)
+    }
+
+    #[inline]
+    fn try_from_slice(data: &[u8]) -> std::io::Result<Self> {
+        crate::fixed_codec::cursor_from_slice(data)
+    }
+}
+
+/// `deserialize_reader` above on a cursor, selector for selector; an unknown selector marks the
+/// cursor invalid exactly where the reader returns its error.
+impl crate::fixed_codec::CursorField for ScopedSettlementActionV1 {
+    #[inline(never)]
+    fn read(c: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
+        use crate::compressed_option_settlement::CompressedCashOptionClaim;
+        match c.u8() {
+            0 => Self::Authorize,
+            1 => Self::Execute,
+            2 => Self::Revoke,
+            5 => Self::ExpireUnredeemed {
+                series_index: c.u8(),
+            },
+            8 => Self::RedeemCompressedCash(CompressedCashOptionClaim::read(c)),
+            9 => Self::SettleCompressedCash(CompressedCashOptionClaim::read(c)),
+            10 => Self::RedeemCompressedCashSponsored(CompressedCashOptionClaim::read(c)),
+            _ => {
+                c.invalid = true;
+                Self::Authorize
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]

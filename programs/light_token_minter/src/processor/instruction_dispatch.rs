@@ -60,7 +60,7 @@ fn current_invocation_stack_height() -> usize {
 #[inline(always)]
 fn require_governed_invocation(tag: u8, accounts: &[AccountInfo]) -> ProgramResult {
     let height = current_invocation_stack_height();
-    #[cfg(any(feature = "devnet-v3-governance-controller", feature = "mainnet-v3"))]
+    #[cfg(feature = "devnet-v3-governance-controller")]
     if height == solana_program::instruction::TRANSACTION_LEVEL_STACK_HEIGHT + 1
         && tag
             == crate::ameba_dlmm_instruction::AmoebaDlmmInstructionTag::InitializeLightConfig as u8
@@ -236,13 +236,22 @@ pub(super) fn dispatch_0_63(
     if tag == VaultInstructionTag::OracleCarryForwardV1 {
         return oracle_carry::process(program_id, accounts, payload, context.is_compressed_inner());
     }
+    if tag == VaultInstructionTag::ManageEarnFundV1 {
+        // The Earn Fund uses exact native accounts only; no compressed state views.
+        if context.is_compressed_inner() {
+            return Err(VaultError::InvalidInstructionData.into());
+        }
+        return writer_sleeve::earn_fund::process(program_id, accounts, payload);
+    }
     let handler: fn(&Pubkey, &[AccountInfo], &[u8]) -> ProgramResult = match tag {
+        #[cfg(not(feature = "mainnet-v3"))]
         VaultInstructionTag::Initialize => process_initialize_instruction,
         VaultInstructionTag::UpdateConfig => process_update_config_instruction,
         VaultInstructionTag::DepositUsdc => process_deposit_instruction,
         VaultInstructionTag::InitUserCollateral => process_init_user_collateral_instruction,
         VaultInstructionTag::DepositCollateral => process_deposit_collateral_instruction,
         VaultInstructionTag::WithdrawCollateral => process_withdraw_collateral_instruction,
+        VaultInstructionTag::ManageTradingSessionV1 => trading_session::process,
 
         VaultInstructionTag::CloseOracleMonth => process_close_oracle_month_instruction,
         _ => return Err(VaultError::InvalidInstructionData.into()),
@@ -271,6 +280,7 @@ pub(super) fn dispatch_64_124(
         VaultInstructionTag::SetMarketPaused => {
             process_set_market_paused_instruction(program_id, accounts, payload)
         }
+        #[cfg(not(feature = "mainnet-v3"))]
         VaultInstructionTag::InitializeSettlementSignerRegistry => {
             process_initialize_settlement_signer_registry_instruction(program_id, accounts, payload)
         }
@@ -350,6 +360,7 @@ pub(super) fn dispatch_128_158(
 ) -> ProgramResult {
     let compressed_state_transport = context.is_compressed_inner();
     match tag {
+        #[cfg(not(feature = "mainnet-v3"))]
         VaultInstructionTag::BootstrapVaultGovernanceV2 => {
             let params = BootstrapVaultGovernanceV2Params {
                 new_oracle_authority: Pubkey::new_from_array(decode_bytes32_payload(payload)?),

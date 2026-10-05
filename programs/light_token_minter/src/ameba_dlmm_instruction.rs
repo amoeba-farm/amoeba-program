@@ -112,12 +112,14 @@ pub struct AddAmoebaDlmmLiquidityV1Params {
     pub entries: Vec<AmoebaDlmmDepositEntry>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct AmoebaDlmmRemoveEntry {
-    pub bin_id: u16,
-    pub shares: u128,
-    pub minimum_option_out: u64,
-    pub minimum_quote_out: u64,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct AmoebaDlmmRemoveEntry {
+        pub bin_id: u16,
+        pub shares: u128,
+        pub minimum_option_out: u64,
+        pub minimum_quote_out: u64,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -127,22 +129,24 @@ pub struct RemoveAmoebaDlmmLiquidityV1Params {
     pub close_position_when_empty: bool,
 }
 
-/// Tag 126 withdraws LP reserves into regular compressed wallet leaves. The
-/// optional witnesses spend whole authenticated Pool custody leaves; any hot
-/// pool remainder is compressed in the same Transfer2. No holder hot account
-/// or decompression instruction is part of this packet.
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
-pub struct RemoveCompressedLiquidityV1Params {
-    pub position_nonce: u64,
-    pub entries: Vec<AmoebaDlmmRemoveEntry>,
-    pub close_position_when_empty: bool,
-    pub page_count: u8,
-    pub merkle_account_count: u8,
-    pub output_tree_index: u8,
-    pub output_queue_index: u8,
-    pub pool_option_input: Option<CompressedSwapLeafWitnessV1>,
-    pub pool_quote_input: Option<CompressedSwapLeafWitnessV1>,
-    pub proof: Option<[u8; 128]>,
+crate::fixed_codec::compact_borsh_struct! {
+    /// Tag 126 withdraws LP reserves into regular compressed wallet leaves. The
+    /// optional witnesses spend whole authenticated Pool custody leaves; any hot
+    /// pool remainder is compressed in the same Transfer2. No holder hot account
+    /// or decompression instruction is part of this packet.
+    #[derive(Clone, Debug, BorshSerialize)]
+    pub struct RemoveCompressedLiquidityV1Params {
+        pub position_nonce: u64,
+        pub entries: Vec<AmoebaDlmmRemoveEntry>,
+        pub close_position_when_empty: bool,
+        pub page_count: u8,
+        pub merkle_account_count: u8,
+        pub output_tree_index: u8,
+        pub output_queue_index: u8,
+        pub pool_option_input: Option<CompressedSwapLeafWitnessV1>,
+        pub pool_quote_input: Option<CompressedSwapLeafWitnessV1>,
+        pub proof: Option<[u8; 128]>,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
@@ -152,42 +156,63 @@ pub enum AmoebaDlmmSwapDirection {
     OptionForQuote = 1,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct SwapAmoebaDlmmExactInV1Params {
-    pub direction: AmoebaDlmmSwapDirection,
-    pub amount_in: u64,
-    pub minimum_amount_out: u64,
-    pub limit_bin_id: u16,
-    pub deadline_ts: u64,
+/// The derived Borsh tag is the declaration index (equal to the discriminants above).
+impl crate::fixed_codec::CursorField for AmoebaDlmmSwapDirection {
+    #[inline(never)]
+    fn read(input: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
+        match input.u8() {
+            0 => Self::QuoteForOption,
+            1 => Self::OptionForQuote,
+            _ => {
+                input.invalid = true;
+                Self::QuoteForOption
+            }
+        }
+    }
 }
 
-/// A regular v3 leaf authenticated by the one aggregate Light proof. Tree and
-/// queue indices address only the unique Merkle-account suffix after the fixed
-/// compressed-swap tail, not arbitrary DLMM accounts or route pages.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct CompressedSwapLeafWitnessV1 {
-    pub leaf_index: u32,
-    pub root_index: u16,
-    pub prove_by_index: bool,
-    pub tree_index: u8,
-    pub queue_index: u8,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct SwapAmoebaDlmmExactInV1Params {
+        pub direction: AmoebaDlmmSwapDirection,
+        pub amount_in: u64,
+        pub minimum_amount_out: u64,
+        pub limit_bin_id: u16,
+        pub deadline_ts: u64,
+    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct SwapCollectiveCompressedExactInV1Params {
-    pub swap: SwapAmoebaDlmmExactInV1Params,
-    pub page_count: u8,
-    pub merkle_account_count: u8,
-    pub output_tree_index: u8,
-    pub output_queue_index: u8,
-    pub user_input_amount: u64,
-    pub sponsor_fee_atoms: u64,
-    pub user_input_has_delegate: bool,
-    pub user_input: CompressedSwapLeafWitnessV1,
-    pub pool_option_input: Option<CompressedSwapLeafWitnessV1>,
-    pub pool_quote_input: Option<CompressedSwapLeafWitnessV1>,
-    pub writer_quote_input: Option<CompressedSwapLeafWitnessV1>,
-    pub proof: Option<[u8; 128]>,
+crate::fixed_codec::compact_borsh_struct! {
+    /// A regular v3 leaf authenticated by the one aggregate Light proof. Tree and
+    /// queue indices address only the unique Merkle-account suffix after the fixed
+    /// compressed-swap tail, not arbitrary DLMM accounts or route pages.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct CompressedSwapLeafWitnessV1 {
+        pub leaf_index: u32,
+        pub root_index: u16,
+        pub prove_by_index: bool,
+        pub tree_index: u8,
+        pub queue_index: u8,
+    }
+}
+
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct SwapCollectiveCompressedExactInV1Params {
+        pub swap: SwapAmoebaDlmmExactInV1Params,
+        pub page_count: u8,
+        pub merkle_account_count: u8,
+        pub output_tree_index: u8,
+        pub output_queue_index: u8,
+        pub user_input_amount: u64,
+        pub sponsor_fee_atoms: u64,
+        pub user_input_has_delegate: bool,
+        pub user_input: CompressedSwapLeafWitnessV1,
+        pub pool_option_input: Option<CompressedSwapLeafWitnessV1>,
+        pub pool_quote_input: Option<CompressedSwapLeafWitnessV1>,
+        pub writer_quote_input: Option<CompressedSwapLeafWitnessV1>,
+        pub proof: Option<[u8; 128]>,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]

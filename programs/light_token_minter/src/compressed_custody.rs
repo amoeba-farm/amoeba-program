@@ -52,6 +52,7 @@ impl CompressedCustodyV1 {
     pub const LEN: usize = 3 + 32 * 3 + 8 * 2;
     pub const ACCOUNT_LEN: usize = 8 + Self::LEN;
 
+    #[inline(never)]
     pub fn new(
         kind: CustodyKind,
         parent: Pubkey,
@@ -114,6 +115,46 @@ pub fn load(
     option_mint: &Pubkey,
     quote_mint: &Pubkey,
 ) -> Result<Option<CompressedCustodyV1>, ProgramError> {
+    load_bound(
+        program,
+        account,
+        kind,
+        parent,
+        option_mint,
+        quote_mint,
+        true,
+    )
+}
+
+/// Read the same canonical binding without granting mutation authority.
+pub fn load_observation(
+    program: &Pubkey,
+    account: Option<&AccountInfo>,
+    kind: CustodyKind,
+    parent: &Pubkey,
+    option_mint: &Pubkey,
+    quote_mint: &Pubkey,
+) -> Result<Option<CompressedCustodyV1>, ProgramError> {
+    load_bound(
+        program,
+        account,
+        kind,
+        parent,
+        option_mint,
+        quote_mint,
+        false,
+    )
+}
+
+fn load_bound(
+    program: &Pubkey,
+    account: Option<&AccountInfo>,
+    kind: CustodyKind,
+    parent: &Pubkey,
+    option_mint: &Pubkey,
+    quote_mint: &Pubkey,
+    require_writable: bool,
+) -> Result<Option<CompressedCustodyV1>, ProgramError> {
     let Some(account) = account else {
         return Ok(None);
     };
@@ -121,7 +162,7 @@ pub fn load(
     if account.key != &expected
         || account.owner != program
         || account.data_len() != CompressedCustodyV1::ACCOUNT_LEN
-        || !account.is_writable
+        || (require_writable && !account.is_writable)
     {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -135,6 +176,30 @@ pub fn load(
         return Err(ProgramError::InvalidAccountData);
     }
     Ok(Some(state))
+}
+
+/// Quote atoms held by a sleeve vault's canonical WriterCash custody, or zero when
+/// it is not supplied. Writer cash never records option atoms.
+#[inline(never)]
+pub fn writer_cash(
+    program: &Pubkey,
+    account: Option<&AccountInfo>,
+    vault: &Pubkey,
+    quote_mint: &Pubkey,
+) -> Result<u64, ProgramError> {
+    match load(
+        program,
+        account,
+        CustodyKind::WriterCash,
+        vault,
+        &Pubkey::default(),
+        quote_mint,
+    )? {
+        Some(state) if state.option_atoms != 0 => {
+            Err(crate::error::VaultError::WriterSupplyMismatch.into())
+        }
+        state => Ok(state.map_or(0, |state| state.quote_atoms)),
+    }
 }
 
 pub fn store(account: &AccountInfo, state: &CompressedCustodyV1) -> Result<(), ProgramError> {

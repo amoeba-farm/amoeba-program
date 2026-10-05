@@ -9,6 +9,60 @@ pub(super) const CHUNK: usize = 192;
 pub(super) const DEFINITION_MAX: usize = 4096;
 const LINK_LEN: usize = 251;
 
+pub(super) fn validate_cleanup_link(
+    program: &Pubkey,
+    month: &Pubkey,
+    info: &AccountInfo,
+) -> ProgramResult {
+    if info.owner != program || info.executable || info.data_len() != LINK_LEN {
+        return invalid();
+    }
+    let d = info.try_borrow_data()?;
+    let event = read_key(&d[70..102]);
+    let commitment: [u8; 32] = d[187..219]
+        .try_into()
+        .map_err(|_| VaultError::InvalidOracleOpeningEvidence)?;
+    let (key, bump) = link_address(program, &event, d[166], &commitment);
+    if *info.key != key
+        || d[..6] != [b'O', b'E', b'L', 1, 1, bump]
+        || d[6..38] != month.to_bytes()
+        || d[166] > 5
+        || commitment == [0; 32]
+        || crate::pubkey_is_default(&event)
+    {
+        return invalid();
+    }
+    Ok(())
+}
+
+fn require_evidence_month_open(program: &Pubkey, info: &AccountInfo) -> ProgramResult {
+    let month: OracleMonthState = load_exact_zero_padded_state(
+        info,
+        program,
+        OracleMonthState::LEN,
+        VaultError::InvalidOracleState,
+    )?;
+    let (key, bump) = Pubkey::find_program_address(
+        &[
+            CURRENT_STATE_NAMESPACE_SEED,
+            ORACLE_MONTH_PDA_SEED,
+            month.market.as_ref(),
+        ],
+        program,
+    );
+    if info.executable
+        || *info.key != key
+        || !month.is_initialized
+        || month.bump != bump
+        || month.account_discriminator != OracleMonthState::ACCOUNT_DISCRIMINATOR
+        || month.account_version != OracleMonthState::ACCOUNT_VERSION
+        || month.phase == OraclePhase::Closed
+    {
+        return invalid();
+    }
+    Ok(())
+}
+
 fn invalid<T>() -> Result<T, ProgramError> {
     Err(VaultError::InvalidOracleOpeningEvidence.into())
 }
@@ -398,6 +452,7 @@ pub(super) fn backfill_source(program: &Pubkey, a: &[AccountInfo]) -> ProgramRes
     if a.len() != 8 {
         return invalid();
     }
+    require_evidence_month_open(program, &a[1])?;
     let source = load_valid_oracle_source(program, a[1].key, &a[2])?;
     for (role, commitment, object, link) in [
         (0, source.canonical_locator_hash, 3, 4),
@@ -428,6 +483,7 @@ pub(super) fn backfill_claim(program: &Pubkey, a: &[AccountInfo], role: u8) -> P
     if a.len() != 8 {
         return invalid();
     }
+    require_evidence_month_open(program, &a[1])?;
     let source = load_valid_oracle_source(program, a[1].key, &a[2])?;
     let (attempt, value, time, evidence, archive) = match role {
         2 => {

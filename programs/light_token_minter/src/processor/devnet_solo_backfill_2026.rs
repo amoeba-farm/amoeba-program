@@ -73,6 +73,12 @@ enum Product {
     Nandx,
 }
 
+/// SKU counts of the two registered manifests these historical Devnet cohorts were pinned to,
+/// alongside their pinned roots. They describe these cohorts only; the program has no product
+/// table, and each cohort is checked against the registered manifest's own count and root.
+const RAMX_COHORT_SKU_COUNT: u16 = 52;
+const NANDX_COHORT_SKU_COUNT: u16 = 48;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Cohort {
     index: u8,
@@ -91,7 +97,7 @@ impl Cohort {
                 product: Product::Ramx,
                 month: 202609,
                 expiry_ts: 1_790_812_800,
-                required_sku_count: RAMX_ORACLE_PRODUCT_SKU_COUNT,
+                required_sku_count: RAMX_COHORT_SKU_COUNT,
                 required_sku_root: RAMX_ROOT,
             }),
             1 => Ok(Self {
@@ -99,7 +105,7 @@ impl Cohort {
                 product: Product::Nandx,
                 month: 202609,
                 expiry_ts: 1_790_812_800,
-                required_sku_count: NANDX_ORACLE_PRODUCT_SKU_COUNT,
+                required_sku_count: NANDX_COHORT_SKU_COUNT,
                 required_sku_root: NANDX_ROOT,
             }),
             2 => Ok(Self {
@@ -107,7 +113,7 @@ impl Cohort {
                 product: Product::Ramx,
                 month: 202610,
                 expiry_ts: 1_793_491_200,
-                required_sku_count: RAMX_ORACLE_PRODUCT_SKU_COUNT,
+                required_sku_count: RAMX_COHORT_SKU_COUNT,
                 required_sku_root: RAMX_ROOT,
             }),
             3 => Ok(Self {
@@ -115,7 +121,7 @@ impl Cohort {
                 product: Product::Nandx,
                 month: 202610,
                 expiry_ts: 1_793_491_200,
-                required_sku_count: NANDX_ORACLE_PRODUCT_SKU_COUNT,
+                required_sku_count: NANDX_COHORT_SKU_COUNT,
                 required_sku_root: NANDX_ROOT,
             }),
             _ => Err(VaultError::InvalidInstructionData.into()),

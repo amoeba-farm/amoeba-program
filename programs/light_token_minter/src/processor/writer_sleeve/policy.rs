@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 pub(in crate::processor) fn process_initialize_policy_registry(
     program_id: &Pubkey,
     accounts: &[AccountInfo],

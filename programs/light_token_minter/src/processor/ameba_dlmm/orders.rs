@@ -1,5 +1,6 @@
 use super::*;
 mod compressed;
+pub(in crate::processor) mod expired;
 mod recovery;
 mod storage;
 use crate::ameba_dlmm_state::AMOEBA_DLMM_ACCOUNT_VERSION;
@@ -338,6 +339,10 @@ pub(in crate::processor) fn process(
     action: DlmmOrderAction,
 ) -> ProgramResult {
     match action {
+        DlmmOrderAction::ExpireClassic {
+            sequence,
+            record_count,
+        } => return expired::process(program, a, sequence, record_count),
         DlmmOrderAction::Cancel { .. }
         | DlmmOrderAction::Claim { .. }
         | DlmmOrderAction::Close { .. }
@@ -354,10 +359,9 @@ pub(in crate::processor) fn process(
     if a.len() != ORDER_SWAP_FIXED_ACCOUNTS || !a[0].is_signer || !a[0].is_writable {
         return Err(VaultError::InvalidAccountList.into());
     }
-    validate_pack_dlmm_account_privileges(
-        AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1,
-        a,
-    )?;
+    // Initialization has the swap's core roles and three book custody roles,
+    // but it does not deliver compressed tokens or carry a delivery tail.
+    validate_collective_swap_base_privileges(program, a)?;
     for index in 31..34 {
         if !a[index].is_writable
             || a[index].is_signer

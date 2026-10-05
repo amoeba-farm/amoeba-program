@@ -1,5 +1,14 @@
 use super::*;
 
+/// Values loaded by the collective binding before any CPI. Kept boxed to avoid
+/// copying large account states through SBF stack frames.
+pub(super) struct LoadedSwapState {
+    pub config: Box<VaultConfig>,
+    pub market: Box<Market>,
+    pub month: Box<OracleMonthState>,
+    pub pool: Box<AmoebaDlmmPoolV1>,
+}
+
 #[derive(Clone)]
 pub(super) struct LoadedSwapPage {
     account_index: usize,
@@ -66,15 +75,6 @@ pub(super) fn load_swap_config(
 }
 
 #[inline(never)]
-pub(super) fn load_swap_market(
-    program_id: &Pubkey,
-    market_info: &AccountInfo,
-) -> Result<Box<Market>, ProgramError> {
-    let market = load_valid_market(program_id, market_info)?;
-    Ok(Box::new(market))
-}
-
-#[inline(never)]
 pub(super) fn load_swap_pool(
     program_id: &Pubkey,
     pool_info: &AccountInfo,
@@ -90,6 +90,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer<'a>(
     writer: &mut Option<super::super::writer_sleeve::dlmm::WriterSwapState>,
     writer_accounts: &[AccountInfo<'a>],
     compression: &[AccountInfo<'a>],
+    loaded: LoadedSwapState,
 ) -> ProgramResult {
     process_collective_swap_mode(
         program_id,
@@ -99,6 +100,7 @@ pub(super) fn process_collective_swap_exact_in_core_with_writer<'a>(
         writer_accounts,
         compression,
         None,
+        loaded,
     )
 }
 
@@ -115,6 +117,7 @@ pub(super) fn process_collective_swap_mode<'a>(
         &compressed_swap::CompressedSwapAccounts<'_, 'a>,
         &crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params,
     )>,
+    loaded: LoadedSwapState,
 ) -> ProgramResult {
     const FIXED_ACCOUNTS: usize = 20;
     let compressed_mode = compressed.is_some();
@@ -122,9 +125,6 @@ pub(super) fn process_collective_swap_mode<'a>(
         return Err(VaultError::InvalidAccountList.into());
     }
     let trader_info = &accounts[0];
-    let config_info = &accounts[1];
-    let market_info = &accounts[2];
-    let month_info = &accounts[3];
     let pool_info = &accounts[4];
     let authority_info = &accounts[5];
     let option_mint_info = &accounts[6];
@@ -161,10 +161,12 @@ pub(super) fn process_collective_swap_mode<'a>(
         spl_token_program_info,
         system_program_info,
     )?;
-    let config = load_swap_config(program_id, config_info)?;
-    let market = load_swap_market(program_id, market_info)?;
-    let month = Box::new(load_oracle_month_state(month_info, program_id)?);
-    let mut pool = load_swap_pool(program_id, pool_info)?;
+    let LoadedSwapState {
+        config,
+        market,
+        month,
+        mut pool,
+    } = loaded;
     if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -241,7 +243,7 @@ pub(super) fn process_collective_swap_mode<'a>(
     } else {
         None
     };
-    let before_vault_amounts = validate_pool_vault_amounts_with(
+    let (validated_vaults, before_vault_amounts) = validate_pool_vaults_once(
         program_id,
         pool_info,
         &pool,
@@ -365,13 +367,22 @@ pub(super) fn process_collective_swap_mode<'a>(
         let (page_index, local_index) = bin_to_page(fill.bin_id).map_err(math_error)?;
         let loaded_index =
             find_swap_page(&pages, page_index).ok_or(VaultError::InvalidAmoebaDlmmRoute)?;
-        pages[loaded_index].page.option_reserve[local_index as usize] = fill.option_reserve_after;
-        pages[loaded_index].page.quote_reserve[local_index as usize] = fill.quote_reserve_after;
+        let page = &mut pages[loaded_index].page;
+        page.option_reserve[local_index as usize] = fill.option_reserve_after;
+        page.quote_reserve[local_index as usize] = fill.quote_reserve_after;
+        // The loader validated all 32 bits; only this filled bin changed.
+        let bit = 1u32 << local_index;
+        page.ask_bitmap = (page.ask_bitmap & !bit)
+            | if fill.option_reserve_after > 0 {
+                bit
+            } else {
+                0
+            };
+        page.bid_bitmap =
+            (page.bid_bitmap & !bit) | if fill.quote_reserve_after > 0 { bit } else { 0 };
     }
     let slot = Clock::get()?.slot;
     for loaded in &mut pages {
-        (loaded.page.bid_bitmap, loaded.page.ask_bitmap) =
-            refresh_local_liquidity_bits(&loaded.page.option_reserve, &loaded.page.quote_reserve);
         set_page_bit(
             &mut pool.bid_page_bitmap,
             loaded.page.page_index,
@@ -448,8 +459,7 @@ pub(super) fn process_collective_swap_mode<'a>(
     pool.last_trade_bin_id = quote.last_bin_id;
     pool.last_updated_slot = slot;
 
-    let (_, authority_bump) = derive_ameba_dlmm_authority_pda(program_id, pool_info.key);
-    let authority_bump_bytes = [authority_bump];
+    let authority_bump_bytes = [validated_vaults.authority_bump];
     let authority_seeds: &[&[u8]] = &[
         CURRENT_STATE_NAMESPACE_SEED,
         AMOEBA_DLMM_AUTHORITY_PDA_SEED,
@@ -578,7 +588,7 @@ pub(super) fn process_collective_swap_mode<'a>(
             compressed_mode && direction == AmoebaDlmmSwapDirection::OptionForQuote,
         )?;
     }
-    let after_vault_amounts = validate_pool_vault_amounts_with(
+    let after_vault_amounts = validated_vaults.read_amounts(
         program_id,
         pool_info,
         &pool,

@@ -27,18 +27,22 @@ const CREATE_ASSOCIATED_TOKEN_ACCOUNT_IDEMPOTENT: u8 = 102;
 const TRANSFER2: u8 = 101;
 const LIGHT_CANNOT_DETERMINE_ACCOUNT_TYPE: u32 = 17_503;
 
+#[inline(never)]
 pub(crate) const fn light_token_program_id() -> Pubkey {
     LIGHT_TOKEN_PROGRAM_ID
 }
 
+#[inline(never)]
 pub(crate) const fn cpi_authority() -> Pubkey {
     LIGHT_TOKEN_CPI_AUTHORITY
 }
 
+#[inline(never)]
 pub(crate) const fn compressible_config() -> Pubkey {
     LIGHT_TOKEN_COMPRESSIBLE_CONFIG
 }
 
+#[inline(never)]
 pub(crate) const fn rent_sponsor() -> Pubkey {
     LIGHT_TOKEN_RENT_SPONSOR
 }

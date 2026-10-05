@@ -140,7 +140,10 @@ pub(super) fn process(
     let mut quantities = [0u64; 20];
     let mut payment = 0u64;
     let count = usize::from(wire.leg_count);
-    let mut fills = Vec::with_capacity(count);
+    // The public eight-ask bound also bounds temporary memory. Keep this small
+    // validation buffer on the stack so it does not consume the CPI heap budget.
+    let mut fills: [Option<(crate::individual_writer::IndividualWriterPosition, u64)>;
+        MAX_BUYBACK_LEGS] = std::array::from_fn(|_| None);
     for i in 0..count {
         let view = fill_accounts(a, i);
         let leg = wire.legs[i];
@@ -163,7 +166,7 @@ pub(super) fn process(
             .ok_or(VaultError::InvalidInstructionData)?;
         payment = checked(payment.checked_add(price))?;
         quantities[index] = checked(quantities[index].checked_add(leg.quantity))?;
-        fills.push((ask, price));
+        fills[i] = Some((ask, price));
     }
     // No partial execution: even a multi-leg straddle is funded against its
     // final combined risk before any seller or custody state is committed.
@@ -176,7 +179,8 @@ pub(super) fn process(
             wire.minimum_refund,
         )
         .map_err(writer_math_error)?;
-    for (i, (ask, price)) in fills.into_iter().enumerate() {
+    for (i, fill) in fills.into_iter().take(count).enumerate() {
+        let (ask, price) = fill.ok_or(VaultError::InvalidInstructionData)?;
         let view = fill_accounts(a, i);
         let index = usize::from(wire.legs[i].series_index);
         // Reload after earlier legs: multiple asks may share this seller.

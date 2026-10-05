@@ -19,10 +19,8 @@ pub(super) fn register_period(program: &Pubkey, a: &[AccountInfo], root: bool) -
     let period_pda = address(program, PERIOD_SEED, a[3].key.as_ref());
     let timestamp = now()?;
     let (predecessor, predecessor_recipe, expected_imports) = if root {
-        if !matches!(
-            month.phase,
-            OraclePhase::Game | OraclePhase::Settled | OraclePhase::Closed
-        ) || month.recipe_hash == [0; 32]
+        if !matches!(month.phase, OraclePhase::Game | OraclePhase::Settled)
+            || month.recipe_hash == [0; 32]
             || month.frozen_source_count == 0
         {
             return invalid();
@@ -99,6 +97,41 @@ pub(super) fn register_period(program: &Pubkey, a: &[AccountInfo], root: bool) -
     } else {
         save(program, &a[4], &registry)
     }
+}
+
+/// A retired month cannot still supply membership to a pending carry import.
+/// The registry advances monotonically; prior successors must complete imports
+/// before becoming eligible parents. Shared source/checkpoint bytes stay alive.
+pub(in crate::processor) fn require_cleanup_dependencies(
+    program: &Pubkey,
+    market: &Market,
+    month: &Pubkey,
+    registry_info: &AccountInfo,
+    latest_period_info: &AccountInfo,
+) -> ProgramResult {
+    let expected = address(program, REGISTRY_SEED, &market.instrument.underlying_id);
+    if registry_info.owner != program {
+        validate_canonical_system_zero_pda_proof(&expected.0, registry_info)?;
+        if *latest_period_info.key != system_program::id() {
+            return invalid();
+        }
+        return Ok(());
+    }
+    let registry: Registry = load(program, registry_info, expected)?;
+    if registry.underlying != market.instrument.underlying_id
+        || registry.latest_period == *month
+        || registry.latest_expiry < market.instrument.expiry_ts
+    {
+        return invalid();
+    }
+    let period = load_period(program, &registry.latest_period, latest_period_info)?;
+    if period.underlying != registry.underlying
+        || period.expiry != registry.latest_expiry
+        || period.next_import != period.expected_imports
+    {
+        return invalid();
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)] // Explicit account and snapshot roles.

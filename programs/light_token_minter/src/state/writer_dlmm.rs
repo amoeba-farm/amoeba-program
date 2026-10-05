@@ -20,7 +20,7 @@ impl WriterDlmmSeriesPolicyV1 {
 
 /// Immutable signed terms and separately maintained spending/custody counters.
 /// `sealed` is a create-once lifecycle state, never an operational feature switch.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriterDlmmPolicyV1 {
     pub is_initialized: bool,
     pub bump: u8,
@@ -51,6 +51,42 @@ pub struct WriterDlmmPolicyV1 {
     pub series_monthly_spent_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
     pub series_pool_inventory_atoms: [u64; WRITER_SERIES_STORAGE_CAPACITY],
     pub reserved: [u8; 32],
+}
+
+/// Field for field what `#[derive(Default)]` produced. The std `Default` for 32-element arrays
+/// unrolls 32 element constructions; the `[value; N]` repeat expression builds the same array.
+impl Default for WriterDlmmPolicyV1 {
+    fn default() -> Self {
+        Self {
+            is_initialized: false,
+            bump: 0,
+            account_discriminator: [0; 3],
+            account_version: 0,
+            sleeve: Pubkey::default(),
+            policy_snapshot: Pubkey::default(),
+            management_authority: Pubkey::default(),
+            committing_policy_authority: Pubkey::default(),
+            expected_policy_hash: [0; 32],
+            rolling_policy_hash: [0; 32],
+            monthly_buyback_cap_atoms: 0,
+            transaction_buyback_cap_atoms: 0,
+            reserve_release_spend_ratio_ppm: 0,
+            price_separation_ticks: 0,
+            series_count: 0,
+            appended_series_count: 0,
+            sealed: false,
+            created_slot: 0,
+            sealed_slot: 0,
+            spending_month_start_ts: 0,
+            monthly_spent_atoms: 0,
+            total_pool_quote_atoms: 0,
+            total_uncommitted_quote_atoms: 0,
+            series: [WriterDlmmSeriesPolicyV1::default(); WRITER_SERIES_STORAGE_CAPACITY],
+            series_monthly_spent_atoms: [0; WRITER_SERIES_STORAGE_CAPACITY],
+            series_pool_inventory_atoms: [0; WRITER_SERIES_STORAGE_CAPACITY],
+            reserved: [0; 32],
+        }
+    }
 }
 
 impl WriterDlmmPolicyV1 {
@@ -113,7 +149,7 @@ impl WriterDlmmBinV1 {
 
 /// Sole writer owner of its segregated lane in one existing canonical pool.
 /// Sale proceeds are uncommitted until a permitted placement below the sale floor.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WriterDlmmPositionV1 {
     pub is_initialized: bool,
     pub bump: u8,
@@ -131,6 +167,30 @@ pub struct WriterDlmmPositionV1 {
     pub last_updated_slot: u64,
     pub bins: [WriterDlmmBinV1; WRITER_DLMM_POSITION_BINS],
     pub reserved: [u8; 32],
+}
+
+/// Field for field what `#[derive(Default)]` produced; see `WriterDlmmPolicyV1`'s impl.
+impl Default for WriterDlmmPositionV1 {
+    fn default() -> Self {
+        Self {
+            is_initialized: false,
+            bump: 0,
+            account_discriminator: [0; 3],
+            account_version: 0,
+            pool: Pubkey::default(),
+            sleeve: Pubkey::default(),
+            policy: Pubkey::default(),
+            market: Pubkey::default(),
+            series_index: 0,
+            bin_count: 0,
+            uncommitted_quote_atoms: 0,
+            option_inventory_atoms: 0,
+            allocated_quote_atoms: 0,
+            last_updated_slot: 0,
+            bins: [WriterDlmmBinV1::default(); WRITER_DLMM_POSITION_BINS],
+            reserved: [0; 32],
+        }
+    }
 }
 
 impl WriterDlmmPositionV1 {

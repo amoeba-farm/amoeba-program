@@ -31,8 +31,8 @@ cargo check --manifest-path programs/light_token_minter/Cargo.toml \
 
 ## Deployment and verification
 
-This source tree supports Devnet and Mainnet profiles. The latest attested Mainnet
-artifact, deployment slot, build inputs, and gate snapshot are recorded in
+This source tree supports Devnet and Mainnet profiles. The selected Mainnet artifact, exact build inputs, and publication, deployment
+and verification status are recorded in
 [`MAINNET_BUILD.json`](MAINNET_BUILD.json); the Devnet integration remains in
 [the integration manifest](release/current-integration.json) and
 [Devnet configuration](deployments/devnet-v3.json).

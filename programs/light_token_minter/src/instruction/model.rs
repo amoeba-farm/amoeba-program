@@ -2,6 +2,9 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum VaultInstruction {
+    ManageTradingSessionV1 {
+        action: crate::trading_session::Action,
+    },
     /// Initialize the single vault PDA config.
     ///
     /// Accounts:
@@ -490,6 +493,10 @@ pub enum VaultInstruction {
     },
     ManageDlmmOrdersV1 {
         params: crate::dlmm_order_state::DlmmOrderAction,
+    },
+    /// Earn Fund v1: one shared USDC fund contributing into writer sleeves.
+    ManageEarnFundV1 {
+        params: crate::earn_fund_state::EarnFundActionV1,
     },
 
     /// Run one current instruction against transient native views of bounded Light-compressed

@@ -18,7 +18,10 @@ pub struct OracleProductSkuDraft {
     pub account_version: u8,
     pub underlying_id: [u8; 32],
     pub draft_nonce: u64,
+    /// Declared by the first chunk; every later chunk must repeat it.
     pub expected_sku_count: u16,
+    /// Declared SKU Merkle root; the final chunk must reproduce it exactly.
+    pub expected_sku_root: [u8; 32],
     pub appended_sku_count: u16,
     /// Occupancy bits for `merkle_frontier`. Canonically equal to `appended_sku_count` because the
     /// occupied subtree levels are exactly the set bits in the binary leaf count.
@@ -38,6 +41,7 @@ impl Default for OracleProductSkuDraft {
             underlying_id: [0; 32],
             draft_nonce: 0,
             expected_sku_count: 0,
+            expected_sku_root: [0; 32],
             appended_sku_count: 0,
             frontier_mask: 0,
             last_sku_id: [0; 32],
@@ -48,15 +52,18 @@ impl Default for OracleProductSkuDraft {
 }
 
 impl OracleProductSkuDraft {
-    pub const LEN: usize = 380;
+    /// Version 3 adds the declared root (version 2 was 380 bytes and derived the count from a
+    /// built-in product table).
+    pub const LEN: usize = 412;
     pub const ACCOUNT_DISCRIMINATOR: [u8; 3] = *b"OPD";
-    pub const ACCOUNT_VERSION: u8 = 2;
+    pub const ACCOUNT_VERSION: u8 = 3;
 
     pub fn has_canonical_layout(&self) -> bool {
         if self.account_discriminator != Self::ACCOUNT_DISCRIMINATOR
             || self.account_version != Self::ACCOUNT_VERSION
             || self.expected_sku_count == 0
             || self.expected_sku_count > crate::constants::MAX_ORACLE_REQUIRED_SKUS
+            || crate::bytes32_is_zero(&self.expected_sku_root)
             || self.appended_sku_count > self.expected_sku_count
             || self.frontier_mask != self.appended_sku_count
             || (self.appended_sku_count == 0) != (crate::bytes32_is_zero(&self.last_sku_id))
@@ -90,10 +97,11 @@ pub fn derive_oracle_product_sku_draft_pda(
 
 /// Create-once product-level commitment to the complete canonical terminal-SKU set.
 ///
-/// A month may copy a root/count only from this exact PDA. Governance supplies the full ordered
-/// identifier set through bounded chunks in a nonce-scoped OPD. The exact final append checks the
-/// known product count, rejects zero, duplicate, and out-of-order identifiers, and computes this
-/// root on chain before creating the OPM atomically.
+/// A month may copy a root/count only from this exact PDA. Governance registers a product as
+/// data: the first chunk of a nonce-scoped OPD declares the SKU count and root, every chunk
+/// repeats them, zero, duplicate and out-of-order identifiers are rejected, and the exact final
+/// append computes the root on chain and creates the OPM atomically only if it equals the
+/// declared root. The stored count and root are then authoritative for every reader.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OracleProductSkuManifest {
     pub is_initialized: bool,

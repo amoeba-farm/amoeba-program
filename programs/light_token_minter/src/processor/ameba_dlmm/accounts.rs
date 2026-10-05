@@ -97,7 +97,7 @@ pub(super) fn store_light_state<T: AmoebaDlmmLightState>(
     Ok(())
 }
 
-pub(super) fn load_pool(
+pub(in crate::processor) fn load_pool(
     program_id: &Pubkey,
     pool_info: &AccountInfo,
 ) -> Result<AmoebaDlmmPoolV1, ProgramError> {
@@ -279,10 +279,12 @@ pub(super) fn page_bit(bitmap: &u64, page_index: u16) -> bool {
     page_index < MAX_AMOEBA_DLMM_PAGE_COUNT && bitmap & (1u64 << page_index) != 0
 }
 
+#[inline(never)]
 pub(super) fn first_set_page(bitmap: &u64) -> Option<u16> {
     (*bitmap != 0).then(|| bitmap.trailing_zeros() as u16)
 }
 
+#[inline(never)]
 pub(super) fn last_set_page(bitmap: &u64) -> Option<u16> {
     (*bitmap != 0).then(|| 63 - bitmap.leading_zeros() as u16)
 }
@@ -467,6 +469,109 @@ pub(super) fn validate_pool_vault_amounts_with(
             .checked_add(sidecar.as_ref().map_or(0, |state| state.quote_atoms))
             .ok_or(VaultError::ArithmeticOverflow)?,
     ))
+}
+
+/// Instruction-local proof of canonical immutable vault identities.
+/// Token state and custody are freshly read on every use.
+pub(super) struct ValidatedPoolVaults {
+    program: Pubkey,
+    pool: Pubkey,
+    authority: Pubkey,
+    option_mint: Pubkey,
+    quote_mint: Pubkey,
+    option_vault: Pubkey,
+    quote_vault: Pubkey,
+    pub(super) authority_bump: u8,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn validate_pool_vaults_once(
+    program_id: &Pubkey,
+    pool_info: &AccountInfo,
+    pool: &AmoebaDlmmPoolV1,
+    authority_info: &AccountInfo,
+    option_vault_info: &AccountInfo,
+    quote_vault_info: &AccountInfo,
+    sidecar_info: Option<&AccountInfo>,
+) -> Result<(ValidatedPoolVaults, (u64, u64)), ProgramError> {
+    let (authority, authority_bump) = derive_ameba_dlmm_authority_pda(program_id, pool_info.key);
+    let option_vault = derive_ameba_dlmm_vault_pda(program_id, pool_info.key, &pool.option_mint).0;
+    let quote_vault = derive_ameba_dlmm_vault_pda(program_id, pool_info.key, &pool.quote_mint).0;
+    let proof = ValidatedPoolVaults {
+        program: *program_id,
+        pool: *pool_info.key,
+        authority,
+        authority_bump,
+        option_mint: pool.option_mint,
+        quote_mint: pool.quote_mint,
+        option_vault,
+        quote_vault,
+    };
+    let amounts = proof.read_amounts(
+        program_id,
+        pool_info,
+        pool,
+        authority_info,
+        option_vault_info,
+        quote_vault_info,
+        sidecar_info,
+    )?;
+    Ok((proof, amounts))
+}
+
+impl ValidatedPoolVaults {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn read_amounts(
+        &self,
+        program_id: &Pubkey,
+        pool_info: &AccountInfo,
+        pool: &AmoebaDlmmPoolV1,
+        authority_info: &AccountInfo,
+        option_vault_info: &AccountInfo,
+        quote_vault_info: &AccountInfo,
+        sidecar_info: Option<&AccountInfo>,
+    ) -> Result<(u64, u64), ProgramError> {
+        if *program_id != self.program
+            || *pool_info.key != self.pool
+            || *authority_info.key != self.authority
+            || pool.option_mint != self.option_mint
+            || pool.quote_mint != self.quote_mint
+            || pool.option_vault != self.option_vault
+            || pool.quote_vault != self.quote_vault
+            || *option_vault_info.key != self.option_vault
+            || *quote_vault_info.key != self.quote_vault
+        {
+            return Err(VaultError::InvalidAmoebaDlmmVault.into());
+        }
+        let option = load_canonical_light_token_account(
+            option_vault_info,
+            &self.authority,
+            &self.option_mint,
+        )
+        .map_err(|_| ProgramError::from(VaultError::InvalidAmoebaDlmmVault))?;
+        let quote =
+            load_canonical_light_token_account(quote_vault_info, &self.authority, &self.quote_mint)
+                .map_err(|_| ProgramError::from(VaultError::InvalidAmoebaDlmmVault))?;
+        let sidecar = crate::compressed_custody::load(
+            program_id,
+            sidecar_info,
+            crate::compressed_custody::CustodyKind::Pool,
+            &self.pool,
+            &self.option_mint,
+            &self.quote_mint,
+        )?;
+        ensure_custody_with(pool, &option, &quote, sidecar.as_ref())?;
+        Ok((
+            option
+                .amount
+                .checked_add(sidecar.as_ref().map_or(0, |state| state.option_atoms))
+                .ok_or(VaultError::ArithmeticOverflow)?,
+            quote
+                .amount
+                .checked_add(sidecar.as_ref().map_or(0, |state| state.quote_atoms))
+                .ok_or(VaultError::ArithmeticOverflow)?,
+        ))
+    }
 }
 
 pub(super) fn validate_new_token_vault_target(account_info: &AccountInfo) -> ProgramResult {

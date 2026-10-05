@@ -304,6 +304,7 @@ fn create<'a>(
     Ok(bump)
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 #[inline(never)]
 pub(super) fn process(
     program: &Pubkey,
@@ -316,6 +317,7 @@ pub(super) fn process(
     process_cohort(program, a, operation, market, row, digest, false)
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 pub(super) fn process_october(
     program: &Pubkey,
     a: &[AccountInfo],
@@ -968,9 +970,12 @@ pub(super) fn reject_pending_october(
                 let month =
                     crate::fixed_codec::decode_oracle_month(&data, VaultError::InvalidOracleState)?;
                 if month.schedule_version == 5
-                    && !(tag == 30 && payload.first() == Some(&23))
+                    && !(!cfg!(feature = "mainnet-v3") && tag == 30 && payload.first() == Some(&23))
                     && tag != 200
                 {
+                    if cfg!(feature = "mainnet-v3") {
+                        return invalid();
+                    }
                     // The outer transport reaches this dispatcher before its authenticated
                     // inner call. Admit only the exact October append wire; the inner
                     // dispatcher and receipt/manifest checks still run unchanged.
@@ -1015,15 +1020,14 @@ pub(super) fn require_october_membership_receipt(
     )?;
     let product = r.market_index / 2;
     let count = if product == 0 { 13 } else { 22 };
-    let expected = format!(
-        "{}-202610-{}-01",
-        if product == 0 { "RAMX" } else { "NANDX" },
-        if r.market_index % 2 == 0 {
-            "CALL"
-        } else {
-            "PUT"
-        }
-    );
+    // The four possible `{RAMX|NANDX}-202610-{CALL|PUT}-01` identifiers, spelled out instead
+    // of formatted at run time.
+    let expected: &[u8] = match (product == 0, r.market_index % 2 == 0) {
+        (true, true) => b"RAMX-202610-CALL-01",
+        (true, false) => b"RAMX-202610-PUT-01",
+        (false, true) => b"NANDX-202610-CALL-01",
+        (false, false) => b"NANDX-202610-PUT-01",
+    };
     if r.finished
         || r.cursor != count
         || r.registry_hash
@@ -1032,7 +1036,7 @@ pub(super) fn require_october_membership_receipt(
             } else {
                 NANDX_REGISTRY_HASH
             }
-        || !padded_ascii_underlying_matches(&market.market_id, expected.as_bytes())
+        || !padded_ascii_underlying_matches(&market.market_id, expected)
         || month.source_count != u16::from(count)
         || month.frozen_source_count != u16::from(count)
         || month.opened_source_count != u16::from(count)

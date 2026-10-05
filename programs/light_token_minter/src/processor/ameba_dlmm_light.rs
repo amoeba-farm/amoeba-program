@@ -232,6 +232,7 @@ fn write_light_config(config_info: &AccountInfo, config: &AmoebaLightConfig) -> 
     Ok(())
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 fn create_config_account<'info>(
     program_id: &Pubkey,
     payer: &AccountInfo<'info>,
@@ -263,6 +264,7 @@ fn create_config_account<'info>(
     .map_err(|_| invalid_light())
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 fn check_upgrade_authority(
     program_id: &Pubkey,
     program_data: &AccountInfo,
@@ -287,6 +289,7 @@ fn check_upgrade_authority(
     Ok(())
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 #[inline(never)]
 fn process_initialize_config(
     program_id: &Pubkey,
@@ -416,6 +419,7 @@ pub fn process_lifecycle_instruction(
     payload: &[u8],
 ) -> ProgramResult {
     match instruction {
+        #[cfg(not(feature = "mainnet-v3"))]
         AmoebaDlmmInstructionTag::InitializeLightConfig => {
             process_initialize_config(program_id, accounts, payload)
         }

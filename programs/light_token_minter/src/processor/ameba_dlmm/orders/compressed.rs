@@ -170,6 +170,7 @@ pub(super) fn place(program: &Pubkey, a: &[AccountInfo], action: DlmmOrderAction
         .cloned()
         .collect();
     validate_pack_dlmm_account_privileges(
+        program,
         AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1,
         &base,
     )?;
@@ -484,6 +485,7 @@ pub(super) fn exit(program: &Pubkey, a: &[AccountInfo], action: DlmmOrderAction)
     }
     let base: Vec<_> = prefix[..31].iter().cloned().collect();
     validate_pack_dlmm_account_privileges(
+        program,
         AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1,
         &base,
     )?;

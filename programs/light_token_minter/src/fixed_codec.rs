@@ -37,6 +37,7 @@ use crate::{
 };
 
 mod accounts;
+mod capped_strip;
 mod compact_borsh;
 mod cursor;
 mod fields;

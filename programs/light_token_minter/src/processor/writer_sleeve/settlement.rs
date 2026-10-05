@@ -307,8 +307,12 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
         return Err(VaultError::WriterSolvencyViolation.into());
     }
     let count = usize::from(book.series_count);
-    for (index, mint_info) in accounts[FINALIZE_WRITER_SETTLEMENT_FIXED_ACCOUNT_COUNT..mint_end]
+    // Account count and book size were authenticated above. Iterate over exactly
+    // the mint accounts so the optional WriterCash account is never included.
+    for (index, mint_info) in accounts
         .iter()
+        .skip(FINALIZE_WRITER_SETTLEMENT_FIXED_ACCOUNT_COUNT)
+        .take(count)
         .enumerate()
     {
         let record = &book.records[index];
@@ -450,7 +454,10 @@ pub(super) fn process_close_writer_sleeve(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
 ) -> ProgramResult {
-    if accounts.len() != CLOSE_WRITER_SLEEVE_ACCOUNT_COUNT {
+    // An optional tenth account is the sleeve vault's canonical WriterCash custody.
+    if accounts.len() != CLOSE_WRITER_SLEEVE_ACCOUNT_COUNT
+        && accounts.len() != CLOSE_WRITER_SLEEVE_ACCOUNT_COUNT + 1
+    {
         return Err(VaultError::InvalidAccountList.into());
     }
     let cranker_info = &accounts[0];
@@ -525,7 +532,18 @@ pub(super) fn process_close_writer_sleeve(
     }
     validate_vault_token_account(sleeve_vault_info, &sleeve.settlement_mint, sleeve_info.key)?;
     let physical = validate_token_account(sleeve_vault_info)?.amount;
-    if physical < sleeve.stranded_surplus_atoms {
+    // Every claim is paid (accounted assets are zero), so compressed WriterCash is
+    // surplus exactly like hot cash: it backs stranded surplus and is never moved.
+    let cash = crate::compressed_custody::writer_cash(
+        program_id,
+        accounts.get(CLOSE_WRITER_SLEEVE_ACCOUNT_COUNT),
+        sleeve_vault_info.key,
+        &sleeve.settlement_mint,
+    )?;
+    if physical
+        .checked_add(cash)
+        .is_none_or(|cash| cash < sleeve.stranded_surplus_atoms)
+    {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
     if physical == 0 {

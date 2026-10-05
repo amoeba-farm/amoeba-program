@@ -14,9 +14,11 @@ pub(in crate::processor) use capacity::{
 };
 pub(in crate::processor) use liquidity::{process_initialize_position, process_liquidity_action};
 pub(in crate::processor) use swap::{
-    finish_swap_with_cash, load_swap_state, load_swap_state_with_cash, WriterSwapState,
+    finish_swap_with_cash, load_swap_state_with_cash, observe_writer_lane, WriterLaneAccounts,
+    WriterSwapState,
 };
 
+#[inline(never)]
 pub(in crate::processor) fn risk_limits(
     snapshot: &WriterPolicySnapshotV1,
     group: &WriterSettlementGroupV1,
@@ -51,24 +53,51 @@ pub(in crate::processor) fn update_cash_metrics(
     policy: &WriterDlmmPolicyV1,
     enforce: bool,
 ) -> ProgramResult {
+    update_cash_metrics_with_admission(sleeve, group, book, snapshot, policy, enforce, None)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::processor) fn update_cash_metrics_with_admission(
+    sleeve: &mut WriterSleeveV1,
+    group: &WriterSettlementGroupV1,
+    book: &WriterSeriesBookV1,
+    snapshot: &WriterPolicySnapshotV1,
+    policy: &WriterDlmmPolicyV1,
+    enforce: bool,
+    admitted: Option<&crate::writer_dlmm_quote::AdmittedWriterCash>,
+) -> ProgramResult {
     let series = writer_book_math_series(book)?;
     let limits = risk_limits(snapshot, group);
-    let summary = if enforce {
-        crate::writer_dlmm_math::admit_writer_dlmm_cash(
-            &series,
-            crate::writer_dlmm_math::WriterDlmmCash {
-                assets_atoms: sleeve.accounted_asset_atoms,
-                principal_atoms: sleeve.writer_principal_atoms,
-                allocated_lp_quote_atoms: policy
-                    .total_pool_quote_atoms
-                    .checked_sub(policy.total_uncommitted_quote_atoms)
-                    .ok_or(VaultError::WriterSolvencyViolation)?,
-                pooled_quote_atoms: policy.total_pool_quote_atoms,
-            },
-            &limits,
-        )
-        .map_err(|_| VaultError::WriterSolvencyViolation)?
-        .0
+    let cash = crate::writer_dlmm_math::WriterDlmmCash {
+        assets_atoms: sleeve.accounted_asset_atoms,
+        principal_atoms: sleeve.writer_principal_atoms,
+        allocated_lp_quote_atoms: if enforce || admitted.is_some() {
+            policy
+                .total_pool_quote_atoms
+                .checked_sub(policy.total_uncommitted_quote_atoms)
+                .ok_or(VaultError::WriterSolvencyViolation)?
+        } else {
+            0
+        },
+        pooled_quote_atoms: policy.total_pool_quote_atoms,
+    };
+    let cached = admitted
+        .map(|proof| {
+            proof
+                .for_final_state(&series, cash, &limits)
+                .ok_or(VaultError::WriterSolvencyViolation)
+        })
+        .transpose()?;
+    let summary = if let Some((summary, exposure)) = cached {
+        // Recheck cash gates against reconciled custody. The full book, cash and
+        // risk inputs must exactly match the internally admitted quote first.
+        crate::writer_dlmm_math::admit_writer_dlmm_cash_summary(summary, exposure, cash, &limits)
+            .map_err(|_| VaultError::WriterSolvencyViolation)?
+            .0
+    } else if enforce {
+        crate::writer_dlmm_math::admit_writer_dlmm_cash(&series, cash, &limits)
+            .map_err(|_| VaultError::WriterSolvencyViolation)?
+            .0
     } else {
         exact_reserve(
             &series,
@@ -80,9 +109,12 @@ pub(in crate::processor) fn update_cash_metrics(
     sleeve.exact_reserve_atoms = summary.reserve_atoms;
     sleeve.lower_tail_reserve_atoms = summary.lower_tail_reserve_atoms;
     sleeve.upper_tail_reserve_atoms = summary.upper_tail_reserve_atoms;
-    sleeve.security_exposure_atoms =
+    sleeve.security_exposure_atoms = if let Some((_, exposure)) = cached {
+        exposure
+    } else {
         calculate_security_exposure(limits.security_mode, &series, summary.reserve_atoms)
-            .map_err(writer_math_error)?;
+            .map_err(writer_math_error)?
+    };
     if sleeve.writer_principal_atoms > 0 {
         participation::admit_time_participation(
             sleeve,
@@ -192,6 +224,101 @@ pub(in crate::processor) fn load_policy(
         return Err(VaultError::InvalidWriterPolicySnapshot.into());
     }
     Ok(value)
+}
+
+/// Selector 11, AmendPolicy. Accounts: management authority (s, w), sleeve,
+/// group, book, policy snapshot, writer DLMM policy (w), the sleeve's Earn
+/// Fund slot (w: the shared slot loader requires it; never written), the
+/// Earn Fund, the fund's allocator (s).
+///
+/// The management authority, co-signed by the fund's allocator (so a stolen
+/// management key alone moves nothing), rewrites a sealed policy's operational terms
+/// while every pooled atom of the sleeve is the Earn Fund's: the fund's slot
+/// of this sleeve holds the whole writer principal, so no other pooled writer
+/// (a legacy receipt, or a receipt merely transferred to the fund) shares the
+/// P&L these terms decide. Only Funding or Active sleeves before expiry.
+///
+/// The spending month is rolled first, so caps are checked against this
+/// month's spend. The payload is the Begin header (the current authority, the
+/// amended policy's hash chain by the Begin/Append formula over the new
+/// terms, the sleeve caps, ratio and separation) then the Append body. The
+/// committed chain is stored and the account must load again, which
+/// recomputes the chain and every layout rule: a wrong commitment, a cap
+/// below the month's spend or an out-of-bounds term is refused here instead
+/// of making the policy unloadable everywhere (including settlement).
+/// Counters, custody totals, identities, `sealed` and the risk snapshot bound
+/// into receipts are untouched.
+#[inline(never)]
+pub(in crate::processor) fn process_amend_policy(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    amend: crate::writer_dlmm_instruction::AmendWriterDlmmPolicyV1Params,
+) -> ProgramResult {
+    let header = &amend.header;
+    let [authority, sleeve_info, group_info, book_info, snapshot_info, policy_info, slot_info, fund_info, allocator] =
+        accounts
+    else {
+        return Err(VaultError::InvalidAccountList.into());
+    };
+    liquidity::validate_privileges(&accounts[..8], 8, &[0, 5, 6])?;
+    let context = load_writer_policy_context(
+        program_id,
+        sleeve_info,
+        group_info,
+        book_info,
+        snapshot_info,
+        None,
+    )?;
+    let mut policy = load_policy(
+        program_id,
+        policy_info,
+        sleeve_info,
+        &context.snapshot,
+        &context.book,
+        true,
+    )?;
+    let fund = super::earn_fund::accounts::load_fund(program_id, fund_info)?;
+    if policy.management_authority != *authority.key
+        || header.management_authority != *authority.key
+        || fund.allocator != *allocator.key
+        || !allocator.is_signer
+    {
+        return Err(VaultError::Unauthorized.into());
+    }
+    let slot = super::earn_fund::accounts::load_slot(program_id, slot_info, sleeve_info.key)?;
+    let sleeve = &context.sleeve;
+    let now = current_unix_timestamp()?;
+    let start = usize::from(amend.start_index);
+    if slot.principal != sleeve.writer_principal_atoms
+        || !matches!(
+            sleeve.status,
+            WriterSleeveStatus::Funding | WriterSleeveStatus::Active
+        )
+        || now >= sleeve.expiry_ts
+        || start + amend.entries.len() > usize::from(policy.series_count)
+    {
+        return Err(VaultError::InvalidWriterLifecycle.into());
+    }
+    advance_spending_month(&mut policy, now)?;
+    policy.expected_policy_hash = header.expected_policy_hash;
+    policy.rolling_policy_hash = header.expected_policy_hash;
+    policy.monthly_buyback_cap_atoms = header.monthly_buyback_cap_atoms;
+    policy.transaction_buyback_cap_atoms = header.transaction_buyback_cap_atoms;
+    policy.reserve_release_spend_ratio_ppm = header.reserve_release_spend_ratio_ppm;
+    policy.price_separation_ticks = header.price_separation_ticks;
+    for (stored, amended) in policy.series.iter_mut().skip(start).zip(&amend.entries) {
+        *stored = *amended;
+    }
+    store_state(policy_info, policy.as_ref())?;
+    load_policy(
+        program_id,
+        policy_info,
+        sleeve_info,
+        &context.snapshot,
+        &context.book,
+        true,
+    )
+    .map(drop)
 }
 
 /// Funding reads the already-sealed create-once record without expanding the
@@ -392,7 +519,7 @@ pub(in crate::processor) fn activation_sides(
     ))
 }
 
-fn validate_series_terms(
+pub(super) fn validate_series_terms(
     record: &WriterSeriesRecordV1,
     terms: &WriterDlmmSeriesPolicyV1,
 ) -> ProgramResult {

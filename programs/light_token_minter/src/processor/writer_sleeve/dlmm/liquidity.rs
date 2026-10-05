@@ -8,7 +8,7 @@ use crate::state::{WriterDlmmBinV1, WRITER_DLMM_POSITION_BINS, WRITER_DLMM_POSIT
 
 mod relocation;
 
-fn validate_privileges(
+pub(super) fn validate_privileges(
     accounts: &[AccountInfo],
     count: usize,
     writable: &[usize],
@@ -204,6 +204,8 @@ fn apply_entries(
 }
 
 /// Add/remove use exact canonical token deltas. No ordinary reserve page or share is changed.
+/// An optional 28th account is the sleeve vault's canonical WriterCash sidecar;
+/// it must be supplied once compressed premiums exist (see `observe_writer_lane`).
 #[inline(never)]
 pub(in crate::processor) fn process_liquidity_action(
     program_id: &Pubkey,
@@ -212,8 +214,8 @@ pub(in crate::processor) fn process_liquidity_action(
 ) -> ProgramResult {
     validate_privileges(
         accounts,
-        27,
-        &[0, 2, 4, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 21, 22, 26],
+        accounts.len().clamp(27, 28),
+        &[0, 2, 4, 6, 7, 9, 11, 12, 14, 15, 16, 17, 18, 21, 22, 26, 27],
     )?;
     let relocation = match &action {
         ManageWriterDlmmV1Params::RelocateLiquidity {
@@ -352,8 +354,27 @@ pub(in crate::processor) fn process_liquidity_action(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    let mint_before =
-        validate_canonical_market_mint(market_info, &mut market, option_mint_info, 0)?;
+    // The same supply, custody and cash identities as every writer swap.
+    let lane = super::swap::observe_writer_lane(
+        program_id,
+        &super::swap::WriterLaneAccounts {
+            sleeve: sleeve_info,
+            usdc_vault: sleeve_vault_info,
+            usdc_mint: quote_mint_info.key,
+            cash_sidecar: accounts.get(27),
+            market: market_info,
+            mint: option_mint_info,
+            staging: staging_info,
+            retirement: retirement_info,
+            token_program: token_info,
+        },
+        &sleeve,
+        &book,
+        &policy,
+        index,
+        position.option_inventory_atoms,
+        &mut market,
+    )?;
     validate_collateral_mint_account(quote_mint_info, token_info.key)?;
     validate_spl_interface_account(option_mint_info.key, option_interface_info)?;
     validate_spl_interface_account(quote_mint_info.key, quote_interface_info)?;
@@ -365,50 +386,17 @@ pub(in crate::processor) fn process_liquidity_action(
         option_vault_info,
         quote_vault_info,
     )?;
-    validate_vault_token_account(sleeve_vault_info, quote_mint_info.key, sleeve_info.key)?;
-    let before_cash = validate_token_account(sleeve_vault_info)?.amount;
-    let accounted_vault_cash = sleeve
-        .accounted_asset_atoms
-        .checked_sub(policy.total_pool_quote_atoms)
-        .ok_or(VaultError::WriterSolvencyViolation)?;
-    if before_cash < accounted_vault_cash
+    if !lane.reconciled
         || pool.option_mint != *option_mint_info.key
         || pool.quote_mint != *quote_mint_info.key
         || book.records[index].contract_mint != *option_mint_info.key
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    let staged_before = custody::observe_market_staging_amount(
-        program_id,
-        market_info,
-        staging_info,
-        option_mint_info,
-        token_info,
-    )?;
-    let retired_before = custody::observe_writer_retirement_custody_amount(
-        program_id,
-        sleeve_info,
-        market_info,
-        retirement_info,
-        option_mint_info,
-        token_info,
-    )?;
-    let observed_issuer = position
-        .option_inventory_atoms
-        .checked_add(staged_before)
-        .and_then(|value| value.checked_add(retired_before))
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    if mint_before.supply != book.records[index].total_physical_supply_atoms
-        || observed_issuer != book.records[index].issuer_controlled_atoms
-        || mint_before.supply.checked_sub(observed_issuer) != book.external_total(index)
-        || market_outstanding_contract_amount(&market)?
-            != book
-                .external_total(index)
-                .and_then(|v| v.checked_add(position.option_inventory_atoms))
-                .ok_or(VaultError::ArithmeticOverflow)?
-    {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
+    // Hot-vault deltas only: the sidecar is read, never moved, here.
+    let before_cash = lane.before_hot_cash;
+    let staged_before = lane.staged;
+    let retired_before = lane.retired;
     if let Some((expected_hash, moves)) = relocation {
         if solana_program::hash::hash(&position_info.try_borrow_data()?).to_bytes() != expected_hash
         {
@@ -429,6 +417,10 @@ pub(in crate::processor) fn process_liquidity_action(
             maximum_bid,
         )?;
         position.last_updated_slot = Clock::get()?.slot;
+        // A relocation changes executable quotes without moving custody. It
+        // must invalidate both published marks and pending multipart samples.
+        book.last_updated_slot = position.last_updated_slot;
+        store_state(book_info, book.as_ref())?;
         return store_state(position_info, position.as_ref());
     }
     let (option_amount, quote_amount) = if sweep {
@@ -464,7 +456,12 @@ pub(in crate::processor) fn process_liquidity_action(
                 return Err(VaultError::InvalidWriterPolicySnapshot.into());
             }
         }
-        if quote_amount > accounted_vault_cash {
+        // `lane.reconciled` proved this subtraction cannot underflow.
+        if quote_amount
+            > sleeve
+                .accounted_asset_atoms
+                .saturating_sub(policy.total_pool_quote_atoms)
+        {
             return Err(VaultError::WriterSolvencyViolation.into());
         }
         policy.total_pool_quote_atoms = policy

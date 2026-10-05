@@ -1,5 +1,5 @@
 //! Fully compressed option entitlement. The leaf itself is the replay-protected claim.
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshSerialize;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
@@ -9,14 +9,16 @@ pub const CLAIM_WINDOW_SECONDS: u64 = 72 * 60 * 60;
 pub const SPONSORED_REDEMPTION_FEE_ATOMS: u64 = 10_000;
 pub const RETIREMENT_SEED: &[u8] = b"compressed-retirement";
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct CompressedOptionClaim {
-    pub amount: u64,
-    pub has_delegate: bool,
-    pub leaf_index: u32,
-    pub root_index: u16,
-    pub prove_by_index: bool,
-    pub proof: Option<[u8; 128]>,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct CompressedOptionClaim {
+        pub amount: u64,
+        pub has_delegate: bool,
+        pub leaf_index: u32,
+        pub root_index: u16,
+        pub prove_by_index: bool,
+        pub proof: Option<[u8; 128]>,
+    }
 }
 
 impl CompressedOptionClaim {
@@ -30,16 +32,18 @@ impl CompressedOptionClaim {
     }
 }
 
-/// A single aggregate proof authenticates the option and optional WriterCash
-/// input. A zero cash amount only adds authenticated reserve backing; payout
-/// still comes from the sleeve's existing vault.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct CompressedCashOptionClaim {
-    pub option: CompressedOptionClaim,
-    pub cash_amount: u64,
-    pub cash_leaf_index: u32,
-    pub cash_root_index: u16,
-    pub cash_prove_by_index: bool,
+crate::fixed_codec::compact_borsh_struct! {
+    /// A single aggregate proof authenticates the option and optional WriterCash
+    /// input. A zero cash amount only adds authenticated reserve backing; payout
+    /// still comes from the sleeve's existing vault.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct CompressedCashOptionClaim {
+        pub option: CompressedOptionClaim,
+        pub cash_amount: u64,
+        pub cash_leaf_index: u32,
+        pub cash_root_index: u16,
+        pub cash_prove_by_index: bool,
+    }
 }
 
 impl CompressedCashOptionClaim {

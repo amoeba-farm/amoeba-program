@@ -60,23 +60,16 @@ impl WriterSwapState {
     }
 }
 
-/// Reads all writer companions from the current 32-account collective prefix.
+/// Reads all writer companions from the current 32-account collective prefix,
+/// plus the sleeve vault's canonical WriterCash custody when the route carries it.
 /// A canonical absent writer lane remains ordinary liquidity, including historical sleeves.
-pub(in crate::processor) fn load_swap_state(
+pub(in crate::processor) fn load_swap_state_with_cash<'a, 'info>(
     program_id: &Pubkey,
-    accounts: &[AccountInfo],
+    accounts: &'a [AccountInfo<'info>],
     pool: &AmoebaDlmmPoolV1,
     book_context: WriterBookContext,
-) -> Result<Option<WriterSwapState>, ProgramError> {
-    load_swap_state_with_cash(program_id, accounts, pool, book_context, None)
-}
-
-pub(in crate::processor) fn load_swap_state_with_cash(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    pool: &AmoebaDlmmPoolV1,
-    book_context: WriterBookContext,
-    cash_sidecar_info: Option<&AccountInfo>,
+    cash_sidecar_info: Option<&'a AccountInfo<'info>>,
+    validated_market: &Market,
 ) -> Result<Option<WriterSwapState>, ProgramError> {
     if accounts.len() < 31 {
         return Err(VaultError::InvalidAccountList.into());
@@ -152,72 +145,32 @@ pub(in crate::processor) fn load_swap_state_with_cash(
         return Err(VaultError::InvalidWriterSleeve.into());
     }
     let _registry = load_writer_policy_registry(program_id, &accounts[30], accounts[1].key)?;
-    validate_vault_token_account(&accounts[27], accounts[10].key, sleeve_info.key)?;
-
-    let before_hot_cash = validate_token_account(&accounts[27])?.amount;
-    let cash_sidecar = crate::compressed_custody::load(
+    let mut market = validated_market.clone();
+    let lane = observe_writer_lane(
         program_id,
-        cash_sidecar_info,
-        crate::compressed_custody::CustodyKind::WriterCash,
-        accounts[27].key,
-        &Pubkey::default(),
-        &pool.quote_mint,
+        &WriterLaneAccounts {
+            sleeve: sleeve_info,
+            usdc_vault: &accounts[27],
+            usdc_mint: accounts[10].key,
+            cash_sidecar: cash_sidecar_info,
+            market: &accounts[2],
+            mint: &accounts[9],
+            staging: &accounts[28],
+            retirement: &accounts[29],
+            token_program: &accounts[19],
+        },
+        &context.sleeve,
+        &context.book,
+        &policy,
+        index,
+        position.option_inventory_atoms,
+        &mut market,
     )?;
-    if cash_sidecar
-        .as_ref()
-        .is_some_and(|state| state.option_atoms != 0)
-    {
-        return Err(VaultError::WriterSupplyMismatch.into());
-    }
-    let before_cash = before_hot_cash
-        .checked_add(cash_sidecar.as_ref().map_or(0, |state| state.quote_atoms))
-        .ok_or(VaultError::ArithmeticOverflow)?;
-    let mut market = load_valid_market(program_id, &accounts[2])?;
-    let mint = validate_canonical_market_mint(&accounts[2], &mut market, &accounts[9], 0)?;
-    let staged = custody::observe_market_staging_amount(
-        program_id,
-        &accounts[2],
-        &accounts[28],
-        &accounts[9],
-        &accounts[19],
-    )?;
-    let retired = custody::observe_writer_retirement_custody_amount(
-        program_id,
-        sleeve_info,
-        &accounts[2],
-        &accounts[29],
-        &accounts[9],
-        &accounts[19],
-    )?;
-    let record = &context.book.records[index];
-    let issuer = position
-        .option_inventory_atoms
-        .checked_add(staged)
-        .and_then(|value| value.checked_add(retired))
-        .ok_or(VaultError::ArithmeticOverflow)?;
     // Supply reconciliation and writer cash deficits make only this lane ineligible.
     // Ordinary LP custody is checked independently by the shared pool loader.
-    let mut eligible = context.sleeve.status == WriterSleeveStatus::Active
-        && context.group.status == WriterSettlementGroupStatus::Active
-        && mint.supply == record.total_physical_supply_atoms
-        && issuer == record.issuer_controlled_atoms
-        && mint
-            .supply
-            .checked_sub(issuer)
-            .and_then(|v| v.checked_sub(context.book.individual.compressed_retired_atoms[index]))
-            .and_then(|v| v.checked_sub(context.book.individual.forfeited_atoms[index]))
-            == context.book.external_total(index)
-        && context
-            .sleeve
-            .accounted_asset_atoms
-            .checked_sub(policy.total_pool_quote_atoms)
-            .is_some_and(|cash| before_cash >= cash)
-        && market_outstanding_contract_amount(&market)?
-            == context
-                .book
-                .external_total(index)
-                .and_then(|v| v.checked_add(position.option_inventory_atoms))
-                .ok_or(VaultError::ArithmeticOverflow)?;
+    let mut eligible = lane.reconciled
+        && context.sleeve.status == WriterSleeveStatus::Active
+        && context.group.status == WriterSettlementGroupStatus::Active;
     let round_trip_fee = match crate::writer_dlmm_math::writer_dlmm_price_bounds(
         policy.series[index].seller_floor_quote_atoms,
         pool.tick_size_quote_atomic,
@@ -250,14 +203,142 @@ pub(in crate::processor) fn load_swap_state_with_cash(
         series,
         series_limits,
         eligible,
-        before_cash,
-        before_hot_cash,
+        before_cash: lane.before_cash,
+        before_hot_cash: lane.before_hot_cash,
 
-        before_mint_supply: mint.supply,
-        before_retirement: retired,
+        before_mint_supply: lane.mint_supply,
+        before_retirement: lane.retired,
         round_trip_fee,
         risk,
     }))
+}
+
+/// The accounts a writer lane's custody, supply and cash are read from.
+pub(in crate::processor) struct WriterLaneAccounts<'a, 'info> {
+    pub(in crate::processor) sleeve: &'a AccountInfo<'info>,
+    pub(in crate::processor) usdc_vault: &'a AccountInfo<'info>,
+    pub(in crate::processor) usdc_mint: &'a Pubkey,
+    /// The vault's canonical compressed WriterCash sidecar, when supplied.
+    pub(in crate::processor) cash_sidecar: Option<&'a AccountInfo<'info>>,
+    pub(in crate::processor) market: &'a AccountInfo<'info>,
+    pub(in crate::processor) mint: &'a AccountInfo<'info>,
+    pub(in crate::processor) staging: &'a AccountInfo<'info>,
+    pub(in crate::processor) retirement: &'a AccountInfo<'info>,
+    pub(in crate::processor) token_program: &'a AccountInfo<'info>,
+}
+
+pub(in crate::processor) struct WriterLane {
+    /// Status-independent: supply, issuer custody, external interest, Market
+    /// outstanding and cash backing all reconcile (`writer_lane_reconciled`).
+    pub(in crate::processor) reconciled: bool,
+    /// Hot vault plus the canonical WriterCash sidecar's quote atoms.
+    pub(in crate::processor) before_cash: u64,
+    pub(in crate::processor) before_hot_cash: u64,
+    pub(in crate::processor) mint_supply: u64,
+    pub(in crate::processor) staged: u64,
+    pub(in crate::processor) retired: u64,
+}
+
+/// The one observation of a writer lane shared by every writer swap and every
+/// writer liquidity action (add, remove, sweep, relocate), so the two paths
+/// cannot drift. Writer cash is the hot sleeve vault plus the canonical
+/// compressed WriterCash sidecar when it is supplied; omitting an existing
+/// sidecar only understates cash (fails closed). A swap makes only this lane
+/// ineligible when it does not reconcile; a liquidity action is rejected.
+/// `market` is the caller's loaded `a.market`; its canonical mint is validated here.
+#[inline(never)]
+pub(in crate::processor) fn observe_writer_lane(
+    program_id: &Pubkey,
+    a: &WriterLaneAccounts,
+    sleeve: &WriterSleeveV1,
+    book: &WriterSeriesBookV1,
+    policy: &WriterDlmmPolicyV1,
+    index: usize,
+    inventory: u64,
+    market: &mut Market,
+) -> Result<WriterLane, ProgramError> {
+    validate_vault_token_account(a.usdc_vault, a.usdc_mint, a.sleeve.key)?;
+    let before_hot_cash = validate_token_account(a.usdc_vault)?.amount;
+    let before_cash = before_hot_cash
+        .checked_add(crate::compressed_custody::writer_cash(
+            program_id,
+            a.cash_sidecar,
+            a.usdc_vault.key,
+            a.usdc_mint,
+        )?)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    let mint = validate_canonical_market_mint(a.market, market, a.mint, 0)?;
+    let staged = custody::observe_market_staging_amount(
+        program_id,
+        a.market,
+        a.staging,
+        a.mint,
+        a.token_program,
+    )?;
+    let retired = custody::observe_writer_retirement_custody_amount(
+        program_id,
+        a.sleeve,
+        a.market,
+        a.retirement,
+        a.mint,
+        a.token_program,
+    )?;
+    Ok(WriterLane {
+        reconciled: writer_lane_reconciled(
+            book,
+            index,
+            inventory,
+            staged.checked_add(retired),
+            mint.supply,
+            market_outstanding_contract_amount(market)?,
+            sleeve.accounted_asset_atoms,
+            policy.total_pool_quote_atoms,
+            before_cash,
+        ),
+        before_cash,
+        before_hot_cash,
+        mint_supply: mint.supply,
+        staged,
+        retired,
+    })
+}
+
+/// The series book's identities for one writer lane:
+/// physical supply = issuer custody (pool inventory + staging + retirement
+/// custody) + external interest (managed + individual) + compressed-retired +
+/// forfeited, Market outstanding = external interest + pool inventory, and the
+/// observed writer cash (hot + WriterCash sidecar) backs every accounted asset
+/// not lent to the pool.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::processor) fn writer_lane_reconciled(
+    book: &WriterSeriesBookV1,
+    index: usize,
+    inventory: u64,
+    staged_and_retired: Option<u64>,
+    mint_supply: u64,
+    market_outstanding: u64,
+    accounted_assets: u64,
+    pooled_quote: u64,
+    cash: u64,
+) -> bool {
+    let record = &book.records[index];
+    let (Some(issuer), Some(external)) = (
+        staged_and_retired.and_then(|value| value.checked_add(inventory)),
+        book.external_total(index),
+    ) else {
+        return false;
+    };
+    mint_supply == record.total_physical_supply_atoms
+        && issuer == record.issuer_controlled_atoms
+        && mint_supply
+            .checked_sub(issuer)
+            .and_then(|v| v.checked_sub(book.individual.compressed_retired_atoms[index]))
+            .and_then(|v| v.checked_sub(book.individual.forfeited_atoms[index]))
+            == Some(external)
+        && accounted_assets
+            .checked_sub(pooled_quote)
+            .is_some_and(|required| cash >= required)
+        && external.checked_add(inventory) == Some(market_outstanding)
 }
 
 /// Apply only the already-admitted writer portion after the ordinary trader transfers.
@@ -401,7 +482,10 @@ pub(in crate::processor) fn finish_swap_with_cash(
                 &Pubkey::default(),
                 &pool.quote_mint,
             )?
-            .map_or(0, |state| state.quote_atoms);
+            // Classic delivery does not move the validated compressed balance.
+            .map_or(state.before_cash - state.before_hot_cash, |cash| {
+                cash.quote_atoms
+            });
             if hot_after
                 .checked_add(compressed_after)
                 .and_then(|total| total.checked_sub(state.before_cash))
@@ -560,13 +644,14 @@ pub(in crate::processor) fn finish_swap_with_cash(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    update_cash_metrics(
+    update_cash_metrics_with_admission(
         &mut state.context.sleeve,
         &state.context.group,
         &state.context.book,
         &state.context.snapshot,
         &state.policy,
         true,
+        route.admitted_cash(),
     )?;
     let slot = Clock::get()?.slot;
     state.context.sleeve.last_updated_slot = slot;

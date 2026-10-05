@@ -57,6 +57,30 @@ fn settle(
     keeper: bool,
     sponsored: bool,
 ) -> ProgramResult {
+    settle_with_trading_owner(program, a, cash_claim, keeper, sponsored, None)
+}
+
+pub(in crate::processor) fn process_trading_session_close(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    claim: CompressedCashOptionClaim,
+    owner: Pubkey,
+    sponsored: bool,
+) -> ProgramResult {
+    if a.get(1).map(|i| *i.key) != Some(crate::trading_session::derive(program, &owner).0) {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    settle_with_trading_owner(program, a, claim, false, sponsored, Some(owner))
+}
+
+fn settle_with_trading_owner(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    cash_claim: CompressedCashOptionClaim,
+    keeper: bool,
+    sponsored: bool,
+    trading_owner: Option<Pubkey>,
+) -> ProgramResult {
     let claim = cash_claim.option;
     let sponsor_index = 28;
     if a.len() != sponsor_index + usize::from(sponsored)
@@ -195,6 +219,17 @@ fn settle(
         a[7].key.as_ref(),
         &bump,
     ];
+    let trading_bump = [trading_owner
+        .map(|owner| crate::trading_session::derive(program, &owner).1)
+        .unwrap_or(0)];
+    let trading_seeds: Option<Vec<&[u8]>> = trading_owner.as_ref().map(|owner| {
+        vec![
+            CURRENT_STATE_NAMESPACE_SEED,
+            crate::trading_session::SEED,
+            owner.as_ref(),
+            &trading_bump,
+        ]
+    });
     if cash_input != 0 {
         retire_and_pay_cash(
             a,
@@ -204,6 +239,7 @@ fn settle(
             compressed_holder,
             compressed_fee,
             seeds,
+            trading_seeds.as_deref(),
         )?;
     } else {
         let keys = core::array::from_fn(|i| *a[i].key);
@@ -214,7 +250,11 @@ fn settle(
         if keeper {
             invoke_signed(&retirement, &infos, &[seeds])?;
         } else {
-            invoke(&retirement, &infos)?;
+            if let Some(trading) = trading_seeds.as_deref() {
+                invoke_signed(&retirement, &infos, &[trading])?;
+            } else {
+                invoke(&retirement, &infos)?;
+            }
         }
     }
     for (recipient, amount) in [
@@ -284,6 +324,7 @@ fn retire_and_pay_cash<'a>(
     holder_amount: u64,
     fee: u64,
     delegate_seeds: &[&[u8]],
+    trading_seeds: Option<&[&[u8]]>,
 ) -> ProgramResult {
     use crate::regular_compressed_transfer::{self as transfer, InputLeaf, OutputLeaf};
     // Seven fixed Light metas followed by option context, cash context and identities.
@@ -362,11 +403,15 @@ fn retire_and_pay_cash<'a>(
     if keeper {
         invoke_signed(&ix, &infos, &[cash_seeds, delegate_seeds])
     } else {
-        invoke_signed(&ix, &infos, &[cash_seeds])
+        if let Some(trading) = trading_seeds {
+            invoke_signed(&ix, &infos, &[cash_seeds, trading])
+        } else {
+            invoke_signed(&ix, &infos, &[cash_seeds])
+        }
     }
 }
 
-fn apply_retirement(
+pub(super) fn apply_retirement(
     book: &mut WriterSeriesBookV1,
     sleeve: &mut WriterSleeveV1,
     market: &mut Market,

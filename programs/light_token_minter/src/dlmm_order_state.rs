@@ -239,20 +239,22 @@ pub fn derive_order_book(program: &Pubkey, pool: &Pubkey) -> (Pubkey, u8) {
     )
 }
 
-#[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
-pub struct CompressedOrderExitV1Params {
-    pub sequence: u64,
-    pub record_count: u8,
-    pub merkle_account_count: u8,
-    pub output_tree_index: u8,
-    pub output_queue_index: u8,
-    pub expected_option_atoms: u64,
-    pub expected_quote_atoms: u64,
-    pub book_option_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
-    pub book_quote_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
-    pub fee_input_amount: u64,
-    pub fee_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
-    pub proof: Option<[u8; 128]>,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, PartialEq, BorshSerialize)]
+    pub struct CompressedOrderExitV1Params {
+        pub sequence: u64,
+        pub record_count: u8,
+        pub merkle_account_count: u8,
+        pub output_tree_index: u8,
+        pub output_queue_index: u8,
+        pub expected_option_atoms: u64,
+        pub expected_quote_atoms: u64,
+        pub book_option_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
+        pub book_quote_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
+        pub fee_input_amount: u64,
+        pub fee_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
+        pub proof: Option<[u8; 128]>,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -269,6 +271,11 @@ pub enum DlmmOrderAction {
         sequence: u64,
     },
     CloseBook,
+    /// Permissionless post-expiry recovery to the authenticated classic owner.
+    ExpireClassic {
+        sequence: u64,
+        record_count: u8,
+    },
     /// Future owner-signed regular compressed Book funding.
     PlaceCompressedEscrow {
         expected_sequence: u64,
@@ -304,8 +311,8 @@ pub enum DlmmOrderAction {
     },
 }
 
-// Only historical owner recovery bytes 2/3/4/7 remain live. Placement,
-// matching, swaps and consent selectors still reject before custody access.
+// Historical owner recovery bytes 2/3/4/7 and permissionless expired classic
+// recovery 15 remain live. Retired placement/matching/consent bytes still reject.
 impl BorshSerialize for DlmmOrderAction {
     fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         match self {
@@ -323,6 +330,14 @@ impl BorshSerialize for DlmmOrderAction {
                 sequence.serialize(writer)
             }
             Self::CloseBook => 7u8.serialize(writer),
+            Self::ExpireClassic {
+                sequence,
+                record_count,
+            } => {
+                15u8.serialize(writer)?;
+                sequence.serialize(writer)?;
+                record_count.serialize(writer)
+            }
             Self::PlaceCompressedEscrow {
                 expected_sequence,
                 side,
@@ -401,6 +416,10 @@ impl BorshDeserialize for DlmmOrderAction {
                 sequence: u64::deserialize_reader(reader)?,
             }),
             7 => Ok(Self::CloseBook),
+            15 => Ok(Self::ExpireClassic {
+                sequence: u64::deserialize_reader(reader)?,
+                record_count: u8::deserialize_reader(reader)?,
+            }),
             12 => Ok(Self::PlaceCompressedEscrow {
                 expected_sequence: u64::deserialize_reader(reader)?,
                 side: u8::deserialize_reader(reader)?,
@@ -435,6 +454,80 @@ impl BorshDeserialize for DlmmOrderAction {
             }),
             // Retired order selector.
             _ => Err(io::Error::from(io::ErrorKind::InvalidData)),
+        }
+    }
+
+    #[inline]
+    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
+        crate::fixed_codec::cursor_deserialize(buf)
+    }
+
+    /// Borsh's rule: decode, then reject any unread byte.
+    #[inline]
+    fn try_from_slice(data: &[u8]) -> io::Result<Self> {
+        crate::fixed_codec::cursor_from_slice(data)
+    }
+}
+
+/// The slice decoder the program uses: the same tags, fields and order as
+/// `deserialize_reader` above (the tested reference), read from a
+/// `CheckedCursor`; an unknown tag poisons the cursor where Borsh errors.
+impl crate::fixed_codec::CursorField for DlmmOrderAction {
+    #[inline(never)]
+    fn read(input: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
+        use crate::fixed_codec::CursorField as F;
+        match input.u8() {
+            0 => Self::Initialize,
+            2 => Self::Cancel {
+                sequence: input.u64(),
+            },
+            3 => Self::Claim {
+                sequence: input.u64(),
+            },
+            4 => Self::Close {
+                sequence: input.u64(),
+            },
+            7 => Self::CloseBook,
+            15 => Self::ExpireClassic {
+                sequence: input.u64(),
+                record_count: input.u8(),
+            },
+            12 => Self::PlaceCompressedEscrow {
+                expected_sequence: input.u64(),
+                side: input.u8(),
+                limit_bin: input.u16(),
+                quantity: input.u64(),
+                post_only: input.boolean(),
+                record_count: input.u8(),
+                page_count: input.u8(),
+                merkle_account_count: input.u8(),
+                output_tree_index: input.u8(),
+                output_queue_index: input.u8(),
+                funding_mode: input.u8(),
+                user_input_amount: input.u64(),
+                user_input_has_delegate: input.boolean(),
+                user_input: F::read(input),
+                book_option_input: F::read(input),
+                book_quote_input: F::read(input),
+                pool_option_input: F::read(input),
+                pool_quote_input: F::read(input),
+                writer_quote_input: F::read(input),
+                sponsor_fee_atoms: input.u64(),
+                fee_input_mode: input.u8(),
+                fee_input_amount: input.u64(),
+                fee_input: F::read(input),
+                proof: F::read(input),
+            },
+            13 => Self::CancelCompressedEscrow {
+                params: F::read(input),
+            },
+            14 => Self::ClaimCompressedEscrow {
+                params: F::read(input),
+            },
+            _ => {
+                input.invalid = true;
+                Self::Initialize
+            }
         }
     }
 }

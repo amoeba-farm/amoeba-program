@@ -27,6 +27,7 @@ pub fn derive_portfolio(program: &Pubkey, book: &Pubkey, owner: &Pubkey) -> (Pub
 }
 
 /// Mathematical ceiling, including negative numerators. Rust division truncates toward zero.
+#[inline(never)]
 pub fn signed_liability_ceil(numerator: i128) -> i128 {
     let scale = i128::from(WRITER_CONTRACT_ATOMIC_SCALE);
     numerator / scale + i128::from(numerator % scale > 0)

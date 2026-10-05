@@ -11,53 +11,73 @@ pub const POSITION_SEED: &[u8] = b"individual-writer-v1";
 pub const SCALE: u64 = 1_000_000;
 pub const MAX_BUYBACK_LEGS: usize = 8;
 
-/// Fixed-size payload: malformed lengths cannot allocate an unbounded leg list.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct IndividualBuybackLegV1 {
-    pub series_index: u8,
-    pub quantity: u64,
+crate::fixed_codec::compact_borsh_struct! {
+    /// Fixed-size payload: malformed lengths cannot allocate an unbounded leg list.
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, BorshSerialize)]
+    pub struct IndividualBuybackLegV1 {
+        pub series_index: u8,
+        pub quantity: u64,
+    }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct IndividualBuybackV1 {
-    pub leg_count: u8,
-    pub legs: [IndividualBuybackLegV1; MAX_BUYBACK_LEGS],
-    pub maximum_payment: u64,
-    pub minimum_refund: u64,
-    pub deadline_ts: u64,
+/// Borsh's `[T; N]` for non-byte elements: every element, in order.
+impl crate::fixed_codec::CursorField for [IndividualBuybackLegV1; MAX_BUYBACK_LEGS] {
+    #[inline(never)]
+    fn read(c: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
+        core::array::from_fn(|_| {
+            <IndividualBuybackLegV1 as crate::fixed_codec::CursorField>::read(c)
+        })
+    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct IndividualHedgeLeafWitnessV1 {
-    pub amount: u64,
-    pub leaf_index: u32,
-    pub root_index: u16,
-    pub prove_by_index: bool,
-    pub tree_index: u8,
-    pub queue_index: u8,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct IndividualBuybackV1 {
+        pub leg_count: u8,
+        pub legs: [IndividualBuybackLegV1; MAX_BUYBACK_LEGS],
+        pub maximum_payment: u64,
+        pub minimum_refund: u64,
+        pub deadline_ts: u64,
+    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct IndividualHedgeTransferV1 {
-    pub series_index: u8,
-    pub quantity: u64,
-    pub input: IndividualHedgeLeafWitnessV1,
-    pub input_has_delegate: bool,
-    pub output_queue_index: u8,
-    pub merkle_account_count: u8,
-    pub maximum_topup: u64,
-    pub proof: Option<[u8; 128]>,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct IndividualHedgeLeafWitnessV1 {
+        pub amount: u64,
+        pub leaf_index: u32,
+        pub root_index: u16,
+        pub prove_by_index: bool,
+        pub tree_index: u8,
+        pub queue_index: u8,
+    }
 }
 
-/// Optional whole WriterCash leaf consumed when its compressed custody backs
-/// a deferred owner credit. The same proof covers one input and its change.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, BorshDeserialize, BorshSerialize)]
-pub struct IndividualPortfolioCashWitnessV1 {
-    pub amount: u64,
-    pub leaf_index: u32,
-    pub root_index: u16,
-    pub prove_by_index: bool,
-    pub proof: Option<[u8; 128]>,
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct IndividualHedgeTransferV1 {
+        pub series_index: u8,
+        pub quantity: u64,
+        pub input: IndividualHedgeLeafWitnessV1,
+        pub input_has_delegate: bool,
+        pub output_queue_index: u8,
+        pub merkle_account_count: u8,
+        pub maximum_topup: u64,
+        pub proof: Option<[u8; 128]>,
+    }
+}
+
+crate::fixed_codec::compact_borsh_struct! {
+    /// Optional whole WriterCash leaf consumed when its compressed custody backs
+    /// a deferred owner credit. The same proof covers one input and its change.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct IndividualPortfolioCashWitnessV1 {
+        pub amount: u64,
+        pub leaf_index: u32,
+        pub root_index: u16,
+        pub prove_by_index: bool,
+        pub proof: Option<[u8; 128]>,
+    }
 }
 
 pub fn derive_position(
@@ -241,4 +261,43 @@ pub enum IndividualWriterAction {
     /// Buy exact matching options from funded asks using only this owner's
     /// portfolio cash. Delivery into portfolio custody and refund are atomic.
     BuybackFromAsks(IndividualBuybackV1),
+}
+
+/// The derived `IndividualWriterAction` reader on a cursor: the declaration-order variant tag,
+/// then the variant's fields in order. An unknown tag marks the cursor invalid exactly where the
+/// derived reader returns its error.
+impl crate::fixed_codec::CursorField for IndividualWriterAction {
+    #[inline(never)]
+    fn read(c: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
+        match c.u8() {
+            0 => Self::Open {
+                nonce: c.u64(),
+                series_index: c.u8(),
+                quantity: c.u64(),
+                price: c.u64(),
+                maximum_collateral: c.u64(),
+            },
+            1 => Self::Fill {
+                quantity: c.u64(),
+                maximum_payment: c.u64(),
+            },
+            2 => Self::Cancel,
+            3 => Self::FundSettlement,
+            4 => Self::Claim,
+            5 => Self::Close,
+            6 => Self::FillCompressed {
+                quantity: c.u64(),
+                maximum_payment: c.u64(),
+            },
+            7 => Self::LockHedge(IndividualHedgeTransferV1::read(c)),
+            8 => Self::UnlockHedge(IndividualHedgeTransferV1::read(c)),
+            9 => Self::RetireHedge(IndividualHedgeTransferV1::read(c)),
+            10 => Self::ClaimPortfolio(Option::<IndividualPortfolioCashWitnessV1>::read(c)),
+            11 => Self::BuybackFromAsks(IndividualBuybackV1::read(c)),
+            _ => {
+                c.invalid = true;
+                Self::Cancel
+            }
+        }
+    }
 }

@@ -11,7 +11,7 @@ use crate::writer_dlmm_math::{
     WriterDlmmBuybackLimits, WriterDlmmCash, WriterDlmmRetirement, WriterDlmmRiskLimits,
     WriterDlmmSeriesLimits,
 };
-use crate::writer_sleeve_math::{WriterSeries, WRITER_MAX_SERIES};
+use crate::writer_sleeve_math::{WriterReserveSummary, WriterSeries, WRITER_MAX_SERIES};
 
 /// Full candidate, six geometric reductions, then the smallest input. This is
 /// a bounded feasibility search, not a claim of monotonicity or maximum size.
@@ -61,6 +61,36 @@ pub struct WriterDlmmRouteQuote {
     pub writer_fills: Vec<AmoebaDlmmBinFill>,
     pub writer: WriterDlmmFillTotals,
     pub order_fills: Vec<PublicOrderFill>,
+    admitted_cash: Option<AdmittedWriterCash>,
+}
+
+/// Internal quote evidence. No instruction or caller-supplied bytes can create
+/// it; reuse requires the complete final mathematical book and cash to match.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct AdmittedWriterCash {
+    summary: WriterReserveSummary,
+    exposure: u64,
+    cash: WriterDlmmCash,
+    risk: WriterDlmmRiskLimits,
+    series: Vec<WriterSeries>,
+}
+
+impl AdmittedWriterCash {
+    pub(crate) fn for_final_state(
+        &self,
+        series: &[WriterSeries],
+        cash: WriterDlmmCash,
+        risk: &WriterDlmmRiskLimits,
+    ) -> Option<(WriterReserveSummary, u64)> {
+        (series == self.series && cash == self.cash && *risk == self.risk)
+            .then_some((self.summary, self.exposure))
+    }
+}
+
+impl WriterDlmmRouteQuote {
+    pub(crate) fn admitted_cash(&self) -> Option<&AdmittedWriterCash> {
+        self.admitted_cash.as_ref()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -78,6 +108,7 @@ pub struct PublicOrderRouteLimits {
     pub maximum_order_fills: usize,
 }
 
+#[inline(never)]
 fn checked_add(a: u64, b: u64) -> Result<u64, AmoebaDlmmMathError> {
     a.checked_add(b)
         .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)
@@ -109,17 +140,29 @@ fn remaining_budget(policy: &WriterDlmmSwapPolicy, totals: &WriterDlmmFillTotals
 }
 
 #[inline(never)]
-fn admit_totals(
+fn admit_totals_with_metrics(
     config: &WriterDlmmRouteConfig,
     policy: &WriterDlmmSwapPolicy,
     totals: &mut WriterDlmmFillTotals,
-) -> bool {
+    prepared: Option<&crate::writer_sleeve_math::PreparedWriterReserve>,
+) -> Option<AdmittedWriterCash> {
+    admit_totals_with_cash_mode(config, policy, totals, prepared, false)
+}
+
+#[inline(never)]
+fn admit_totals_with_cash_mode(
+    config: &WriterDlmmRouteConfig,
+    policy: &WriterDlmmSwapPolicy,
+    totals: &mut WriterDlmmFillTotals,
+    prepared: Option<&crate::writer_sleeve_math::PreparedWriterReserve>,
+    sleeve_cash: bool,
+) -> Option<AdmittedWriterCash> {
     if !policy.eligible
         || policy.series_index >= policy.book.len()
         || policy.book.len() != policy.series_limits.len()
         || policy.book.len() > WRITER_MAX_SERIES
     {
-        return false;
+        return None;
     }
     let terms = policy.series_limits[policy.series_index];
     match config.direction {
@@ -130,10 +173,10 @@ fn admit_totals(
                 terms.seller_floor_quote_atoms,
                 dlmm::AMOEBA_DLMM_PRICE_SCALE,
             ) else {
-                return false;
+                return None;
             };
             if net < floor {
-                return false;
+                return None;
             }
             let Some(assets) = policy
                 .cash
@@ -141,70 +184,140 @@ fn admit_totals(
                 .checked_add(net)
                 .and_then(|value| value.checked_add(totals.lp_fee_atoms))
             else {
-                return false;
+                return None;
             };
-            // Repeated rejected probes must not consume the SBF bump heap.
-            let mut storage = [WriterSeries::EMPTY; WRITER_MAX_SERIES];
-            let book = &mut storage[..policy.book.len()];
-            book.copy_from_slice(policy.book);
-            let Some(oi) = book[policy.series_index]
+            let Some(oi) = policy.book[policy.series_index]
                 .external_oi_atoms
                 .checked_add(totals.sold_option_atoms)
             else {
-                return false;
+                return None;
             };
-            book[policy.series_index].external_oi_atoms = oi;
-            let Ok((reserve, _, _)) = admit_writer_dlmm_cash(
-                book,
-                WriterDlmmCash {
-                    assets_atoms: assets,
-                    ..policy.cash
-                },
-                &policy.risk,
-            ) else {
-                return false;
+            let admission = if let Some(prepared) = prepared {
+                prepared.reserve(oi).and_then(|summary| {
+                    let exposure=match policy.risk.security_mode {
+                        crate::writer_sleeve_math::WriterSecurityMode::GrossExternalMaximumPayout => prepared.gross(oi)?,
+                        crate::writer_sleeve_math::WriterSecurityMode::ExactExternalEnvelope => summary.reserve_atoms,
+                    };
+                    Ok((summary,exposure))
+                }).map_err(crate::writer_dlmm_math::WriterDlmmAdmissionError::Envelope).and_then(|(summary,exposure)| {
+                    crate::writer_dlmm_math::admit_writer_dlmm_cash_summary(summary,exposure,WriterDlmmCash {assets_atoms:assets,..policy.cash},&policy.risk)
+                })
+            } else {
+                // Invalid preparation follows the unchanged full-book admission path.
+                let mut storage = [WriterSeries::EMPTY; WRITER_MAX_SERIES];
+                let book = &mut storage[..policy.book.len()];
+                book.copy_from_slice(policy.book);
+                book[policy.series_index].external_oi_atoms = oi;
+                admit_writer_dlmm_cash(
+                    book,
+                    WriterDlmmCash {
+                        assets_atoms: assets,
+                        ..policy.cash
+                    },
+                    &policy.risk,
+                )
+            };
+            let Ok((reserve, _, exposure)) = admission else {
+                return None;
             };
             if policy.participation.is_some_and(|participation| {
                 participation.admit(assets, reserve.reserve_atoms).is_err()
             }) {
-                return false;
+                return None;
             }
             totals.net_premium_atoms = net;
-            true
+            Some(AdmittedWriterCash {
+                summary: reserve,
+                exposure,
+                cash: WriterDlmmCash {
+                    assets_atoms: assets,
+                    ..policy.cash
+                },
+                risk: policy.risk,
+                series: Vec::new(),
+            })
         }
         AmoebaDlmmSwapDirection::OptionForQuote => {
-            let Some(allocated_after) = policy
-                .cash
-                .allocated_lp_quote_atoms
-                .checked_sub(totals.spent_quote_atoms)
-            else {
-                return false;
+            let allocated_after = if sleeve_cash {
+                policy.cash.allocated_lp_quote_atoms
+            } else {
+                policy
+                    .cash
+                    .allocated_lp_quote_atoms
+                    .checked_sub(totals.spent_quote_atoms)?
             };
-            let Ok(admission) = admit_writer_dlmm_retirement(
-                policy.book,
-                policy.cash,
-                &policy.risk,
-                &policy.buyback,
-                policy.series_limits,
-                &[WriterDlmmRetirement {
-                    series_index: policy.series_index,
-                    retired_atoms: totals.retired_option_atoms,
-                    cost_atoms: totals.spent_quote_atoms,
-                    series_month_spent_atoms: policy.series_month_spent_atoms,
-                }],
-                policy.month_spent_atoms,
-                allocated_after,
-                false,
-            ) else {
-                return false;
+            let retirements = [WriterDlmmRetirement {
+                series_index: policy.series_index,
+                retired_atoms: totals.retired_option_atoms,
+                cost_atoms: totals.spent_quote_atoms,
+                series_month_spent_atoms: policy.series_month_spent_atoms,
+            }];
+            let admission = if sleeve_cash && prepared.is_some() {
+                crate::writer_dlmm_math::admit_writer_sleeve_retirement_prepared(
+                    policy.book,
+                    policy.cash,
+                    &policy.risk,
+                    &policy.buyback,
+                    policy.series_limits,
+                    &retirements,
+                    policy.month_spent_atoms,
+                    prepared.unwrap(),
+                )
+            } else if sleeve_cash {
+                crate::writer_dlmm_math::admit_writer_sleeve_cash_retirement(
+                    policy.book,
+                    policy.cash,
+                    &policy.risk,
+                    &policy.buyback,
+                    policy.series_limits,
+                    &retirements,
+                    policy.month_spent_atoms,
+                )
+            } else {
+                admit_writer_dlmm_retirement(
+                    policy.book,
+                    policy.cash,
+                    &policy.risk,
+                    &policy.buyback,
+                    policy.series_limits,
+                    &retirements,
+                    policy.month_spent_atoms,
+                    allocated_after,
+                    false,
+                )
             };
-            policy.participation.is_none_or(|participation| {
+            let Ok(admission) = admission else {
+                return None;
+            };
+            let participating = policy.participation.is_none_or(|participation| {
                 participation
                     .admit(
                         admission.assets_after_atoms,
                         admission.reserve_after.reserve_atoms,
                     )
                     .is_ok()
+            });
+            if !participating {
+                return None;
+            }
+            Some(AdmittedWriterCash {
+                summary: admission.reserve_after,
+                exposure: admission.security_exposure_after_atoms,
+                cash: WriterDlmmCash {
+                    assets_atoms: admission.assets_after_atoms,
+                    allocated_lp_quote_atoms: allocated_after,
+                    pooled_quote_atoms: if sleeve_cash {
+                        policy.cash.pooled_quote_atoms
+                    } else {
+                        policy
+                            .cash
+                            .pooled_quote_atoms
+                            .checked_sub(totals.spent_quote_atoms)?
+                    },
+                    ..policy.cash
+                },
+                risk: policy.risk,
+                series: Vec::new(),
             })
         }
     }
@@ -257,6 +370,61 @@ pub fn quote_dlmm_with_orders(
     orders: &[crate::dlmm_order_state::DlmmOrder],
     limits: PublicOrderRouteLimits,
 ) -> Result<WriterDlmmRouteQuote, AmoebaDlmmMathError> {
+    quote_with_cash_mode(
+        config, ordinary, writer, policy, orders, limits, false, None,
+    )
+}
+
+pub fn quote_shared_strip_writer(
+    config: WriterDlmmRouteConfig,
+    writer: &[WriterDlmmBinV1],
+    policy: &WriterDlmmSwapPolicy,
+    limits: PublicOrderRouteLimits,
+) -> Result<WriterDlmmRouteQuote, AmoebaDlmmMathError> {
+    quote_with_cash_mode(config, &[], writer, Some(policy), &[], limits, true, None)
+}
+
+pub(crate) fn quote_shared_strip_writer_prepared(
+    config: WriterDlmmRouteConfig,
+    writer: &[WriterDlmmBinV1],
+    policy: &WriterDlmmSwapPolicy,
+    limits: PublicOrderRouteLimits,
+    prepared: &crate::writer_sleeve_math::PreparedWriterReserve,
+) -> Result<WriterDlmmRouteQuote, AmoebaDlmmMathError> {
+    if prepared.target != policy.series_index
+        || !prepared.matches_bounds(
+            policy.risk.lower_tail_max_settlement_atomic,
+            policy.risk.upper_tail_min_settlement_atomic,
+        )
+        || policy
+            .book
+            .get(policy.series_index)
+            .is_none_or(|s| s.external_oi_atoms != prepared.initial_oi)
+    {
+        return Err(AmoebaDlmmMathError::InvalidRoute);
+    }
+    quote_with_cash_mode(
+        config,
+        &[],
+        writer,
+        Some(policy),
+        &[],
+        limits,
+        true,
+        Some(prepared),
+    )
+}
+
+fn quote_with_cash_mode(
+    config: WriterDlmmRouteConfig,
+    ordinary: &[AmoebaDlmmBinLiquidity],
+    writer: &[WriterDlmmBinV1],
+    policy: Option<&WriterDlmmSwapPolicy>,
+    orders: &[crate::dlmm_order_state::DlmmOrder],
+    limits: PublicOrderRouteLimits,
+    sleeve_cash: bool,
+    prepared_override: Option<&crate::writer_sleeve_math::PreparedWriterReserve>,
+) -> Result<WriterDlmmRouteQuote, AmoebaDlmmMathError> {
     if config.maximum_bins == 0
         || config.maximum_bins > dlmm::AMOEBA_DLMM_MAXIMUM_BINS_PER_SWAP
         || (!limits.allow_partial && config.minimum_amount_out == 0)
@@ -306,6 +474,22 @@ pub fn quote_dlmm_with_orders(
         return Err(AmoebaDlmmMathError::InvalidRoute);
     }
     let fees = dlmm::calculate_fees(config.amount_in)?;
+    let prepared_storage = policy
+        .filter(|policy| {
+            prepared_override.is_none()
+                && policy.eligible
+                && config.direction == AmoebaDlmmSwapDirection::QuoteForOption
+        })
+        .and_then(|policy| {
+            crate::writer_sleeve_math::PreparedWriterReserve::new(
+                policy.book,
+                policy.series_index,
+                policy.risk.lower_tail_max_settlement_atomic,
+                policy.risk.upper_tail_min_settlement_atomic,
+            )
+            .ok()
+        });
+    let prepared = prepared_override.or(prepared_storage.as_ref());
     let mut result = WriterDlmmRouteQuote::default();
     let mut remaining = fees.trade_input;
     let mut allocated = 0u64;
@@ -560,7 +744,19 @@ pub fn quote_dlmm_with_orders(
                                         checked_add(totals.spent_quote_atoms, fill.amount_out)?;
                                 }
                             }
-                            if fill.amount_out > 0 && admit_totals(&config, policy, &mut totals) {
+                            let admitted = (fill.amount_out > 0)
+                                .then(|| {
+                                    admit_totals_with_cash_mode(
+                                        &config,
+                                        policy,
+                                        &mut totals,
+                                        prepared,
+                                        sleeve_cash,
+                                    )
+                                })
+                                .flatten();
+                            if let Some(admitted) = admitted {
+                                result.admitted_cash = Some(admitted);
                                 if ascending {
                                     writer_after.option_atoms = writer_after
                                         .option_atoms
@@ -653,5 +849,20 @@ pub fn quote_dlmm_with_orders(
         .last()
         .ok_or(AmoebaDlmmMathError::InvalidRoute)?
         .bin_id;
+    if let Some(admitted) = result.admitted_cash.as_mut() {
+        let policy = policy.ok_or(AmoebaDlmmMathError::InvalidRoute)?;
+        admitted.series = policy.book.to_vec();
+        let target = &mut admitted.series[policy.series_index];
+        target.external_oi_atoms = if ascending {
+            target
+                .external_oi_atoms
+                .checked_add(result.writer.sold_option_atoms)
+        } else {
+            target
+                .external_oi_atoms
+                .checked_sub(result.writer.retired_option_atoms)
+        }
+        .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?;
+    }
     Ok(result)
 }

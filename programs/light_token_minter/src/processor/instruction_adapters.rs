@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 #[inline(always)]
 pub(super) fn process_initialize_instruction(
     program_id: &Pubkey,
@@ -68,6 +69,7 @@ pub(super) fn process_set_market_paused_instruction(
     process_set_market_paused(program_id, accounts, params)
 }
 
+#[cfg_attr(feature = "mainnet-v3", allow(dead_code))]
 pub(super) fn process_initialize_settlement_signer_registry_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],

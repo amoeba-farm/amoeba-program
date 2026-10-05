@@ -44,6 +44,7 @@ use crate::{
 use super::ameba_dlmm_light::{initialize_compression_info, register_initialized_pdas};
 
 mod vault_restore;
+pub(super) use collective::process_trading_session_compressed_swap;
 pub(super) use vault_restore::process_restore_vault;
 
 const EVENT_POOL_INITIALIZED: [u8; 8] = *b"ADPIEV1\0";
@@ -65,8 +66,37 @@ const EVENT_POOL_CLOSED: [u8; 8] = *b"ADCLEV1\0";
 /// cannot attribute an effective bit to a particular duplicate source meta, and a duplicate
 /// between two canonical read-only, non-signer roles remains subject to handler identity checks.
 fn validate_pack_dlmm_account_privileges(
+    program_id: &Pubkey,
     tag: AmoebaDlmmInstructionTag,
     accounts: &[AccountInfo],
+) -> ProgramResult {
+    validate_pack_dlmm_account_privileges_with_delivery(
+        program_id,
+        tag,
+        accounts,
+        compressed_delivery::COMPRESSION_ACCOUNTS,
+    )
+}
+
+/// The compressed swap supplies its own separately authenticated Light tail.
+/// Its core has the same fixed roles and pages as the classic route.
+fn validate_collective_swap_base_privileges(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+) -> ProgramResult {
+    validate_pack_dlmm_account_privileges_with_delivery(
+        program_id,
+        AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1,
+        accounts,
+        0,
+    )
+}
+
+fn validate_pack_dlmm_account_privileges_with_delivery(
+    program_id: &Pubkey,
+    tag: AmoebaDlmmInstructionTag,
+    accounts: &[AccountInfo],
+    delivery_count: usize,
 ) -> ProgramResult {
     let count = accounts.len();
     let valid_count = match tag {
@@ -78,10 +108,18 @@ fn validate_pack_dlmm_account_privileges(
             count >= 18 && (count - 16).is_multiple_of(2)
         }
         AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1 => {
-            (collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
-                ..=collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
-                    + usize::from(MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP))
-                .contains(&count)
+            let minimum = collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS + delivery_count;
+            let maximum = minimum + usize::from(MAX_AMOEBA_DLMM_PAGE_HOPS_PER_SWAP);
+            (minimum..=maximum + 1).contains(&count)
+                && (count <= maximum || {
+                    let expected = crate::compressed_custody::derive_compressed_custody(
+                        program_id,
+                        crate::compressed_custody::CustodyKind::WriterCash,
+                        accounts[27].key,
+                    )
+                    .0;
+                    *accounts[count - delivery_count - 1].key == expected
+                })
         }
         _ => return Ok(()),
     };
@@ -89,9 +127,13 @@ fn validate_pack_dlmm_account_privileges(
         return Err(VaultError::InvalidAccountList.into());
     }
 
+    let ordinary_only = tag == AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1
+        && [2, 4, 6, 24, 26, 27, 28, 29]
+            .iter()
+            .all(|index| !accounts[*index].is_writable);
     for (index, account) in accounts.iter().enumerate() {
         let expected_signer = index == 0;
-        let expected_writable = match tag {
+        let mut expected_writable = match tag {
             AmoebaDlmmInstructionTag::AddLiquidityV1
             | AmoebaDlmmInstructionTag::RemoveLiquidityV1 => {
                 matches!(index, 0 | 1 | 2 | 6 | 7 | 8 | 9 | 12 | 13) || index >= 16
@@ -117,10 +159,15 @@ fn validate_pack_dlmm_account_privileges(
                         | 27
                         | 28
                         | 29
-                ) || index >= collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
+                ) || (index >= collective::COLLECTIVE_SWAP_FIXED_ACCOUNTS
+                    && index < count - delivery_count)
+                    || (delivery_count != 0 && index == count - 1)
             }
             _ => false,
         };
+        if ordinary_only && matches!(index, 2 | 4 | 6 | 24 | 26 | 27 | 28 | 29) {
+            expected_writable = false;
+        }
         // Preserve exact effective privileges except for the runtime's unavoidable promotion of
         // a required signer when that signer is also the transaction fee payer.
         let writable_matches = account.is_writable == expected_writable
@@ -517,7 +564,7 @@ pub fn process_instruction(
     tag: AmoebaDlmmInstructionTag,
     payload: &[u8],
 ) -> ProgramResult {
-    validate_pack_dlmm_account_privileges(tag, accounts)?;
+    validate_pack_dlmm_account_privileges(program_id, tag, accounts)?;
     match tag {
         AmoebaDlmmInstructionTag::InitializeBinPageV1 => {
             process_initialize_bin_page_payload(program_id, accounts, payload)
@@ -567,6 +614,7 @@ pub(in crate::processor) mod orders;
 mod scoped_position;
 mod swap;
 
+pub(in crate::processor) use accounts::load_pool;
 use accounts::*;
 use collective::*;
 use initialization::*;

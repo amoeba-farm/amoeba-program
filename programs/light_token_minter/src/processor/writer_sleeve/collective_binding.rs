@@ -8,7 +8,7 @@ pub(in crate::processor) fn load_collective_settlement_group_for_dlmm(
 }
 
 #[inline(never)]
-fn load_collective_group_binding(
+pub(super) fn load_collective_group_binding(
     sleeve_info: &AccountInfo,
     book_info: &AccountInfo,
     market_key: &Pubkey,
@@ -38,7 +38,7 @@ fn load_collective_group_binding(
 }
 
 #[inline(never)]
-fn load_collective_market_binding(
+pub(super) fn load_collective_market_binding(
     program_id: &Pubkey,
     market_info: &AccountInfo,
     binding: &CollectiveGroupBinding,
@@ -87,15 +87,16 @@ fn load_collective_market_binding(
         maximum_price_quote_atomic: market.instrument.max_payout_per_contract,
         maximum_bin_id,
         maximum_bins_per_swap,
+        market: Box::new(market),
     })
 }
 
 #[inline(never)]
-fn load_collective_anchor_month_status(
+pub(super) fn load_collective_anchor_month_status(
     program_id: &Pubkey,
     anchor_month_info: &AccountInfo,
     binding: &CollectiveGroupBinding,
-) -> Result<bool, ProgramError> {
+) -> Result<Box<OracleMonthState>, ProgramError> {
     let anchor_month = load_oracle_month_state(anchor_month_info, program_id)?;
     let (expected_month, expected_bump) =
         derive_oracle_month_pda(program_id, &binding.anchor_market, binding.expiry_ts);
@@ -107,8 +108,7 @@ fn load_collective_anchor_month_status(
     {
         return Err(VaultError::InvalidWriterSettlementGroup.into());
     }
-    Ok(anchor_month.settlement_record.is_some()
-        || anchor_month.settlement_status == OracleSettlementStatus::Final)
+    Ok(Box::new(anchor_month))
 }
 
 /// Load the immutable collective binding needed by the secondary DLMM lanes. The pool remains
@@ -183,8 +183,10 @@ pub(super) fn collective_dlmm_context_from_validated_book(
         book,
     )?;
     let market = load_collective_market_binding(program_id, market_info, &binding)?;
-    let anchor_month_settled =
+    let anchor_month =
         load_collective_anchor_month_status(program_id, anchor_month_info, &binding)?;
+    let anchor_month_settled = anchor_month.settlement_record.is_some()
+        || anchor_month.settlement_status == OracleSettlementStatus::Final;
     Ok(CollectiveDlmmContext {
         sleeve_status: binding.sleeve_status,
         group_status: binding.group_status,
@@ -197,5 +199,7 @@ pub(super) fn collective_dlmm_context_from_validated_book(
         maximum_price_quote_atomic: market.maximum_price_quote_atomic,
         maximum_bin_id: market.maximum_bin_id,
         maximum_bins_per_swap: market.maximum_bins_per_swap,
+        market: market.market,
+        anchor_month,
     })
 }

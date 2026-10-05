@@ -170,23 +170,40 @@ pub fn final_payout(
         .weight_offset
         .checked_add(lot.weight()?)
         .ok_or(ParticipationError::Overflow)?;
-    if end > total_weight || lot.principal > total_principal {
+    range_payout(
+        lot.principal,
+        lot.weight_offset,
+        end,
+        total_principal,
+        total_weight,
+        residual,
+    )
+}
+
+/// The payout of `principal` owning the capital-seconds range `[start, end)`.
+/// For one lot this is `final_payout`; for contiguous lots it is exactly the
+/// sum of their payouts (the cumulative floors telescope).
+pub fn range_payout(
+    principal: u64,
+    start: u128,
+    end: u128,
+    total_principal: u64,
+    total_weight: u128,
+    residual: u64,
+) -> Result<u64, ParticipationError> {
+    if end > total_weight || principal > total_principal {
         return Err(ParticipationError::InvalidInterval);
     }
     let magnitude = residual.abs_diff(total_principal);
     let allocation = proportional_floor(magnitude, end, total_weight)?
-        .checked_sub(proportional_floor(
-            magnitude,
-            lot.weight_offset,
-            total_weight,
-        )?)
+        .checked_sub(proportional_floor(magnitude, start, total_weight)?)
         .ok_or(ParticipationError::InvalidInterval)?;
     if residual >= total_principal {
-        lot.principal
+        principal
             .checked_add(allocation)
             .ok_or(ParticipationError::Overflow)
     } else {
-        lot.principal
+        principal
             .checked_sub(allocation)
             .ok_or(ParticipationError::Insolvent)
     }

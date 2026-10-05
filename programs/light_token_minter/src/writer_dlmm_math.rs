@@ -163,6 +163,18 @@ pub fn admit_writer_dlmm_cash(
     limits: &WriterDlmmRiskLimits,
 ) -> Result<(WriterReserveSummary, u64, u64)> {
     let summary = reserve(book, limits)?;
+    let (_, free_cash, _) = admit_writer_dlmm_cash_summary(summary, 0, cash, limits)?;
+    let exposure = security_exposure(limits.security_mode, book, summary.reserve_atoms)
+        .map_err(WriterDlmmAdmissionError::Envelope)?;
+    Ok((summary, free_cash, exposure))
+}
+
+pub(crate) fn admit_writer_dlmm_cash_summary(
+    summary: WriterReserveSummary,
+    exposure: u64,
+    cash: WriterDlmmCash,
+    limits: &WriterDlmmRiskLimits,
+) -> Result<(WriterReserveSummary, u64, u64)> {
     if cash.allocated_lp_quote_atoms > cash.pooled_quote_atoms {
         return Err(WriterDlmmAdmissionError::InvalidBook);
     }
@@ -199,8 +211,6 @@ pub fn admit_writer_dlmm_cash(
         summary.upper_tail_reserve_atoms,
         limits.upper_drawdown_ppm,
     )?;
-    let exposure = security_exposure(limits.security_mode, book, summary.reserve_atoms)
-        .map_err(WriterDlmmAdmissionError::Envelope)?;
     // The legacy oracle cap is informational only. Cash, exact reserve and
     // drawdown checks above remain mandatory for every admitted operation.
     Ok((summary, free_cash, exposure))
@@ -221,6 +231,98 @@ pub fn admit_writer_dlmm_retirement(
     allocated_lp_quote_after_atoms: u64,
     close_pending: bool,
 ) -> Result<WriterDlmmAdmission> {
+    admit_writer_retirement_inner(
+        book,
+        cash,
+        risk,
+        policy,
+        series_limits,
+        retirements,
+        month_spent_atoms,
+        allocated_lp_quote_after_atoms,
+        close_pending,
+        false,
+        None,
+    )
+}
+
+/// The same retirement price, budget and full-book reserve checks when the
+/// authenticated cash remains in the sleeve rather than a pool LP escrow.
+pub fn admit_writer_sleeve_cash_retirement(
+    book: &[WriterSeries],
+    cash: WriterDlmmCash,
+    risk: &WriterDlmmRiskLimits,
+    policy: &WriterDlmmBuybackLimits,
+    series_limits: &[WriterDlmmSeriesLimits],
+    retirements: &[WriterDlmmRetirement],
+    month_spent_atoms: u64,
+) -> Result<WriterDlmmAdmission> {
+    admit_writer_retirement_inner(
+        book,
+        cash,
+        risk,
+        policy,
+        series_limits,
+        retirements,
+        month_spent_atoms,
+        cash.allocated_lp_quote_atoms,
+        false,
+        true,
+        None,
+    )
+}
+
+pub(crate) fn admit_writer_sleeve_retirement_prepared(
+    book: &[WriterSeries],
+    cash: WriterDlmmCash,
+    risk: &WriterDlmmRiskLimits,
+    policy: &WriterDlmmBuybackLimits,
+    series_limits: &[WriterDlmmSeriesLimits],
+    retirements: &[WriterDlmmRetirement],
+    month_spent_atoms: u64,
+    prepared: &crate::writer_sleeve_math::PreparedWriterReserve,
+) -> Result<WriterDlmmAdmission> {
+    if retirements.len() != 1
+        || !prepared.matches_bounds(
+            risk.lower_tail_max_settlement_atomic,
+            risk.upper_tail_min_settlement_atomic,
+        )
+        || retirements[0].series_index != prepared.target
+        || book
+            .get(prepared.target)
+            .is_none_or(|s| s.external_oi_atoms != prepared.initial_oi)
+    {
+        return Err(WriterDlmmAdmissionError::InvalidPolicy);
+    }
+    admit_writer_retirement_inner(
+        book,
+        cash,
+        risk,
+        policy,
+        series_limits,
+        retirements,
+        month_spent_atoms,
+        cash.allocated_lp_quote_atoms,
+        false,
+        true,
+        Some(prepared),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn admit_writer_retirement_inner(
+    book: &[WriterSeries],
+    cash: WriterDlmmCash,
+    risk: &WriterDlmmRiskLimits,
+    policy: &WriterDlmmBuybackLimits,
+    series_limits: &[WriterDlmmSeriesLimits],
+    retirements: &[WriterDlmmRetirement],
+    month_spent_atoms: u64,
+    allocated_lp_quote_after_atoms: u64,
+    close_pending: bool,
+    sleeve_cash: bool,
+    prepared: Option<&crate::writer_sleeve_math::PreparedWriterReserve>,
+) -> Result<WriterDlmmAdmission> {
     if close_pending {
         return Err(WriterDlmmAdmissionError::CloseHasPriority);
     }
@@ -238,7 +340,13 @@ pub fn admit_writer_dlmm_retirement(
     {
         return Err(WriterDlmmAdmissionError::InvalidPolicy);
     }
-    let before = reserve(book, risk)?;
+    let before = if let Some(cache) = prepared {
+        cache
+            .reserve(cache.initial_oi)
+            .map_err(WriterDlmmAdmissionError::Envelope)?
+    } else {
+        reserve(book, risk)?
+    };
     let mut after = [WriterSeries::EMPTY; WRITER_MAX_SERIES];
     after[..book.len()].copy_from_slice(book);
     let tick_gap = policy
@@ -302,19 +410,38 @@ pub fn admit_writer_dlmm_retirement(
         .assets_atoms
         .checked_sub(total_cost)
         .ok_or(WriterDlmmAdmissionError::Insolvent)?;
-    let (summary, free_cash, exposure) = admit_writer_dlmm_cash(
-        &after[..book.len()],
-        WriterDlmmCash {
-            assets_atoms: assets_after,
-            principal_atoms: cash.principal_atoms,
-            allocated_lp_quote_atoms: allocated_lp_quote_after_atoms,
-            pooled_quote_atoms: cash
-                .pooled_quote_atoms
+    // Compact execution spends the sleeve's cash. Independent-pool custody
+    // stays reserved and its balances cannot fund this retirement.
+    if sleeve_cash && assets_after < cash.pooled_quote_atoms {
+        return Err(WriterDlmmAdmissionError::Insolvent);
+    }
+    let after_cash = WriterDlmmCash {
+        assets_atoms: assets_after,
+        principal_atoms: cash.principal_atoms,
+        allocated_lp_quote_atoms: allocated_lp_quote_after_atoms,
+        pooled_quote_atoms: if sleeve_cash {
+            cash.pooled_quote_atoms
+        } else {
+            cash.pooled_quote_atoms
                 .checked_sub(total_cost)
-                .ok_or(WriterDlmmAdmissionError::Insolvent)?,
+                .ok_or(WriterDlmmAdmissionError::Insolvent)?
         },
-        risk,
-    )?;
+    };
+    let (summary, free_cash, exposure) = if let Some(cache) = prepared {
+        let oi = after[cache.target].external_oi_atoms;
+        let summary = cache
+            .reserve(oi)
+            .map_err(WriterDlmmAdmissionError::Envelope)?;
+        let exposure = match risk.security_mode {
+            WriterSecurityMode::GrossExternalMaximumPayout => cache
+                .gross(oi)
+                .map_err(WriterDlmmAdmissionError::Envelope)?,
+            WriterSecurityMode::ExactExternalEnvelope => summary.reserve_atoms,
+        };
+        admit_writer_dlmm_cash_summary(summary, exposure, after_cash, risk)?
+    } else {
+        admit_writer_dlmm_cash(&after[..book.len()], after_cash, risk)?
+    };
     let released = before
         .reserve_atoms
         .checked_sub(summary.reserve_atoms)
