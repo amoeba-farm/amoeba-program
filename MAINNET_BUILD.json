@@ -24,18 +24,24 @@
   "defaultFeatures": true,
   "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
   "nativeToolchain": "cargo-build-sbf 4.0.0; platform-tools v1.53; SBF rustc 1.89.0",
-  "deployedSlot": null,
-  "publicationStatus": "prepared",
-  "deploymentStatus": "pending",
+  "deployedSlot": 453609919,
+  "publicationStatus": "published",
+  "deploymentStatus": "installed",
   "publicDockerBuildMatchesQualifiedArtifact": true,
-  "hostedVerificationClaimed": false,
+  "hostedVerificationClaimed": true,
   "buildInstructions": "release/mainnet-basic-magic-direct-20261005/README.md",
   "evidence": {
     "publicationInventory": "release/mainnet-basic-magic-direct-20261005/publication-inventory.json",
     "nativeBuilds": "release/mainnet-basic-magic-direct-20261005/native-builds.json",
-    "publicDockerBuild": "release/mainnet-basic-magic-direct-20261005/public-docker-build.json"
+    "publicDockerBuild": "release/mainnet-basic-magic-direct-20261005/public-docker-build.json",
+    "actualDeploymentAndVerification": "deployment-evidence/basic-magic-direct-mainnet-20261005.json"
   },
   "semanticClientSourceCommit": "d79dd75c921d7627f7ff749a4c97134c43f9355e",
   "change": "Direct-wallet Basic capped-futures strips with allocator-authorized Earn allocation to existing markets",
-  "normalizedExecutableHash": "317078970d33ba453982b59a9252a049d75293ad26b781745899d197a6d8a95d"
+  "normalizedExecutableHash": "317078970d33ba453982b59a9252a049d75293ad26b781745899d197a6d8a95d",
+  "programDataCapacity": 1767688,
+  "mandatoryZeroPaddingBytes": 9208,
+  "verifiedSourceCommit": "65e20d96369a2732b3e718c6470ab23880ce0380",
+  "verificationStatus": "verified",
+  "verificationObservedAt": "2026-10-05T15:13:22.626Z"
 }

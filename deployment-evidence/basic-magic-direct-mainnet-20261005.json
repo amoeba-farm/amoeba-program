@@ -1,0 +1,25 @@
+{
+  "schema": "amoeba-public-mainnet-verification-v1",
+  "network": "mainnet-beta",
+  "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+  "deployedSlot": "453609919",
+  "programDataAccountSha256": "83dc41d9e59d26767feeee69a8e31267d661d04c6160c547573d956ea93326b6",
+  "programDataCapacity": 1767688,
+  "mandatoryZeroPaddingBytes": 9208,
+  "loaderExtensionBytes": 10240,
+  "artifactBytes": 1758480,
+  "artifactSha256": "a8f44ac3016b6caa79a32ed0d6dfdb7c3f391b75998a07fc35ccb55d9c196e92",
+  "normalizedExecutableHash": "317078970d33ba453982b59a9252a049d75293ad26b781745899d197a6d8a95d",
+  "verifiedSourceCommit": "65e20d96369a2732b3e718c6470ab23880ce0380",
+  "sourceUrl": "https://github.com/amoeba-farm/amoeba-program/tree/65e20d96369a2732b3e718c6470ab23880ce0380",
+  "verificationObservedAt": "2026-10-05T15:13:22.626Z",
+  "verification": {
+    "provider": "OtterSec Solana Verified Programs",
+    "verified": true,
+    "globalMatches": true,
+    "authorityMatches": true,
+    "statusUrl": "https://verify.osec.io/status/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "authorityStatusUrl": "https://verify.osec.io/status-all/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw"
+  }
+}
