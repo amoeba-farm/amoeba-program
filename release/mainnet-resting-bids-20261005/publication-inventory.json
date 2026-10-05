@@ -242,7 +242,7 @@
   "sourceProvenanceSha256": "0604c10ed4e747048036ef9199cfd7821bc59ce13701288ec6e128e6c8a6411f",
   "supplementalFiles": {
     ".github/workflows/ci.yml": "7a18ead6f52695a41c79d8875ec4461f24171f85113673516aee24fa8da8c1c9",
-    "MAINNET_BUILD.json": "697a632c51760634d793fee3cbf3f5662af64a43d05224b6737373065b7f05b5",
+    "MAINNET_BUILD.json": "ed326a32f25e80ebea5def3eed541695cf3f75aa3fe0f3e11b7ffde452b7a228",
     "README.md": "f6a868c892ab7da32b809a6b9198d43a192751b6d8511c992b5041048c1d9372",
     "programs/light_token_minter/.cargo/config.toml": "01c026efdd8a6979fc0c485d7dd2f694819a591e00cb9d43d3b6d827f494303d",
     "programs/light_token_minter/mainnet-profile.rs": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",

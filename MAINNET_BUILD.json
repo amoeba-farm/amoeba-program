@@ -7,7 +7,7 @@
   "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
   "sourceCommit": "85d71cbd5861b9e22dbe992d5603862cd3ddf971",
   "publicExportSourceCommit": "85d71cbd5861b9e22dbe992d5603862cd3ddf971",
-  "clientSourceCommit": "7c3197afc0486d29c33935ac782449b8db6deee5",
+  "clientSourceCommit": "3e397309c4d50735fabb779887b717697e1920c2",
   "exportedTreeSha256": "702caaef5d6d41db33806cb935866381c819b1f768fa1c97bab1db24bfb39e1c",
   "profileSha256": "8fe52bdb33111d5b8a700caf14c8dfd71caf278fce104839194a070bb78a1b2e",
   "generatedProfileRsSha256": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",
@@ -34,5 +34,6 @@
     "publicationInventory": "release/mainnet-resting-bids-20261005/publication-inventory.json",
     "publicDockerBuild": "release/mainnet-resting-bids-20261005/public-docker-build.json"
   },
-  "normalizedExecutableHash": "4cf356f21ed54d03c020e59919328dcd7a112cc62151c68fff24ec11132eebbb"
+  "normalizedExecutableHash": "4cf356f21ed54d03c020e59919328dcd7a112cc62151c68fff24ec11132eebbb",
+  "semanticClientSourceCommit": "7c3197afc0486d29c33935ac782449b8db6deee5"
 }
