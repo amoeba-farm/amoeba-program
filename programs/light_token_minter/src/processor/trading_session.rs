@@ -43,6 +43,27 @@ fn store(info: &AccountInfo, record: &TradingSessionV2) -> ProgramResult {
 pub(super) fn process(program: &Pubkey, a: &[AccountInfo], payload: &[u8]) -> ProgramResult {
     let action: Action = decode_instruction_payload(payload)?;
     match action {
+        Action::DirectWalletTradeStrip {
+            params,
+            classic_quote_amount,
+        } => {
+            if a.len() < crate::capped_strip::COMMON
+                || !a[0].is_signer
+                || a[1].is_signer
+                || *a[1].key != system_program::id()
+                || a[2].key != a[0].key
+                || !a[2].is_signer
+            {
+                return Err(invalid());
+            }
+            writer_sleeve::process_direct_wallet_strip_trade(
+                program,
+                a,
+                params,
+                *a[0].key,
+                classic_quote_amount,
+            )
+        }
         Action::Order { generation, action } => order(program, a, action, Some(generation)),
         Action::OwnerOrder { action } => order(program, a, action, None),
         Action::TradeStrip { generation, params } => {

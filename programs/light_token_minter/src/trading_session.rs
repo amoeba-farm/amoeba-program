@@ -54,6 +54,12 @@ crate::fixed_codec::compact_borsh_struct! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Action {
+    /// Owner-signed wallet strip; zero uses compressed cash, positive Buy cap
+    /// appends the canonical wallet USDC ATA for an atomic exact-debit conversion.
+    DirectWalletTradeStrip {
+        params: crate::capped_strip::Trade,
+        classic_quote_amount: u64,
+    },
     Order {
         generation: u64,
         action: crate::dlmm_order_state::DlmmOrderAction,
@@ -94,6 +100,14 @@ pub enum Action {
 impl BorshSerialize for Action {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         match self {
+            Self::DirectWalletTradeStrip {
+                params,
+                classic_quote_amount,
+            } => {
+                14u8.serialize(writer)?;
+                params.serialize(writer)?;
+                classic_quote_amount.serialize(writer)
+            }
             Self::Order { generation, action } => {
                 12u8.serialize(writer)?;
                 generation.serialize(writer)?;
@@ -153,6 +167,10 @@ impl BorshSerialize for Action {
 impl BorshDeserialize for Action {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
+            14 => Self::DirectWalletTradeStrip {
+                params: crate::capped_strip::Trade::deserialize_reader(reader)?,
+                classic_quote_amount: u64::deserialize_reader(reader)?,
+            },
             12 => Self::Order {
                 generation: u64::deserialize_reader(reader)?,
                 action: crate::dlmm_order_state::DlmmOrderAction::deserialize_reader(reader)?,
@@ -214,6 +232,10 @@ impl crate::fixed_codec::CursorField for Action {
     #[inline(never)]
     fn read(c: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
         match c.u8() {
+            14 => Self::DirectWalletTradeStrip {
+                params: crate::capped_strip::Trade::read(c),
+                classic_quote_amount: c.u64(),
+            },
             12 => Self::Order {
                 generation: c.u64(),
                 action: crate::dlmm_order_state::DlmmOrderAction::read(c),

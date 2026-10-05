@@ -5,14 +5,14 @@
   "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
   "programData": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
   "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
-  "sourceCommit": "fea3f4b1bba84b1aa06d49442a379fb8ba3fba63",
-  "publicExportSourceCommit": "fea3f4b1bba84b1aa06d49442a379fb8ba3fba63",
-  "clientSourceCommit": "fea3f4b1bba84b1aa06d49442a379fb8ba3fba63",
-  "exportedTreeSha256": "eacddf1e1d9512b1c9bb2806b28e9fd9e4d6f0ff5736b8c8d8e2c7424a612756",
+  "sourceCommit": "6b10b9d2b05346fd4552f03abfb9791375170ad2",
+  "publicExportSourceCommit": "6b10b9d2b05346fd4552f03abfb9791375170ad2",
+  "clientSourceCommit": "6b10b9d2b05346fd4552f03abfb9791375170ad2",
+  "exportedTreeSha256": "d454d594af66b02284c701654cbbc98d984856515590c335f198238e276a3c87",
   "profileSha256": "8fe52bdb33111d5b8a700caf14c8dfd71caf278fce104839194a070bb78a1b2e",
   "generatedProfileRsSha256": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",
-  "artifactBytes": 1758480,
-  "artifactSha256": "a8f44ac3016b6caa79a32ed0d6dfdb7c3f391b75998a07fc35ccb55d9c196e92",
+  "artifactBytes": 1756952,
+  "artifactSha256": "763f859a79bfddd8c2a4589627c652d99d0443077dff4272a520116f7cb035a8",
   "arch": "v1",
   "libraryName": "light_token_minter",
   "mountPath": "programs/light_token_minter",
@@ -29,13 +29,13 @@
   "deploymentStatus": "pending",
   "publicDockerBuildMatchesQualifiedArtifact": true,
   "hostedVerificationClaimed": false,
-  "buildInstructions": "release/mainnet-basic-magic-direct-20261005/README.md",
+  "buildInstructions": "release/mainnet-earn-open-markets-20261005/README.md",
   "evidence": {
-    "publicationInventory": "release/mainnet-basic-magic-direct-20261005/publication-inventory.json",
-    "nativeBuilds": "release/mainnet-basic-magic-direct-20261005/native-builds.json",
-    "publicDockerBuild": "release/mainnet-basic-magic-direct-20261005/public-docker-build.json"
+    "publicationInventory": "release/mainnet-earn-open-markets-20261005/publication-inventory.json",
+    "nativeBuilds": "release/mainnet-earn-open-markets-20261005/native-builds.json",
+    "publicDockerBuild": "release/mainnet-earn-open-markets-20261005/public-docker-build.json"
   },
-  "semanticClientSourceCommit": "d79dd75c921d7627f7ff749a4c97134c43f9355e",
-  "change": "Direct-wallet Basic capped-futures strips with allocator-authorized Earn allocation to existing markets",
-  "normalizedExecutableHash": "317078970d33ba453982b59a9252a049d75293ad26b781745899d197a6d8a95d"
+  "semanticClientSourceCommit": "7c3197afc0486d29c33935ac782449b8db6deee5",
+  "change": "Allocator-authorized Earn allocation to existing eligible markets; existing account and solvency checks retained",
+  "normalizedExecutableHash": "25469d42bfad8f2ce07be63a6a62967fbcea2474655c82438b4ea8d25ed158a9"
 }

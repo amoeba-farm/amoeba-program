@@ -4,7 +4,7 @@ Solana smart contracts for Amoeba's index options protocol. The program implemen
 collateral custody, oracle source selection, contract issuance, settlement, and
 an integrated discrete liquidity market maker (DLMM).
 
-[Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
+[Website](https://amoeba.farm) Â· [Governance](https://github.com/amoeba-farm/amoeba-governance) Â· [Security](SECURITY.md)
 
 ## Source
 
@@ -31,8 +31,8 @@ cargo check --manifest-path programs/light_token_minter/Cargo.toml \
 
 ## Deployment and verification
 
-This source tree supports Devnet and Mainnet profiles. The selected Mainnet artifact, exact build inputs, and publication, deployment
-and verification status are recorded in
+This source tree supports Devnet and Mainnet profiles. The selected Mainnet artifact, build inputs, and deployment and verification
+status are recorded in
 [`MAINNET_BUILD.json`](MAINNET_BUILD.json); historical Devnet configuration remains
 in [Devnet configuration](deployments/devnet-v3.json).
 

@@ -20,6 +20,7 @@ use crate::{
 
 mod accounts;
 mod capped_strip;
+pub(super) use capped_strip::direct_wallet_trade as process_direct_wallet_strip_trade;
 pub(super) use capped_strip::trade as process_shared_strip_trade;
 mod october_ladder;
 pub(super) use october_ladder::process_install_october_ladder;

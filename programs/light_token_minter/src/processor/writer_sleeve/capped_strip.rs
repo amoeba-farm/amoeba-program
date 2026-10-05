@@ -458,6 +458,26 @@ pub(in crate::processor) fn trade<'a>(
     wire: strip::Trade,
     owner: Pubkey,
 ) -> ProgramResult {
+    trade_with_funding(program, a, wire, owner, None)
+}
+
+pub(in crate::processor) fn direct_wallet_trade<'a>(
+    program: &Pubkey,
+    a: &[AccountInfo<'a>],
+    wire: strip::Trade,
+    owner: Pubkey,
+    classic_quote_amount: u64,
+) -> ProgramResult {
+    trade_with_funding(program, a, wire, owner, Some(classic_quote_amount))
+}
+
+fn trade_with_funding<'a>(
+    program: &Pubkey,
+    a: &[AccountInfo<'a>],
+    wire: strip::Trade,
+    owner: Pubkey,
+    direct: Option<u64>,
+) -> ProgramResult {
     use crate::{
         regular_compressed_transfer::{self as transfer, HotCompression, InputLeaf, OutputLeaf},
         writer_dlmm_math::{WriterDlmmBuybackLimits, WriterDlmmCash, WriterDlmmSeriesLimits},
@@ -466,6 +486,8 @@ pub(in crate::processor) fn trade<'a>(
     use solana_program::instruction::AccountMeta;
     let count = wire.legs.len();
     let buy = wire.direction == 0;
+    let classic = direct.is_some_and(|amount| amount > 0);
+    let extra = usize::from(classic);
     if (buy || count <= 4) && wire.tail_proof.is_some() {
         return Err(invalid());
     }
@@ -473,16 +495,21 @@ pub(in crate::processor) fn trade<'a>(
         || wire.direction > 1
         || wire.option_quantity == 0
         || wire.aggregate_quote_bound == 0
-        || a.len() != strip::COMMON + 4 * count
+        || a.len() != strip::COMMON + 4 * count + extra
         || *a[0].key != owner
-        || *a[2].key != crate::trading_session::derive(program, &owner).0
+        || (if direct.is_some() {
+            *a[2].key != owner || !a[0].is_signer || !a[2].is_signer
+        } else {
+            *a[2].key != crate::trading_session::derive(program, &owner).0
+        })
+        || (classic && (!buy || wire.user_cash.is_some() || direct != Some(wire.user_cash_amount)))
         || !a[3].is_signer
         || !a[3].is_writable
         || !a[2].is_writable
         || [5, 7, 9, 11, 14, 15, 16, 25, 26]
             .iter()
             .any(|i| !a[*i].is_writable)
-        || a[strip::COMMON..]
+        || a[strip::COMMON..strip::COMMON + 4 * count]
             .iter()
             .enumerate()
             .any(|(i, info)| !info.is_writable && (buy || i % 4 < 2))
@@ -540,6 +567,18 @@ pub(in crate::processor) fn trade<'a>(
         return Err(invalid());
     }
     validate_collateral_mint_account(&a[13], a[19].key)?;
+    if classic {
+        let ata = &a[strip::COMMON + 4 * count];
+        let canonical = crate::associated_token::get_associated_token_address_with_program_id(
+            &owner,
+            a[13].key,
+            &spl_token_program_id(),
+        );
+        if *ata.key != canonical || !ata.is_writable || ata.executable || ata.owner != a[19].key {
+            return Err(invalid());
+        }
+        validate_vault_token_account(ata, a[13].key, &owner)?;
+    }
     let (_, cash_interface_bump) = validate_spl_interface_account_with_bump(a[13].key, &a[16])?;
     validate_vault_token_account(&a[14], a[13].key, a[5].key)?;
     let hot_before = validate_token_account(&a[14])?.amount;
@@ -553,7 +592,7 @@ pub(in crate::processor) fn trade<'a>(
                     .checked_sub(policy.total_pool_quote_atoms),
             )?
         || wire.writer_cash.is_some() != (cash.quote_atoms > 0)
-        || (buy && (wire.user_cash.is_none() || wire.user_cash_amount == 0))
+        || (buy && ((!classic && wire.user_cash.is_none()) || wire.user_cash_amount == 0))
         || (!buy && (wire.user_cash.is_some() || wire.user_cash_amount != 0))
     {
         return Err(invalid());
@@ -821,7 +860,12 @@ pub(in crate::processor) fn trade<'a>(
         };
         prepared.push((market, mint.supply, premium));
     }
-    let fees = checked(crate::trading_session::SPONSOR_FEE_ATOMS.checked_mul(count as u64))?;
+    let per_leg_fee = if direct.is_some() {
+        0
+    } else {
+        crate::trading_session::SPONSOR_FEE_ATOMS
+    };
+    let fees = checked(per_leg_fee.checked_mul(count as u64))?;
     let aggregate = if buy {
         checked(gross.checked_add(fees))?
     } else {
@@ -862,7 +906,7 @@ pub(in crate::processor) fn trade<'a>(
                 market: *a[strip::COMMON + 4 * i].key,
                 mint: *a[strip::COMMON + 4 * i + 1].key,
                 gross_quote_atoms: p.2,
-                sponsor_fee_atoms: crate::trading_session::SPONSOR_FEE_ATOMS,
+                sponsor_fee_atoms: per_leg_fee,
             })
             .collect(),
     };
@@ -919,7 +963,7 @@ pub(in crate::processor) fn trade<'a>(
         inputs.push(leaf(w, 4, original_cash, 3));
     }
     if buy {
-        if wire.user_cash_amount > aggregate {
+        if !classic && wire.user_cash_amount > aggregate {
             outputs.push(out(2, wire.user_cash_amount - aggregate, 3));
         }
         cash.quote_atoms = checked(original_cash.checked_add(gross))?;
@@ -946,7 +990,25 @@ pub(in crate::processor) fn trade<'a>(
     if cash.quote_atoms > 0 {
         outputs.push(out(4, cash.quote_atoms, 3));
     }
-    outputs.push(out(5, fees, 3));
+    if fees > 0 {
+        outputs.push(out(5, fees, 3));
+    }
+    if classic {
+        let ata = &a[strip::COMMON + 4 * count];
+        if validate_token_account(ata)?.amount < aggregate {
+            return Err(ProgramError::InsufficientFunds);
+        }
+        compressions.push(HotCompression {
+            amount: aggregate,
+            mint: 3,
+            source: (11 + 4 * count.min(4)) as u8,
+            authority: 2,
+            pool_account_index: 9,
+            pool_index: 0,
+            bump: cash_interface_bump,
+            decimals: 6,
+        });
+    }
     for (i, (market, _, _)) in prepared.iter().enumerate() {
         let n = strip::COMMON + 4 * i;
         let mint = (11 + 4 * i) as u8;
@@ -1078,6 +1140,9 @@ pub(in crate::processor) fn trade<'a>(
             .collect::<Vec<_>>();
         let mut batch_roles = roles[..18].to_vec();
         batch_roles.extend_from_slice(&roles[18 + 4 * start..18 + 4 * end]);
+        if classic && start == 0 {
+            batch_roles.push(strip::COMMON + 4 * count);
+        }
         let metas = batch_roles
             .iter()
             .enumerate()
@@ -1105,7 +1170,10 @@ pub(in crate::processor) fn trade<'a>(
             .map(|r| a[*r].clone())
             .collect::<Vec<_>>();
         infos.push(a[17].clone());
-        let mut signers = vec![trading_seeds, cash_seeds, sleeve_seeds.as_slice()];
+        let mut signers = vec![cash_seeds, sleeve_seeds.as_slice()];
+        if direct.is_none() {
+            signers.push(trading_seeds);
+        }
         if buy {
             signers.extend(market_seeds[start..end].iter().map(|s| s.as_slice()));
         }
