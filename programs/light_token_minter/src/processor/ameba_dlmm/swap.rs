@@ -119,6 +119,38 @@ pub(super) fn process_collective_swap_mode<'a>(
     )>,
     loaded: LoadedSwapState,
 ) -> ProgramResult {
+    process_collective_swap_with_orders(
+        program_id,
+        accounts,
+        params,
+        writer,
+        writer_accounts,
+        compression,
+        compressed,
+        loaded,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+pub(super) fn process_collective_swap_with_orders<'a>(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo<'a>],
+    params: SwapAmoebaDlmmExactInV1Params,
+    writer: &mut Option<super::super::writer_sleeve::dlmm::WriterSwapState>,
+    writer_accounts: &[AccountInfo<'a>],
+    compression: &[AccountInfo<'a>],
+    compressed: Option<(
+        &compressed_swap::CompressedSwapAccounts<'_, 'a>,
+        &crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params,
+    )>,
+    loaded: LoadedSwapState,
+    mut orders: Option<(
+        &mut orders::OrderSwapState,
+        &orders::trading::SettlementContext<'_, 'a>,
+    )>,
+) -> ProgramResult {
     const FIXED_ACCOUNTS: usize = 20;
     let compressed_mode = compressed.is_some();
     if accounts.len() < FIXED_ACCOUNTS {
@@ -167,7 +199,7 @@ pub(super) fn process_collective_swap_mode<'a>(
         month,
         mut pool,
     } = loaded;
-    if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
+    if (pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION) != orders.is_some() {
         return Err(VaultError::InvalidAccountList.into());
     }
     if pool.status != AmoebaDlmmPoolStatus::Active {
@@ -335,10 +367,17 @@ pub(super) fn process_collective_swap_mode<'a>(
     let writer_policy = writer
         .as_ref()
         .map(|state| state.quote_policy(pool.tick_size_quote_atomic));
-    let limits = crate::writer_dlmm_quote::PublicOrderRouteLimits {
-        allow_partial: false,
-        maximum_option_output: u64::MAX,
-        maximum_order_fills: crate::dlmm_order_math::MAX_ORDER_FILLS,
+    let makers = orders
+        .as_ref()
+        .map_or_else(Vec::new, |(state, _)| state.makers(direction));
+    let limits = if let Some((state, _)) = orders.as_ref() {
+        state.limits()?
+    } else {
+        crate::writer_dlmm_quote::PublicOrderRouteLimits {
+            allow_partial: false,
+            maximum_option_output: u64::MAX,
+            maximum_order_fills: crate::dlmm_order_math::MAX_ORDER_FILLS,
+        }
     };
     let route = crate::writer_dlmm_quote::quote_dlmm_with_orders(
         crate::writer_dlmm_quote::WriterDlmmRouteConfig {
@@ -354,14 +393,25 @@ pub(super) fn process_collective_swap_mode<'a>(
         &bins,
         writer.as_ref().map_or(&[], |state| state.bins()),
         writer_policy.as_ref(),
-        &[],
+        &makers,
         limits,
     )
     .map_err(math_error)?;
     let quote = &route.quote;
-    if quote.amount_in == 0 {
+    if quote.amount_in == 0
+        && orders
+            .as_ref()
+            .is_none_or(|(state, _)| state.taker_sequence.is_none())
+    {
         return Err(VaultError::InvalidAmoebaDlmmRoute.into());
     }
+    if orders.as_ref().is_some_and(|(state, _)| state.post_only) && quote.amount_in > 0 {
+        return Err(VaultError::InvalidAmoebaDlmmRoute.into());
+    }
+    let order_effects = orders
+        .as_ref()
+        .map(|(state, _)| orders::preview_compressed_finish(state, &route, direction, &pool))
+        .transpose()?;
 
     for fill in &route.ordinary_fills {
         let (page_index, local_index) = bin_to_page(fill.bin_id).map_err(math_error)?;
@@ -427,7 +477,7 @@ pub(super) fn process_collective_swap_mode<'a>(
     } else {
         0
     };
-    if pages.len() > required_page_count {
+    if orders.is_none() && pages.len() > required_page_count {
         return Err(VaultError::UnexpectedAmoebaDlmmWritableAccount.into());
     }
     let (maker_input, maker_output) = orders::maker_amounts(&route, direction)?;
@@ -456,7 +506,9 @@ pub(super) fn process_collective_swap_mode<'a>(
 
     pool.best_ask_bin_id = refresh_swap_best_side(&pool, &pages, true)?;
     pool.best_bid_bin_id = refresh_swap_best_side(&pool, &pages, false)?;
-    pool.last_trade_bin_id = quote.last_bin_id;
+    if quote.amount_in > 0 {
+        pool.last_trade_bin_id = quote.last_bin_id;
+    }
     pool.last_updated_slot = slot;
 
     let authority_bump_bytes = [validated_vaults.authority_bump];
@@ -513,7 +565,20 @@ pub(super) fn process_collective_swap_mode<'a>(
             system_program_info,
         )?;
     }
-    if let Some((context, wire)) = compressed {
+    if let Some((state, context)) = orders.as_mut() {
+        orders::trading::settle(
+            program_id,
+            context,
+            state,
+            order_effects
+                .as_ref()
+                .ok_or(VaultError::InvalidAccountList)?,
+            &pool,
+            &route,
+            direction,
+            authority_seeds,
+        )?;
+    } else if let Some((context, wire)) = compressed {
         compressed_swap::settle(
             program_id,
             context,
@@ -636,6 +701,12 @@ pub(super) fn process_collective_swap_mode<'a>(
                 .ok_or(VaultError::ArithmeticOverflow)?;
     if !physical_delta_ok {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
+    }
+    if let Some((state, context)) = orders.as_mut() {
+        state.book = order_effects
+            .ok_or(VaultError::InvalidAccountList)?
+            .book_after;
+        orders::trading::persist(program_id, context, state)?;
     }
     for loaded in &pages {
         store_light_state(&accounts[loaded.account_index], &loaded.page)?;

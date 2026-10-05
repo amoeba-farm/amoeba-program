@@ -43,6 +43,8 @@ fn store(info: &AccountInfo, record: &TradingSessionV2) -> ProgramResult {
 pub(super) fn process(program: &Pubkey, a: &[AccountInfo], payload: &[u8]) -> ProgramResult {
     let action: Action = decode_instruction_payload(payload)?;
     match action {
+        Action::Order { generation, action } => order(program, a, action, Some(generation)),
+        Action::OwnerOrder { action } => order(program, a, action, None),
         Action::TradeStrip { generation, params } => {
             if a.len() < crate::capped_strip::COMMON
                 || a[0].is_signer
@@ -195,6 +197,52 @@ pub(super) fn process(program: &Pubkey, a: &[AccountInfo], payload: &[u8]) -> Pr
             )
         }
     }
+}
+
+fn order(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    action: crate::dlmm_order_state::DlmmOrderAction,
+    generation: Option<u64>,
+) -> ProgramResult {
+    use crate::dlmm_order_state::DlmmOrderAction as O;
+    let (records, pages) = match &action {
+        O::PlaceCompressedEscrow {
+            record_count,
+            page_count,
+            funding_mode: 0,
+            ..
+        } => (*record_count, *page_count),
+        O::CancelCompressedEscrow { params } | O::ClaimCompressedEscrow { params } => {
+            (params.record_count, 0)
+        }
+        O::SwapCompressedOrders { params } => (params.record_count, params.params.page_count),
+        _ => return Err(invalid()),
+    };
+    let prefix = if generation.is_some() { 3 } else { 2 };
+    if a.len() < prefix + 34 + usize::from(records) + usize::from(pages) + 7
+        || a[prefix - 1].is_signer
+        || a[prefix].key != a[prefix - 1].key
+        || (generation.is_some() && (a[0].is_signer || !a[1].is_signer))
+        || (generation.is_none() && !a[0].is_signer)
+    {
+        return Err(invalid());
+    }
+    let record = load(program, &a[prefix - 1], a[0].key)?;
+    let base = &a[prefix..];
+    if *base[34 + usize::from(records) + usize::from(pages) + 1].key != record.sponsor
+        || *base[10].key != record.quote_mint
+    {
+        return Err(invalid());
+    }
+    if let Some(generation) = generation {
+        if !record.authorized(a[1].key, generation, current_unix_timestamp()?) {
+            return Err(VaultError::Unauthorized.into());
+        }
+    }
+    let mut internal = base.to_vec();
+    internal[0].is_signer = true;
+    ameba_dlmm::orders::process_with_authority(program, &internal, action, record.owner)
 }
 
 /// Enable changes only authority. It works before funding and preserves every

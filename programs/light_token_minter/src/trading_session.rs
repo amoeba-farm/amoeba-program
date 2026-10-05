@@ -54,6 +54,13 @@ crate::fixed_codec::compact_borsh_struct! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Action {
+    Order {
+        generation: u64,
+        action: crate::dlmm_order_state::DlmmOrderAction,
+    },
+    OwnerOrder {
+        action: crate::dlmm_order_state::DlmmOrderAction,
+    },
     TradeStrip {
         generation: u64,
         params: crate::capped_strip::Trade,
@@ -87,6 +94,15 @@ pub enum Action {
 impl BorshSerialize for Action {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         match self {
+            Self::Order { generation, action } => {
+                12u8.serialize(writer)?;
+                generation.serialize(writer)?;
+                action.serialize(writer)
+            }
+            Self::OwnerOrder { action } => {
+                13u8.serialize(writer)?;
+                action.serialize(writer)
+            }
             Self::TradeStrip { generation, params } => {
                 10u8.serialize(writer)?;
                 generation.serialize(writer)?;
@@ -137,6 +153,13 @@ impl BorshSerialize for Action {
 impl BorshDeserialize for Action {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
+            12 => Self::Order {
+                generation: u64::deserialize_reader(reader)?,
+                action: crate::dlmm_order_state::DlmmOrderAction::deserialize_reader(reader)?,
+            },
+            13 => Self::OwnerOrder {
+                action: crate::dlmm_order_state::DlmmOrderAction::deserialize_reader(reader)?,
+            },
             10 => Self::TradeStrip {
                 generation: u64::deserialize_reader(reader)?,
                 params: crate::capped_strip::Trade::deserialize_reader(reader)?,
@@ -191,6 +214,13 @@ impl crate::fixed_codec::CursorField for Action {
     #[inline(never)]
     fn read(c: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
         match c.u8() {
+            12 => Self::Order {
+                generation: c.u64(),
+                action: crate::dlmm_order_state::DlmmOrderAction::read(c),
+            },
+            13 => Self::OwnerOrder {
+                action: crate::dlmm_order_state::DlmmOrderAction::read(c),
+            },
             10 => Self::TradeStrip {
                 generation: c.u64(),
                 params: crate::capped_strip::Trade::read(c),

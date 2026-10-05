@@ -3,6 +3,7 @@ mod compressed;
 pub(in crate::processor) mod expired;
 mod recovery;
 mod storage;
+pub(super) mod trading;
 use crate::ameba_dlmm_state::AMOEBA_DLMM_ACCOUNT_VERSION;
 use crate::dlmm_order_math::{OrderBalance, OrderSide, MAX_ORDER_FILLS};
 use crate::dlmm_order_state::{
@@ -16,7 +17,6 @@ pub(super) fn witness_end(accounts: &[AccountInfo]) -> Result<usize, ProgramErro
 }
 
 pub(super) const ORDER_SWAP_FIXED_ACCOUNTS: usize = 34;
-const COMPRESSED_ORDER_EXITS_READY: bool = false;
 
 /// Commit the header together with every loaded or newly created owner record.
 pub(super) fn persist_book(
@@ -330,6 +330,28 @@ pub(super) fn preview_compressed_finish(
     })
 }
 
+pub(in crate::processor) fn process_with_authority(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    action: DlmmOrderAction,
+    owner: Pubkey,
+) -> ProgramResult {
+    if a.first().map(|v| *v.key) != Some(crate::trading_session::derive(program, &owner).0) {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    match action {
+        DlmmOrderAction::CancelCompressedEscrow { .. }
+        | DlmmOrderAction::ClaimCompressedEscrow { .. } => {
+            compressed::exit_with_authority(program, a, action, Some(owner))
+        }
+        DlmmOrderAction::PlaceCompressedEscrow { .. }
+        | DlmmOrderAction::SwapCompressedOrders { .. } => {
+            trading::process_with_authority(program, a, action, Some(owner))
+        }
+        _ => Err(VaultError::InvalidAmoebaDlmmRoute.into()),
+    }
+}
+
 /// Move maker output into the existing pool before the taker's output transfer.
 /// The future Book admits only current compressed custody actions. Deployed
 /// classic records retain their separate owner recovery path.
@@ -347,8 +369,10 @@ pub(in crate::processor) fn process(
         | DlmmOrderAction::Claim { .. }
         | DlmmOrderAction::Close { .. }
         | DlmmOrderAction::CloseBook => return recovery::process(program, a, action),
-        DlmmOrderAction::PlaceCompressedEscrow { .. } => {
-            return compressed::place(program, a, action)
+        DlmmOrderAction::PlaceCompressedEscrow { .. }
+        | DlmmOrderAction::SwapCompressedOrders { .. }
+        | DlmmOrderAction::MatchCompressedBid { .. } => {
+            return trading::process(program, a, action)
         }
         DlmmOrderAction::CancelCompressedEscrow { .. }
         | DlmmOrderAction::ClaimCompressedEscrow { .. } => {

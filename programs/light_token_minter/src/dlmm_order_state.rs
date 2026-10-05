@@ -240,7 +240,7 @@ pub fn derive_order_book(program: &Pubkey, pool: &Pubkey) -> (Pubkey, u8) {
 }
 
 crate::fixed_codec::compact_borsh_struct! {
-    #[derive(Clone, Debug, PartialEq, BorshSerialize)]
+    #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize)]
     pub struct CompressedOrderExitV1Params {
         pub sequence: u64,
         pub record_count: u8,
@@ -257,7 +257,17 @@ crate::fixed_codec::compact_borsh_struct! {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+crate::fixed_codec::compact_borsh_struct! {
+    #[derive(Clone, Debug, Eq, PartialEq, BorshSerialize)]
+    pub struct CompressedOrderRouteV1Params {
+        pub record_count: u8,
+        pub book_option_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
+        pub book_quote_input: Option<crate::ameba_dlmm_instruction::CompressedSwapLeafWitnessV1>,
+        pub params: crate::ameba_dlmm_instruction::SwapCollectiveCompressedExactInV1Params,
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DlmmOrderAction {
     Initialize,
     /// Recovery only for the deployed classic owner-funded records.
@@ -276,7 +286,7 @@ pub enum DlmmOrderAction {
         sequence: u64,
         record_count: u8,
     },
-    /// Future owner-signed regular compressed Book funding.
+    /// Owner-signed regular compressed or canonical SPL Book funding.
     PlaceCompressedEscrow {
         expected_sequence: u64,
         side: u8,
@@ -308,6 +318,13 @@ pub enum DlmmOrderAction {
     },
     ClaimCompressedEscrow {
         params: CompressedOrderExitV1Params,
+    },
+    SwapCompressedOrders {
+        params: CompressedOrderRouteV1Params,
+    },
+    MatchCompressedBid {
+        sequence: u64,
+        params: CompressedOrderRouteV1Params,
     },
 }
 
@@ -398,6 +415,15 @@ impl BorshSerialize for DlmmOrderAction {
                 14u8.serialize(writer)?;
                 params.serialize(writer)
             }
+            Self::SwapCompressedOrders { params } => {
+                16u8.serialize(writer)?;
+                params.serialize(writer)
+            }
+            Self::MatchCompressedBid { sequence, params } => {
+                17u8.serialize(writer)?;
+                sequence.serialize(writer)?;
+                params.serialize(writer)
+            }
         }
     }
 }
@@ -451,6 +477,13 @@ impl BorshDeserialize for DlmmOrderAction {
             }),
             14 => Ok(Self::ClaimCompressedEscrow {
                 params: CompressedOrderExitV1Params::deserialize_reader(reader)?,
+            }),
+            16 => Ok(Self::SwapCompressedOrders {
+                params: CompressedOrderRouteV1Params::deserialize_reader(reader)?,
+            }),
+            17 => Ok(Self::MatchCompressedBid {
+                sequence: u64::deserialize_reader(reader)?,
+                params: CompressedOrderRouteV1Params::deserialize_reader(reader)?,
             }),
             // Retired order selector.
             _ => Err(io::Error::from(io::ErrorKind::InvalidData)),
@@ -522,6 +555,13 @@ impl crate::fixed_codec::CursorField for DlmmOrderAction {
                 params: F::read(input),
             },
             14 => Self::ClaimCompressedEscrow {
+                params: F::read(input),
+            },
+            16 => Self::SwapCompressedOrders {
+                params: F::read(input),
+            },
+            17 => Self::MatchCompressedBid {
+                sequence: input.u64(),
                 params: F::read(input),
             },
             _ => {
