@@ -1,0 +1,96 @@
+{
+  "schema": "ameba-mainnet-activation-verification-v1",
+  "network": "mainnet-beta",
+  "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+  "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+  "qualifiedPublicationCommit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+  "artifactSha256": "ff89d727f62530882dd9b973d786fc3cfd08c3337ac10d193aa3f99f6817fa4f",
+  "artifactBytes": 1684872,
+  "deployedSlot": 453486523,
+  "normalizedExecutableHash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad",
+  "programDataAccountSha256": "28432872e242a6a347083d4909d0d376c3ea273640b2679d3812d579d4d9577d",
+  "activation": {
+    "proposalId": "29",
+    "finalizedObservationSlot": 453498314,
+    "gate": {
+      "bump": 254,
+      "status": 0,
+      "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+      "targetProgram": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+      "programdata": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
+      "epoch": "24",
+      "activeProposal": "11111111111111111111111111111111",
+      "freezeSlot": "0",
+      "reason": 0,
+      "lastCompletedProposal": "G3Gz2KLkWYrmeAaP3PbjjBYuD2jeZ6wYYSzHwWBLkE56"
+    },
+    "gateDataSha256": "a4fabe984158fed49b8470148ab1f915d8cbd5cc6cc5fd22aeee607abf5a90a1",
+    "receiptSha256": "d0d97cd0bd0badeedfb7b1398e46af133f3c50b0302967a46a00abf9bd41a3a7",
+    "programDataUnchanged": true
+  },
+  "authorityMetadata": {
+    "program": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+    "authority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+    "publicCommit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+    "repository": "https://github.com/amoeba-farm/amoeba-program",
+    "normalizedExecutableHash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad",
+    "deployedSlot": "453486523",
+    "metadataAddress": "599mCDfv3X5U8eTBSdim9u4yZRP1eXHcxRPjY31L9H5q",
+    "metadataAccountSha256": "cc2cee9de267af46302cbc18fe071876c540d2d901f5b94234c64ef6ce19a767",
+    "recipeSha256": "e8aadd7e64c43da1c1c6f51dd7dd0b03b7460f8754f21c79893c4378623e02be",
+    "metadataExecutionSignature": "3urVW6Mg4dNLnUtNdgBoYkUGmaVndWQjMuAX8tq7ZbZ2iydqtbJy1xmsi9tATNGJkA1Fz67GFvAhrF42YWBAd1J5",
+    "metadataFinalizedSlot": 453499544,
+    "proposalId": "31",
+    "proposal": {
+      "id": "31",
+      "approvals": 3,
+      "notBefore": "453494091",
+      "expires": "456081591",
+      "executedSlot": "453499447"
+    },
+    "recipeHex": "05000000302e352e312d00000068747470733a2f2f6769746875622e636f6d2f616d6f6562612d6661726d2f616d6f6562612d70726f6772616d28000000313831306233316364363365303466366464383965646565666463396533383837616463323332380d0000000c0000002d2d6d6f756e742d706174681b00000070726f6772616d732f6c696768745f746f6b656e5f6d696e746572100000002d2d776f726b73706163652d706174681b00000070726f6772616d732f6c696768745f746f6b656e5f6d696e7465720e0000002d2d6c6962726172792d6e616d65120000006c696768745f746f6b656e5f6d696e7465720c0000002d2d626173652d696d61676570000000736f6c616e61666f756e646174696f6e2f736f6c616e612d76657269666961626c652d6275696c64407368613235363a30623465333731366661643963613462346161633365336639373766343361616439336131386332323239366330633066343466633232653634346264643638060000002d2d61726368020000007631020000002d2d0a0000002d2d66656174757265730a0000006d61696e6e65742d7633bba7071b00000000",
+    "accountOwner": "verifycLy8mB96wd9wqq3WDXQwM4oU6r42Th37Db9fC",
+    "accountDataBase64": "zmXCiIdxcwwZvjKRD6S6/5VJ/U6x4gEcORL8JtlXd/e5pxFGqPpXJjcLFo/lq5Rap3D5t5tjgcmcrZzDUG0llVcY/e1Ym0t3BQAAADAuNS4xLQAAAGh0dHBzOi8vZ2l0aHViLmNvbS9hbW9lYmEtZmFybS9hbW9lYmEtcHJvZ3JhbSgAAAAxODEwYjMxY2Q2M2UwNGY2ZGQ4OWVkZWVmZGM5ZTM4ODdhZGMyMzI4DQAAAAwAAAAtLW1vdW50LXBhdGgbAAAAcHJvZ3JhbXMvbGlnaHRfdG9rZW5fbWludGVyEAAAAC0td29ya3NwYWNlLXBhdGgbAAAAcHJvZ3JhbXMvbGlnaHRfdG9rZW5fbWludGVyDgAAAC0tbGlicmFyeS1uYW1lEgAAAGxpZ2h0X3Rva2VuX21pbnRlcgwAAAAtLWJhc2UtaW1hZ2VwAAAAc29sYW5hZm91bmRhdGlvbi9zb2xhbmEtdmVyaWZpYWJsZS1idWlsZEBzaGEyNTY6MGI0ZTM3MTZmYWQ5Y2E0YjRhYWMzZTNmOTc3ZjQzYWFkOTNhMThjMjIyOTZjMGMwZjQ0ZmMyMmU2NDRiZGQ2OAYAAAAtLWFyY2gCAAAAdjECAAAALS0KAAAALS1mZWF0dXJlcwoAAABtYWlubmV0LXYzu6cHGwAAAAD/",
+    "metadataRentIncreaseLamports": "0",
+    "authorityDeltaLamports": "0"
+  },
+  "hostedVerification": {
+    "status": "verified",
+    "verified": true,
+    "globalMatches": true,
+    "authorityMatches": true,
+    "observation": {
+      "observedAt": "2026-10-05T06:36:54.817Z",
+      "requestId": "c9ed8803-86da-4d38-96a7-b9ae7df556a6",
+      "jobStatus": "completed",
+      "global": {
+        "is_verified": true,
+        "commit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+        "on_chain_hash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad",
+        "executable_hash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad",
+        "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+        "is_closed": false,
+        "is_frozen": false
+      },
+      "authority": {
+        "signer": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
+        "is_verified": true,
+        "commit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+        "on_chain_hash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad",
+        "executable_hash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad",
+        "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+        "is_closed": false,
+        "is_frozen": false
+      }
+    }
+  },
+  "inputReceipts": {
+    "completion.json": "c052ce4c906e6efcaaecf6cf03b84b79fefeade9083eb97895258acee797ebaa",
+    "controller-completed.json": "df04dcc0537a2f9f8ee7a92c20a2e5618512dbf044048d91bd0f0225ccbc2f72",
+    "activate-executed-state.json": "d0d97cd0bd0badeedfb7b1398e46af133f3c50b0302967a46a00abf9bd41a3a7",
+    "controller-spread-metadata-completed.json": "1863ca3099e1b4ed9a0e90e244102972d0d2d350207174648f51af323dd9bcd5",
+    "otter-spread-status.json": "6792aadfbf6d892e475a3c9b10aaf779913d4627175d26fd609bf497c1d127a7"
+  },
+  "sourceAndBuildInputsUnchanged": true
+}

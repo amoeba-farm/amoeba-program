@@ -1,0 +1,58 @@
+{
+  "schema": "amoeba-mainnet-verification-metadata-inventory-v1",
+  "qualifiedPublicationCommit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+  "previousMetadataCommit": "b0796d6cb6fc6ef995d077384a6ded70958bc2ec",
+  "previousMainnetBuild": {
+    "gitCommit": "b0796d6cb6fc6ef995d077384a6ded70958bc2ec",
+    "path": "MAINNET_BUILD.json",
+    "bytes": 2641,
+    "sha256": "07e8e4ef9755d2593f0a01aa0c36e6197008e6fc278cda20a24e13e2636ebc0f",
+    "preservedCopy": "release/mainnet-20261005/prior-mainnet-build-installed.json"
+  },
+  "immutableEvidence": [
+    {
+      "path": "release/mainnet-20261005/public-docker-build.json",
+      "bytes": 43989,
+      "sha256": "b1ef67e69e5f22167909602947cf33f8e99374da308f050c5f9b20b2c0a2deda"
+    },
+    {
+      "path": "release/mainnet-20261005/publication-inventory.json",
+      "bytes": 35621,
+      "sha256": "3a8c1ca7c8e27f15df140dbeb734a4abfa95f40e1ceefd2262df784354939109"
+    },
+    {
+      "path": "release/mainnet-20261005/installation.json",
+      "bytes": 2895,
+      "sha256": "2aa0cea5d98306a7fc47ca8bcf484d8ca4fb0e59dcf273b61148e63a56826a1c"
+    },
+    {
+      "path": "release/mainnet-20261005/installation-inventory.json",
+      "bytes": 1219,
+      "sha256": "a0cbd83a9135898f0b410e5c7ce9db759ee63cd71275db919533b96a17a99fad"
+    }
+  ],
+  "changedFiles": [
+    {
+      "path": "MAINNET_BUILD.json",
+      "bytes": 2992,
+      "sha256": "3770b885f9173ef043a178177398906763629905df70ae2692c3b68b26fa55d8"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2511,
+      "sha256": "84d2d98edcbd5f5413f040783ad3caafd61a7dae8de6688e64a468c1f86dddb3"
+    },
+    {
+      "path": "release/mainnet-20261005/verification.json",
+      "bytes": 6137,
+      "sha256": "d4a0c8ca34bb80025ce00af343aebd6b6a5cfe763e80fa0d13afbb49a82bcc86"
+    },
+    {
+      "path": "release/mainnet-20261005/prior-mainnet-build-installed.json",
+      "bytes": 2641,
+      "sha256": "07e8e4ef9755d2593f0a01aa0c36e6197008e6fc278cda20a24e13e2636ebc0f"
+    }
+  ],
+  "sourceAndBuildInputsUnchanged": true,
+  "inventoryExcludesItself": true
+}

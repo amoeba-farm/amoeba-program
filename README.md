@@ -31,6 +31,12 @@ cargo check --manifest-path programs/light_token_minter/Cargo.toml \
 
 ## Deployment and verification
 
+**Mainnet source verification passed.** The installed artifact at slot 453486523
+matches [public source 1810b31](https://github.com/amoeba-farm/amoeba-program/commit/1810b31cd63e04f6dd89edeefdc9e3887adc2328).
+The gate was observed Active at epoch 24 after council proposal 29.
+[Verifier status](https://verify.osec.io/status/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw) ·
+[Activation and verification evidence](release/mainnet-20261005/verification.json).
+
 This source tree supports Devnet and Mainnet profiles. The selected Mainnet artifact, exact build inputs, and publication, deployment
 and verification status are recorded in
 [`MAINNET_BUILD.json`](MAINNET_BUILD.json); the Devnet integration remains in
