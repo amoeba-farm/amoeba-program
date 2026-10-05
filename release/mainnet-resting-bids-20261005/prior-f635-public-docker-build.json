@@ -1,10 +1,10 @@
 {
   "schema": "amoeba-public-mainnet-docker-build-v1",
-  "recordedAtUtc": "2026-10-05T09:11:55.807557+00:00",
-  "privateSourceCommit": "85d71cbd5861b9e22dbe992d5603862cd3ddf971",
+  "recordedAtUtc": "2026-10-05T09:02:08.572352+00:00",
+  "privateSourceCommit": "f635d38950ad8fdd75a160b8af41bc81359c6a9d",
   "publicRepository": "https://github.com/amoeba-farm/amoeba-program",
-  "publicBaseCommit": "873b4949c0fc5c8fe5c88f4d74649291f91d51a5",
-  "generatedExportTreeSha256": "702caaef5d6d41db33806cb935866381c819b1f768fa1c97bab1db24bfb39e1c",
+  "publicBaseCommit": "2253c96b9ecd3f2b1d56848f3d54b9e4bb80c989",
+  "generatedExportTreeSha256": "a0e93ce41b35734c7a0e06b44526c8f693ffc5f371d4a78ba16c397c962121e2",
   "verifierVersion": "0.5.1",
   "dockerServerVersion": "28.3.0",
   "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
@@ -14,11 +14,11 @@
     "mainnet-v3"
   ],
   "defaultFeatures": true,
-  "artifactBytes": 1757448,
-  "rawArtifactSha256": "00d87a91975555179d8927d2445efd5b04065e1ac4a750b3bc1b956a3ff1f018",
-  "normalizedExecutableHash": "4cf356f21ed54d03c020e59919328dcd7a112cc62151c68fff24ec11132eebbb",
+  "artifactBytes": 1757320,
+  "rawArtifactSha256": "69705f2fcb92a27b9730b7a91984122a66ba4910900f1a098ae63d8c1a0d182a",
+  "normalizedExecutableHash": "79d4afe3651abcbea5d37365378538746a29f8ad07e2eb5a83afb9925bca1e01",
   "matchesBothQualifiedNativeBuilds": true,
-  "buildLogSha256": "4fbb89689c2a8afae21fa137e57a30818e02a3aea255db7b0fa3db2da7b8572f",
+  "buildLogSha256": "4ce5e0a8b30c3c86bcfdfbad37224bc7860a01500efcb75355cc10424ea1eb6d",
   "programBuildInputs": [
     {
       "path": "programs/light_token_minter/.cargo/config.toml",
@@ -377,8 +377,8 @@
     },
     {
       "path": "programs/light_token_minter/src/processor/ameba_dlmm/lifecycle.rs",
-      "sha256": "ea478d4c87972c910a4b8efbb0bc0bb285104690924cf3700ec7130820f278a1",
-      "bytes": 7519
+      "sha256": "0eacf16674f428571683763400a4347534bb173908d7933706b4da082ee42265",
+      "bytes": 6992
     },
     {
       "path": "programs/light_token_minter/src/processor/ameba_dlmm/liquidity/compressed.rs",
@@ -1102,7 +1102,7 @@
     }
   ],
   "checks": {
-    "maintainedCleanPublicExport": "PASS: 233 files from exact 85d71 source and reviewed Mainnet profile",
+    "maintainedCleanPublicExport": "PASS: 233 files from exact f635 source and reviewed Mainnet profile",
     "sensitiveArtifactScan": "PASS",
     "dockerExactArtifactEquality": "PASS"
   },

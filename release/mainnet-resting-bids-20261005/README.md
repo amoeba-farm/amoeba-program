@@ -1,8 +1,8 @@
 # Mainnet source and reproducible build
 
-This release exports canonical source `f635d38950ad8fdd75a160b8af41bc81359c6a9d`.
-The qualified Mainnet ELF is 1,757,320 bytes with SHA-256
-`69705f2fcb92a27b9730b7a91984122a66ba4910900f1a098ae63d8c1a0d182a`.
+This release exports canonical source `85d71cbd5861b9e22dbe992d5603862cd3ddf971`.
+The qualified Mainnet ELF is 1,757,448 bytes with SHA-256
+`00d87a91975555179d8927d2445efd5b04065e1ac4a750b3bc1b956a3ff1f018`.
 The reviewed profile is [profile.json](profile.json). Its generated Rust file is
 also included in the program directory; Cargo selects that file through its
 checked-in relative environment configuration.

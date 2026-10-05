@@ -55,14 +55,22 @@ pub(super) fn process_set_collective_pool_status_core(
             month_info.key,
             active_manifest_info,
         )?;
+        // Version 4 is installed only by admin-authorized canonical Book creation,
+        // which reserves one position; closing that Book restores version 1.
+        // Funded orders can therefore start an empty Book without LP inventory.
+        // Oracle, market, writer binding and physical custody admission still apply.
+        let funded_book = pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION
+            && pool.position_count > 0;
         if !coverage.coverage_finalized
             || coverage.covered_sku_count != coverage.required_sku_count
             || active.phase != OracleRecipeWeightPhase::Finalized
             || active.rolling_manifest_hash != month.active_weight_manifest_hash
-            || (!writer_sides.0
+            || (!funded_book
+                && !writer_sides.0
                 && (pool.best_bid_bin_id == AMOEBA_DLMM_EMPTY_BIN_ID
                     || first_set_page(&pool.bid_page_bitmap).is_none()))
-            || (!writer_sides.1
+            || (!funded_book
+                && !writer_sides.1
                 && (pool.best_ask_bin_id == AMOEBA_DLMM_EMPTY_BIN_ID
                     || first_set_page(&pool.ask_page_bitmap).is_none()))
         {

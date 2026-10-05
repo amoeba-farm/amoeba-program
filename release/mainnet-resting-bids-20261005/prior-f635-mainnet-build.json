@@ -5,14 +5,14 @@
   "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
   "programData": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
   "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
-  "sourceCommit": "85d71cbd5861b9e22dbe992d5603862cd3ddf971",
-  "publicExportSourceCommit": "85d71cbd5861b9e22dbe992d5603862cd3ddf971",
+  "sourceCommit": "f635d38950ad8fdd75a160b8af41bc81359c6a9d",
+  "publicExportSourceCommit": "f635d38950ad8fdd75a160b8af41bc81359c6a9d",
   "clientSourceCommit": "7c3197afc0486d29c33935ac782449b8db6deee5",
-  "exportedTreeSha256": "702caaef5d6d41db33806cb935866381c819b1f768fa1c97bab1db24bfb39e1c",
+  "exportedTreeSha256": "a0e93ce41b35734c7a0e06b44526c8f693ffc5f371d4a78ba16c397c962121e2",
   "profileSha256": "8fe52bdb33111d5b8a700caf14c8dfd71caf278fce104839194a070bb78a1b2e",
   "generatedProfileRsSha256": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",
-  "artifactBytes": 1757448,
-  "artifactSha256": "00d87a91975555179d8927d2445efd5b04065e1ac4a750b3bc1b956a3ff1f018",
+  "artifactBytes": 1757320,
+  "artifactSha256": "69705f2fcb92a27b9730b7a91984122a66ba4910900f1a098ae63d8c1a0d182a",
   "arch": "v1",
   "libraryName": "light_token_minter",
   "mountPath": "programs/light_token_minter",
@@ -34,5 +34,5 @@
     "publicationInventory": "release/mainnet-resting-bids-20261005/publication-inventory.json",
     "publicDockerBuild": "release/mainnet-resting-bids-20261005/public-docker-build.json"
   },
-  "normalizedExecutableHash": "4cf356f21ed54d03c020e59919328dcd7a112cc62151c68fff24ec11132eebbb"
+  "normalizedExecutableHash": "79d4afe3651abcbea5d37365378538746a29f8ad07e2eb5a83afb9925bca1e01"
 }
