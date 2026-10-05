@@ -24,15 +24,27 @@
   "defaultFeatures": true,
   "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
   "nativeToolchain": "cargo-build-sbf 4.0.0; platform-tools v1.53; SBF rustc 1.89.0",
-  "deployedSlot": null,
-  "publicationStatus": "prepared",
-  "deploymentStatus": "pending",
+  "deployedSlot": 453486523,
+  "publicationStatus": "published",
+  "deploymentStatus": "installed-awaiting-activation",
   "publicDockerBuildMatchesQualifiedArtifact": true,
   "hostedVerificationClaimed": false,
   "buildInstructions": "release/mainnet-20261005/README.md",
   "evidence": {
     "publicationInventory": "release/mainnet-20261005/publication-inventory.json",
-    "publicDockerBuild": "release/mainnet-20261005/public-docker-build.json"
+    "publicDockerBuild": "release/mainnet-20261005/public-docker-build.json",
+    "installation": "release/mainnet-20261005/installation.json",
+    "installationInventory": "release/mainnet-20261005/installation-inventory.json"
   },
-  "normalizedExecutableHash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad"
+  "normalizedExecutableHash": "90924ac215b3c3ba26c44cfd9f747313e3da456464543c5c126804416367f5ad",
+  "programDataAccountBytes": 1684917,
+  "programDataAccountSha256": "28432872e242a6a347083d4909d0d376c3ea273640b2679d3812d579d4d9577d",
+  "programDataPayloadBytes": 1684872,
+  "programDataPayloadSha256": "ff89d727f62530882dd9b973d786fc3cfd08c3337ac10d193aa3f99f6817fa4f",
+  "mandatoryZeroPaddingBytes": 0,
+  "minimumContextSlot": 453486619,
+  "gateEpoch": "23",
+  "gateStatus": 2,
+  "executionSignature": "37uVBbSw1V2i1C1b4o6CoRHmUGFEnhtTHpXZr9kH5NSwNLbM2LcTdUbsEeBvZTdpeadPAL6xF5yKLT2A6UaeRDZp",
+  "qualifiedPublicationCommit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328"
 }

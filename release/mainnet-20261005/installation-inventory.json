@@ -1,0 +1,34 @@
+{
+  "schema": "amoeba-mainnet-installation-metadata-inventory-v1",
+  "qualifiedPublicationCommit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+  "immutableBuildPublicationInventory": {
+    "path": "release/mainnet-20261005/publication-inventory.json",
+    "sha256": "3a8c1ca7c8e27f15df140dbeb734a4abfa95f40e1ceefd2262df784354939109",
+    "bytes": 35621
+  },
+  "immutablePublicDockerBuild": {
+    "path": "release/mainnet-20261005/public-docker-build.json",
+    "sha256": "b1ef67e69e5f22167909602947cf33f8e99374da308f050c5f9b20b2c0a2deda",
+    "bytes": 43989
+  },
+  "priorMainnetBuild": {
+    "gitCommit": "1810b31cd63e04f6dd89edeefdc9e3887adc2328",
+    "path": "MAINNET_BUILD.json",
+    "sha256": "52c1aaa5b42908f7621577489c3acff262d962788041c2f2ebd0692bdb266f8a",
+    "bytes": 1889
+  },
+  "changedFiles": [
+    {
+      "path": "MAINNET_BUILD.json",
+      "sha256": "07e8e4ef9755d2593f0a01aa0c36e6197008e6fc278cda20a24e13e2636ebc0f",
+      "bytes": 2641
+    },
+    {
+      "path": "release/mainnet-20261005/installation.json",
+      "sha256": "2aa0cea5d98306a7fc47ca8bcf484d8ca4fb0e59dcf273b61148e63a56826a1c",
+      "bytes": 2895
+    }
+  ],
+  "sourceAndBuildInputsUnchanged": true,
+  "inventoryExcludesItself": true
+}
