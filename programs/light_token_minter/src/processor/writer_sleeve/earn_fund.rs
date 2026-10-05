@@ -18,7 +18,7 @@
 //! `docs/earn-fund/EARN_FUND_V2.md`.
 use super::participation::{
     claim_commit, claim_create_custody, claim_prepare, contribute_core, ClaimAccounts,
-    ContributeAccounts, FundEntry,
+    ContributeAccounts,
 };
 use super::*;
 use crate::buyback_mark_math::{BuybackParams, ExitBucket};
@@ -617,9 +617,9 @@ fn complete_withdrawal(
 /// system, SPL Token.
 ///
 /// Any program-owned writer sleeve of any market (Spread's own loaders),
-/// Funding or Active before expiry and inside the tenor window, entered with
-/// zero exposure or as its (all but `max_third_party_bps`) sole pooled
-/// writer; at least `min_allocation`; the minimum cash buffer stays live. A
+/// Funding or Active before expiry and inside the tenor window, regardless
+/// of existing pooled ownership or exposure; at least `min_allocation`;
+/// the minimum cash buffer stays live. A
 /// top-up must extend the slot's contiguous capital-seconds range and leaves
 /// the slot unpriced until it is valued again.
 fn allocate(program: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
@@ -678,10 +678,7 @@ fn allocate(program: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
         },
         fund.book.next_lot_id,
         amount,
-        &FundEntry {
-            params: &params,
-            fund_principal: slot.principal,
-        },
+        &params,
         &[&seeds],
     )?;
     let end = lot

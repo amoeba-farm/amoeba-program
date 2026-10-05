@@ -1,0 +1,25 @@
+{
+  "schema": "amoeba-mainnet-paired-native-build-v1",
+  "sourceCommit": "6b10b9d2b05346fd4552f03abfb9791375170ad2",
+  "artifactSha256": "763f859a79bfddd8c2a4589627c652d99d0443077dff4272a520116f7cb035a8",
+  "artifactBytes": 1756952,
+  "builds": [
+    {
+      "name": "production-a",
+      "artifactSha256": "763f859a79bfddd8c2a4589627c652d99d0443077dff4272a520116f7cb035a8",
+      "artifactBytes": 1756952,
+      "reusedDependencyTarget": true
+    },
+    {
+      "name": "production-b",
+      "artifactSha256": "763f859a79bfddd8c2a4589627c652d99d0443077dff4272a520116f7cb035a8",
+      "artifactBytes": 1756952,
+      "reusedDependencyTarget": true
+    }
+  ],
+  "sourceInputsReceiptSha256": "b1ee2a1fd49e16fa0c26667b68f85cd3692ea518cbf0e1915f0c191613ffd1c9",
+  "nativeToolchain": "cargo-build-sbf 4.0.0; platform-tools v1.53; SBF rustc 1.89.0",
+  "profileSha256": "8fe52bdb33111d5b8a700caf14c8dfd71caf278fce104839194a070bb78a1b2e",
+  "deploymentIncluded": false,
+  "publicDockerEqualityClaimed": false
+}

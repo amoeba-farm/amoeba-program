@@ -5,14 +5,14 @@
   "programId": "2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
   "programData": "8KR6hgcQehz32jm7CvrAriYNhvT2Bu9JuUWHce81J1oh",
   "upgradeAuthority": "4hsEKyThDv85YA4HjUaGWn2nWnVbM5V23XcLrEX3UKzn",
-  "sourceCommit": "6b10b9d2b05346fd4552f03abfb9791375170ad2",
-  "publicExportSourceCommit": "6b10b9d2b05346fd4552f03abfb9791375170ad2",
-  "clientSourceCommit": "6b10b9d2b05346fd4552f03abfb9791375170ad2",
-  "exportedTreeSha256": "d454d594af66b02284c701654cbbc98d984856515590c335f198238e276a3c87",
+  "sourceCommit": "85d71cbd5861b9e22dbe992d5603862cd3ddf971",
+  "publicExportSourceCommit": "85d71cbd5861b9e22dbe992d5603862cd3ddf971",
+  "clientSourceCommit": "3e397309c4d50735fabb779887b717697e1920c2",
+  "exportedTreeSha256": "702caaef5d6d41db33806cb935866381c819b1f768fa1c97bab1db24bfb39e1c",
   "profileSha256": "8fe52bdb33111d5b8a700caf14c8dfd71caf278fce104839194a070bb78a1b2e",
   "generatedProfileRsSha256": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",
-  "artifactBytes": 1756952,
-  "artifactSha256": "763f859a79bfddd8c2a4589627c652d99d0443077dff4272a520116f7cb035a8",
+  "artifactBytes": 1757448,
+  "artifactSha256": "00d87a91975555179d8927d2445efd5b04065e1ac4a750b3bc1b956a3ff1f018",
   "arch": "v1",
   "libraryName": "light_token_minter",
   "mountPath": "programs/light_token_minter",
@@ -29,13 +29,11 @@
   "deploymentStatus": "pending",
   "publicDockerBuildMatchesQualifiedArtifact": true,
   "hostedVerificationClaimed": false,
-  "buildInstructions": "release/mainnet-earn-open-markets-20261005/README.md",
+  "buildInstructions": "release/mainnet-resting-bids-20261005/README.md",
   "evidence": {
-    "publicationInventory": "release/mainnet-earn-open-markets-20261005/publication-inventory.json",
-    "nativeBuilds": "release/mainnet-earn-open-markets-20261005/native-builds.json",
-    "publicDockerBuild": "release/mainnet-earn-open-markets-20261005/public-docker-build.json"
+    "publicationInventory": "release/mainnet-resting-bids-20261005/publication-inventory.json",
+    "publicDockerBuild": "release/mainnet-resting-bids-20261005/public-docker-build.json"
   },
-  "semanticClientSourceCommit": "7c3197afc0486d29c33935ac782449b8db6deee5",
-  "change": "Allocator-authorized Earn allocation to existing eligible markets; existing account and solvency checks retained",
-  "normalizedExecutableHash": "25469d42bfad8f2ce07be63a6a62967fbcea2474655c82438b4ea8d25ed158a9"
+  "normalizedExecutableHash": "4cf356f21ed54d03c020e59919328dcd7a112cc62151c68fff24ec11132eebbb",
+  "semanticClientSourceCommit": "7c3197afc0486d29c33935ac782449b8db6deee5"
 }

@@ -214,7 +214,7 @@ pub(super) fn process(
 /// Funding-stage emptiness of everything except the series records: the
 /// sleeve never activated (Funding with an Anchored group and a frozen book),
 /// was never settled, and has sold, reserved, owed and spent nothing. Shared
-/// by `ExpireUnactivatedV3` and Earn Fund entry; with
+/// by `ExpireUnactivatedV3`; with
 /// `book_has_no_exposure` it is the complete zero-exposure predicate.
 pub(super) fn funding_has_no_exposure(
     sleeve: &WriterSleeveV1,
@@ -331,14 +331,6 @@ pub(super) struct ContributeAccounts<'a, 'b> {
     pub token: &'b AccountInfo<'a>,
 }
 
-/// Who may enter a sleeve: the sleeve must be empty of exposure, or every
-/// pooled atom but at most `max_third_party_bps` must already be the fund's.
-pub(super) struct FundEntry<'p> {
-    pub params: &'p crate::earn_fund_math::FundParams,
-    /// Principal of the fund's open lots in this sleeve.
-    pub fund_principal: u64,
-}
-
 /// The pooled contribution core, reachable only through Earn Fund Allocate
 /// since the direct user selector was retired: the exact validation,
 /// accounting, receipt creation and source transfer of a contribution.
@@ -350,7 +342,7 @@ pub(super) fn contribute_core<'a>(
     a: &ContributeAccounts<'a, '_>,
     nonce: u64,
     amount: u64,
-    entry: &FundEntry,
+    params: &crate::earn_fund_math::FundParams,
     authority_seeds: &[&[&[u8]]],
 ) -> Result<WriterContributionV2, ProgramError> {
     let config = load_canonical_vault_config(program, a.config)?;
@@ -389,17 +381,10 @@ pub(super) fn contribute_core<'a>(
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    // Entry before any option is sold never inherits P&L. Otherwise the fund
-    // must already be (all but a bounded share of) the pooled writers, so a
-    // par top-up can move at most the third parties' share of embedded P&L.
-    let zero_exposure = funding_has_no_exposure(sleeve, &context.group, &context.book, &policy)
-        && book_has_no_exposure(&context.book);
-    if !zero_exposure
-        && !entry
-            .params
-            .sole_writer_admissible(sleeve.writer_principal_atoms, entry.fund_principal)
-        || !entry.params.sleeve_priceable(context.book.series_count)
-    {
+    // The allocator chooses exposure, including a first entry into an Active
+    // sleeve with legacy pooled writers. Existing participation accounting
+    // determines the lot's share of pooled profit and loss at settlement.
+    if !params.sleeve_priceable(context.book.series_count) {
         return Err(VaultError::EarnFundInvalidAllocation.into());
     }
     validate_collateral_mint_account(a.mint, a.token.key)?;
