@@ -1,8 +1,8 @@
 use super::*;
 use crate::ameba_dlmm_state::{derive_ameba_dlmm_authority_pda, AmoebaDlmmPoolStatus};
 use crate::processor::ameba_dlmm::{
-    load_writer_dlmm_pool, store_writer_dlmm_pool, validate_writer_dlmm_pool_binding,
-    writer_dlmm_vault_amounts,
+    commit_resident, load_pool_with_accounts, resident_pool_hot_vault_amounts,
+    store_writer_dlmm_pool, validate_writer_dlmm_pool_binding,
 };
 use crate::state::{WriterDlmmBinV1, WRITER_DLMM_POSITION_BINS, WRITER_DLMM_POSITION_SEED};
 
@@ -56,7 +56,7 @@ pub(in crate::processor) fn process_initialize_position(
     )?;
     if policy.management_authority != *actor.key
         || context.sleeve.vault_config != *accounts[1].key
-        || *accounts[11].key != system_program::id()
+        || !crate::is_system_program(accounts[11].key)
         || usize::from(series_index) >= usize::from(context.book.series_count)
         || context.book.records[usize::from(series_index)].market != *accounts[9].key
         || matches!(
@@ -68,7 +68,7 @@ pub(in crate::processor) fn process_initialize_position(
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    let pool = load_writer_dlmm_pool(program_id, &accounts[7])?;
+    let pool = load_pool_with_accounts(program_id, &accounts[7], accounts)?;
     let binding = load_collective_dlmm_context(
         program_id,
         &accounts[2],
@@ -115,7 +115,7 @@ pub(in crate::processor) fn process_initialize_position(
             policy: *accounts[6].key,
             market: *accounts[9].key,
             series_index,
-            last_updated_slot: Clock::get()?.slot,
+            last_updated_slot: crate::compact_error::slot()?,
             ..WriterDlmmPositionV1::default()
         },
     )
@@ -308,7 +308,7 @@ pub(in crate::processor) fn process_liquidity_action(
     if (!sweep && !closing && policy.management_authority != *actor.key) || (add && closing) {
         return Err(VaultError::Unauthorized.into());
     }
-    let mut pool = load_writer_dlmm_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, accounts)?;
     let binding = load_collective_dlmm_context(
         program_id,
         sleeve_info,
@@ -342,7 +342,7 @@ pub(in crate::processor) fn process_liquidity_action(
         pool_info.key,
         sleeve_info.key,
         policy_info.key,
-        market_info.key,
+        market_info,
         series_index,
     )?;
     if policy.series_pool_inventory_atoms[index] != position.option_inventory_atoms
@@ -378,13 +378,14 @@ pub(in crate::processor) fn process_liquidity_action(
     validate_collateral_mint_account(quote_mint_info, token_info.key)?;
     validate_spl_interface_account(option_mint_info.key, option_interface_info)?;
     validate_spl_interface_account(quote_mint_info.key, quote_interface_info)?;
-    let before_pool = writer_dlmm_vault_amounts(
+    let before_pool = resident_pool_hot_vault_amounts(
         program_id,
         pool_info,
         &pool,
         authority_info,
         option_vault_info,
         quote_vault_info,
+        accounts,
     )?;
     if !lane.reconciled
         || pool.option_mint != *option_mint_info.key
@@ -398,8 +399,11 @@ pub(in crate::processor) fn process_liquidity_action(
     let staged_before = lane.staged;
     let retired_before = lane.retired;
     if let Some((expected_hash, moves)) = relocation {
-        if solana_program::hash::hash(&position_info.try_borrow_data()?).to_bytes() != expected_hash
-        {
+        // Bind the authoritative logical row, including after its physical PDA
+        // becomes a forwarding marker.
+        let position_bytes =
+            borsh::to_vec(position.as_ref()).map_err(|_| VaultError::InvalidWriterSleeve)?;
+        if solana_program::hash::hash(&position_bytes).to_bytes() != expected_hash {
             return Err(VaultError::InvalidInstructionData.into());
         }
         let (minimum_ask, maximum_bid, _) = crate::writer_dlmm_math::writer_dlmm_price_bounds(
@@ -416,12 +420,12 @@ pub(in crate::processor) fn process_liquidity_action(
             minimum_ask,
             maximum_bid,
         )?;
-        position.last_updated_slot = Clock::get()?.slot;
+        position.last_updated_slot = crate::compact_error::slot()?;
         // A relocation changes executable quotes without moving custody. It
         // must invalidate both published marks and pending multipart samples.
         book.last_updated_slot = position.last_updated_slot;
         store_state(book_info, book.as_ref())?;
-        return store_state(position_info, position.as_ref());
+        return resident::store_position(program_id, position_info, market_info, position.as_ref());
     }
     let (option_amount, quote_amount) = if sweep {
         let quote = position.uncommitted_quote_atoms;
@@ -691,13 +695,14 @@ pub(in crate::processor) fn process_liquidity_action(
             }
         }
     }
-    let after_pool = writer_dlmm_vault_amounts(
+    let after_pool = resident_pool_hot_vault_amounts(
         program_id,
         pool_info,
         &pool,
         authority_info,
         option_vault_info,
         quote_vault_info,
+        accounts,
     )?;
     let after_cash = validate_token_account(sleeve_vault_info)?.amount;
     let after_mint = validate_mint_account(option_mint_info, token_info.key)?;
@@ -733,16 +738,31 @@ pub(in crate::processor) fn process_liquidity_action(
     } else {
         WriterSeriesCustodyStatus::Open
     };
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     position.last_updated_slot = slot;
     pool.last_updated_slot = slot;
     sleeve.last_updated_slot = slot;
     book.last_updated_slot = slot;
     book.book_digest = writer_book_digest(&book);
-    store_state(position_info, position.as_ref())?;
+    let resident_position =
+        resident::position_is_resident(program_id, market_info, position.as_ref())?;
+    if !resident_position {
+        store_state(position_info, position.as_ref())?;
+    }
     store_state(policy_info, policy.as_ref())?;
     store_state(sleeve_info, sleeve.as_ref())?;
     store_state(book_info, book.as_ref())?;
     store_state(market_info, &market)?;
-    store_writer_dlmm_pool(pool_info, &pool)
+    if !commit_resident(program_id, pool_info, accounts, |state| {
+        state.pool = pool;
+        if resident_position {
+            state.writer_position = Some(*position);
+        }
+        state.pool_hot_option = after_pool.0;
+        state.pool_hot_quote = after_pool.1;
+        Ok(())
+    })? {
+        store_writer_dlmm_pool(pool_info, &pool)?;
+    }
+    Ok(())
 }

@@ -78,7 +78,7 @@ pub(in crate::processor) fn process_commit_oracle_update_claim_v3(
         ],
     )?;
 
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let earliest_reveal_slot = slot
         .checked_add(ORACLE_UPDATE_MIN_REVEAL_DELAY_SLOTS)
         .ok_or(VaultError::ArithmeticOverflow)?;
@@ -201,7 +201,7 @@ pub(in crate::processor) fn process_reveal_oracle_update_claim_v3(
         source_info.key,
         claim_info,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     validate_oracle_update_claim_v2_reveal(
         program_id,
         month_info.key,

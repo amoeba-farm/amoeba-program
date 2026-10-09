@@ -12,7 +12,7 @@ pub(in crate::processor) fn validate_claim_custody(
     mint_info: &AccountInfo,
     token_program_info: &AccountInfo,
 ) -> Result<(TokenAccount, Mint), ProgramError> {
-    if *token_program_info.key != spl_token_program_id()
+    if !crate::token_instruction::check_id(token_program_info.key)
         || reward_vault.mint != config.usdc_mint
         || *mint_info.key != config.usdc_mint
         || reward_vault.token_account != *reward_token_info.key
@@ -439,7 +439,7 @@ pub(in crate::processor) fn process_claim_oracle_usdc_reward_for(
         )?;
     }
 
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     collateral.available_balance = collateral
         .available_balance
         .checked_add(computed.amount)

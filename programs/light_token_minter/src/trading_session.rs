@@ -54,6 +54,18 @@ crate::fixed_codec::compact_borsh_struct! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Action {
+    /// A whole Basic position closes immediately, preserving direct wallet
+    /// custody. The user may elect USDC sponsorship or fund transaction costs in SOL.
+    DirectWalletCloseAtomicPosition {
+        params: crate::atomic_option_route::Close,
+    },
+    CloseAtomicPosition {
+        generation: u64,
+        params: crate::atomic_option_route::Close,
+    },
+    OwnerCloseAtomicPosition {
+        params: crate::atomic_option_route::Close,
+    },
     /// Owner-signed wallet strip; zero uses compressed cash, positive Buy cap
     /// appends the canonical wallet USDC ATA for an atomic exact-debit conversion.
     DirectWalletTradeStrip {
@@ -100,6 +112,19 @@ pub enum Action {
 impl BorshSerialize for Action {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         match self {
+            Self::DirectWalletCloseAtomicPosition { params } => {
+                15u8.serialize(writer)?;
+                params.serialize(writer)
+            }
+            Self::CloseAtomicPosition { generation, params } => {
+                16u8.serialize(writer)?;
+                generation.serialize(writer)?;
+                params.serialize(writer)
+            }
+            Self::OwnerCloseAtomicPosition { params } => {
+                17u8.serialize(writer)?;
+                params.serialize(writer)
+            }
             Self::DirectWalletTradeStrip {
                 params,
                 classic_quote_amount,
@@ -167,6 +192,16 @@ impl BorshSerialize for Action {
 impl BorshDeserialize for Action {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
+            15 => Self::DirectWalletCloseAtomicPosition {
+                params: crate::atomic_option_route::Close::deserialize_reader(reader)?,
+            },
+            16 => Self::CloseAtomicPosition {
+                generation: u64::deserialize_reader(reader)?,
+                params: crate::atomic_option_route::Close::deserialize_reader(reader)?,
+            },
+            17 => Self::OwnerCloseAtomicPosition {
+                params: crate::atomic_option_route::Close::deserialize_reader(reader)?,
+            },
             14 => Self::DirectWalletTradeStrip {
                 params: crate::capped_strip::Trade::deserialize_reader(reader)?,
                 classic_quote_amount: u64::deserialize_reader(reader)?,
@@ -232,6 +267,16 @@ impl crate::fixed_codec::CursorField for Action {
     #[inline(never)]
     fn read(c: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
         match c.u8() {
+            15 => Self::DirectWalletCloseAtomicPosition {
+                params: crate::atomic_option_route::Close::read(c),
+            },
+            16 => Self::CloseAtomicPosition {
+                generation: c.u64(),
+                params: crate::atomic_option_route::Close::read(c),
+            },
+            17 => Self::OwnerCloseAtomicPosition {
+                params: crate::atomic_option_route::Close::read(c),
+            },
             14 => Self::DirectWalletTradeStrip {
                 params: crate::capped_strip::Trade::read(c),
                 classic_quote_amount: c.u64(),
@@ -292,7 +337,7 @@ pub fn derive(program: &Pubkey, owner: &Pubkey) -> (Pubkey, u8) {
 /// Edwards syscall as solana-curve25519 2.3.13/src/edwards.rs does, preserving
 /// transaction Ed25519 authority and rejecting another program's signing PDA.
 fn ed25519_key(key: &Pubkey) -> bool {
-    if *key == Pubkey::default() {
+    if crate::pubkey_is_default(key) {
         return false;
     }
     #[cfg(target_os = "solana")]
@@ -326,9 +371,9 @@ impl TradingSessionV2 {
             && self.sponsor != self.owner
             && self.sponsor != self.session
             && self.sponsor != key
-            && self.sponsor != Pubkey::default()
-            && self.quote_mint != Pubkey::default()
-            && ((self.session == Pubkey::default()
+            && !crate::pubkey_is_default(&self.sponsor)
+            && !crate::pubkey_is_default(&self.quote_mint)
+            && ((crate::pubkey_is_default(&self.session)
                 && self.generation == 0
                 && self.expires_at == 0
                 && self.revoked)
@@ -338,8 +383,8 @@ impl TradingSessionV2 {
     pub fn dormant(owner: Pubkey, quote_mint: Pubkey, sponsor: Pubkey, bump: u8) -> Option<Self> {
         if !ed25519_key(&owner)
             || sponsor == owner
-            || sponsor == Pubkey::default()
-            || quote_mint == Pubkey::default()
+            || crate::pubkey_is_default(&sponsor)
+            || crate::pubkey_is_default(&quote_mint)
         {
             return None;
         }
@@ -370,8 +415,8 @@ impl TradingSessionV2 {
             || owner == grant.session
             || grant.sponsor == owner
             || grant.sponsor == grant.session
-            || grant.sponsor == Pubkey::default()
-            || quote_mint == Pubkey::default()
+            || crate::pubkey_is_default(&grant.sponsor)
+            || crate::pubkey_is_default(&quote_mint)
         {
             return None;
         }

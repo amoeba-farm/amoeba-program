@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 #[inline(never)]
 pub(in crate::processor) fn process_submit_oracle_opening_claim_v2(
@@ -95,7 +96,7 @@ pub(in crate::processor) fn process_submit_oracle_opening_claim_v2(
         load_canonical_user_collateral(program_id, collateral_info, claimant_info.key)?;
     debit_oracle_usdc_available(&mut collateral, sku.opening_bond)?;
 
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let claim = OracleOpeningClaim {
         is_initialized: true,
         bump: claim_bump,
@@ -192,7 +193,7 @@ pub(in crate::processor) fn process_challenge_oracle_opening_claim_v2(
         claim_info,
         &source,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     if source.bucket_id != sku.bucket_id
         || claim.escrow_disposition != OracleEscrowDisposition::Unsettled
         || source.status != OracleSourceStatus::OpeningPending
@@ -329,7 +330,7 @@ pub(in crate::processor) fn process_resolve_oracle_opening_claim_challenge_v2(
     if month_info.owner != program_id || month_info.data_len() != OracleMonthState::LEN {
         return Err(VaultError::InvalidOracleState.into());
     }
-    let month_data = month_info.try_borrow_data()?;
+    let month_data = month_info.try_data()?;
     let mut month = crate::fixed_codec::decode_oracle_month(
         month_data.as_ref(),
         VaultError::InvalidOracleState,
@@ -372,7 +373,7 @@ pub(in crate::processor) fn process_resolve_oracle_opening_claim_challenge_v2(
         &challenge.challenger,
     )?;
 
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     match params.outcome {
         OracleOpeningChallengeOutcome::KeepOpening => {
             challenge.status = OracleChallengeStatus::Rejected;
@@ -446,7 +447,7 @@ pub(in crate::processor) fn process_finalize_oracle_opening_claim_v2(
         claim_info,
         &source,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     if claim.escrow_disposition != OracleEscrowDisposition::Unsettled
         || source.status != OracleSourceStatus::OpeningPending
         || source.opening_submitted
@@ -462,7 +463,7 @@ pub(in crate::processor) fn process_finalize_oracle_opening_claim_v2(
     }
     let _claimant_collateral =
         load_canonical_user_collateral(program_id, claimant_collateral_info, &claim.claimant)?;
-    let source_before = source.clone();
+    let source_before = source;
     append_oracle_source_observation(
         &mut source,
         &mut observations,

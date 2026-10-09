@@ -1,5 +1,5 @@
 //! Fixed regular v3 Transfer2 encoding for authenticated leaves and optional
-//! compression of hot inputs. No decompression, top-up, or TLV is represented.
+//! compression and decompression of canonical hot custody. No top-up or TLV is represented.
 use crate::ProgramError;
 use solana_program::{
     instruction::{AccountMeta, Instruction},
@@ -8,6 +8,22 @@ use solana_program::{
 
 const TRANSFER2: u8 = 101;
 const REGULAR_V3: u8 = 3;
+
+/// Packed mint indices are bytes. Remember which complete mint sums were
+/// checked without allocating or repeating them for every fragment/output.
+#[inline]
+fn first_mint(seen: &mut [u64; 4], mint: u8) -> bool {
+    let word = usize::from(mint >> 6);
+    let bit = 1u64 << (mint & 63);
+    let first = seen[word] & bit == 0;
+    seen[word] |= bit;
+    first
+}
+
+#[inline]
+fn contains_mint(seen: &[u64; 4], mint: u8) -> bool {
+    seen[usize::from(mint >> 6)] & (1u64 << (mint & 63)) != 0
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct InputLeaf {
@@ -33,13 +49,27 @@ pub struct OutputLeaf {
 }
 
 /// Canonical SPL/Light hot input that is compressed inside the same Transfer2
-/// as the authenticated regular leaves. No decompression mode is exposed.
+/// as the authenticated regular leaves.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct HotCompression {
     pub amount: u64,
     pub mint: u8,
     pub source: u8,
     pub authority: u8,
+    pub pool_account_index: u8,
+    pub pool_index: u8,
+    pub bump: u8,
+    pub decimals: u8,
+}
+
+/// Canonical hot destination authenticated by the business handler. A Light
+/// token account uses zero interface fields; an SPL target uses its validated
+/// interface pool and mint decimals.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HotDecompression {
+    pub amount: u64,
+    pub mint: u8,
+    pub recipient: u8,
     pub pool_account_index: u8,
     pub pool_index: u8,
     pub bump: u8,
@@ -57,7 +87,33 @@ pub fn instruction_with_compressions(
     compressions: &[HotCompression],
     outputs: &[OutputLeaf],
 ) -> Result<Instruction, ProgramError> {
-    if compressions.is_empty() {
+    instruction_with_hot_actions(
+        program,
+        accounts,
+        output_queue,
+        proof,
+        inputs,
+        compressions,
+        &[],
+        outputs,
+    )
+}
+
+/// Transfer regular leaves and typed hot custody in one conserving Light CPI.
+/// Every packed identity, destination and exact balance delta remains the
+/// responsibility of the calling business handler.
+#[allow(clippy::too_many_arguments)]
+pub fn instruction_with_hot_actions(
+    program: Pubkey,
+    accounts: Vec<AccountMeta>,
+    output_queue: u8,
+    proof: Option<[u8; 128]>,
+    inputs: &[InputLeaf],
+    compressions: &[HotCompression],
+    decompressions: &[HotDecompression],
+    outputs: &[OutputLeaf],
+) -> Result<Instruction, ProgramError> {
+    if compressions.is_empty() && decompressions.is_empty() {
         return instruction(program, accounts, output_queue, proof, inputs, outputs);
     }
     let count = accounts
@@ -68,7 +124,7 @@ pub fn instruction_with_compressions(
         || count > 248
         || usize::from(output_queue) >= count
         || (inputs.is_empty() && compressions.is_empty())
-        || outputs.is_empty()
+        || (outputs.is_empty() && decompressions.is_empty())
         || inputs.iter().any(|x| {
             x.amount == 0
                 || [x.owner, x.mint, x.tree, x.queue]
@@ -79,6 +135,12 @@ pub fn instruction_with_compressions(
         || compressions.iter().any(|x| {
             x.amount == 0
                 || [x.mint, x.source, x.authority, x.pool_account_index]
+                    .iter()
+                    .any(|index| usize::from(*index) >= count)
+        })
+        || decompressions.iter().any(|x| {
+            x.amount == 0
+                || [x.mint, x.recipient, x.pool_account_index]
                     .iter()
                     .any(|index| usize::from(*index) >= count)
         })
@@ -93,12 +155,17 @@ pub fn instruction_with_compressions(
     {
         return Err(ProgramError::InvalidInstructionData);
     }
+    let mut seen_mints = [0u64; 4];
     for mint in inputs
         .iter()
         .map(|x| x.mint)
         .chain(compressions.iter().map(|x| x.mint))
+        .chain(decompressions.iter().map(|x| x.mint))
         .chain(outputs.iter().map(|x| x.mint))
     {
+        if !first_mint(&mut seen_mints, mint) {
+            continue;
+        }
         let debit: u128 = inputs
             .iter()
             .filter(|x| x.mint == mint)
@@ -113,19 +180,29 @@ pub fn instruction_with_compressions(
             .iter()
             .filter(|x| x.mint == mint)
             .map(|x| u128::from(x.amount))
-            .sum();
+            .sum::<u128>()
+            + decompressions
+                .iter()
+                .filter(|x| x.mint == mint)
+                .map(|x| u128::from(x.amount))
+                .sum::<u128>();
         if debit != credit {
             return Err(ProgramError::InvalidInstructionData);
         }
     }
     let mut data = Vec::with_capacity(
         32 + proof.map_or(0, |_| 128)
-            + 16 * compressions.len()
+            + 16 * (compressions.len() + decompressions.len())
             + 22 * inputs.len()
             + 13 * outputs.len(),
     );
     data.extend_from_slice(&[TRANSFER2, 0, 0, 0, 0, output_queue, 0, 0, 0, 1]);
-    data.extend_from_slice(&(compressions.len() as u32).to_le_bytes());
+    let action_count = compressions
+        .len()
+        .checked_add(decompressions.len())
+        .and_then(|n| u32::try_from(n).ok())
+        .ok_or(ProgramError::InvalidInstructionData)?;
+    data.extend_from_slice(&action_count.to_le_bytes());
     for x in compressions {
         data.push(0); // CompressionMode::Compress
         data.extend_from_slice(&x.amount.to_le_bytes());
@@ -133,6 +210,19 @@ pub fn instruction_with_compressions(
             x.mint,
             x.source,
             x.authority,
+            x.pool_account_index,
+            x.pool_index,
+            x.bump,
+            x.decimals,
+        ]);
+    }
+    for x in decompressions {
+        data.push(1); // CompressionMode::Decompress
+        data.extend_from_slice(&x.amount.to_le_bytes());
+        data.extend_from_slice(&[
+            x.mint,
+            x.recipient,
+            0,
             x.pool_account_index,
             x.pool_index,
             x.bump,
@@ -224,7 +314,11 @@ pub fn instruction(
     }
     // Light itself authenticates each input. Reject accidental mint creation
     // or loss before invoking it; callers also check their economic deltas.
+    let mut seen_mints = [0u64; 4];
     for mint in inputs.iter().map(|x| x.mint) {
+        if !first_mint(&mut seen_mints, mint) {
+            continue;
+        }
         let debit: u128 = inputs
             .iter()
             .filter(|x| x.mint == mint)
@@ -239,10 +333,7 @@ pub fn instruction(
             return Err(ProgramError::InvalidInstructionData);
         }
     }
-    if outputs
-        .iter()
-        .any(|x| !inputs.iter().any(|i| i.mint == x.mint))
-    {
+    if outputs.iter().any(|x| !contains_mint(&seen_mints, x.mint)) {
         return Err(ProgramError::InvalidInstructionData);
     }
     let mut data =

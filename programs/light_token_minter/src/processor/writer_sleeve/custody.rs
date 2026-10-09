@@ -184,6 +184,28 @@ pub(in crate::processor::writer_sleeve) fn load_or_create_market_staging<'a>(
     token_program_info: &AccountInfo<'a>,
     system_program_info: &AccountInfo<'a>,
 ) -> Result<TokenAccount, ProgramError> {
+    let _ = market;
+    load_or_create_market_staging_checked(
+        program_id,
+        payer_info,
+        market_info,
+        staging_info,
+        mint_info,
+        token_program_info,
+        system_program_info,
+    )
+}
+/// The full Market is authenticated by the caller; staging creation needs only
+/// the canonical physical account keys, mint and SPL authority.
+pub(in crate::processor::writer_sleeve) fn load_or_create_market_staging_checked<'a>(
+    program_id: &Pubkey,
+    payer_info: &AccountInfo<'a>,
+    market_info: &AccountInfo<'a>,
+    staging_info: &AccountInfo<'a>,
+    mint_info: &AccountInfo<'a>,
+    token_program_info: &AccountInfo<'a>,
+    system_program_info: &AccountInfo<'a>,
+) -> Result<TokenAccount, ProgramError> {
     let (expected, bump) = derive_contract_mint_staging_pda(program_id, market_info.key);
     if *staging_info.key != expected {
         return Err(VaultError::InvalidPda.into());
@@ -207,7 +229,6 @@ pub(in crate::processor::writer_sleeve) fn load_or_create_market_staging<'a>(
     )?;
     invoke_token_initialize_account3(token_program_info, staging_info, mint_info, market_info.key)?;
     validate_vault_token_account(staging_info, mint_info.key, market_info.key)?;
-    let _ = market;
     validate_token_account(staging_info)
 }
 
@@ -218,6 +239,43 @@ pub(in crate::processor::writer_sleeve) fn observe_market_staging_amount(
     mint_info: &AccountInfo,
     token_program_info: &AccountInfo,
 ) -> Result<u64, ProgramError> {
+    observe_market_staging_amount_checked(
+        program_id,
+        market_info,
+        staging_info,
+        mint_info,
+        token_program_info,
+        true,
+    )
+}
+
+/// Projection observes an absent canonical target without granting a write or
+/// allocating it. Actual settlement retains the create-only writable check.
+pub(in crate::processor::writer_sleeve) fn observe_market_staging_amount_readonly(
+    program_id: &Pubkey,
+    market_info: &AccountInfo,
+    staging_info: &AccountInfo,
+    mint_info: &AccountInfo,
+    token_program_info: &AccountInfo,
+) -> Result<u64, ProgramError> {
+    observe_market_staging_amount_checked(
+        program_id,
+        market_info,
+        staging_info,
+        mint_info,
+        token_program_info,
+        false,
+    )
+}
+
+fn observe_market_staging_amount_checked(
+    program_id: &Pubkey,
+    market_info: &AccountInfo,
+    staging_info: &AccountInfo,
+    mint_info: &AccountInfo,
+    token_program_info: &AccountInfo,
+    require_writable: bool,
+) -> Result<u64, ProgramError> {
     let expected = derive_contract_mint_staging_pda(program_id, market_info.key).0;
     if *staging_info.key != expected {
         return Err(VaultError::InvalidPda.into());
@@ -226,7 +284,7 @@ pub(in crate::processor::writer_sleeve) fn observe_market_staging_amount(
         validate_vault_token_account(staging_info, mint_info.key, market_info.key)?;
         return Ok(validate_token_account(staging_info)?.amount);
     }
-    validate_create_only_program_account_target(program_id, staging_info)?;
+    validate_observed_empty_target(program_id, &expected, staging_info, require_writable)?;
     Ok(0)
 }
 
@@ -238,6 +296,45 @@ pub(in crate::processor::writer_sleeve) fn observe_writer_retirement_custody_amo
     mint_info: &AccountInfo,
     token_program_info: &AccountInfo,
 ) -> Result<u64, ProgramError> {
+    observe_writer_retirement_custody_amount_checked(
+        program_id,
+        sleeve_info,
+        market_info,
+        custody_info,
+        mint_info,
+        token_program_info,
+        true,
+    )
+}
+
+pub(in crate::processor::writer_sleeve) fn observe_writer_retirement_custody_amount_readonly(
+    program_id: &Pubkey,
+    sleeve_info: &AccountInfo,
+    market_info: &AccountInfo,
+    custody_info: &AccountInfo,
+    mint_info: &AccountInfo,
+    token_program_info: &AccountInfo,
+) -> Result<u64, ProgramError> {
+    observe_writer_retirement_custody_amount_checked(
+        program_id,
+        sleeve_info,
+        market_info,
+        custody_info,
+        mint_info,
+        token_program_info,
+        false,
+    )
+}
+
+fn observe_writer_retirement_custody_amount_checked(
+    program_id: &Pubkey,
+    sleeve_info: &AccountInfo,
+    market_info: &AccountInfo,
+    custody_info: &AccountInfo,
+    mint_info: &AccountInfo,
+    token_program_info: &AccountInfo,
+    require_writable: bool,
+) -> Result<u64, ProgramError> {
     let expected =
         derive_writer_retirement_custody_pda(program_id, sleeve_info.key, market_info.key).0;
     if *custody_info.key != expected {
@@ -247,8 +344,23 @@ pub(in crate::processor::writer_sleeve) fn observe_writer_retirement_custody_amo
         validate_vault_token_account(custody_info, mint_info.key, sleeve_info.key)?;
         return Ok(validate_token_account(custody_info)?.amount);
     }
-    validate_create_only_program_account_target(program_id, custody_info)?;
+    validate_observed_empty_target(program_id, &expected, custody_info, require_writable)?;
     Ok(0)
+}
+
+fn validate_observed_empty_target(
+    program: &Pubkey,
+    expected: &Pubkey,
+    target: &AccountInfo,
+    require_writable: bool,
+) -> ProgramResult {
+    if require_writable {
+        return validate_create_only_program_account_target(program, target);
+    }
+    if target.owner == program {
+        return Err(VaultError::AlreadyInitialized.into());
+    }
+    validate_canonical_system_zero_pda_proof(expected, target)
 }
 
 #[inline(never)]

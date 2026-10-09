@@ -85,7 +85,7 @@ fn create_lot<'a>(
 ) -> ProgramResult {
     let (key, bump) = derive_contribution(program, sleeve.key, &lot.creator, lot.nonce);
     if *info.key != key
-        || *system.key != system_program::id()
+        || !crate::is_system_program(system.key)
         || !payer.is_writable
         || !info.is_writable
         || info.is_signer
@@ -189,8 +189,8 @@ pub(super) fn process(
             return Err(VaultError::InvalidAccountList.into());
         }
         if info.executable
-            && *info.key != system_program::id()
-            && *info.key != spl_token_program_id()
+            && !crate::is_system_program(info.key)
+            && !crate::token_instruction::check_id(info.key)
         {
             return Err(VaultError::InvalidAccountList.into());
         }
@@ -273,7 +273,7 @@ fn expire_unactivated(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
         mut book,
         snapshot,
     } = load_writer_policy_context(program, &a[2], &a[3], &a[4], &a[5], None)?;
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let now =
         u64::try_from(clock.unix_timestamp).map_err(|_| VaultError::InvalidWriterLifecycle)?;
     let policy = dlmm::load_funding_policy(program, &a[7], &a[2], &sleeve, &snapshot)?;
@@ -374,7 +374,7 @@ pub(super) fn contribute_core<'a>(
         || sleeve.usdc_vault != *a.writer_usdc.key
         || sleeve.settlement_mint != *a.mint.key
         || config.usdc_mint != *a.mint.key
-        || *a.token.key != spl_token_program_id()
+        || !crate::token_instruction::check_id(a.token.key)
         || !a.sleeve.is_writable
         || !a.writer_usdc.is_writable
         || !a.source_usdc.is_writable
@@ -401,7 +401,7 @@ pub(super) fn contribute_core<'a>(
     // Writer cash is the hot vault plus the canonical WriterCash sidecar,
     // exactly the backing the writer DLMM swap lane admits; a compressed-mode
     // sale credits accounted assets while its premium sits in the sidecar.
-    let sidecar = if *a.cash_custody.key == system_program::id() {
+    let sidecar = if crate::is_system_program(a.cash_custody.key) {
         None
     } else {
         crate::compressed_custody::load(
@@ -485,7 +485,7 @@ pub(super) fn contribute_core<'a>(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    sleeve.last_updated_slot = Clock::get()?.slot;
+    sleeve.last_updated_slot = crate::compact_error::slot()?;
     store_state(a.sleeve, sleeve.as_ref())?;
     Ok(lot)
 }
@@ -584,16 +584,14 @@ fn claim_compressed<'a>(
         || !a[7].is_writable
         || !a[8].is_writable
         || !a[17].is_writable
-        || *a[9].key != light_token_program_id()
-        || *a[10].key != cpi_authority()
-        || *a[11].key != spl_token_program_id()
-        || *a[12].key != system_program::id()
-        || *a[13].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[14].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[15].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[16].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_program(a[9].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[10].key)
+        || !crate::token_instruction::check_id(a[11].key)
+        || !crate::is_system_program(a[12].key)
+        || !crate::light_token_instruction::is_light_system_program(a[13].key)
+        || !crate::light_token_instruction::is_registered_program(a[14].key)
+        || !crate::light_token_instruction::is_compression_authority(a[15].key)
+        || !crate::light_token_instruction::is_compression_program(a[16].key)
         || !matches!(sponsor_fee_atoms, 0 | SPONSORED_REDEMPTION_FEE_ATOMS)
         || (permissionless && sponsor_fee_atoms != 0)
         || (!permissionless && sponsor_fee_atoms == 0 && a[0].key != a[1].key)
@@ -603,8 +601,8 @@ fn claim_compressed<'a>(
                 || cash_root_index != 0
                 || cash_prove_by_index
                 || proof.is_some()
-                || a[18].key != &system_program::id()
-                || a[19].key != &system_program::id()))
+                || !crate::is_system_program(a[18].key)
+                || !crate::is_system_program(a[19].key)))
         || (cash_amount != 0
             && (!a[18].is_writable
                 || !a[19].is_writable
@@ -901,7 +899,7 @@ pub(super) fn claim_commit(
         .accounted_asset_atoms
         .checked_sub(plan.payout)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    sleeve.last_updated_slot = Clock::get()?.slot;
+    sleeve.last_updated_slot = crate::compact_error::slot()?;
     plan.lot.claimed = true;
     store_state(a.sleeve, sleeve.as_ref())?;
     store_state(a.receipt, &plan.lot)

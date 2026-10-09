@@ -6,6 +6,7 @@ pub(super) const LAUNCH_PHASE_SECONDS: u64 = 3_600;
 /// Written only by the consumed September council bootstrap. Original launch
 /// timestamps remain in its receipt; no historical review phases are invented.
 pub(super) const COUNCIL_BOOTSTRAP_SCHEDULE_VERSION: u8 = 4;
+#[cfg(not(feature = "mainnet-v3"))]
 pub(super) const OCTOBER_BOOTSTRAP_PENDING_SCHEDULE_VERSION: u8 = 5;
 
 pub(super) fn schedule_windows(month: &OracleMonthState) -> Result<[u64; 4], ProgramError> {
@@ -77,22 +78,6 @@ pub(super) fn validate_launch_market(market: &Market) -> ProgramResult {
         return Err(VaultError::InvalidOracleState.into());
     }
     Ok(())
-}
-
-/// Tag 181's explicit (0,0) schedule selector uses account 8 as a cohort clock,
-/// not the ordinary ladder. This immutable 54-byte PDA is shared by call and put.
-#[inline(never)]
-pub(super) fn initialize_launch_clock<'a>(
-    program_id: &Pubkey,
-    market: &Market,
-    payer: &AccountInfo<'a>,
-    clock_info: &AccountInfo<'a>,
-    system: &AccountInfo<'a>,
-    now: u64,
-) -> Result<(u64, u64), ProgramError> {
-    // Historical clocks remain readable; new four-hour cohorts are retired.
-    let _ = (program_id, market, payer, clock_info, system, now);
-    Err(VaultError::InvalidOracleState.into())
 }
 
 /// No new placement/reopening after a launch deadline. Existing dispute settlement remains required.

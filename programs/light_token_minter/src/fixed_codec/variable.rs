@@ -96,7 +96,7 @@ variable_state_codec!(OracleMonthState, 299, oracle_month_encoded_len, {
     accepted_cash_update_count: u32,
 });
 
-fixed_state_deserialize!(WriterSleeveV1, 545, {
+fixed_state_deserialize_flat!(WriterSleeveV1, 545, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],

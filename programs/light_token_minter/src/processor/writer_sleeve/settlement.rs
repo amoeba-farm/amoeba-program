@@ -163,12 +163,12 @@ pub(super) fn process_publish_writer_group_settlement(
     {
         return Err(VaultError::InvalidWriterSettlementGroup.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     if handoff {
         let handoff_info = &accounts[13];
         let system_info = &accounts[14];
         let (key, bump) = derive_writer_settlement_handoff(program_id, group_info.key);
-        if key != *handoff_info.key || *system_info.key != system_program::id() {
+        if key != *handoff_info.key || !crate::is_system_program(system_info.key) {
             return Err(VaultError::InvalidAccountList.into());
         }
         validate_create_only_program_account_target(program_id, handoff_info)?;
@@ -439,7 +439,7 @@ pub(super) fn process_finalize_writer_sleeve_settlement(
     sleeve.lower_tail_reserve_atoms = 0;
     sleeve.upper_tail_reserve_atoms = 0;
     sleeve.security_exposure_atoms = 0;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     sleeve.status = WriterSleeveStatus::SettlementFinalized;
     book.individual.settlement_finalized_ts = current_unix_timestamp()?;
     sleeve.settlement_finalized_slot = slot;
@@ -472,8 +472,8 @@ pub(super) fn process_close_writer_sleeve(
     if !cranker_info.is_signer || !cranker_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *token_program_info.key != spl_token_program_id()
-        || *system_program_info.key != system_program::id()
+    if !crate::token_instruction::check_id(token_program_info.key)
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -557,7 +557,7 @@ pub(super) fn process_close_writer_sleeve(
             &[&signer],
         )?;
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     group.status = WriterSettlementGroupStatus::Closed;
     group.last_updated_slot = slot;
     sleeve.status = WriterSleeveStatus::Closed;

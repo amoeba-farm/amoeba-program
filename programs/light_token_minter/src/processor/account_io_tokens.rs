@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 #[inline(never)]
 #[allow(clippy::too_many_arguments)]
@@ -232,7 +233,14 @@ pub(super) fn store_state(
     account_info: &AccountInfo,
     value: &dyn crate::fixed_codec::FixedStateEncode,
 ) -> ProgramResult {
-    let mut data = account_info.try_borrow_mut_data()?;
+    let mut data = account_info.try_data_mut()?;
+    if value.preserves_market_router() {
+        crate::market_router_account::prefix(&data)?;
+        let prefix = &mut data[..Market::LEN];
+        solana_program::program_memory::sol_memset(prefix, 0, Market::LEN);
+        value.encode_fixed(prefix);
+        return Ok(());
+    }
     if value.maximum_encoded_len() > data.len() {
         return Err(ProgramError::AccountDataTooSmall);
     }
@@ -251,7 +259,7 @@ pub(super) fn validate_mint_account(
     if mint_info.owner != token_program {
         return Err(VaultError::InvalidMint.into());
     }
-    let mint_data = mint_info.try_borrow_data()?;
+    let mint_data = mint_info.try_data()?;
     Mint::unpack(&mint_data).map_err(|_| VaultError::InvalidMint.into())
 }
 
@@ -309,7 +317,7 @@ pub(super) fn validate_canonical_market_mint(
     if *mint_info.key != expected_mint || market.long_contract_mint != Some(expected_mint) {
         return Err(VaultError::InvalidContractMint.into());
     }
-    if mint_info.owner != &spl_token_program_id() {
+    if !crate::token_instruction::check_id(mint_info.owner) {
         return Err(VaultError::InvalidMarketMintPolicy.into());
     }
     let mint = validate_mint_account(mint_info, &spl_token_program_id())?;
@@ -391,7 +399,7 @@ pub(super) fn load_canonical_light_token_account(
     expected_mint: &Pubkey,
 ) -> Result<TokenAccount, ProgramError> {
     validate_light_token_account(account_info)?;
-    let data = account_info.try_borrow_data()?;
+    let data = account_info.try_data()?;
     if !has_canonical_compressible_token_layout(&data) {
         return Err(VaultError::InvalidLightTokenAccount.into());
     }
@@ -448,10 +456,10 @@ pub(super) fn validate_strict_token_account(
 pub(super) fn validate_token_account(
     token_info: &AccountInfo,
 ) -> Result<TokenAccount, ProgramError> {
-    if token_info.owner != &spl_token_program_id() {
+    if !crate::token_instruction::check_id(token_info.owner) {
         return Err(VaultError::InvalidTokenAccount.into());
     }
-    let token_data = token_info.try_borrow_data()?;
+    let token_data = token_info.try_data()?;
     TokenAccount::unpack(&token_data).map_err(|_| VaultError::InvalidTokenAccount.into())
 }
 
@@ -476,7 +484,7 @@ pub(super) fn validate_spl_interface_account_with_bump(
     }
     let token = validate_token_account(interface_info)?;
     if token.mint != *mint
-        || token.owner != cpi_authority()
+        || !crate::light_token_instruction::is_cpi_authority(&token.owner)
         || token.state != AccountState::Initialized
         || token.delegate != COption::None
         || token.delegated_amount != 0

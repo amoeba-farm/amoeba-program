@@ -1,6 +1,7 @@
 //! Narrow session entrypoint; it accepts no arbitrary instruction, destination,
 //! transfer amount outside owner funding, or signer substitution by a client.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::trading_session::{self as session, Action, TradingSessionV2};
 use borsh::BorshSerialize;
 mod classic_funding;
@@ -23,8 +24,7 @@ pub(super) fn load(
     {
         return Err(invalid());
     }
-    let record =
-        TradingSessionV2::try_from_slice(&info.try_borrow_data()?).map_err(|_| invalid())?;
+    let record = TradingSessionV2::try_from_slice(&info.try_data()?).map_err(|_| invalid())?;
     if record.owner != *owner || !record.valid(program, info.key) {
         return Err(invalid());
     }
@@ -36,13 +36,63 @@ fn store(info: &AccountInfo, record: &TradingSessionV2) -> ProgramResult {
     if bytes.len() != session::ACCOUNT_SIZE || info.data_len() != bytes.len() {
         return Err(invalid());
     }
-    info.try_borrow_mut_data()?.copy_from_slice(&bytes);
+    info.try_data_mut()?.copy_from_slice(&bytes);
     Ok(())
 }
 
 pub(super) fn process(program: &Pubkey, a: &[AccountInfo], payload: &[u8]) -> ProgramResult {
     let action: Action = decode_instruction_payload(payload)?;
     match action {
+        Action::DirectWalletCloseAtomicPosition { params } => {
+            if a.len() < 2 + crate::atomic_option_route::COMMON
+                || !a[0].is_signer
+                || a[1].is_signer
+                || !crate::is_system_program(a[1].key)
+                || a[2].key != a[0].key
+                || !a[2].is_signer
+            {
+                return Err(invalid());
+            }
+            writer_sleeve::process_atomic_position_close(program, &a[2..], params, *a[0].key)
+        }
+        Action::CloseAtomicPosition { generation, params } => {
+            if a.len() < 2 + crate::atomic_option_route::COMMON
+                || a[0].is_signer
+                || !a[1].is_signer
+                || a[2].is_signer
+            {
+                return Err(invalid());
+            }
+            let record = load(program, &a[2], a[0].key)?;
+            if record.sponsor != *a[4].key
+                || record.quote_mint != *a[6].key
+                || !record.authorized(a[1].key, generation, current_unix_timestamp()?)
+            {
+                return Err(VaultError::Unauthorized.into());
+            }
+            writer_sleeve::process_atomic_position_close(program, &a[2..], params, record.owner)
+        }
+        Action::OwnerCloseAtomicPosition { params } => {
+            if a.len() < 2 + crate::atomic_option_route::COMMON
+                || !a[0].is_signer
+                || a[1].is_signer
+                || !crate::is_system_program(a[1].key)
+            {
+                return Err(invalid());
+            }
+            if a[2].key != a[0].key {
+                if a[2].is_signer {
+                    return Err(invalid());
+                }
+                let record = load(program, &a[2], a[0].key)?;
+                if record.sponsor != *a[4].key || record.quote_mint != *a[6].key {
+                    return Err(invalid());
+                }
+            } else if !a[2].is_signer {
+                return Err(invalid());
+            }
+            writer_sleeve::process_atomic_position_close(program, &a[2..], params, *a[0].key)
+        }
         Action::DirectWalletTradeStrip {
             params,
             classic_quote_amount,
@@ -50,7 +100,7 @@ pub(super) fn process(program: &Pubkey, a: &[AccountInfo], payload: &[u8]) -> Pr
             if a.len() < crate::capped_strip::COMMON
                 || !a[0].is_signer
                 || a[1].is_signer
-                || *a[1].key != system_program::id()
+                || !crate::is_system_program(a[1].key)
                 || a[2].key != a[0].key
                 || !a[2].is_signer
             {
@@ -88,7 +138,7 @@ pub(super) fn process(program: &Pubkey, a: &[AccountInfo], payload: &[u8]) -> Pr
                 || !a[0].is_signer
                 || a[1].is_signer
                 || a[2].is_signer
-                || *a[1].key != system_program::id()
+                || !crate::is_system_program(a[1].key)
             {
                 return Err(invalid());
             }
@@ -227,6 +277,54 @@ fn order(
     generation: Option<u64>,
 ) -> ProgramResult {
     use crate::dlmm_order_state::DlmmOrderAction as O;
+    if let O::MultiOrder(action) = action {
+        let prefix = if generation.is_some() { 3 } else { 2 };
+        if a.len() < prefix + crate::multi_order::COMMON
+            || (generation.is_some() && (a[0].is_signer || !a[1].is_signer))
+            || (generation.is_none() && !a[0].is_signer)
+            || a[prefix - 1].is_signer
+        {
+            return Err(invalid());
+        }
+        if generation.is_none() && crate::is_system_program(a[1].key) {
+            let base = &a[2..];
+            if base[0].key != a[0].key || base[1].key != a[0].key {
+                return Err(invalid());
+            }
+            if let crate::multi_order::Action::Cancel(exit) = action {
+                return super::multi_order::process_sponsored_cancel(program, base, exit);
+            }
+            return Err(invalid());
+        }
+        let record = load(program, &a[prefix - 1], a[0].key)?;
+        let base = &a[prefix..];
+        let sponsored =
+            generation.is_some() || matches!(action, crate::multi_order::Action::Cancel(_));
+        if base[0].key != a[prefix - 1].key
+            || *base[5].key != record.quote_mint
+            || (sponsored && *base[2].key != record.sponsor)
+            || base[1].key
+                != if generation.is_some() {
+                    a[1].key
+                } else {
+                    a[0].key
+                }
+        {
+            return Err(invalid());
+        }
+        if let Some(generation) = generation {
+            if !record.authorized(a[1].key, generation, current_unix_timestamp()?) {
+                return Err(VaultError::Unauthorized.into());
+            }
+        }
+        if !matches!(
+            action,
+            crate::multi_order::Action::Place(_) | crate::multi_order::Action::Cancel(_)
+        ) {
+            return Err(invalid());
+        }
+        return super::multi_order::process_session(program, base, action, record.owner, sponsored);
+    }
     let (records, pages) = match &action {
         O::PlaceCompressedEscrow {
             record_count,
@@ -283,7 +381,7 @@ fn enable(program: &Pubkey, a: &[AccountInfo], grant: session::Grant) -> Program
         || *a[4].key != grant.sponsor
         || a[5].is_signer
         || a[5].is_writable
-        || *a[5].key != system_program::id()
+        || !crate::is_system_program(a[5].key)
         || *a[1].key != session::derive(program, a[0].key).0
     {
         return Err(invalid());
@@ -295,7 +393,7 @@ fn enable(program: &Pubkey, a: &[AccountInfo], grant: session::Grant) -> Program
     validate_collateral_mint_account(&a[3], &spl_token_program_id())?;
     let existing = if a[1].owner == program {
         Some(load(program, &a[1], a[0].key)?)
-    } else if a[1].owner == &system_program::id() && a[1].data_is_empty() && !a[1].executable {
+    } else if crate::is_system_program(a[1].owner) && a[1].data_is_empty() && !a[1].executable {
         None
     } else {
         return Err(invalid());

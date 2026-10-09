@@ -287,7 +287,7 @@ pub(in crate::processor) fn process_register_oracle_usdc_reward_source(
         Pubkey::default()
     };
 
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     source_reward.registered = true;
     source_reward.terminal_status = source.status;
     source_reward.opening_claim = opening_claim;
@@ -383,7 +383,7 @@ pub(in crate::processor) fn process_register_oracle_usdc_reward_update(
             .checked_add(bounty)
             .ok_or(VaultError::ArithmeticOverflow)?;
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     create_reward_registration(
         program_id,
         payer_info,
@@ -463,6 +463,6 @@ pub(in crate::processor) fn process_finalize_oracle_usdc_reward_entitlements(
         return Err(VaultError::OracleUsdcRewardRegistrationIncomplete.into());
     }
     schedule.phase = OracleUsdcRewardSchedulePhase::EntitlementsFinalized;
-    schedule.last_updated_slot = Clock::get()?.slot;
+    schedule.last_updated_slot = crate::compact_error::slot()?;
     store_state(schedule_info, &schedule)
 }

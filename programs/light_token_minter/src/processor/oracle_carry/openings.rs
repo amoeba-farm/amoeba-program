@@ -7,7 +7,7 @@ fn require_no_fresh_claim(
     claim_info: &AccountInfo,
 ) -> ProgramResult {
     let expected = derive_oracle_opening_claim_pda(program, &source.month, source_key).0;
-    if claim_info.owner == &system_program::id() {
+    if crate::is_system_program(claim_info.owner) {
         return validate_canonical_system_zero_pda_proof(&expected, claim_info);
     }
     let claim =
@@ -99,7 +99,7 @@ pub(super) fn begin_selection(program: &Pubkey, a: &[AccountInfo]) -> ProgramRes
         return invalid();
     }
     let journal_pda = address(program, JOURNAL_SEED, a[6].key.as_ref());
-    if a[7].owner == &system_program::id() {
+    if crate::is_system_program(a[7].owner) {
         validate_canonical_system_zero_pda_proof(&journal_pda.0, &a[7])?;
         carry.status = NO_ELIGIBLE_CHECKPOINT;
     } else {
@@ -145,8 +145,8 @@ pub(super) fn freeze_opening(program: &Pubkey, a: &[AccountInfo]) -> ProgramResu
         target_context(program, &a[1], &a[2], &a[3], &a[4], &a[5])?;
     if carry.status != SELECTING
         || carry.remaining != 0
-        || carry.cursor != Pubkey::default()
-        || carry.selected_checkpoint == Pubkey::default()
+        || !crate::pubkey_is_default(&carry.cursor)
+        || crate::pubkey_is_default(&carry.selected_checkpoint)
         || carry.value == 0
         || carry.cutoff != oracle_opening_start_ts(&month)?
         || carry.deadline != month.listing_ts
@@ -222,7 +222,7 @@ pub(super) fn freeze_opening(program: &Pubkey, a: &[AccountInfo]) -> ProgramResu
     {
         return invalid();
     }
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     append_checkpoint(
         program,
         &a[0],
@@ -257,7 +257,7 @@ pub(in crate::processor) fn require_carry_resolved_before_expiry(
     companion: &AccountInfo,
     contract_expiry: u64,
 ) -> ProgramResult {
-    if companion.owner == &system_program::id() {
+    if crate::is_system_program(companion.owner) {
         return validate_canonical_system_zero_pda_proof(
             &address(program, SOURCE_SEED, source.as_ref()).0,
             companion,
@@ -284,7 +284,7 @@ pub(in crate::processor) fn validate_inherited_reward_registration(
         || source.status != OracleSourceStatus::Active
         || source.baseline_state != carry.value
         || !source.opening_submitted
-        || carry.selected_checkpoint == Pubkey::default()
+        || crate::pubkey_is_default(&carry.selected_checkpoint)
     {
         return invalid();
     }
@@ -299,7 +299,7 @@ pub(in crate::processor) fn inherited_reward_opening(
     source: &OracleSourceState,
     info: &AccountInfo,
 ) -> Result<bool, ProgramError> {
-    if info.owner == &system_program::id() {
+    if crate::is_system_program(info.owner) {
         validate_canonical_system_zero_pda_proof(
             &address(program, SOURCE_SEED, source_key.as_ref()).0,
             info,

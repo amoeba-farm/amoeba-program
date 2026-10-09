@@ -80,7 +80,7 @@ pub(in crate::processor) fn settle(
     if *a[26].key != cash_key {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let absent = a[26].owner == &system_program::id() && a[26].data_is_empty();
+    let absent = crate::is_system_program(a[26].owner) && a[26].data_is_empty();
     let cash = custody::load_observation(
         program,
         if absent { None } else { Some(&a[26]) },
@@ -121,7 +121,7 @@ pub(in crate::processor) fn settle(
         amount,
         payout,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     book.book_digest = writer_book_digest(&book);
     book.last_updated_slot = slot;
     sleeve.last_updated_slot = slot;

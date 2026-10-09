@@ -38,6 +38,32 @@ pub(crate) const fn cpi_authority() -> Pubkey {
 }
 
 #[inline(never)]
+pub(crate) fn is_program(key: &Pubkey) -> bool {
+    crate::pubkey_eq(key, &LIGHT_TOKEN_PROGRAM_ID)
+}
+
+#[inline(never)]
+pub(crate) fn is_cpi_authority(key: &Pubkey) -> bool {
+    crate::pubkey_eq(key, &LIGHT_TOKEN_CPI_AUTHORITY)
+}
+
+// Share existing Light account identities without reconstructing a Pubkey at
+// every comparison. The expected bytes continue to come from the pinned SDK.
+macro_rules! light_identity {
+    ($name:ident, $constant:ident) => {
+        #[inline(never)]
+        pub(crate) fn $name(key: &Pubkey) -> bool {
+            crate::bytes32_eq(key.as_array(), &light_sdk::constants::$constant)
+        }
+    };
+}
+
+light_identity!(is_light_system_program, LIGHT_SYSTEM_PROGRAM_ID);
+light_identity!(is_registered_program, REGISTERED_PROGRAM_PDA);
+light_identity!(is_compression_authority, ACCOUNT_COMPRESSION_AUTHORITY_PDA);
+light_identity!(is_compression_program, ACCOUNT_COMPRESSION_PROGRAM_ID);
+
+#[inline(never)]
 pub(crate) const fn compressible_config() -> Pubkey {
     LIGHT_TOKEN_COMPRESSIBLE_CONFIG
 }
@@ -404,7 +430,7 @@ pub(crate) fn compress_to_wallet_with_delegate(
 ) -> Result<Instruction, ProgramError> {
     let spl = token_instruction::id();
     let from_spl = *source_owner == spl;
-    if !from_spl && *source_owner != light_token_program_id() {
+    if !from_spl && !crate::light_token_instruction::is_program(source_owner) {
         return Err(ProgramError::Custom(LIGHT_CANNOT_DETERMINE_ACCOUNT_TYPE));
     }
     let mut data = vec![TRANSFER2, 0, 0, 0, 0, 0, 0, 0, 0, 1];

@@ -3,6 +3,7 @@
 //! the entire snapshot. Guessing incorrectly cannot reserve the canonical path:
 //! each proposal has its own deterministic account.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::oracle_rank::MedianRank;
 use borsh::BorshSerialize;
 
@@ -64,7 +65,7 @@ fn load_median(program: &Pubkey, info: &AccountInfo) -> Result<HistoryMedian, Pr
     if info.owner != program || info.executable || info.data_len() != HistoryMedian::LEN {
         return invalid();
     }
-    let value = HistoryMedian::try_from_slice(&info.try_borrow_data()?)
+    let value = HistoryMedian::try_from_slice(&info.try_data()?)
         .map_err(|_| VaultError::InvalidOracleMedian)?;
     let value: HistoryMedian = load(
         program,
@@ -79,14 +80,14 @@ fn load_median(program: &Pubkey, info: &AccountInfo) -> Result<HistoryMedian, Pr
             value.rank.upper,
         ),
     )?;
-    if value.source == Pubkey::default()
-        || value.payer == Pubkey::default()
+    if crate::pubkey_is_default(&value.source)
+        || crate::pubkey_is_default(&value.payer)
         || value.snapshot == [0; 32]
         || value.mode > 1
         || value.total == 0
         || value.remaining > value.total
         || value.complete != (value.remaining == 0)
-        || value.complete != (value.cursor == Pubkey::default())
+        || value.complete != (crate::pubkey_is_default(&value.cursor))
         || value.start == 0
         || value.start > value.end
         || value.rank.count > value.total - value.remaining
@@ -212,7 +213,7 @@ fn apply_checkpoint(
         .ok_or(VaultError::ArithmeticOverflow)?;
     value.cursor = checkpoint.previous;
     if value.remaining == 0 {
-        if value.cursor != Pubkey::default() {
+        if !crate::pubkey_is_default(&value.cursor) {
             return invalid();
         }
         if value.rank.count > 0 {
@@ -281,8 +282,8 @@ pub(super) fn close_history_median(program: &Pubkey, a: &[AccountInfo]) -> Progr
         .lamports()
         .checked_add(amount)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    **a[0].try_borrow_mut_lamports()? = balance;
-    **a[1].try_borrow_mut_lamports()? = 0;
+    **a[0].try_lamports_mut()? = balance;
+    **a[1].try_lamports_mut()? = 0;
     a[1].resize(0)?;
     a[1].assign(&system_program::id());
     Ok(())

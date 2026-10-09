@@ -3,11 +3,7 @@
 use crate::compact_error::cpi::invoke_signed;
 use crate::ProgramError;
 use crate::ProgramResult;
-use solana_program::{
-    account_info::{next_account_info, AccountInfo},
-    pubkey::Pubkey,
-    sysvar::{clock::Clock, Sysvar},
-};
+use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
 use super::*;
 use crate::{
@@ -70,6 +66,23 @@ fn validate_pack_dlmm_account_privileges(
     tag: AmoebaDlmmInstructionTag,
     accounts: &[AccountInfo],
 ) -> ProgramResult {
+    let resident_lp = matches!(
+        tag,
+        AmoebaDlmmInstructionTag::AddLiquidityV1 | AmoebaDlmmInstructionTag::RemoveLiquidityV1
+    ) && accounts
+        .get(1)
+        .map(|pool| forwarded_pool(program_id, pool))
+        .transpose()?
+        .unwrap_or(false);
+    let accounts = if resident_lp {
+        let market = accounts.last().ok_or(VaultError::InvalidAccountList)?;
+        if !market.is_writable || market.is_signer || market.executable {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        without_market_tail(program_id, &accounts[1], accounts)?
+    } else {
+        accounts
+    };
     validate_pack_dlmm_account_privileges_with_delivery(
         program_id,
         tag,
@@ -127,10 +140,12 @@ fn validate_pack_dlmm_account_privileges_with_delivery(
         return Err(VaultError::InvalidAccountList.into());
     }
 
+    let resident_mode = tag == AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1
+        && forwarded_pool(program_id, &accounts[7])?;
     let ordinary_only = tag == AmoebaDlmmInstructionTag::SwapCollectiveDlmmExactInV1
         && [2, 4, 6, 24, 26, 27, 28, 29]
             .iter()
-            .all(|index| !accounts[*index].is_writable);
+            .all(|index| (resident_mode && *index == 2) || !accounts[*index].is_writable);
     for (index, account) in accounts.iter().enumerate() {
         let expected_signer = index == 0;
         let mut expected_writable = match tag {
@@ -165,7 +180,10 @@ fn validate_pack_dlmm_account_privileges_with_delivery(
             }
             _ => false,
         };
-        if ordinary_only && matches!(index, 2 | 4 | 6 | 24 | 26 | 27 | 28 | 29) {
+        if ordinary_only
+            && matches!(index, 2 | 4 | 6 | 24 | 26 | 27 | 28 | 29)
+            && !(resident_mode && index == 2)
+        {
             expected_writable = false;
         }
         // Preserve exact effective privileges except for the runtime's unavoidable promotion of
@@ -604,6 +622,11 @@ pub fn process_instruction(
 }
 
 mod accounts;
+mod ordinary_helpers;
+use ordinary_helpers::*;
+pub(in crate::processor) use ordinary_helpers::{
+    commit_resident, load_pool_with_accounts, resident_for_pool, resident_pool_hot_vault_amounts,
+};
 mod collective;
 pub(in crate::processor) mod compressed_delivery;
 mod compressed_swap;
@@ -623,27 +646,8 @@ use liquidity::*;
 pub(super) use scoped_position::process_scoped_position_settlement;
 use swap::*;
 
-// Narrow custody access for the writer lane; ordinary share/page loaders stay private.
-pub(super) fn load_writer_dlmm_pool(
-    program_id: &Pubkey,
-    info: &AccountInfo,
-) -> Result<AmoebaDlmmPoolV1, ProgramError> {
-    load_pool(program_id, info)
-}
-
 pub(super) fn store_writer_dlmm_pool(info: &AccountInfo, pool: &AmoebaDlmmPoolV1) -> ProgramResult {
     store_light_state(info, pool)
-}
-
-pub(super) fn writer_dlmm_vault_amounts(
-    program_id: &Pubkey,
-    pool_info: &AccountInfo,
-    pool: &AmoebaDlmmPoolV1,
-    authority: &AccountInfo,
-    option: &AccountInfo,
-    quote: &AccountInfo,
-) -> Result<(u64, u64), ProgramError> {
-    validate_pool_vault_amounts(program_id, pool_info, pool, authority, option, quote)
 }
 
 pub(super) fn validate_writer_dlmm_pool_binding(

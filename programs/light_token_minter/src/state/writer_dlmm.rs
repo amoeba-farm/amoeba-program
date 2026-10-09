@@ -7,6 +7,7 @@ pub const WRITER_DLMM_ACTION_ENTRIES: usize = 8;
 pub const WRITER_DLMM_POLICY_HASH_DOMAIN: &[u8] = b"ameba-writer-dlmm-policy-g3";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[repr(C)]
 pub struct WriterDlmmSeriesPolicyV1 {
     pub conservative_claim_value_atoms: u64,
     pub seller_floor_quote_atoms: u64,
@@ -149,7 +150,7 @@ impl WriterDlmmBinV1 {
 
 /// Sole writer owner of its segregated lane in one existing canonical pool.
 /// Sale proceeds are uncommitted until a permitted placement below the sale floor.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Debug, Eq, PartialEq)]
 pub struct WriterDlmmPositionV1 {
     pub is_initialized: bool,
     pub bump: u8,
@@ -167,6 +168,13 @@ pub struct WriterDlmmPositionV1 {
     pub last_updated_slot: u64,
     pub bins: [WriterDlmmBinV1; WRITER_DLMM_POSITION_BINS],
     pub reserved: [u8; 32],
+}
+
+impl Clone for WriterDlmmPositionV1 {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 /// Field for field what `#[derive(Default)]` produced; see `WriterDlmmPolicyV1`'s impl.

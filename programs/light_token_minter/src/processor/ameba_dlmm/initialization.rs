@@ -9,32 +9,31 @@ pub(super) fn process_initialize_collective_pool_core(
     if accounts.len() < 17 {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let account_info_iter = &mut accounts.iter();
-    let admin_info = next_account_info(account_info_iter)?;
-    let config_info = next_account_info(account_info_iter)?;
-    let market_info = next_account_info(account_info_iter)?;
-    let month_info = next_account_info(account_info_iter)?;
-    let pool_info = next_account_info(account_info_iter)?;
-    let authority_info = next_account_info(account_info_iter)?;
-    let option_mint_info = next_account_info(account_info_iter)?;
-    let quote_mint_info = next_account_info(account_info_iter)?;
-    let option_vault_info = next_account_info(account_info_iter)?;
-    let quote_vault_info = next_account_info(account_info_iter)?;
-    let light_token_program_info = next_account_info(account_info_iter)?;
-    let compressed_token_authority_info = next_account_info(account_info_iter)?;
-    let state_config_info = next_account_info(account_info_iter)?;
-    let state_rent_sponsor_info = next_account_info(account_info_iter)?;
-    let token_config_info = next_account_info(account_info_iter)?;
-    let token_rent_sponsor_info = next_account_info(account_info_iter)?;
-    let system_program_info = next_account_info(account_info_iter)?;
-    let light_tail = account_info_iter.as_slice();
+    let admin_info = &accounts[0];
+    let config_info = &accounts[1];
+    let market_info = &accounts[2];
+    let month_info = &accounts[3];
+    let pool_info = &accounts[4];
+    let authority_info = &accounts[5];
+    let option_mint_info = &accounts[6];
+    let quote_mint_info = &accounts[7];
+    let option_vault_info = &accounts[8];
+    let quote_vault_info = &accounts[9];
+    let light_token_program_info = &accounts[10];
+    let compressed_token_authority_info = &accounts[11];
+    let state_config_info = &accounts[12];
+    let state_rent_sponsor_info = &accounts[13];
+    let token_config_info = &accounts[14];
+    let token_rent_sponsor_info = &accounts[15];
+    let system_program_info = &accounts[16];
+    let light_tail = &accounts[17..];
 
     if !admin_info.is_signer || !admin_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *light_token_program_info.key != light_token_program_id()
-        || *compressed_token_authority_info.key != cpi_authority()
-        || *system_program_info.key != system_program::id()
+    if !crate::light_token_instruction::is_program(light_token_program_info.key)
+        || !crate::light_token_instruction::is_cpi_authority(compressed_token_authority_info.key)
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -140,7 +139,7 @@ pub(super) fn process_initialize_collective_pool_core(
         light_token_program_info,
     )?;
 
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let mut pool = AmoebaDlmmPoolV1 {
         is_initialized: true,
         bump: pool_bump,
@@ -200,6 +199,8 @@ pub(super) fn process_initialize_bin_page(
     if accounts.len() < 7 {
         return Err(VaultError::InvalidAccountList.into());
     }
+    let supplied = accounts;
+    let accounts = without_market_tail(program_id, &accounts[1], accounts)?;
     let manager_info = &accounts[0];
     let pool_info = &accounts[1];
     let page_info = &accounts[2];
@@ -211,7 +212,7 @@ pub(super) fn process_initialize_bin_page(
     if !manager_info.is_signer || !manager_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    let mut pool = load_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, supplied)?;
     if pool.liquidity_manager != *manager_info.key {
         return Err(VaultError::UnauthorizedAmoebaDlmmManager.into());
     }
@@ -265,7 +266,7 @@ pub(super) fn process_initialize_bin_page(
             &share_bump_bytes,
         ],
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let first_bin_id = page_first_bin(params.page_index).map_err(math_error)?;
     let mut page = AmoebaDlmmBinPageV1 {
         is_initialized: true,
@@ -309,7 +310,7 @@ pub(super) fn process_initialize_bin_page(
     )?;
     set_page_bit(&mut pool.initialized_page_bitmap, params.page_index, true)?;
     pool.last_updated_slot = slot;
-    store_light_state(pool_info, &pool)?;
+    persist_pool(program_id, pool_info, supplied, &pool)?;
     emit_event(
         &EVENT_PAGE_INITIALIZED,
         AmoebaDlmmEvent::PageInitialized(PageInitializedEvent {
@@ -329,6 +330,8 @@ pub(super) fn process_initialize_position(
     if accounts.len() < 7 {
         return Err(VaultError::InvalidAccountList.into());
     }
+    let supplied = accounts;
+    let accounts = without_market_tail(program_id, &accounts[1], accounts)?;
     let owner_info = &accounts[0];
     let pool_info = &accounts[1];
     let position_info = &accounts[2];
@@ -339,7 +342,7 @@ pub(super) fn process_initialize_position(
     if !owner_info.is_signer || !owner_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    let mut pool = load_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, supplied)?;
     if pool.liquidity_manager != *owner_info.key {
         return Err(VaultError::UnauthorizedAmoebaDlmmManager.into());
     }
@@ -383,7 +386,7 @@ pub(super) fn process_initialize_position(
             &bump_bytes,
         ],
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let mut position = AmoebaDlmmPositionV1 {
         is_initialized: true,
         bump,
@@ -414,16 +417,21 @@ pub(super) fn process_initialize_position(
         .checked_add(1)
         .ok_or(VaultError::ArithmeticOverflow)?;
     pool.last_updated_slot = slot;
-    store_light_state(pool_info, &pool)?;
+    persist_pool(program_id, pool_info, supplied, &pool)?;
     super::scoped_position::process_scoped_position_settlement(
         program_id,
-        &[
-            owner_info.clone(),
-            pool_info.clone(),
-            position_info.clone(),
-            accounts[6].clone(),
-            system_program_info.clone(),
-        ],
+        &with_resident_market(
+            program_id,
+            pool_info,
+            supplied,
+            vec![
+                owner_info.clone(),
+                pool_info.clone(),
+                position_info.clone(),
+                accounts[6].clone(),
+                system_program_info.clone(),
+            ],
+        )?,
         0,
     )?;
     emit_event(

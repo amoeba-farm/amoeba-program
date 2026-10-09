@@ -123,7 +123,7 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
         bucket.recompute_processed_source_count,
         &source.source_id,
     )?;
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let now = u64::try_from(clock.unix_timestamp)
         .map_err(|_| ProgramError::from(VaultError::InvalidOracleMedian))?;
     ensure_settlement_finalization_ready_at(market.instrument.expiry_ts, now)?;
@@ -169,7 +169,7 @@ pub(super) fn process_recompute_oracle_bucket_median_v1(
             || source.current_state != 0
             || *observations_info.key
                 != derive_oracle_source_observations_pda(program_id, source_info.key).0
-            || observations_info.owner != &system_program::id()
+            || !crate::is_system_program(observations_info.owner)
             || observations_info.executable
             || observations_info.data_len() != 0
         {

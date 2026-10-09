@@ -1,5 +1,6 @@
 //! One-position cleanup permission, captured by the original owner-signed LP operation.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::scoped_settlement::{
     derive_position_settlement_authority, POSITION_SETTLEMENT_AUTHORITY_DISCRIMINATOR as MAGIC,
     POSITION_SETTLEMENT_AUTHORITY_LEN as LEN, POSITION_SETTLEMENT_AUTHORITY_SEED as SEED,
@@ -51,7 +52,7 @@ fn validate_marker(
         || marker.owner != program_id
         || marker.executable
         || marker.data_len() != LEN
-        || *marker.try_borrow_data()? != marker_bytes(owner, pool, position, bump).as_slice()
+        || *marker.try_data()? != marker_bytes(owner, pool, position, bump).as_slice()
     {
         return Err(VaultError::InvalidAmoebaDlmmPosition.into());
     }
@@ -63,6 +64,9 @@ pub(in crate::processor) fn process_scoped_position_settlement(
     accounts: &[AccountInfo],
     action: u8,
 ) -> ProgramResult {
+    let supplied = accounts;
+    let pool = accounts.get(1).ok_or(VaultError::InvalidAccountList)?;
+    let accounts = without_market_tail(program_id, pool, accounts)?;
     if action == 0 || action == 2 {
         if accounts.len() != 5 {
             return Err(VaultError::InvalidAccountList.into());
@@ -71,7 +75,7 @@ pub(in crate::processor) fn process_scoped_position_settlement(
         let pool_info = &accounts[1];
         let position_info = &accounts[2];
         let marker = &accounts[3];
-        let pool = load_pool(program_id, pool_info)?;
+        let pool = load_pool_with_accounts(program_id, pool_info, supplied)?;
         let position = load_position(program_id, pool_info.key, position_info)?;
         validate_position_owner_and_nonce(owner, &pool, &position, position.position_nonce)?;
         if !owner.is_writable || !marker.is_writable {
@@ -115,7 +119,7 @@ pub(in crate::processor) fn process_scoped_position_settlement(
                 &[bump],
             ],
         )?;
-        marker.try_borrow_mut_data()?.copy_from_slice(&marker_bytes(
+        marker.try_data_mut()?.copy_from_slice(&marker_bytes(
             owner.key,
             pool_info.key,
             position_info.key,
@@ -136,7 +140,7 @@ pub(in crate::processor) fn process_scoped_position_settlement(
     if !keeper.is_signer || !keeper.is_writable || !owner.is_writable || !marker.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    let mut pool = load_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, supplied)?;
     let mut position = load_position(program_id, pool_info.key, position_info)?;
     validate_marker(
         program_id,
@@ -161,10 +165,10 @@ pub(in crate::processor) fn process_scoped_position_settlement(
             .position_count
             .checked_sub(1)
             .ok_or(VaultError::AmoebaDlmmInvariantViolation)?;
-        position.last_updated_slot = Clock::get()?.slot;
+        position.last_updated_slot = crate::compact_error::slot()?;
         pool.last_updated_slot = position.last_updated_slot;
         store_light_state(position_info, &position)?;
-        store_light_state(pool_info, &pool)?;
+        persist_pool(program_id, pool_info, supplied, &pool)?;
     } else {
         let permit = ScopedCleanup {
             keeper,
@@ -189,7 +193,7 @@ pub(in crate::processor) fn process_scoped_position_settlement(
         }
         process_scoped_liquidity_cleanup(
             program_id,
-            &accounts[..end],
+            &with_resident_market(program_id, pool_info, supplied, accounts[..end].to_vec())?,
             RemoveAmoebaDlmmLiquidityV1Params {
                 position_nonce: position.position_nonce,
                 entries,

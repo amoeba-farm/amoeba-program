@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 pub(in crate::processor) fn validate_leaf_target(
     target: &AccountInfo,
@@ -290,7 +291,7 @@ pub(in crate::processor) fn materialize_leaf<'a>(
         }
         CompressedStateDomain::OracleSourceDescriptor => {
             super::super::load_self_valid_oracle_source(program_id, target)?;
-            let mut data = target.try_borrow_data()?.to_vec();
+            let mut data = target.try_data()?.to_vec();
             data[98..194].copy_from_slice(&leaf.data);
             data
         }
@@ -356,7 +357,7 @@ pub(in crate::processor) fn materialize_leaf<'a>(
             return Err(VaultError::InvalidOracleUsdcRewardReceipt.into());
         }
     };
-    let mut data = target.try_borrow_mut_data()?;
+    let mut data = target.try_data_mut()?;
     if data.len() != full_data.len() {
         return Err(VaultError::InvalidCompressionWitness.into());
     }
@@ -398,7 +399,7 @@ pub(in crate::processor) fn capture_leaf(
     if target.owner != program_id || target.executable {
         return Err(VaultError::InvalidCompressionWitness.into());
     }
-    let full_data = target.try_borrow_data()?;
+    let full_data = target.try_data()?;
     let mut data = Vec::new();
     validate_typed_state_data(program_id, target.key, domain, &full_data, Some(&mut data))?;
     Ok(CompressedAmebaStateLeaf {

@@ -22,6 +22,7 @@ use super::participation::{
 };
 use super::*;
 use crate::buyback_mark_math::{BuybackParams, ExitBucket};
+use crate::compact_error::CompactAccountInfo;
 use crate::earn_fund_math::{
     mul_div_floor, FundLedger, FundMathError, FundParams, PositionLedger, QueueState, RollOutcome,
     BPS_DENOMINATOR, MAX_COMPLETED_BATCHES,
@@ -122,7 +123,8 @@ fn ledger_of(fund: &EarnFundV1) -> Result<FundLedger, ProgramError> {
 }
 
 fn clock_now() -> Result<u64, ProgramError> {
-    u64::try_from(Clock::get()?.unix_timestamp).map_err(|_| VaultError::EarnFundNotReady.into())
+    u64::try_from(crate::compact_error::clock()?.unix_timestamp)
+        .map_err(|_| VaultError::EarnFundNotReady.into())
 }
 
 fn buyback_of(fund: &EarnFundV1) -> BuybackParams {
@@ -160,8 +162,8 @@ fn initialize(program: &Pubkey, a: &[AccountInfo], params: &FundParams) -> Progr
         || !a[0].is_writable
         || !a[2].is_writable
         || !a[3].is_writable
-        || *a[5].key != system_program::id()
-        || *a[6].key != spl_token_program_id()
+        || !crate::is_system_program(a[5].key)
+        || !crate::token_instruction::check_id(a[6].key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -278,7 +280,7 @@ fn deposit(program: &Pubkey, a: &[AccountInfo], request: DepositRequest) -> Prog
         || !a[0].is_writable
         || !a[1].is_signer
         || !a[2].is_writable
-        || ((!classic || amount == 0) && *a[4].key != system_program::id())
+        || ((!classic || amount == 0) && !crate::is_system_program(a[4].key))
         || (amount == 0 && !classic)
     {
         return Err(VaultError::InvalidAccountList.into());
@@ -629,7 +631,7 @@ fn allocate(program: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
         || !a[1].is_writable
         || !a[3].is_writable
         || !a[14].is_writable
-        || (*a[11].key != system_program::id() && !a[11].is_writable)
+        || (!crate::is_system_program(a[11].key) && !a[11].is_writable)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -730,7 +732,7 @@ fn allocate(program: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
     if fund.ledger() != Some(ledger) {
         return Err(VaultError::EarnFundAccounting.into());
     }
-    slot.write(&mut a[14].try_borrow_mut_data()?);
+    slot.write(&mut a[14].try_data_mut()?);
     store_state(&a[3], fund.as_ref())?;
     require_backed(&fund, &a[4])
 }
@@ -772,23 +774,21 @@ fn collect(program: &Pubkey, a: &[AccountInfo], cash: CashWitness) -> ProgramRes
         || !a[18].is_writable
         || !a[21].is_writable
         || !a[22].is_writable
-        || *a[10].key != light_token_program_id()
-        || *a[11].key != cpi_authority()
-        || *a[12].key != spl_token_program_id()
-        || *a[13].key != system_program::id()
-        || *a[14].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[15].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[16].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[17].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_program(a[10].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[11].key)
+        || !crate::token_instruction::check_id(a[12].key)
+        || !crate::is_system_program(a[13].key)
+        || !crate::light_token_instruction::is_light_system_program(a[14].key)
+        || !crate::light_token_instruction::is_registered_program(a[15].key)
+        || !crate::light_token_instruction::is_compression_authority(a[16].key)
+        || !crate::light_token_instruction::is_compression_program(a[17].key)
         || (cash.amount == 0
             && (cash.leaf_index != 0
                 || cash.root_index != 0
                 || cash.prove_by_index
                 || cash.proof.is_some()
-                || a[19].key != &system_program::id()
-                || a[20].key != &system_program::id()))
+                || !crate::is_system_program(a[19].key)
+                || !crate::is_system_program(a[20].key)))
         || (cash.amount != 0
             && (!a[19].is_writable
                 || !a[20].is_writable
@@ -962,7 +962,7 @@ fn collect(program: &Pubkey, a: &[AccountInfo], cash: CashWitness) -> ProgramRes
         fund.book
             .record(&mut slot.mark, value, value, now, true, now)
             .map_err(fund_error)?;
-        slot.write(&mut a[22].try_borrow_mut_data()?);
+        slot.write(&mut a[22].try_data_mut()?);
     }
     fund.set_ledger(&ledger);
     if fund.ledger() != Some(ledger) {

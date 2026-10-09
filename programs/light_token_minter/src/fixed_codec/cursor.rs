@@ -360,7 +360,7 @@ impl<'a> FixedCursor<'a> {
     pub(crate) fn finish_borsh(self) -> std::io::Result<()> {
         if self.invalid
             || self.offset > self.data.len()
-            || self.data[self.offset..].iter().any(|byte| *byte != 0)
+            || !crate::bytes_are_zero(&self.data[self.offset..])
         {
             Err(invalid_fixed_borsh())
         } else {

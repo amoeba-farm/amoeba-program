@@ -79,7 +79,7 @@ fn process_capacity_amendment(
     {
         return Err(VaultError::InvalidWriterPolicySnapshot.into());
     }
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let now =
         u64::try_from(clock.unix_timestamp).map_err(|_| VaultError::InvalidWriterLifecycle)?;
     if config.paused

@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Debug, Default, Eq, PartialEq)]
 pub struct InstrumentDefinition {
     pub underlying_id: [u8; 32],
     pub expiry_ts: u64,
@@ -12,17 +12,31 @@ pub struct InstrumentDefinition {
     pub settlement: SettlementStyle,
 }
 
+impl Clone for InstrumentDefinition {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
 impl InstrumentDefinition {
     pub const LEN: usize = 32 + 8 + 8 + 8 + 8 + 8 + 1 + 1;
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Debug, Default, Eq, PartialEq)]
 pub struct MarketParameters {
     pub tick_size: u64,
     pub lot_size: u64,
     pub min_order_qty: u64,
     pub min_cancel_slots: u64,
     pub max_fills_per_instruction: u8,
+}
+
+impl Clone for MarketParameters {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl MarketParameters {
@@ -70,7 +84,7 @@ impl MarketMintAccounting {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Debug, Eq, PartialEq)]
 pub struct Market {
     pub is_initialized: bool,
     pub bump: u8,
@@ -84,6 +98,13 @@ pub struct Market {
     pub total_position_collateral_locked: u64,
     pub paused: bool,
     pub mint_accounting: MarketMintAccounting,
+}
+
+impl Clone for Market {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl Default for Market {

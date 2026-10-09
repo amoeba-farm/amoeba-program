@@ -53,6 +53,11 @@ pub struct ConfigureOracleEconomicsTemplateV2Params {
 crate::fixed_codec::fixed_instruction_deserialize!(ConfigureOracleEconomicsTemplateV2Params, 26, {
     expected_config_version: u64,
     economics: OracleEconomicParams,
+}, flat {
+    expected_config_version: u64,
+    economics.emergency_supermajority_bps: u16,
+    economics.emergency_commit_window_slots: u64,
+    economics.emergency_reveal_window_slots: u64,
 });
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]

@@ -3,7 +3,7 @@ use super::{
     fixed_state_deserialize, fixed_state_deserialize_compact, fixed_state_deserialize_flat,
 };
 
-fixed_state_deserialize!(OracleSupportPosition, 141, {
+fixed_state_deserialize_flat!(OracleSupportPosition, 141, {
     is_initialized: bool,
     bump: u8,
     month: Pubkey,
@@ -106,8 +106,35 @@ fixed_state_deserialize_flat!(OracleMaturityLadderRegistry, 62, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleUpdateClaimV2, 346, {
+fixed_state_deserialize_flat!(OracleUpdateClaimV2, 346, {
     claim: OracleUpdateClaimData,
+    commit_hash: [u8; 32],
+    commit_slot: u64,
+    earliest_reveal_slot: u64,
+    reveal_deadline_slot: u64,
+    revealed_slot: u64,
+    council_review_pending: bool,
+    freshness_reward_multiplier: u8,
+    revealed_at_ts: u64,
+    prior_finalized_step: u64,
+}, flat {
+    claim.is_initialized: bool,
+    claim.bump: u8,
+    claim.month: Pubkey,
+    claim.claim_id: [u8; 32],
+    claim.source: Pubkey,
+    claim.source_id: [u8; 32],
+    claim.claimant: Pubkey,
+    claim.prior_state: u64,
+    claim.new_state: u64,
+    claim.source_time: u64,
+    claim.stake: u64,
+    claim.status: OracleClaimStatus,
+    claim.evidence_hash: [u8; 32],
+    claim.archive_url_hash: [u8; 32],
+    claim.escrow_disposition: OracleEscrowDisposition,
+    claim.account_discriminator: [u8; 3],
+    claim.account_version: u8,
     commit_hash: [u8; 32],
     commit_slot: u64,
     earliest_reveal_slot: u64,
@@ -157,13 +184,23 @@ fixed_state_deserialize_flat!(MarketMintAccounting, 32, {
     total_burned: u64,
 });
 
-fixed_state_deserialize!(OracleEconomicsConfig, 40, {
+fixed_state_deserialize_flat!(OracleEconomicsConfig, 40, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
     account_version: u8,
     config_version: u64,
     economics: OracleEconomicParams,
+    last_updated_slot: u64,
+}, flat {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    config_version: u64,
+    economics.emergency_supermajority_bps: u16,
+    economics.emergency_commit_window_slots: u64,
+    economics.emergency_reveal_window_slots: u64,
     last_updated_slot: u64,
 });
 
@@ -233,7 +270,7 @@ fixed_state_deserialize_compact!(
     }
 );
 
-fixed_state_deserialize!(OracleOpeningClaimChallenge, 380, {
+fixed_state_deserialize_flat!(OracleOpeningClaimChallenge, 380, {
     is_initialized: bool,
     bump: u8,
     month: Pubkey,

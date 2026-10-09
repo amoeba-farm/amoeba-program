@@ -4,6 +4,7 @@
 //! writes a maturity-ladder registry. Every market and authority is derived or pinned here.
 
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::governance_manifest::{
     is_devnet_solo_backfill_2026_instruction_tag,
     DEVNET_SOLO_BACKFILL_ACCUMULATE_ACTIVE_WEIGHT_TAG as ACCUMULATE_ACTIVE_WEIGHT_TAG,
@@ -341,7 +342,7 @@ fn load_sidecar(
     {
         return Err(VaultError::InvalidPda.into());
     }
-    let data = sidecar_info.try_borrow_data()?;
+    let data = sidecar_info.try_data()?;
     let sidecar = DevnetSoloBackfill2026V1::try_from_slice(data.as_ref())
         .map_err(|_| ProgramError::from(VaultError::InvalidOracleState))?;
     if !sidecar.is_initialized
@@ -364,9 +365,7 @@ fn store_sidecar(sidecar_info: &AccountInfo, sidecar: &DevnetSoloBackfill2026V1)
     {
         return Err(ProgramError::AccountDataTooSmall);
     }
-    sidecar_info
-        .try_borrow_mut_data()?
-        .copy_from_slice(&encoded);
+    sidecar_info.try_data_mut()?.copy_from_slice(&encoded);
     Ok(())
 }
 
@@ -388,7 +387,7 @@ fn exact_config(
 }
 
 fn current_clock() -> Result<(u64, u64), ProgramError> {
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let timestamp = u64::try_from(clock.unix_timestamp)
         .map_err(|_| ProgramError::from(VaultError::InvalidOracleState))?;
     Ok((clock.slot, timestamp))
@@ -1690,7 +1689,7 @@ fn process_finalize_opening(
     {
         return Err(VaultError::OracleOpeningClaimNotFinalizable.into());
     }
-    let source_before = source.clone();
+    let source_before = source;
     append_oracle_source_observation(
         &mut source,
         &mut observations,

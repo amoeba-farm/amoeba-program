@@ -128,7 +128,7 @@ pub(super) fn process_resolve_oracle_source_challenge(
             }
             OracleSourceChallengeOutcome::RuleReviewUnresolved => {
                 challenge.status = OracleChallengeStatus::RuleReviewUnresolved;
-                challenge.rule_review_slot = Clock::get()?.slot;
+                challenge.rule_review_slot = crate::compact_error::slot()?;
                 challenge.council_authority_version = 1;
                 challenge.emergency_snapshot_version = 3;
             }
@@ -186,7 +186,7 @@ pub(super) fn process_resolve_oracle_source_challenge(
     } else {
         decrement_pending_oracle_source_challenge_if_terminal(&mut month, params.outcome)?;
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     month.last_updated_slot = slot;
     coverage.last_updated_slot = slot;
     coverage_record.last_updated_slot = slot;

@@ -10,6 +10,9 @@ pub(in crate::processor) fn process_restore_vault(
     a: &[AccountInfo],
     payload: &[u8],
 ) -> ProgramResult {
+    let supplied = a;
+    let pool_info = a.get(1).ok_or(VaultError::InvalidAccountList)?;
+    let a = without_market_tail(program_id, pool_info, a)?;
     // payer, pool, mint, vault, token config/sponsor, System, token program,
     // Light System, token CPI authority, registered program, compression authority,
     // compression program, state tree, output queue.
@@ -22,10 +25,10 @@ pub(in crate::processor) fn process_restore_vault(
         || a[1].is_signer
         || *a[4].key != crate::constants::LIGHT_TOKEN_COMPRESSIBLE_CONFIG
         || *a[5].key != crate::constants::LIGHT_TOKEN_RENT_SPONSOR
-        || *a[6].key != system_program::id()
-        || *a[7].key != light_token_program_id()
-        || *a[8].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[9].key != cpi_authority()
+        || !crate::is_system_program(a[6].key)
+        || !crate::light_token_instruction::is_program(a[7].key)
+        || !crate::light_token_instruction::is_light_system_program(a[8].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[9].key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -41,7 +44,7 @@ pub(in crate::processor) fn process_restore_vault(
     if prove > 1 || (prove == 1 && root_index != 0) || (prove == 0 && proof.0.is_none()) {
         return Err(VaultError::InvalidCompressionWitness.into());
     }
-    let pool = load_pool(program_id, &a[1])?;
+    let pool = load_pool_with_accounts(program_id, &a[1], supplied)?;
     let expected = if *a[2].key == pool.option_mint {
         pool.option_vault
     } else if *a[2].key == pool.quote_mint {
@@ -115,5 +118,13 @@ pub(in crate::processor) fn process_restore_vault(
     if after.amount != amount {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
+    commit_resident(program_id, &a[1], supplied, |state| {
+        if *a[2].key == pool.option_mint {
+            state.pool_hot_option = after.amount;
+        } else {
+            state.pool_hot_quote = after.amount;
+        }
+        Ok(())
+    })?;
     Ok(())
 }

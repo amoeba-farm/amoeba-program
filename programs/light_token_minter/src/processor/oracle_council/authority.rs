@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 #[derive(Debug)]
 pub struct CouncilView {
@@ -53,7 +54,7 @@ pub fn decode_council(
     }
     let seats = core::array::from_fn(|i| pk(139 + 32 * i));
     for (i, seat) in seats.iter().enumerate() {
-        if *seat == Pubkey::default() || *seat == authority || seats[..i].contains(seat) {
+        if crate::pubkey_is_default(seat) || *seat == authority || seats[..i].contains(seat) {
             return Err(bad());
         }
     }
@@ -82,6 +83,6 @@ pub(in crate::processor) fn council(info: &AccountInfo) -> Result<CouncilView, P
         &pinned_controller()?,
         info.key,
         info.owner,
-        &info.try_borrow_data()?,
+        &info.try_data()?,
     )
 }

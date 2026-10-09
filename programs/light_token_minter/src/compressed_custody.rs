@@ -1,5 +1,6 @@
 //! Accounted regular compressed-token custody for an existing DLMM pool or order book.
 //! The sidecar is an inventory ledger, not a second price or obligation ledger.
+use crate::compact_error::CompactAccountInfo;
 use crate::ProgramError;
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
@@ -166,7 +167,7 @@ fn load_bound(
     {
         return Err(ProgramError::InvalidAccountData);
     }
-    let data = account.try_borrow_data()?;
+    let data = account.try_data()?;
     if data[..8] != COMPRESSED_CUSTODY_DISCRIMINATOR {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -206,7 +207,7 @@ pub fn store(account: &AccountInfo, state: &CompressedCustodyV1) -> Result<(), P
     if !account.is_writable || account.data_len() != CompressedCustodyV1::ACCOUNT_LEN {
         return Err(ProgramError::InvalidAccountData);
     }
-    let mut data = account.try_borrow_mut_data()?;
+    let mut data = account.try_data_mut()?;
     data[..8].copy_from_slice(&COMPRESSED_CUSTODY_DISCRIMINATOR);
     state
         .serialize(&mut &mut data[8..])

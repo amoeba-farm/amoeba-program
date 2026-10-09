@@ -14,7 +14,7 @@ pub(super) fn process_init_user_collateral(
     if !user_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
 

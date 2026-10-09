@@ -3,8 +3,8 @@
 use crate::constants::CURRENT_STATE_NAMESPACE_SEED;
 use crate::dlmm_order_math::{OrderBalance, OrderError, OrderSide};
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
-    FixedStateEncode, FixedWriter,
+    fixed_state_deserialize, fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor,
+    FixedField, FixedStateDecode, FixedStateEncode, FixedWriter,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
@@ -15,7 +15,7 @@ pub const ORDER_POOL_VERSION: u8 = 4;
 pub const ORDER_RECORD_SEED: &[u8] = b"order-record-g3";
 pub const MAX_ORDER_WITNESSES: usize = 24;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Debug, Default, Eq, PartialEq)]
 pub struct DlmmOrder {
     pub owner: Pubkey,
     pub sequence: u64,
@@ -28,6 +28,13 @@ pub struct DlmmOrder {
     pub claimable_quote: u64,
     pub previous: u64,
     pub next: u64,
+}
+
+impl Clone for DlmmOrder {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl DlmmOrder {
     pub const LEN: usize = 99;
@@ -79,7 +86,7 @@ fixed_state_deserialize!(DlmmOrder, DlmmOrder::LEN, {
     claimable_option: u64, claimable_quote: u64, previous: u64, next: u64,
 });
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Debug, Default, Eq, PartialEq)]
 pub struct DlmmOrderBookHeader {
     pub initialized: bool,
     pub bump: u8,
@@ -99,10 +106,17 @@ pub struct DlmmOrderBookHeader {
     pub ask_head: u64,
     pub record_count: u64,
 }
+
+impl Clone for DlmmOrderBookHeader {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 impl DlmmOrderBookHeader {
     pub const LEN: usize = 230;
 }
-fixed_state_deserialize!(DlmmOrderBookHeader, DlmmOrderBookHeader::LEN, {
+fixed_state_deserialize_flat!(DlmmOrderBookHeader, DlmmOrderBookHeader::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8,
     pool: Pubkey, market: Pubkey, option_mint: Pubkey, quote_mint: Pubkey, rent_payer: Pubkey,
     next_sequence: u64, expiry_ts: u64, option_obligations: u64, quote_obligations: u64,
@@ -205,7 +219,7 @@ impl FixedStateEncode for DlmmOrderBook {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Debug, Default, Eq, PartialEq)]
 pub struct DlmmOrderRecord {
     pub initialized: bool,
     pub bump: u8,
@@ -214,11 +228,35 @@ pub struct DlmmOrderRecord {
     pub book: Pubkey,
     pub order: DlmmOrder,
 }
+
+impl Clone for DlmmOrderRecord {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 impl DlmmOrderRecord {
     pub const LEN: usize = 137;
 }
-fixed_state_deserialize!(DlmmOrderRecord, DlmmOrderRecord::LEN, {
+fixed_state_deserialize_flat!(DlmmOrderRecord, DlmmOrderRecord::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8, book: Pubkey, order: DlmmOrder,
+}, flat {
+    initialized: bool,
+    bump: u8,
+    discriminator: [u8; 3],
+    version: u8,
+    book: Pubkey,
+    order.owner: Pubkey,
+    order.sequence: u64,
+    order.side: u8,
+    order.limit_bin: u16,
+    order.original_quantity: u64,
+    order.remaining_quantity: u64,
+    order.remaining_input: u64,
+    order.claimable_option: u64,
+    order.claimable_quote: u64,
+    order.previous: u64,
+    order.next: u64,
 });
 pub fn derive_order_record(program: &Pubkey, book: &Pubkey, sequence: u64) -> (Pubkey, u8) {
     Pubkey::find_program_address(
@@ -269,6 +307,7 @@ crate::fixed_codec::compact_borsh_struct! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DlmmOrderAction {
+    MultiOrder(crate::multi_order::Action),
     Initialize,
     /// Recovery only for the deployed classic owner-funded records.
     Cancel {
@@ -285,6 +324,15 @@ pub enum DlmmOrderAction {
     ExpireClassic {
         sequence: u64,
         record_count: u8,
+    },
+    /// Config-admin refund of remaining classic escrow and accrued proceeds to
+    /// the recorded owner, without an owner signature or an expiry wait.
+    AdminRefundClassic {
+        sequence: u64,
+        record_count: u8,
+    },
+    AdminRefundCompressedEscrow {
+        params: CompressedOrderExitV1Params,
     },
     /// Owner-signed regular compressed or canonical SPL Book funding.
     PlaceCompressedEscrow {
@@ -333,6 +381,19 @@ pub enum DlmmOrderAction {
 impl BorshSerialize for DlmmOrderAction {
     fn serialize<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         match self {
+            Self::MultiOrder(action) => action.serialize(writer),
+            Self::AdminRefundClassic {
+                sequence,
+                record_count,
+            } => {
+                29u8.serialize(writer)?;
+                sequence.serialize(writer)?;
+                record_count.serialize(writer)
+            }
+            Self::AdminRefundCompressedEscrow { params } => {
+                30u8.serialize(writer)?;
+                params.serialize(writer)
+            }
             Self::Initialize => 0u8.serialize(writer),
             Self::Cancel { sequence } => {
                 2u8.serialize(writer)?;
@@ -431,6 +492,16 @@ impl BorshSerialize for DlmmOrderAction {
 impl BorshDeserialize for DlmmOrderAction {
     fn deserialize_reader<R: Read>(reader: &mut R) -> io::Result<Self> {
         match u8::deserialize_reader(reader)? {
+            tag @ 18..=28 => Ok(Self::MultiOrder(crate::multi_order::Action::from_reader(
+                tag, reader,
+            )?)),
+            29 => Ok(Self::AdminRefundClassic {
+                sequence: u64::deserialize_reader(reader)?,
+                record_count: u8::deserialize_reader(reader)?,
+            }),
+            30 => Ok(Self::AdminRefundCompressedEscrow {
+                params: CompressedOrderExitV1Params::deserialize_reader(reader)?,
+            }),
             0 => Ok(Self::Initialize),
             2 => Ok(Self::Cancel {
                 sequence: u64::deserialize_reader(reader)?,
@@ -510,6 +581,14 @@ impl crate::fixed_codec::CursorField for DlmmOrderAction {
     fn read(input: &mut crate::fixed_codec::CheckedCursor<'_>) -> Self {
         use crate::fixed_codec::CursorField as F;
         match input.u8() {
+            tag @ 18..=28 => Self::MultiOrder(crate::multi_order::Action::from_cursor(tag, input)),
+            29 => Self::AdminRefundClassic {
+                sequence: input.u64(),
+                record_count: input.u8(),
+            },
+            30 => Self::AdminRefundCompressedEscrow {
+                params: CompressedOrderExitV1Params::read(input),
+            },
             0 => Self::Initialize,
             2 => Self::Cancel {
                 sequence: input.u64(),

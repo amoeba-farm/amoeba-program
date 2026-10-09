@@ -139,8 +139,10 @@ pub(in crate::processor) fn required_accesses(
     use RequiredAccessKind::{Initialize, Mutable, MutableOrInitialize, ReadOnly as Read};
     let s = RequiredAccessSpec::new;
     let (expected, specs): (usize, Vec<RequiredAccessSpec>) = match decode(payload)? {
-        Action::ExtendOctoberLadder(_) => (59, vec![]),
-        Action::InstallOctoberLadder(_) => (45, vec![]),
+        Action::ExtendOctoberLadder(_)
+        | Action::InstallOctoberLadder(_)
+        | Action::InitializeCfmMonth { .. }
+        | Action::InitializeCfmPolicy { .. } => return invalid(),
         Action::TerminalCleanup(params) => {
             (super::terminal_cleanup::account_count(&params)?, vec![])
         }
@@ -166,8 +168,6 @@ pub(in crate::processor) fn required_accesses(
             2 => (11, vec![]),
             _ => return invalid(),
         },
-        Action::InitializeCfmMonth { .. } => (12, vec![]),
-        Action::InitializeCfmPolicy { .. } => (10, vec![]),
         Action::Council(action) => {
             return super::oracle_council::required_accesses(&action, account_count)
         }
@@ -264,18 +264,10 @@ pub(in crate::processor) fn process(
     // The wrapper already verifies every logical read remains unchanged. All source
     // views are physically writable during materialization, including logical reads.
     match decode(payload)? {
-        Action::ExtendOctoberLadder(params) => {
-            if compressed_inner {
-                return invalid();
-            }
-            super::writer_sleeve::process_extend_october_ladder(program, accounts, params)
-        }
-        Action::InstallOctoberLadder(params) => {
-            if compressed_inner {
-                return invalid();
-            }
-            super::writer_sleeve::process_install_october_ladder(program, accounts, params)
-        }
+        Action::ExtendOctoberLadder(_)
+        | Action::InstallOctoberLadder(_)
+        | Action::InitializeCfmMonth { .. }
+        | Action::InitializeCfmPolicy { .. } => invalid(),
         Action::TerminalCleanup(params) => {
             if compressed_inner {
                 return invalid();
@@ -303,18 +295,6 @@ pub(in crate::processor) fn process(
         } => super::september_bootstrap::process_october(
             program, accounts, operation, market, row, plan_hash,
         ),
-        Action::InitializeCfmMonth {
-            product,
-            settlement_base_oracle_atomic,
-        } => super::cfm_parent_proxy::initialize_month(
-            program,
-            accounts,
-            product,
-            settlement_base_oracle_atomic,
-        ),
-        Action::InitializeCfmPolicy { product } => {
-            super::cfm_parent_proxy::initialize_policy(program, accounts, product)
-        }
         Action::Council(action) => super::oracle_council::process(program, accounts, action),
         Action::RegisterRoot => register_period(program, accounts, true),
         Action::BackfillSourceEvidence => {

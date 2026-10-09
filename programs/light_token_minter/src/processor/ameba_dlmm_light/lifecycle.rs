@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::{ameba_dlmm_math::AMOEBA_DLMM_BINS_PER_PAGE, constants::MAX_AMOEBA_DLMM_PAGE_COUNT};
 
 #[derive(Clone, BorshSerialize, BorshDeserialize)]
@@ -9,18 +10,18 @@ pub(super) struct CompressAndCloseParams {
 }
 
 #[derive(Clone, BorshSerialize)]
-pub(super) struct PackedCompressedAccountData {
-    pub(super) tree_info: PackedStateTreeInfo,
-    pub(super) data: DecodedAmoebaDlmmState,
+pub struct PackedCompressedAccountData {
+    pub tree_info: PackedStateTreeInfo,
+    pub data: DecodedAmoebaDlmmState,
 }
 
 #[derive(Clone, BorshSerialize)]
-pub(super) struct DecompressIdempotentParams {
-    pub(super) system_accounts_offset: u8,
-    pub(super) token_accounts_offset: u8,
-    pub(super) output_queue_index: u8,
-    pub(super) proof: ValidityProof,
-    pub(super) accounts: Vec<PackedCompressedAccountData>,
+pub struct DecompressIdempotentParams {
+    pub system_accounts_offset: u8,
+    pub token_accounts_offset: u8,
+    pub output_queue_index: u8,
+    pub proof: ValidityProof,
+    pub accounts: Vec<PackedCompressedAccountData>,
 }
 
 #[inline(never)]
@@ -77,7 +78,7 @@ pub(super) fn decode_compress_params(
 }
 
 #[inline(never)]
-pub(super) fn decode_decompress_params(
+pub fn decode_decompress_params(
     payload: &[u8],
 ) -> Result<DecompressIdempotentParams, ProgramError> {
     let mut reader = CheckedCursor::new(payload);
@@ -115,7 +116,7 @@ pub(super) fn load_config_and_sponsor(
     if config.rent_sponsor != rent_sponsor.key.to_bytes()
         || !rent_sponsor.is_writable
         || rent_sponsor.executable
-        || rent_sponsor.owner != &system_program::id()
+        || !crate::is_system_program(rent_sponsor.owner)
     {
         return Err(invalid_light());
     }
@@ -145,7 +146,7 @@ const POSITION_EMPTY_END: usize = 597;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
-pub(super) enum AmoebaDlmmStateKind {
+pub enum AmoebaDlmmStateKind {
     Pool = 0,
     BinPage = 1,
     SharePage = 2,
@@ -208,13 +209,13 @@ impl AmoebaDlmmStateKind {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct DecodedAmoebaDlmmState {
+pub struct DecodedAmoebaDlmmState {
     pub(super) kind: AmoebaDlmmStateKind,
     pub(super) body: Vec<u8>,
 }
 
 impl DecodedAmoebaDlmmState {
-    pub(super) fn from_body(kind: AmoebaDlmmStateKind, body: &[u8]) -> Result<Self, ProgramError> {
+    pub fn from_body(kind: AmoebaDlmmStateKind, body: &[u8]) -> Result<Self, ProgramError> {
         if body.len() != kind.body_len()
             || body[0] > 1
             || (kind == AmoebaDlmmStateKind::Pool && body[POOL_STATUS_OFFSET] > 4)
@@ -228,11 +229,27 @@ impl DecodedAmoebaDlmmState {
         })
     }
 
+    pub fn kind(&self) -> AmoebaDlmmStateKind {
+        self.kind
+    }
+
+    pub fn body(&self) -> &[u8] {
+        &self.body
+    }
+
+    /// The exact compressed layout admitted by the native hydration handler.
+    pub fn is_canonical_compressed(&self) -> bool {
+        self.has_layout_with_state(CompressionState::Compressed)
+            && self
+                .compression_info()
+                .is_ok_and(|info| info == CompressionInfo::compressed())
+    }
+
     fn decode(program_id: &Pubkey, account: &AccountInfo) -> Result<Self, ProgramError> {
         if account.owner != program_id || account.executable || !account.is_writable {
             return Err(invalid_light());
         }
-        let data = account.try_borrow_data().map_err(|_| invalid_light())?;
+        let data = account.try_data().map_err(|_| invalid_light())?;
         if data.len() < 8 {
             return Err(invalid_light());
         }
@@ -328,7 +345,7 @@ impl DecodedAmoebaDlmmState {
         }
     }
 
-    pub(super) fn validate_pda(&self, program_id: &Pubkey, key: &Pubkey) -> ProgramResult {
+    pub fn validate_pda(&self, program_id: &Pubkey, key: &Pubkey) -> ProgramResult {
         let bump = [self.body[1]];
         let expected = match self.kind {
             AmoebaDlmmStateKind::Pool => Pubkey::create_program_address(
@@ -457,8 +474,10 @@ pub(super) fn execute_compress(
     }
     let (config, _) = load_config_and_sponsor(program_id, &accounts[1], &accounts[2])?;
     let address_tree = config.address_tree;
-    let current_slot = Clock::get().map_err(|_| invalid_light())?.slot;
-    let rent = Rent::get().map_err(|_| invalid_light())?;
+    let current_slot = crate::compact_error::clock()
+        .map_err(|_| invalid_light())?
+        .slot;
+    let rent = crate::compact_error::rent().map_err(|_| invalid_light())?;
 
     let mut account_infos = Vec::with_capacity(num_pdas);
     for (index, meta) in params.compressed_accounts.iter().enumerate() {
@@ -545,14 +564,14 @@ pub(super) fn create_hot_pda<'info>(
 ) -> ProgramResult {
     if !target.is_writable
         || target.executable
-        || target.owner != &system_program::id()
+        || !crate::is_system_program(target.owner)
         || target.data_len() != 0
         || target.key == rent_sponsor.key
-        || *system_program_info.key != system_program::id()
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(invalid_light());
     }
-    let rent_minimum = Rent::get()
+    let rent_minimum = crate::compact_error::rent()
         .map_err(|_| invalid_light())?
         .minimum_balance(account_len);
     let sponsor_bump = [rent_sponsor_bump];
@@ -673,7 +692,7 @@ impl DecodedAmoebaDlmmState {
         if target.data_len() != self.body.len() + 8 {
             return Err(invalid_light());
         }
-        let mut data = target.try_borrow_mut_data().map_err(|_| invalid_light())?;
+        let mut data = target.try_data_mut().map_err(|_| invalid_light())?;
         data[..8].copy_from_slice(&discriminator);
         data[8..].copy_from_slice(&self.body);
         Self::write_compression_info(&mut data[8..], &decompressed_compression_info(config, slot));
@@ -697,7 +716,7 @@ pub(super) fn validate_existing_hot(
         actual.validate_pda(program_id, target.key)?;
         return Ok(true);
     }
-    if target.owner != &system_program::id()
+    if !crate::is_system_program(target.owner)
         || target.executable
         || target.data_len() != 0
         || !target.is_writable
@@ -731,13 +750,13 @@ pub(super) fn execute_decompress(
     }
     let system_accounts = &accounts[system_accounts_offset..hot_start];
     let system_program_info = system_accounts.get(5).ok_or_else(invalid_light)?;
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(invalid_light());
     }
     let (config, rent_sponsor_bump) =
         load_config_and_sponsor(program_id, &accounts[1], &accounts[2])?;
     let address_tree = config.address_tree;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let mut account_infos = Vec::with_capacity(num_pdas);
 
     for (packed, target) in params.accounts[..num_pdas]

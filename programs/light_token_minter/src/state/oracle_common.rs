@@ -400,7 +400,7 @@ impl OracleMonthState {
             && self.active_weight_initialization_version
                 == Self::ACTIVE_WEIGHT_INITIALIZATION_VERSION
             && (self.schedule_version == Self::SKU_COVERAGE_SCHEDULE_VERSION
-                || (cfg!(feature = "mainnet-v3") && matches!(self.schedule_version, 3 | 4 | 5)))
+                || (cfg!(feature = "mainnet-v3") && matches!(self.schedule_version, 3..=4)))
             && self.work_reward_currency_version == Self::WORK_REWARD_CURRENCY_USDC_V1
             && (!self.is_cfm_parent_proxy() || self.schedule_version == 3)
     }

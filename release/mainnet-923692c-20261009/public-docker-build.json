@@ -1,0 +1,1240 @@
+{
+  "schema": "ameba-public-mainnet-docker-build-v1",
+  "recordedAtUtc": "2026-10-09T12:57:15.363092+00:00",
+  "privateSourceCommit": "923692c717bad8460424122c0093fb399598436b",
+  "publicRepository": "https://github.com/amoeba-farm/amoeba-program",
+  "publicBaseCommit": "970d1e029b312c75599c8c1b3de5d273f966e301",
+  "generatedExportTreeSha256": "02a63f1813389bf9bfccc9ba097da2476bca25b1385dd5b9e82f0548fd7ea35d",
+  "verifierVersion": "0.5.1",
+  "dockerServerVersion": "28.3.0",
+  "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+  "command": "solana-verify build \"$PWD/programs/light_token_minter\" --library-name light_token_minter --base-image solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68 --arch v1 -- --features mainnet-v3",
+  "architecture": "v1",
+  "cargoArgs": [
+    "--features",
+    "mainnet-v3"
+  ],
+  "defaultFeatures": true,
+  "locked": true,
+  "artifactBytes": 1961032,
+  "rawArtifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+  "normalizedExecutableHash": "fd922b2a76bdc0456a85441a0a8c29b8a87597c4788c7a1448f7aca978b40482",
+  "matchesBothQualifiedNativeBuilds": true,
+  "programBuildInputs": [
+    {
+      "path": "programs/light_token_minter/.cargo/config.toml",
+      "sha256": "01c026efdd8a6979fc0c485d7dd2f694819a591e00cb9d43d3b6d827f494303d",
+      "bytes": 685
+    },
+    {
+      "path": "programs/light_token_minter/Cargo.lock",
+      "sha256": "ae7d89f94c54afee97d481c71f2d21baece160e59cd633c10a0dc640cddddfc6",
+      "bytes": 82441
+    },
+    {
+      "path": "programs/light_token_minter/Cargo.toml",
+      "sha256": "5a8e298a6b6d3b1c18393148968fe5deaab92f33197180d985df89ba8020b413",
+      "bytes": 1210
+    },
+    {
+      "path": "programs/light_token_minter/mainnet-profile.rs",
+      "sha256": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",
+      "bytes": 2394
+    },
+    {
+      "path": "programs/light_token_minter/src/ameba_dlmm_instruction.rs",
+      "sha256": "a69df56767459c6119daa59b0d4e7e623c4e555fa19ff57b182ca342cd1185c4",
+      "bytes": 18585
+    },
+    {
+      "path": "programs/light_token_minter/src/ameba_dlmm_math.rs",
+      "sha256": "64451e6ac66418ef4805e1504d86a0baae440ceed60a6640a475a293ad447263",
+      "bytes": 20859
+    },
+    {
+      "path": "programs/light_token_minter/src/ameba_dlmm_state.rs",
+      "sha256": "53dda3c0c5903be20c10056408261e5c87b034550830eca93a8b51c28b22c684",
+      "bytes": 19380
+    },
+    {
+      "path": "programs/light_token_minter/src/associated_token.rs",
+      "sha256": "f70284ddde2bf63ada16ab1c1b317aa88080534cdfb24774d0f7e8e98988b589",
+      "bytes": 1407
+    },
+    {
+      "path": "programs/light_token_minter/src/atomic_option_quote.rs",
+      "sha256": "d974382e1993e6f12952ed0498ff0305355ee2b31f876d3628b7e18434333f7b",
+      "bytes": 8254
+    },
+    {
+      "path": "programs/light_token_minter/src/atomic_option_route.rs",
+      "sha256": "52435c4c40df6275b867497c95088b4f44ac620709dd32f5fbcf16d0781d3468",
+      "bytes": 7892
+    },
+    {
+      "path": "programs/light_token_minter/src/atomic_projection/delta.rs",
+      "sha256": "6302fc39df35678a17a95b6afa13d20f2550d9450fccd952f96e6a4510067f6c",
+      "bytes": 4347
+    },
+    {
+      "path": "programs/light_token_minter/src/atomic_projection.rs",
+      "sha256": "b38227f1607d6fc10cdd7315ffcb12339789e7622c5f6884a360d2b0e3ef8f12",
+      "bytes": 18285
+    },
+    {
+      "path": "programs/light_token_minter/src/atomic_proof.rs",
+      "sha256": "e78a28779379b32feeecce7dbf497eb14af2a326a6945672a7102e76cc22a425",
+      "bytes": 7496
+    },
+    {
+      "path": "programs/light_token_minter/src/bounded_heap.rs",
+      "sha256": "0292a86e481b62a1890e5173394963a0b0dfbd94d4f50802231ee06321228f8e",
+      "bytes": 2035
+    },
+    {
+      "path": "programs/light_token_minter/src/business_generation.rs",
+      "sha256": "bd40d7661e115dd346a662fcdc220fc42f7e75ceefa4752cba9d62f9c5ca4dfc",
+      "bytes": 1185
+    },
+    {
+      "path": "programs/light_token_minter/src/buyback_mark_math.rs",
+      "sha256": "08cccf1abc23cec9bc829f802809179e20967cb013056d5cf83c6b8caaa8fefc",
+      "bytes": 20479
+    },
+    {
+      "path": "programs/light_token_minter/src/buyback_mark_state.rs",
+      "sha256": "af7564126223324a85b97dffdf181d78277687b7d2868734e462389b440a7f1a",
+      "bytes": 8561
+    },
+    {
+      "path": "programs/light_token_minter/src/capped_strip.rs",
+      "sha256": "4309db0dc27a54c826180d0369dd004ee4bd3f6dcc57bdb3408f00a22b89ebc4",
+      "bytes": 12449
+    },
+    {
+      "path": "programs/light_token_minter/src/compact_error/account_info.rs",
+      "sha256": "1633d976ec562ad5d5224f1ac32533560e0c7aab57c99acfbda4bab1812143be",
+      "bytes": 1667
+    },
+    {
+      "path": "programs/light_token_minter/src/compact_error/sysvars.rs",
+      "sha256": "0d2e35eb6245ef63e7bcf36e4a34308a69eb1317a382f718dd469a64e309e28a",
+      "bytes": 571
+    },
+    {
+      "path": "programs/light_token_minter/src/compact_error.rs",
+      "sha256": "9438b098113114b55a7f5e2510612406c641f72254539f6910610c6c4e883449",
+      "bytes": 7994
+    },
+    {
+      "path": "programs/light_token_minter/src/compressed_custody.rs",
+      "sha256": "ca01b7a4b26953398ff3006c10e1fa3d788fb61e22773ad6d5d08bb9a9eef8cc",
+      "bytes": 6997
+    },
+    {
+      "path": "programs/light_token_minter/src/compressed_option_settlement.rs",
+      "sha256": "41aec38d60248f2251af3bdcf9117525b640d7368453325765c2cdec2cc50c69",
+      "bytes": 4408
+    },
+    {
+      "path": "programs/light_token_minter/src/compressed_swap_plan.rs",
+      "sha256": "0eb91126244845688031617d927560535072a72b50234057742b16935a61de76",
+      "bytes": 6486
+    },
+    {
+      "path": "programs/light_token_minter/src/compression.rs",
+      "sha256": "d5c4d0b0225b822928b5e63f8d806e83694d8fd9e6703ac42449f53f13cfb4cc",
+      "bytes": 30808
+    },
+    {
+      "path": "programs/light_token_minter/src/constants.rs",
+      "sha256": "aa5c72d5ed4a262fb7c6a4a3450a6d353492b03dc4939340bdbf1adb86fc67c3",
+      "bytes": 16460
+    },
+    {
+      "path": "programs/light_token_minter/src/dlmm_light_codec.rs",
+      "sha256": "e73215fabb9ef342db1ab7c8679ead29299d17f0117c75248ea8a55926684cc3",
+      "bytes": 1181
+    },
+    {
+      "path": "programs/light_token_minter/src/dlmm_order_math.rs",
+      "sha256": "55b24dba8815fcd64a1cb332f490c14727a660408215acc60ed6f682b0071704",
+      "bytes": 6666
+    },
+    {
+      "path": "programs/light_token_minter/src/dlmm_order_state.rs",
+      "sha256": "c072766e02239faee83ed75b6031392a2afca770d2744dffa42468518313ac53",
+      "bytes": 24402
+    },
+    {
+      "path": "programs/light_token_minter/src/earn_fund_math.rs",
+      "sha256": "8fd2f596160be96338c02582b7227fde13c2fa91eedff90550f93836edeb45eb",
+      "bytes": 47063
+    },
+    {
+      "path": "programs/light_token_minter/src/earn_fund_state/wire.rs",
+      "sha256": "db06718cbb775a666533ed2a01789a7b179991a8776be697b357e9b23959c5dd",
+      "bytes": 3962
+    },
+    {
+      "path": "programs/light_token_minter/src/earn_fund_state.rs",
+      "sha256": "7ff7cd69930bce848a3bdbf9ca34fb4e4c21442de33cfe288dc28b10151990ac",
+      "bytes": 44490
+    },
+    {
+      "path": "programs/light_token_minter/src/error.rs",
+      "sha256": "6901c65e0f67791ad8844660e502f8e6f13559e0acd65493f3deb852069351a1",
+      "bytes": 19631
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/accounts.rs",
+      "sha256": "a2bb77ddec23634adfe05037dc609785a020160988277f828eac251ad722068b",
+      "bytes": 7696
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/capped_strip.rs",
+      "sha256": "7401a0ab5601a04a20c4f12f0f0c1e380c621455d8c1d45a09a2258cf4c8f855",
+      "bytes": 1930
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/compact_borsh.rs",
+      "sha256": "08c224054235668c63bfafcd9393e5de954ea3dfbc5156de715d0ad1e8c1256e",
+      "bytes": 6228
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/cursor.rs",
+      "sha256": "50f2066df291b4d5bdb2d6c09f3df75506c09af738d67d414ba5dcfe909559b1",
+      "bytes": 10184
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/fields.rs",
+      "sha256": "b7da7c8d8ccaf28f8118391c2a6efb80a903164ed86777779149c41ecff8a65b",
+      "bytes": 20640
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/flat.rs",
+      "sha256": "5b0d374e0e961da24aa25cffe82ca2c1665358153c2195daf5dbc9ac541b947c",
+      "bytes": 11180
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/oracle.rs",
+      "sha256": "d4c32f95d0a84523e69f0e589cfa094740ac390d13a0cd09a0755db9fabd6f86",
+      "bytes": 2955
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/state_codecs.rs",
+      "sha256": "f27bca84a09b403a74ba1e21154643b8cd9028d6fbbff60367b50a6b3661c61e",
+      "bytes": 10305
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/state_macros.rs",
+      "sha256": "1fb7ce2e3eb06b6fcf1e78b39e2433ae9a796e38cbaf89ffe1cff6c0da3f77de",
+      "bytes": 24522
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/variable.rs",
+      "sha256": "f08b61d38e4d5eb1daf90390995f2551eda4afd579311b799d5304dbf2d9e4c8",
+      "bytes": 4567
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec/writer_dlmm.rs",
+      "sha256": "a6416b416cbaeb6a3999f548521eddef6f9d0ef137c94a543545bb8f479804f3",
+      "bytes": 4167
+    },
+    {
+      "path": "programs/light_token_minter/src/fixed_codec.rs",
+      "sha256": "1b02abed347c433a28eb9533bc7ef93b7b661a30476457497ee1494fd9407a9d",
+      "bytes": 2687
+    },
+    {
+      "path": "programs/light_token_minter/src/governance_gate/devnet_v3_identity.rs",
+      "sha256": "f42af9b2bb710244860f7d30ddcc48e5790e4106cd96920260e29239f5b50586",
+      "bytes": 445
+    },
+    {
+      "path": "programs/light_token_minter/src/governance_gate.rs",
+      "sha256": "950bc0e4d2507fa476e948f40f8442d6917f1dd2fa3cb58e65155feed52d6046",
+      "bytes": 14836
+    },
+    {
+      "path": "programs/light_token_minter/src/governance_manifest.rs",
+      "sha256": "53d458d95f571d2cd056b34eb771896bc6c79f355aaa93834bdd425ecdf26c84",
+      "bytes": 11760
+    },
+    {
+      "path": "programs/light_token_minter/src/individual_writer.rs",
+      "sha256": "e81ac22e330afa25b1527dc8d12bfb135232954676659a9e482653db5fe7918a",
+      "bytes": 10864
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/compression.rs",
+      "sha256": "2bb47f92d602140eb042364979c13e0be635cf16adea9840134e27bf5e895e64",
+      "bytes": 20133
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/deserialize.rs",
+      "sha256": "f7c262f32fa37ec2e627b71c5aa688315b70dd025e3850d48f9519c5c45878eb",
+      "bytes": 18515
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/market.rs",
+      "sha256": "15fa65ce869eda9eb9eefc5144db114c5e170d1e72c03e4142fc3f522843491d",
+      "bytes": 6496
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/model.rs",
+      "sha256": "ce70e0add0e9fa43c9163ad7925699134c28367bd9c6512bb7e56f1d021eef50",
+      "bytes": 23849
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/oracle_carry.rs",
+      "sha256": "19421a96a3ef43eec6450d56e328988207e4f58d712824a7abd31cb41ae8e354",
+      "bytes": 25823
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/oracle_cash.rs",
+      "sha256": "8c2abfaee399b2c3c4cc74937e2583c8be9a797e2eb3bbe2663a1253bd1d7dab",
+      "bytes": 5481
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/oracle_work.rs",
+      "sha256": "a5a98d8a11c4410cf8837b65a719d2570c6b39e3bf998b20d5f40356a93643e2",
+      "bytes": 10282
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/serialize.rs",
+      "sha256": "0c86f7bb96209d931d6b23369305cfacb4503f5c7336135283dfbcf76e91070a",
+      "bytes": 18473
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/tags.rs",
+      "sha256": "3f7b73c2e6bc7b2dc6fa37655b052f9bdbbd9df52c4f30cc7041e3f25a5c3d1c",
+      "bytes": 3999
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction/writer_sleeve.rs",
+      "sha256": "1f4c1e60a9e3bb496d43088c0eaca056835f58d201e8d43e6ebe5e7dbc315cac",
+      "bytes": 7188
+    },
+    {
+      "path": "programs/light_token_minter/src/instruction.rs",
+      "sha256": "bd790e4914aca34e07c27671a64ea60ceaf9d27d8f1092456975f8f05852b207",
+      "bytes": 4360
+    },
+    {
+      "path": "programs/light_token_minter/src/lib.rs",
+      "sha256": "dbe276733dd36ca689523f84027d7ca93da8397320098f88242df45bdda5e578",
+      "bytes": 7427
+    },
+    {
+      "path": "programs/light_token_minter/src/light_token_instruction.rs",
+      "sha256": "0517bfce27c5364c7933418c0c50e1ea667deec32770572bb45911b7b44836da",
+      "bytes": 19494
+    },
+    {
+      "path": "programs/light_token_minter/src/local_direct_address.rs",
+      "sha256": "b04a7aa7083821c27e405af4431b9818c1f7d2109eb204740bdf34637f38ce8a",
+      "bytes": 990
+    },
+    {
+      "path": "programs/light_token_minter/src/market_router/codec.rs",
+      "sha256": "e1ca850ede96b60f2fbfa28f5f87425af0499f014ee9a823eca6e8af629322ad",
+      "bytes": 3704
+    },
+    {
+      "path": "programs/light_token_minter/src/market_router.rs",
+      "sha256": "e9d6f438cdacaccbc3fe4728a9a5fadcbd35317981d8072ed3392bab46a5876a",
+      "bytes": 16747
+    },
+    {
+      "path": "programs/light_token_minter/src/market_router_account.rs",
+      "sha256": "7c189a083e7d2f992da3e60f5c951a67120e3f3ee9e6995306a4c898f062c25f",
+      "bytes": 3002
+    },
+    {
+      "path": "programs/light_token_minter/src/multi_order.rs",
+      "sha256": "0f3ffce59dc870f8819d6ab6538a4ce67de2f353164f623270bc3b0d39e91d12",
+      "bytes": 12379
+    },
+    {
+      "path": "programs/light_token_minter/src/observation_wire.rs",
+      "sha256": "ed2037251b5bf5ae7a33de9c7dec0d0296c5966d0939ae0fdf82b9cb2a03447c",
+      "bytes": 6133
+    },
+    {
+      "path": "programs/light_token_minter/src/oracle_parent_proxy/mod.rs",
+      "sha256": "c9636a94a3749755bfd57b4c39ba8176f6f41e71f17903d7426f56d936f7302b",
+      "bytes": 10696
+    },
+    {
+      "path": "programs/light_token_minter/src/oracle_parent_proxy/profile.rs",
+      "sha256": "158280c1670de3e8cbb988da32d914720d4f8453027d63ae772baaba8222e80e",
+      "bytes": 1418
+    },
+    {
+      "path": "programs/light_token_minter/src/oracle_parent_proxy/september_bootstrap.rs",
+      "sha256": "0c443de70646c6b93c665831270c28c82cb79b395bf2f7e5c4d50e56da1fa2f7",
+      "bytes": 4169
+    },
+    {
+      "path": "programs/light_token_minter/src/oracle_rank.rs",
+      "sha256": "787fd9beb74a7fd73eb3fef720bc0b37f3df262d3ee5207105ef85c121f2760c",
+      "bytes": 2779
+    },
+    {
+      "path": "programs/light_token_minter/src/oracle_sponsorship.rs",
+      "sha256": "8ed774f121553cb10bf8b08314683a0f449141ccbdde78eec7711771d1fbeddb",
+      "bytes": 5573
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/account_addresses.rs",
+      "sha256": "ca153ce464fe321e31dab668107a3e74fec5930d604c240e3129531da96639fa",
+      "bytes": 17029
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/account_io.rs",
+      "sha256": "b8e2a3bca4d1e0b4e7929b5265574a0bc9ad853e701926bc3af4a579d0107622",
+      "bytes": 30951
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/account_io_tokens.rs",
+      "sha256": "7b807143250a2cd2ea984789a00d2d88f50bab4e180f88ee3231acaaeb7689b5",
+      "bytes": 15429
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/active_weights.rs",
+      "sha256": "6eb1f1fbb1ecc01770477c0817c66c27dfa82d54139a0f4af8bc3ec616668c55",
+      "bytes": 20574
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/accounts.rs",
+      "sha256": "ecb3462ec91f1d1377316e0afe42ac99f04f1ae5a210a8373fb4a7c89345bd01",
+      "bytes": 20181
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/collective.rs",
+      "sha256": "7023d70fd3b97d179a273ecd767299a8e029513983adf8fc692af9f46c44d444",
+      "bytes": 13275
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/compressed_delivery.rs",
+      "sha256": "281855fde31d5f555165e4cb634c2f9bf5600843c7a50df71a99be5d652d7a40",
+      "bytes": 2489
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/compressed_swap.rs",
+      "sha256": "d1d656028fa1bafc2d12c79d57db0008dfd4b9feccdb10022eb24dab15a4f234",
+      "bytes": 24575
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/initialization.rs",
+      "sha256": "b2db1c60d5783e5115a045ccf0fc3e339cc1ff6df817f1b58f9dab296f2edcc5",
+      "bytes": 16098
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/lifecycle.rs",
+      "sha256": "b3a64725c02d77d0bcfc2fa1873288252f17983b31af45232ebd176a9f34cba9",
+      "bytes": 8753
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/liquidity/compressed.rs",
+      "sha256": "b72f55b8a8c7256d890d3f77a1ca5768a0fb6efd18e9af1c559d02dfe1d15276",
+      "bytes": 15140
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/liquidity.rs",
+      "sha256": "55380a0cb69841c1b776f5e542cffdbeb618100fe8a6928582c9f3bcde8513cd",
+      "bytes": 31338
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/orders/compressed.rs",
+      "sha256": "bc4b4901c207286ac0008479d06b9e31eddb29e7dd8df7ea7ee84cbc51e5632d",
+      "bytes": 15926
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/orders/expired.rs",
+      "sha256": "bb1b5c8c2ca3dc6d67902653826d64470fe3631b8a99d2d698be441541777bf2",
+      "bytes": 7797
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/orders/recovery.rs",
+      "sha256": "2e760f5fa80c84dd919f7d27e221ef8f6dd24b8f98a51eb824d92283e71f4c68",
+      "bytes": 15835
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/orders/storage.rs",
+      "sha256": "104e8e1d3b1730262acc43412d66c0d10fb5dfb8916999775e1d375253884fbf",
+      "bytes": 13399
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/orders/trading.rs",
+      "sha256": "d7b4ef4cb59aab4e910cc973b45481704ea117248172f5ace31f7949eb9e5e85",
+      "bytes": 37395
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/orders.rs",
+      "sha256": "c1b069411dbdc892b765dbd3ccca01a5b27f802f429f6de18e69aa3c6e1e4ce3",
+      "bytes": 20125
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/ordinary_helpers.rs",
+      "sha256": "eb80d9a4f9b3c59036412cb77152c81e02239eebe99cc06419b9bc5c4a2752c4",
+      "bytes": 12465
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/scoped_position.rs",
+      "sha256": "a413bf51be77949529c2f21485f332752fc0ed0af266e0dc05c0ac59513086ab",
+      "bytes": 7339
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/swap.rs",
+      "sha256": "af6a6b1dbe49ee628e0ed20d37eddcfd72daa793b2531ac4d3f05ff82db9a560",
+      "bytes": 29032
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm/vault_restore.rs",
+      "sha256": "6ce31601734865c189ff8519c0127c417ef44dc8397c8e64bafd401355cbb67a",
+      "bytes": 5145
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm.rs",
+      "sha256": "35b6c9a62ca30104dafaebaa1bde7feec14160328cbdedb0c9cf2c507d48a77e",
+      "bytes": 22696
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm_light/lifecycle.rs",
+      "sha256": "255c3f44e39ddfc49335254776b49de65325c9882606d86a2f7077b629990bfd",
+      "bytes": 30801
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/ameba_dlmm_light.rs",
+      "sha256": "44fed3ba31312fa9e2fd355e0b9304c968e566a35e975b51a8c17e15846c04cf",
+      "bytes": 19408
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/atomic_projection.rs",
+      "sha256": "68830927d24825b005ad8971e13ec48e801ca558186349b112b76710277839d8",
+      "bytes": 6670
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/atomic_proof.rs",
+      "sha256": "a10185c519b4e1ef1273fa431837c83cfd71bd74d245287ff24e4d54abf8aa49",
+      "bytes": 2138
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/bucket_medians.rs",
+      "sha256": "18987cd04dfee989c04ca4eb9d0915b613ebaeda74ee804097dc1f7696c1d94d",
+      "bytes": 10037
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/cfm_parent_proxy.rs",
+      "sha256": "e7f1949dc753734535439e66d1f0ceaef0cbe88c367736991a89551c6cc23ec1",
+      "bytes": 1065
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/collateral_accounts.rs",
+      "sha256": "96e864f1b32bc96ec6b5368eed0349c1ab94ede5aeb3b96eafc8ec837dca2490",
+      "bytes": 2613
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/compressed_state/contracts.rs",
+      "sha256": "e376b200c4e032cd91990ec4c2eb9698ee7350857eb48827bbfc315e8a609325",
+      "bytes": 21772
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/compressed_state/execute.rs",
+      "sha256": "d1daf5b4023077da0b9713ccce589e91281e739b02e303088c6a77b136c93145",
+      "bytes": 32495
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/compressed_state/materialize.rs",
+      "sha256": "646bb6b2ebd116317550cc74dfc011f47385f1f13420a4c171edce6984ad9894",
+      "bytes": 19758
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/compressed_state/validation.rs",
+      "sha256": "ba7b51084393c8e7c22fed45313723cb527c4155f5b6eb31dcb995c040cf2f3c",
+      "bytes": 19149
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/compressed_state.rs",
+      "sha256": "0dba042afcb94d7638fd549cbd26b89a9705294abcc991e19a45ae28bb67c1ec",
+      "bytes": 10436
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/devnet_solo_backfill_2026.rs",
+      "sha256": "407486b7c8e081e86255e960d80c31abbe5c154981020d50a7f3e2de62d54879",
+      "bytes": 81899
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/instruction_adapters.rs",
+      "sha256": "a5cf6da79a0216295466d3c1634ee93a829f1113451549f3f11f2eaa644b5298",
+      "bytes": 8440
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/instruction_dispatch.rs",
+      "sha256": "317d5a73bfdbb146a7eed1a1b2feca4da29c76b3060fe86389a53c73b3c24cc2",
+      "bytes": 30509
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/instruction_payloads.rs",
+      "sha256": "93c77584ef38f8dd61deb958b29bb4a3d6bb629f7a9f736417d9d52c7dec2411",
+      "bytes": 8220
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/launch_schedule.rs",
+      "sha256": "436b747335041e4d06c9268bfa2d5d27d1ad2e1b5b10580f1f0abbbf954d88c9",
+      "bytes": 3650
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/market_admin.rs",
+      "sha256": "ffbe9f7cbc56a255f4fdf5fa8c197a2ce01abda567b692401eb1d7d49c8aef26",
+      "bytes": 7188
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/market_router.rs",
+      "sha256": "583d1a2a3139bd140ed406fa2d237d569dd0cf97c24568da8ff731100d615b4c",
+      "bytes": 27983
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/market_settlement.rs",
+      "sha256": "5a232b87210012cc6ae3f628c99420bc4d7c1e72b36cf65df5a0557d575c4014",
+      "bytes": 9348
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/median.rs",
+      "sha256": "a530a8da609a1901b9a08d47d81268e6f87bf3b314751b2ec1cff75868415039",
+      "bytes": 12552
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/multi_order.rs",
+      "sha256": "a49bb1e993d718f08b5c9953cd2675271a9be81c13326d1827bb4c12ca39acc4",
+      "bytes": 26069
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/bucket_rank.rs",
+      "sha256": "79c6d0ea5e8867403876c85947643cf1ede4f5bc1f2dc58a744e9a621aa6258c",
+      "bytes": 8843
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/checkpoints.rs",
+      "sha256": "ddea886e2ce5e18d479ae0046a3044a7c7bad53d7767dbe9806e0c60b20c53ed",
+      "bytes": 11657
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/compressed.rs",
+      "sha256": "ffd6118f237489f05016f158d75d6863c2d1cf850cbfa1598746caf714d385d4",
+      "bytes": 4365
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/history.rs",
+      "sha256": "e18157eaf77dc633aadc1cd4d4ad0b65b80c7b447cfe94770e2d92b69a0ecacd",
+      "bytes": 8597
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/mod.rs",
+      "sha256": "08bd76830c62c7f527bc6173e7b1eea8a05499fec7431584e4402e68c86a7cde",
+      "bytes": 12980
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/openings.rs",
+      "sha256": "511032d5376a79592178a29f41505b5f815641d5a0b29a8751d8f84673e4125b",
+      "bytes": 12453
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/periods.rs",
+      "sha256": "77103ac4819d6a25854fc584e6a618e8c77d4cb39acf0201a0e02cdf174f4140",
+      "bytes": 13375
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/scan_transition.rs",
+      "sha256": "fd6c37aa7e74088bdfd99decc44957c307dcc39863db1892da423584b9b70a40",
+      "bytes": 5598
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_carry/state.rs",
+      "sha256": "502ae4d9e4ab20cea880dcf1c0d50f4f3e2b61f3c8e1ab31de5b5471884743b4",
+      "bytes": 7874
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_core.rs",
+      "sha256": "8caccd28b51cc2701f93ac44983e1ce90bbac5e906465c662a1cad3091849e21",
+      "bytes": 2089
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_council/authority.rs",
+      "sha256": "f50993eb5f049748e2768d5e1f0f84568f081a2399898415b292dcfd87445564",
+      "bytes": 2840
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_council/effects.rs",
+      "sha256": "41587b27d8d97b3eca325436559c0c1bd0f2c22f588154350f54994110f60f1d",
+      "bytes": 18649
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_council/helpers.rs",
+      "sha256": "0c4d5556fb11fbf702e688845a4394262c2cbef40eec8c2518165974f7b97233",
+      "bytes": 1482
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_council/mod.rs",
+      "sha256": "eb24b5093d7c8ab5471f371f34b4ec46b34e512d58e3109567344cfbcc312640",
+      "bytes": 21645
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_council/settlement_timing.rs",
+      "sha256": "3c2fa5f886c13f0211d2365d841786817b1aeb3f32463c6fb684c23bb9feca57",
+      "bytes": 1486
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_council/state.rs",
+      "sha256": "b72b796a419801e89db4b45087f625c310a51d3394e0dcbc66971f7e4e6bf0e0",
+      "bytes": 4459
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_council/targets.rs",
+      "sha256": "ef0d24b7a338787fcbdb87d8937c348243ecca9b59fa8fdaeef6a59d111e7b24",
+      "bytes": 17592
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_economics.rs",
+      "sha256": "e747bfa21a9e0f1e0cff3da27fe441bfed4ed92943027d48622efbe6e0d63f9a",
+      "bytes": 2811
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_evidence.rs",
+      "sha256": "ff84a00b69cafbc8ff0282af3ef682cd8155153730f7641e226448b6930247ab",
+      "bytes": 19383
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_membership.rs",
+      "sha256": "1ae7a5f48fbb606cadcac3391df2d714354696ba8279d7717b5bf5d03a2a7517",
+      "bytes": 20417
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_rules.rs",
+      "sha256": "4cdfd96398ea226d76f239647109c4e7c053fc0842f98fa3d68227adf854529c",
+      "bytes": 17318
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_schedule_validation.rs",
+      "sha256": "3e41336e9094e5a6755edcd01176ee08e3686c750a7b954efa164238a6a316c7",
+      "bytes": 22506
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_sponsorship/custody.rs",
+      "sha256": "0057a7c7899ee960199bd21d144efc9418078fa0ce59e4942bf8866d83273c22",
+      "bytes": 4175
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_sponsorship/mod.rs",
+      "sha256": "f597bb5f408350e4440bc0e9e052a065d841654a232618f037a29f6f70eb0f93",
+      "bytes": 6863
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_sponsorship/settlement.rs",
+      "sha256": "98a3c6e9b805ed6dd711d9194b4c86f8cd540dfc2837e39f344a034a10547d0b",
+      "bytes": 3670
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_state_validation.rs",
+      "sha256": "9c8a63709b6bad60a52943f6e39938b0e4cf7fdab45f5bbb3571dd13e2b5cc60",
+      "bytes": 5333
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc/accounting.rs",
+      "sha256": "ec8b9326a03c8d7868c23df277415884a41cc6360fe6f7675c6c5ca2e036f466",
+      "bytes": 18447
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc/opening.rs",
+      "sha256": "043c0a9f936b09f29c6cd246b221db6161473898cd4b02d50e8e01d4cd90106c",
+      "bytes": 19671
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc/schedule.rs",
+      "sha256": "faa5713378e268d34dd1a2420992895ff4c40531b11175a90a22b13394a9e072",
+      "bytes": 11120
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc/sources.rs",
+      "sha256": "930e697ccbcc44291e25302bfbe1fa1ed924797f7d4858ecebb49091b5f7fb11",
+      "bytes": 31491
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc/update_claims.rs",
+      "sha256": "91cd0b48523bfccf1e7c6f33667e8c536cef530ea20de2309f5a2f4e8a414284",
+      "bytes": 11803
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc/update_settlement.rs",
+      "sha256": "11100c454054c310c4a90c5b428fe45f40a32748c9292b40f90be3ed0223fd84",
+      "bytes": 27521
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc.rs",
+      "sha256": "28ff78994a9267812185783f09695a0c15cd85a358182369c05aef613516904b",
+      "bytes": 1594
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc_rewards/claims.rs",
+      "sha256": "29bf4bc65cce411deded6914402961428b6775b480f23325dda0518342b9757f",
+      "bytes": 17947
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc_rewards/escrow.rs",
+      "sha256": "6602afa7224e8d76d650f81805f95f30001c3b2d10f46eeb9b8f3d0673d2fb34",
+      "bytes": 29153
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc_rewards/registration.rs",
+      "sha256": "b232be65c779ffe028489386b628dcda48d7ae9889a9ab91507374cea5e96e84",
+      "bytes": 17263
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_usdc_rewards.rs",
+      "sha256": "bb45889572d0e84c8100ac8e0336da97b178fb3e8aa9dacfde797fed988775c6",
+      "bytes": 1439
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/oracle_validation.rs",
+      "sha256": "7502814a51b7c0be2463ad6c6671ea6816db706ba9814722ffd5dbe2b532e6f9",
+      "bytes": 17133
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/recipe_weights.rs",
+      "sha256": "6f96f129815f4bff32a28c9d53e81c574c34091a8631deba492228e6ff86ae57",
+      "bytes": 11842
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/september_bootstrap/settlement_timing.rs",
+      "sha256": "8081dcce4413d25fd3e51fd134e3b5c1ad36800fa32beb9ccbe2587cc49fe48f",
+      "bytes": 3582
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/september_bootstrap.rs",
+      "sha256": "3b84cf2e0a43367a52dd04359737b3d5bdb427ba9e100832e32edad400d3bbd0",
+      "bytes": 36440
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/settlement_signers.rs",
+      "sha256": "8cf038dac3f789fa9521532362ee6f2ce97b74abb629cecaec7a2073308f0344",
+      "bytes": 17849
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/settlement_sources.rs",
+      "sha256": "a09657afbb3b8add9d833c764b4a88e5e210375ab313b598a6394512b2d010ab",
+      "bytes": 5612
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/settlement_validation.rs",
+      "sha256": "18a8b692c726c0afc3876ed223f06e681cbdbf3f834ab7d747096ffea34dc751",
+      "bytes": 21200
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/sku_coverage.rs",
+      "sha256": "cd86209bbabd1630196bd5ab10c1e2e8baea971a58468157ed611a9a499bff42",
+      "bytes": 20629
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/sku_coverage_resolution.rs",
+      "sha256": "7e71fbc4239d09888f4cefdccb8c1435ebb9242d12950bba5ef8f7e1f4c63f23",
+      "bytes": 9886
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/sku_manifest.rs",
+      "sha256": "564cee6f28634f3641d968bccd68ac8aad8ec90adafb585ebb118517201bafeb",
+      "bytes": 21669
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/terminal_cleanup/targets.rs",
+      "sha256": "877be3b8f31c24c9dabd7149c642b6cae225cc2c518fc225dfed4bbcffeffdd3",
+      "bytes": 2167
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/terminal_cleanup.rs",
+      "sha256": "1c2794465ec40bb18e84c1dbee93ee3b8f1efb8d25a629a667e2abfb9e37139c",
+      "bytes": 7671
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/trading_session/classic_funding.rs",
+      "sha256": "6dcd1a372dc5e702c123521d3ad48b8e7749695900f32814221231e8d04a0fcd",
+      "bytes": 2889
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/trading_session/funding.rs",
+      "sha256": "1f0395fc691ea857bc8ff8e99165699f2b934314a6e4ebaf829a60b941984fd5",
+      "bytes": 5722
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/trading_session.rs",
+      "sha256": "a6a698e4e2466ba81a338b00b58cd720d3a4acfd76e93967f861caeac86d0d02",
+      "bytes": 16101
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/vault_core.rs",
+      "sha256": "c45a05faac113f09c949a3a0f6bf4706581af534d13353428237cdaee0e20c09",
+      "bytes": 22867
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_cash_consolidation.rs",
+      "sha256": "fb625357b205781d932d1ce6be3a05b926b959873032c893acb2c213c150e91c",
+      "bytes": 5488
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/accounts.rs",
+      "sha256": "a5ab10cfc780d19c9ba0e96c5565275dca23368e732af7e890f848064733d248",
+      "bytes": 11373
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/buyback_issuance.rs",
+      "sha256": "0ab644d6c8cb7aafee468523af23d9375fa1d51d77eeec1334dfa98ef70fc5be",
+      "bytes": 7135
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route/primary_only.rs",
+      "sha256": "85d0e9a06cc73ed590f3eded08aba4eda3b911330ae205a526d7857f1db87478",
+      "bytes": 2781
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route/projection/codec.rs",
+      "sha256": "1467e3c40a727469a489111e79536956f05908431aa10ade4ff423eb1f12b28f",
+      "bytes": 7629
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route/projection/context_codec.rs",
+      "sha256": "c6dd4b420d45fca3ad8f55387e8989d8249182639603574684616ded4ec56746",
+      "bytes": 3502
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route/projection/size_log.rs",
+      "sha256": "b43ee5b7a4fbeefae319bc4a9c197cfb6d742a0d17ae493a0acff45a9436c071",
+      "bytes": 870
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route/projection.rs",
+      "sha256": "e5ea1b9d634c5a19ff902cf9bd8436f2eedbec1aa42e6b009f334a8890d847b0",
+      "bytes": 21579
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route/settlement/queue_index.rs",
+      "sha256": "8c87ce49adedefaf7d64fe7593ae9a77bf0af01c0e94543f2cf5adaa0512120e",
+      "bytes": 2607
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route/settlement.rs",
+      "sha256": "e139fceaace096145cb109bc0c1f3071a3aa6a775a573bdf9045c43e5ca729e9",
+      "bytes": 27508
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route.rs",
+      "sha256": "00c4fd92f613fc3db88ccccf719b130c652f0a932cd921f4c56bf29fa2ffff5c",
+      "bytes": 53209
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip/atomic_option_route_sources.rs",
+      "sha256": "b980733c53b551e1c30f55086710605c98d188aaf8200563dd1771f7914df2bf",
+      "bytes": 10484
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/capped_strip.rs",
+      "sha256": "248ad4b85a8956b8935f37025523f3e7a6a9429c5d91519c5c49459769d93b03",
+      "bytes": 46931
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/classic_order_settlement.rs",
+      "sha256": "69a1ac55913a2ba6766a7ccbe3d4e8001574749bf78200924edc8c005e855333",
+      "bytes": 5236
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/collective_binding.rs",
+      "sha256": "96ff6123f7e8ae90973e61089591edacf013ec2b25a181ed849d6fda54779217",
+      "bytes": 8268
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/commitments.rs",
+      "sha256": "3833e7006717b3c1dae48c4b6f7699b747d93ccae554e4c92f5e61173d897b3b",
+      "bytes": 9368
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/compressed_settlement.rs",
+      "sha256": "8932273101a3cddb0a7d37a9e0dcd7ad436ecdd11428b799851856a7818749f9",
+      "bytes": 21275
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/custody.rs",
+      "sha256": "4589006060a986dd1bddfcd3ce128fda9f09bb7b2893c6892c6253c0ca896878",
+      "bytes": 12212
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dispatch.rs",
+      "sha256": "61930d57f9c57006909be4864c60ed84c068d53d00ea7c28edc84d61d7816509",
+      "bytes": 7712
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dlmm/capacity.rs",
+      "sha256": "9e7b3f38ef2bd881952c5257b4ce6d9194a107ca90b3c89231d105d1b4635bbb",
+      "bytes": 4811
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dlmm/liquidity/relocation.rs",
+      "sha256": "732c4ba61f0a20164afbc8f70957466b59f32d9bc338df57b7e99b7e26c5f2a9",
+      "bytes": 3477
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dlmm/liquidity.rs",
+      "sha256": "f9b5a7a27d4deaa0f89622ca6527422da17bd53757cea52cf324984d4e39d654",
+      "bytes": 28593
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dlmm/resident.rs",
+      "sha256": "5b62313a0ab2a21b836962329bc11f76bd22abc87da54e9bb96d69b9ad2909a5",
+      "bytes": 3065
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dlmm/swap.rs",
+      "sha256": "bfd69926ec3d43b648eb04c57fb1f2e41e1f1650622dd3129cc1ee07abf335a4",
+      "bytes": 36506
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/dlmm.rs",
+      "sha256": "b78ed1794eefc0fb27404640231dbb31a8983c2fd84ea389aa680a92a740dfb1",
+      "bytes": 29075
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/earn_fund/accounts.rs",
+      "sha256": "6fde0323612f8d0de028cbbea3d849af8c585cfc071b3832dd1781a2a0d38292",
+      "bytes": 22896
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/earn_fund/buyback.rs",
+      "sha256": "e43186e759f6327759eb9614e3c6f40c3bf77d33faf59d5e3fcee3d78d1f3e64",
+      "bytes": 41455
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/earn_fund.rs",
+      "sha256": "385ab0ce33af0f5b906d6f46eec0d69dbcbba1d6e68b1c18ba8d2bed388368db",
+      "bytes": 38100
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/individual.rs",
+      "sha256": "9a5470ce77c3dd9bcfa6dd91b77e22df49ae0fef48f4b0f4d2f90f326d8e9d91",
+      "bytes": 37210
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/individual_buyback.rs",
+      "sha256": "1b8d94263c8019281f41ef1c223fcbf1b0a3dbb1aa43e6143eff79e971532b9d",
+      "bytes": 9031
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/initialization.rs",
+      "sha256": "800cbab1aa0234c573835b2d53e250573908d02ab8cbe68178f7c0e647ed7660",
+      "bytes": 16056
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/lifecycle.rs",
+      "sha256": "52e8e8140c86d7b501bbbb69c0860fb20571117bc710ffe5e07456ca5ad4927a",
+      "bytes": 11930
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/metrics.rs",
+      "sha256": "02d3fabc26dc8ab1fa02fb901f32ba3fbfe2d8ebfc5df893d0e146b08f34d15c",
+      "bytes": 6193
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/participation.rs",
+      "sha256": "ab464bebee8d91ee59de6d8dda09de82f906fef0c38eaf06297ac30bc18b756b",
+      "bytes": 34008
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/policy.rs",
+      "sha256": "60d6633bbc6ca86c32b824ef3c48d4148c63fa48d74204038d8c213c66bf1c0c",
+      "bytes": 10946
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/portfolio_hedge.rs",
+      "sha256": "99e0bd45e08895cfdaf708007e7be1378bfbc8c3a21a6aee5ce6a564976826e9",
+      "bytes": 16008
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/privileges.rs",
+      "sha256": "c2f6fbc9fe265cdd53c4161b2f0da181b60377091bb02fd9cc2a785e0643f047",
+      "bytes": 2407
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/reconcile.rs",
+      "sha256": "7d499d60c773e8cc3bbf20796a222b0d4705f1ecf36f4a0dcd7baeae7a77e32d",
+      "bytes": 20801
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/settlement.rs",
+      "sha256": "2e5265ec4a7d21faa26441a13bdbda83538ce6028d18509d465d01091434692e",
+      "bytes": 24848
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve/terminal_cleanup.rs",
+      "sha256": "fbd603cc272a76707508d35deead5ad2af3f3ce8316484ac162fc8c3f5c9a9c9",
+      "bytes": 2333
+    },
+    {
+      "path": "programs/light_token_minter/src/processor/writer_sleeve.rs",
+      "sha256": "7da85f583adede67b2e7a0fb341e06b328a3edf41dfbfa37990ad2648d4cece1",
+      "bytes": 5878
+    },
+    {
+      "path": "programs/light_token_minter/src/processor.rs",
+      "sha256": "b0205c132177c835fa60c17866f886b45be7662d76e569d67aae3daf44e3b683",
+      "bytes": 12494
+    },
+    {
+      "path": "programs/light_token_minter/src/regular_compressed_transfer.rs",
+      "sha256": "b0b144bb0eeeec8573c3911eabe7e2656286499ed57054eb9a18ee52e58b9202",
+      "bytes": 15248
+    },
+    {
+      "path": "programs/light_token_minter/src/scoped_settlement.rs",
+      "sha256": "6c90c214b9353182d8b3c87efa49235a7b0aefb1631edf6851448dbefd1a0c66",
+      "bytes": 1461
+    },
+    {
+      "path": "programs/light_token_minter/src/state/compressed.rs",
+      "sha256": "80c05c435a75b1996a8f39877d3ea1a194359b02bbfa590408cc79cd3c1db7d0",
+      "bytes": 22253
+    },
+    {
+      "path": "programs/light_token_minter/src/state/devnet_solo_backfill_2026.rs",
+      "sha256": "a6d675190b646e8b6b2c35730925df41d3774c8410eddbcf1159f3380b0fdb5a",
+      "bytes": 1624
+    },
+    {
+      "path": "programs/light_token_minter/src/state/manifests.rs",
+      "sha256": "bf64a584adcb54af710011b531206da6a816ebfebc475c38e1b01ba595e368d5",
+      "bytes": 6391
+    },
+    {
+      "path": "programs/light_token_minter/src/state/market.rs",
+      "sha256": "06ee847dc4d256985f8f1cfb9831da0b10eeb56bf5e7f439e6d60960afb25761",
+      "bytes": 6593
+    },
+    {
+      "path": "programs/light_token_minter/src/state/median.rs",
+      "sha256": "c58f13eb3b9db5739cb57d6162176bdfa6dea688b5fa2611b8b5097ef743474c",
+      "bytes": 3701
+    },
+    {
+      "path": "programs/light_token_minter/src/state/oracle_activity.rs",
+      "sha256": "3e6f7ca21b2a44e69afaa1cc6de341220939693ef7dd9bf29e2491a87fcf8fbc",
+      "bytes": 18001
+    },
+    {
+      "path": "programs/light_token_minter/src/state/oracle_common.rs",
+      "sha256": "4e294706dab91380ef7bdd5e18ef17f1ffd59750aac2e6015b67ca6f956058fd",
+      "bytes": 16431
+    },
+    {
+      "path": "programs/light_token_minter/src/state/oracle_membership.rs",
+      "sha256": "bb008186040adde19d70c109281ab2bf5fb2ad01483549e4c8034fcb5655b091",
+      "bytes": 2480
+    },
+    {
+      "path": "programs/light_token_minter/src/state/rewards.rs",
+      "sha256": "29889d0b415fbc5ff7c85b24f3276c14d41e685afdc2775bb5450c0ca3dfbf5b",
+      "bytes": 9298
+    },
+    {
+      "path": "programs/light_token_minter/src/state/sku.rs",
+      "sha256": "6088ed5baafd0d83a96d2bf98a3b94812ddfaab4b75e2e5a42ddf1e3a066263c",
+      "bytes": 9980
+    },
+    {
+      "path": "programs/light_token_minter/src/state/vault.rs",
+      "sha256": "4f7b3af031e21a1bbe48defa98f2728816a4525b66609d44440b7289c3a2b6e4",
+      "bytes": 4844
+    },
+    {
+      "path": "programs/light_token_minter/src/state/writer_dlmm.rs",
+      "sha256": "36f0571686353ffecb1247c8926efbcb881e36aa6bdaf95c7a39e917de17df00",
+      "bytes": 9600
+    },
+    {
+      "path": "programs/light_token_minter/src/state/writer_sleeve.rs",
+      "sha256": "7418a9200a2c52e7df445f9ddf2dd2379fb129d031455caaca11ba71690a14c1",
+      "bytes": 20851
+    },
+    {
+      "path": "programs/light_token_minter/src/state.rs",
+      "sha256": "f8e133676aef98ef42be1d3da139ad35f5526c7458c99e11da35733e880014ad",
+      "bytes": 4421
+    },
+    {
+      "path": "programs/light_token_minter/src/system_instruction.rs",
+      "sha256": "eb18dabe9cc168823ff93dfa5389c0140923f7b6d877cd9b36771212b60b9c67",
+      "bytes": 2102
+    },
+    {
+      "path": "programs/light_token_minter/src/token_instruction.rs",
+      "sha256": "88351960a3aca7f8b0c2c876654882b894dc9d8752a1679bb189746183368dc1",
+      "bytes": 5380
+    },
+    {
+      "path": "programs/light_token_minter/src/token_state.rs",
+      "sha256": "c8e272cc1e4fc3c710b3579bbf94964c3bbc43cf5c5d578fe48147fa46dd8add",
+      "bytes": 3150
+    },
+    {
+      "path": "programs/light_token_minter/src/trading_session.rs",
+      "sha256": "d932465097afc9fdf31823a4ec6e4cd7046a8ed4e5980869fbbf7e351d116ffc",
+      "bytes": 15644
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_dlmm_instruction.rs",
+      "sha256": "1b835898e3d6ca7618c03ace9363935acc2a4a8764467ea4573ef1287aff7030",
+      "bytes": 14289
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_dlmm_math.rs",
+      "sha256": "608735f917461e1a1149d55bf18010c28aab3b37b81b5902a48ab9d27a9ce4ff",
+      "bytes": 19073
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_dlmm_quote.rs",
+      "sha256": "3ee897fe6800d4be3854ea7b9dfa57dc4f8478b16f084e15479cc5e314e13bb2",
+      "bytes": 37669
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_participation_math.rs",
+      "sha256": "afa507ce3f9827cc5c19fcd3545f358c2013c92ffc9ab18bc2dbd84f57f0bab8",
+      "bytes": 7012
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_participation_state.rs",
+      "sha256": "88f9c8007b11292d72359d0b3528516280018ff29025ae0cbd20fe73b398df7e",
+      "bytes": 10157
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_portfolio.rs",
+      "sha256": "da7b784398a1e9e7d0deef6a472c31fe401afafbacf556242670bb55541e70b8",
+      "bytes": 16712
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_settlement_handoff.rs",
+      "sha256": "e85d29046e8f4596a44cfa65b4663a873b74e50de2ffd0a2661b71d8e4c05692",
+      "bytes": 2436
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_sleeve_math.rs",
+      "sha256": "38e58d4fbeeddfd2da6cdaf0517c98608eb2159d99381a088d9c4efb3b401a9c",
+      "bytes": 39720
+    },
+    {
+      "path": "programs/light_token_minter/src/writer_supply.rs",
+      "sha256": "8e151d20b3fa10ec489823e0adf29b506f3dcda60d1444874946bf940946c4b0",
+      "bytes": 1087
+    }
+  ],
+  "nativeBuildReceiptSha256": "7b1445f8896dbd9dd5a9ecb1b2eeb4f4d5226107bd3723e5b51cf795c8155748",
+  "buildLogSha256": "9bf6acd3815c6e7a317342e89927b8a487c1a4fad066c02416cf335aa192cea0",
+  "normalizedHashOutputSha256": "d01b303aa4e3553da9e7ff874f07c157aec57b86ff996d3fef482047f37862e4",
+  "deploymentIncluded": false,
+  "hostedVerificationClaimed": false
+}

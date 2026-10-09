@@ -44,12 +44,10 @@ fn accounts<'a>(
         || (mode != Mode::Unlock && w.maximum_topup != 0)
         || (mode != Mode::Lock && w.input_has_delegate)
         || *a[19].key != retirement_owner(program, a[2].key, a[16].key)
-        || *a[20].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[21].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[22].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[23].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_light_system_program(a[20].key)
+        || !crate::light_token_instruction::is_registered_program(a[21].key)
+        || !crate::light_token_instruction::is_compression_authority(a[22].key)
+        || !crate::light_token_instruction::is_compression_program(a[23].key)
         || a[26..].iter().any(|info| !info.is_writable)
     {
         return Err(VaultError::InvalidAccountList.into());
@@ -60,7 +58,7 @@ fn accounts<'a>(
         program, a[25].key, a[17].key,
     )
     .0;
-    if (mode == Mode::Retire && *a[24].key != system_program::id())
+    if (mode == Mode::Retire && !crate::is_system_program(a[24].key))
         || (mode != Mode::Retire && *a[24].key != scope)
         || a[26..]
             .iter()

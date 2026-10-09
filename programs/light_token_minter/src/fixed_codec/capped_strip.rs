@@ -1,6 +1,5 @@
 use super::{FixedCursor, FixedField, FixedStateDecode, FixedStateEncode, FixedWriter};
 use crate::capped_strip::{Lane, Row, LEN};
-use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
 
 impl FixedStateDecode for Lane {

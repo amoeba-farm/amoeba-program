@@ -55,7 +55,7 @@ pub(super) fn process_configure_oracle_economics_template_v2(
         account_version: OracleEconomicsConfig::ACCOUNT_VERSION,
         config_version: next_version,
         economics: params.economics,
-        last_updated_slot: Clock::get()?.slot,
+        last_updated_slot: crate::compact_error::slot()?,
     };
     store_state(economics_info, &economics)
 }

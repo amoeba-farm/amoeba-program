@@ -29,7 +29,7 @@ pub(super) fn process_close_oracle_month(
         return Err(VaultError::InvalidSettlementRecord.into());
     }
     month.phase = OraclePhase::Closed;
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     store_oracle_month_state(month_info, &month)
 }
 
@@ -115,7 +115,7 @@ pub(super) fn validate_vault_config_initialization_target(
         return Err(VaultError::AlreadyInitialized.into());
     }
     if !config_info.is_writable
-        || config_info.owner != &system_program::id()
+        || !crate::is_system_program(config_info.owner)
         || config_info.executable
         || !config_info.data_is_empty()
     {
@@ -161,10 +161,10 @@ pub(super) fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo]) 
     if !is_authorized_vault_initializer(admin_info.key) {
         return Err(VaultError::Unauthorized.into());
     }
-    if *token_program_info.key != spl_token_program_id() {
+    if !crate::token_instruction::check_id(token_program_info.key) {
         return Err(VaultError::InvalidTokenProgram.into());
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
 
@@ -221,7 +221,7 @@ pub(super) fn process_update_config(
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *token_program_info.key != spl_token_program_id() {
+    if !crate::token_instruction::check_id(token_program_info.key) {
         return Err(VaultError::InvalidTokenProgram.into());
     }
 
@@ -380,7 +380,7 @@ pub(super) fn process_bootstrap_vault_governance_v2(
     if registry_info.owner == program_id {
         return Err(VaultError::AlreadyInitialized.into());
     }
-    if registry_info.owner != &system_program::id()
+    if !crate::is_system_program(registry_info.owner)
         || registry_info.executable
         || !registry_info.data_is_empty()
     {
@@ -421,7 +421,7 @@ pub(super) fn process_activate_vault_v2(
     {
         return Err(VaultError::SettlementSignerGovernanceRequired.into());
     }
-    if *token_program_info.key != spl_token_program_id() {
+    if !crate::token_instruction::check_id(token_program_info.key) {
         return Err(VaultError::InvalidTokenProgram.into());
     }
     if *collateral_mint_info.key != config.usdc_mint
@@ -500,7 +500,7 @@ pub(super) fn process_deposit(
     if !user_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *token_program_info.key != spl_token_program_id() {
+    if !crate::token_instruction::check_id(token_program_info.key) {
         return Err(VaultError::InvalidTokenProgram.into());
     }
 
@@ -566,7 +566,7 @@ pub(super) fn process_collateral_withdrawal(
     if !owner_info.is_signer || (assisted && !admin_info.is_signer) {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *token_program_info.key != spl_token_program_id() {
+    if !crate::token_instruction::check_id(token_program_info.key) {
         return Err(VaultError::InvalidTokenProgram.into());
     }
 

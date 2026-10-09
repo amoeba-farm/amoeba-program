@@ -20,6 +20,9 @@ __pycache__/
 # local artifacts
 output/
 tmp/
+/artifacts/
+/node_modules.shared-reference/
+/tools/typescript-build/node_modules.shared-reference/
 wsl-artifacts/*keypair*.json
 
 # macOS

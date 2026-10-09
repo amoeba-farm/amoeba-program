@@ -194,17 +194,6 @@ pub enum WriterSecurityMode {
     ExactExternalEnvelope = 1,
 }
 
-#[inline(never)]
-fn checked_ceil_div(numerator: u128, denominator: u128) -> WriterMathResult<u128> {
-    if denominator == 0 {
-        return Err(WriterMathError::DivisionByZero);
-    }
-    let quotient = numerator / denominator;
-    quotient
-        .checked_add(u128::from(!numerator.is_multiple_of(denominator)))
-        .ok_or(WriterMathError::ArithmeticOverflow)
-}
-
 #[inline]
 fn validate_series(series: &WriterSeries) -> WriterMathResult<()> {
     if series.contract_size_atoms != WRITER_CONTRACT_ATOMIC_SCALE
@@ -300,11 +289,21 @@ pub fn aggregate_liability_numerator(
 
 #[inline(never)]
 fn liability_atoms_from_numerator(numerator: u128) -> WriterMathResult<u64> {
-    u64::try_from(checked_ceil_div(
-        numerator,
-        u128::from(WRITER_CONTRACT_ATOMIC_SCALE),
-    )?)
-    .map_err(|_| WriterMathError::ArithmeticOverflow)
+    // Most live books have a numerator fitting u64. The exact same constant
+    // division then needs no u128 lowering; larger books retain the full path.
+    if let Ok(value) = u64::try_from(numerator) {
+        return Ok(value / WRITER_CONTRACT_ATOMIC_SCALE
+            + u64::from(!value.is_multiple_of(WRITER_CONTRACT_ATOMIC_SCALE)));
+    }
+    // Every liability uses this canonical nonzero scale. Keep it visible to
+    // LLVM so SBF does not execute a generic u128 denominator routine.
+    let quotient = numerator / u128::from(WRITER_CONTRACT_ATOMIC_SCALE);
+    let rounded = quotient
+        .checked_add(u128::from(
+            !numerator.is_multiple_of(u128::from(WRITER_CONTRACT_ATOMIC_SCALE)),
+        ))
+        .ok_or(WriterMathError::ArithmeticOverflow)?;
+    u64::try_from(rounded).map_err(|_| WriterMathError::ArithmeticOverflow)
 }
 
 /// Exact collective atomic liability, rounded upward once after summing the complete book.
@@ -400,12 +399,52 @@ pub fn exact_reserve(
 /// The complete-book numerator is still rounded once, exactly as `exact_reserve`.
 pub(crate) struct PreparedWriterReserve {
     points: Vec<(u64, u128, u64)>,
+    groups: Vec<PreparedReserveGroup>,
     lower: u64,
     upper: u64,
     target_max: u64,
     other_gross: u64,
     pub(crate) target: usize,
     pub(crate) initial_oi: u64,
+}
+
+/// Equal target-payoff coefficients and tail membership share one maximum
+/// other-series numerator. Original points remain ordered for rounded ties.
+struct PreparedReserveGroup {
+    start: usize,
+    end: usize,
+    payout: u64,
+    other_max: u128,
+    lower: bool,
+    upper: bool,
+}
+fn prepare_reserve_groups(
+    points: &[(u64, u128, u64)],
+    lower: u64,
+    upper: u64,
+    groups: &mut Vec<PreparedReserveGroup>,
+) {
+    groups.clear();
+    for (index, &(settlement, other, payout)) in points.iter().enumerate() {
+        let lo = settlement <= lower;
+        let hi = settlement >= upper;
+        if let Some(group) = groups
+            .last_mut()
+            .filter(|g| g.payout == payout && g.lower == lo && g.upper == hi)
+        {
+            group.end = index + 1;
+            group.other_max = group.other_max.max(other);
+        } else {
+            groups.push(PreparedReserveGroup {
+                start: index,
+                end: index + 1,
+                payout,
+                other_max: other,
+                lower: lo,
+                upper: hi,
+            });
+        }
+    }
 }
 
 /// One immutable payoff grid for a progressive, internally authenticated strip.
@@ -460,6 +499,9 @@ impl PreparedWriterStrip {
                 } else {
                     payout_per_contract_unchecked(item, settlement)
                 };
+                if payout == 0 {
+                    continue;
+                }
                 numerator = numerator
                     .checked_add(u128::from(item.external_oi_atoms) * u128::from(payout))
                     .ok_or(WriterMathError::ArithmeticOverflow)?;
@@ -483,6 +525,19 @@ impl PreparedWriterStrip {
         book: &[WriterSeries],
         target: usize,
     ) -> WriterMathResult<PreparedWriterReserve> {
+        let mut prepared = None;
+        self.prepare_into(book, target, &mut prepared)?;
+        prepared.ok_or(WriterMathError::InvalidSeries)
+    }
+
+    /// Reuse a transaction-local payoff buffer after checked OI updates. Solana's
+    /// allocator does not reclaim dropped Vec allocations during an instruction.
+    pub(crate) fn prepare_into(
+        &self,
+        book: &[WriterSeries],
+        target: usize,
+        prepared: &mut Option<PreparedWriterReserve>,
+    ) -> WriterMathResult<()> {
         if book != self.book {
             return Err(WriterMathError::InvalidSeries);
         }
@@ -491,23 +546,24 @@ impl PreparedWriterStrip {
         if column >= self.column_count {
             return Err(WriterMathError::InvalidSeries);
         }
-        let points = self
-            .points
-            .iter()
-            .enumerate()
-            .map(|(point, (settlement, total))| {
-                let payout = self.payouts[point * self.column_count + column];
-                let other = total
-                    .checked_sub(u128::from(item.external_oi_atoms) * u128::from(payout))
-                    .ok_or(WriterMathError::ArithmeticOverflow)?;
-                Ok((*settlement, other, payout))
-            })
-            .collect::<WriterMathResult<Vec<_>>>()?;
+        let (mut points, mut groups) = prepared
+            .take()
+            .map_or_else(|| (Vec::new(), Vec::new()), |p| (p.points, p.groups));
+        points.clear();
+        for (point, (settlement, total)) in self.points.iter().enumerate() {
+            let payout = self.payouts[point * self.column_count + column];
+            let other = total
+                .checked_sub(u128::from(item.external_oi_atoms) * u128::from(payout))
+                .ok_or(WriterMathError::ArithmeticOverflow)?;
+            points.push((*settlement, other, payout));
+        }
         let own_gross = liability_atoms_from_numerator(
             u128::from(item.external_oi_atoms) * u128::from(item.max_payout_per_contract_atoms),
         )?;
-        Ok(PreparedWriterReserve {
+        prepare_reserve_groups(&points, self.lower, self.upper, &mut groups);
+        *prepared = Some(PreparedWriterReserve {
             points,
+            groups,
             lower: self.lower,
             upper: self.upper,
             target_max: item.max_payout_per_contract_atoms,
@@ -517,7 +573,8 @@ impl PreparedWriterStrip {
                 .ok_or(WriterMathError::ArithmeticOverflow)?,
             target,
             initial_oi: item.external_oi_atoms,
-        })
+        });
+        Ok(())
     }
 
     pub(crate) fn update(&mut self, target: usize, oi: u64) -> WriterMathResult<()> {
@@ -541,20 +598,28 @@ impl PreparedWriterStrip {
             .checked_sub(old_gross)
             .and_then(|v| v.checked_add(new_gross))
             .ok_or(WriterMathError::ArithmeticOverflow)?;
-        let totals = self
-            .points
-            .iter()
-            .enumerate()
-            .map(|(point, (_, total))| {
-                let payout = self.payouts[point * self.column_count + column];
-                total
-                    .checked_sub(u128::from(old) * u128::from(payout))
-                    .and_then(|v| v.checked_add(u128::from(oi) * u128::from(payout)))
-                    .ok_or(WriterMathError::ArithmeticOverflow)
-            })
-            .collect::<WriterMathResult<Vec<_>>>()?;
-        for (point, total) in self.points.iter_mut().zip(totals) {
-            point.1 = total;
+        // Every production caller propagates Err before another quote, CPI or
+        // state commit. Discard this transaction-local cache after Err: a late
+        // arithmetic failure may leave earlier points updated in memory.
+        // Book OI and gross advance only after every checked point succeeds.
+        // Each private grid point includes the old target contribution. A
+        // checked delta is therefore exactly subtract-old/add-new, with one
+        // multiplication. Construction and successful updates preserve that
+        // nonnegative whole-book invariant; discard the grid after any Err.
+        let increasing = oi >= old;
+        let change = u128::from(oi.abs_diff(old));
+        for (point, (_, total)) in self.points.iter_mut().enumerate() {
+            let payout = self.payouts[point * self.column_count + column];
+            if payout == 0 || change == 0 {
+                continue;
+            }
+            let difference = change * u128::from(payout);
+            *total = if increasing {
+                total.checked_add(difference)
+            } else {
+                total.checked_sub(difference)
+            }
+            .ok_or(WriterMathError::ArithmeticOverflow)?;
         }
         self.book[target].external_oi_atoms = oi;
         self.gross = gross;
@@ -563,6 +628,21 @@ impl PreparedWriterStrip {
 }
 
 impl PreparedWriterReserve {
+    /// The prepared points and gross exclude the target liability. After an
+    /// authenticated projection changes only that target's OI, the basis is
+    /// identical; retain it and advance the admission binding.
+    pub(crate) fn rebase_same_target(
+        &mut self,
+        target: usize,
+        before: u64,
+        after: u64,
+    ) -> WriterMathResult<()> {
+        if self.target != target || self.initial_oi != before {
+            return Err(WriterMathError::InvalidSeries);
+        }
+        self.initial_oi = after;
+        Ok(())
+    }
     pub(crate) fn matches_bounds(&self, lower: u64, upper: u64) -> bool {
         self.lower == lower && self.upper == upper
     }
@@ -607,8 +687,11 @@ impl PreparedWriterReserve {
                 payout_per_contract_unchecked(selected, settlement),
             ));
         }
+        let mut groups = Vec::new();
+        prepare_reserve_groups(&points, lower, upper, &mut groups);
         Ok(Self {
             points,
+            groups,
             lower,
             upper,
             target_max: selected.max_payout_per_contract_atoms,
@@ -622,16 +705,19 @@ impl PreparedWriterReserve {
         let mut maxima = [0u128; 3];
         let mut saw_lower = false;
         let mut saw_upper = false;
-        for &(settlement, other, payout) in &self.points {
-            let numerator = other
-                .checked_add(u128::from(target_oi) * u128::from(payout))
+        for group in &self.groups {
+            // A group's maximum other-series numerator bounds every member.
+            // Checking its addition proves each original member addition safe.
+            let numerator = group
+                .other_max
+                .checked_add(u128::from(target_oi) * u128::from(group.payout))
                 .ok_or(WriterMathError::ArithmeticOverflow)?;
             maxima[0] = maxima[0].max(numerator);
-            if settlement <= self.lower {
+            if group.lower {
                 saw_lower = true;
                 maxima[1] = maxima[1].max(numerator);
             }
-            if settlement >= self.upper {
+            if group.upper {
                 saw_upper = true;
                 maxima[2] = maxima[2].max(numerator);
             }
@@ -657,29 +743,45 @@ impl PreparedWriterReserve {
         // Ceil ties need the earliest candidate attaining the rounded maximum,
         // not necessarily the candidate with the largest unrounded numerator.
         let mut found = [reserves[0] == 0, false, false];
-        for &(settlement, other, payout) in &self.points {
-            // The immutable first pass already checked every addition.
-            let numerator = other + u128::from(target_oi) * u128::from(payout);
-            if !found[0] && numerator > thresholds[0] {
-                found[0] = true;
-                result.reserve_settlement_atomic = settlement;
+        'groups: for group in &self.groups {
+            let product = u128::from(target_oi) * u128::from(group.payout);
+            // The maximum pass already checked this addition. If this group
+            // cannot attain any remaining rounded maximum, none of its points
+            // can supply an earlier tie. Keep the original order in every
+            // group that can, including zero-valued tail reserves.
+            let maximum = group.other_max + product;
+            let mut can_find = [
+                !found[0] && maximum > thresholds[0],
+                !found[1] && group.lower && (reserves[1] == 0 || maximum > thresholds[1]),
+                !found[2] && group.upper && (reserves[2] == 0 || maximum > thresholds[2]),
+            ];
+            if can_find == [false; 3] {
+                continue;
             }
-            if !found[1]
-                && settlement <= self.lower
-                && (reserves[1] == 0 || numerator > thresholds[1])
-            {
-                found[1] = true;
-                result.lower_tail_settlement_atomic = settlement;
-            }
-            if !found[2]
-                && settlement >= self.upper
-                && (reserves[2] == 0 || numerator > thresholds[2])
-            {
-                found[2] = true;
-                result.upper_tail_settlement_atomic = settlement;
-            }
-            if found == [true; 3] {
-                break;
+            for &(settlement, other, _) in &self.points[group.start..group.end] {
+                // The immutable group maximum already checked every addition.
+                let numerator = other + product;
+                if can_find[0] && numerator > thresholds[0] {
+                    can_find[0] = false;
+                    found[0] = true;
+                    result.reserve_settlement_atomic = settlement;
+                }
+                if can_find[1] && (reserves[1] == 0 || numerator > thresholds[1]) {
+                    can_find[1] = false;
+                    found[1] = true;
+                    result.lower_tail_settlement_atomic = settlement;
+                }
+                if can_find[2] && (reserves[2] == 0 || numerator > thresholds[2]) {
+                    can_find[2] = false;
+                    found[2] = true;
+                    result.upper_tail_settlement_atomic = settlement;
+                }
+                if found == [true; 3] {
+                    break 'groups;
+                }
+                if can_find == [false; 3] {
+                    break;
+                }
             }
         }
         Ok(result)

@@ -112,7 +112,7 @@ pub(in crate::processor) fn require_cleanup_dependencies(
     let expected = address(program, REGISTRY_SEED, &market.instrument.underlying_id);
     if registry_info.owner != program {
         validate_canonical_system_zero_pda_proof(&expected.0, registry_info)?;
-        if *latest_period_info.key != system_program::id() {
+        if !crate::is_system_program(latest_period_info.key) {
             return invalid();
         }
         return Ok(());
@@ -340,7 +340,7 @@ pub(in crate::processor) fn require_import_complete(
     info: &AccountInfo,
 ) -> ProgramResult {
     let pda = address(program, PERIOD_SEED, month.as_ref());
-    if info.owner == &system_program::id() {
+    if crate::is_system_program(info.owner) {
         return validate_canonical_system_zero_pda_proof(&pda.0, info);
     }
     let period = load_period(program, month, info)?;

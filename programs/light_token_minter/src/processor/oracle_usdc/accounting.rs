@@ -110,7 +110,7 @@ pub(in crate::processor) fn debit_oracle_usdc_available(
         .available_balance
         .checked_sub(exact_bond)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    collateral.last_action_slot = Clock::get()?.slot;
+    collateral.last_action_slot = crate::compact_error::slot()?;
     Ok(())
 }
 
@@ -122,7 +122,7 @@ pub(in crate::processor) fn credit_oracle_usdc_available(
         .available_balance
         .checked_add(amount)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    collateral.last_action_slot = Clock::get()?.slot;
+    collateral.last_action_slot = crate::compact_error::slot()?;
     Ok(())
 }
 
@@ -321,7 +321,7 @@ pub(in crate::processor) fn merge_oracle_usdc_source_rewards(
         canonical_source_info.key,
         &mut canonical_reward,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     challenged_reward.last_updated_slot = slot;
     canonical_reward.last_updated_slot = slot;
     store_state(challenged_reward_info, &challenged_reward)?;
@@ -335,7 +335,7 @@ pub(in crate::processor) fn validate_oracle_usdc_reward_custody(
     mint_info: &AccountInfo,
     token_program_info: &AccountInfo,
 ) -> Result<(TokenAccount, Mint), ProgramError> {
-    if *token_program_info.key != spl_token_program_id()
+    if !crate::token_instruction::check_id(token_program_info.key)
         || *mint_info.key != vault.mint
         || *vault_token_info.key != vault.token_account
     {
@@ -374,7 +374,7 @@ pub(in crate::processor) fn process_initialize_oracle_usdc_reward_vault(
     if !payer_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *token_program_info.key != spl_token_program_id()
+    if !crate::token_instruction::check_id(token_program_info.key)
         || *associated_token_program_info.key != crate::associated_token::id()
     {
         return Err(VaultError::InvalidTokenProgram.into());
@@ -422,7 +422,7 @@ pub(in crate::processor) fn process_initialize_oracle_usdc_reward_vault(
         token_account: *reward_token_info.key,
         total_reserved: 0,
         total_paid: 0,
-        last_updated_slot: Clock::get()?.slot,
+        last_updated_slot: crate::compact_error::slot()?,
     };
     store_state(reward_vault_info, &vault)
 }
@@ -479,6 +479,6 @@ pub(in crate::processor) fn process_deposit_oracle_usdc_rewards(
     if reward_token_after.amount != expected_after {
         return Err(VaultError::InvalidOracleUsdcRewardVault.into());
     }
-    vault.last_updated_slot = Clock::get()?.slot;
+    vault.last_updated_slot = crate::compact_error::slot()?;
     store_state(reward_vault_info, &vault)
 }

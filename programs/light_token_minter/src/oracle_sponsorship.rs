@@ -1,7 +1,7 @@
 //! Real USDC underwriting for gasless research. Reputation never changes oracle
 //! weights or substitutes for the existing listing bond.
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
+    fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
     FixedStateEncode, FixedWriter,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -78,7 +78,7 @@ crate::fixed_codec::compact_borsh_struct! {
 impl SponsorTerms {
     pub fn valid(&self) -> bool {
         self.agent_id != [0; 32] && self.candidate_hash != [0; 32]
-            && self.researcher != Pubkey::default() && self.funding <= 1
+            && !crate::pubkey_is_default(&self.researcher) && self.funding <= 1
             && self.researcher_bps <= 10_000 && self.retention_bps <= 10_000
             // Gasless candidates cannot countersign a sponsor's replacement split.
             && self.researcher_bps == if self.funding == 1 { 10_000 } else { DEFAULT_RESEARCHER_BPS }
@@ -103,7 +103,7 @@ impl AgentReserve {
     pub const LEN: usize = 113;
     pub const MAGIC: [u8; 8] = *b"ORAGENT1";
 }
-fixed_state_deserialize!(AgentReserve, 113, {
+fixed_state_deserialize_flat!(AgentReserve, 113, {
     discriminator: [u8; 8], bump: u8, agent_id: [u8; 32], authority: Pubkey,
     accepted: u64, rejected: u64, pending: u64, earned: u64, slashed: u64
 });
@@ -120,7 +120,7 @@ impl SponsorExposure {
     pub const LEN: usize = 81;
     pub const MAGIC: [u8; 8] = *b"OREXPOS1";
 }
-fixed_state_deserialize!(SponsorExposure, 81, {
+fixed_state_deserialize_flat!(SponsorExposure, 81, {
     discriminator: [u8; 8], bump: u8, reserve: Pubkey, funder: Pubkey, outstanding: u64
 });
 
@@ -151,7 +151,7 @@ impl SourceSponsorship {
     pub const LEN: usize = 320;
     pub const MAGIC: [u8; 8] = *b"ORSPONS1";
 }
-fixed_state_deserialize!(SourceSponsorship, 320, {
+fixed_state_deserialize_flat!(SourceSponsorship, 320, {
     discriminator: [u8; 8], bump: u8, source: Pubkey, reserve: Pubkey, funder: Pubkey,
     candidate_hash: [u8; 32], bond: u64, researcher_bps: u16, retention_bps: u16,
     funding: u8, outcome: u8, reward_settled: bool, reward_paid: u64,

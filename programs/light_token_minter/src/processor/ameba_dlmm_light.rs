@@ -4,6 +4,7 @@
 //! program's one-byte instruction tags select the four fixed-layout state
 //! transitions without linking the generic variant/dispatch framework.
 
+use crate::compact_error::CompactAccountInfo;
 use std::io::{Result as IoResult, Write};
 
 use crate::ProgramError;
@@ -24,13 +25,9 @@ use light_sdk_types::{
     },
 };
 use solana_program::{
-    account_info::AccountInfo,
-    clock::Clock,
-    keccak::hashv as keccak_hashv,
-    pubkey::Pubkey,
-    sysvar::{rent::Rent, Sysvar},
+    account_info::AccountInfo, keccak::hashv as keccak_hashv, pubkey::Pubkey, sysvar::rent::Rent,
 };
-use solana_sdk_ids::{bpf_loader_upgradeable, system_program};
+use solana_sdk_ids::bpf_loader_upgradeable;
 
 use super::super::{
     ameba_dlmm_instruction::AmoebaDlmmInstructionTag,
@@ -171,7 +168,7 @@ fn load_light_config(
     {
         return Err(invalid_light());
     }
-    let data = config_info.try_borrow_data().map_err(|_| invalid_light())?;
+    let data = config_info.try_data().map_err(|_| invalid_light())?;
     if data[..8] != LIGHT_CONFIG_DISCRIMINATOR {
         return Err(invalid_light());
     }
@@ -209,9 +206,7 @@ fn write_light_config(config_info: &AccountInfo, config: &AmoebaLightConfig) -> 
     if config_info.data_len() != LIGHT_CONFIG_LEN {
         return Err(invalid_light());
     }
-    let mut data = config_info
-        .try_borrow_mut_data()
-        .map_err(|_| invalid_light())?;
+    let mut data = config_info.try_data_mut().map_err(|_| invalid_light())?;
     data[..8].copy_from_slice(&LIGHT_CONFIG_DISCRIMINATOR);
     let body = &mut data[8..];
     body[0] = config.version;
@@ -244,9 +239,9 @@ fn create_config_account<'info>(
         || !payer.is_writable
         || !config_info.is_writable
         || config_info.executable
-        || config_info.owner != &system_program::id()
+        || !crate::is_system_program(config_info.owner)
         || config_info.data_len() != 0
-        || *system_program_info.key != system_program::id()
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(invalid_light());
     }
@@ -275,9 +270,7 @@ fn check_upgrade_authority(
     if expected != *program_data.key || !authority.is_signer {
         return Err(invalid_light());
     }
-    let data = program_data
-        .try_borrow_data()
-        .map_err(|_| invalid_light())?;
+    let data = program_data.try_data().map_err(|_| invalid_light())?;
     if data.len() < 45 || u32::from_le_bytes(fixed_bytes(&data, 0)) != 3 || data[12] != 1 {
         return Err(invalid_light());
     }
@@ -384,7 +377,7 @@ fn process_update_config(
     write_light_config(&accounts[0], &config)
 }
 
-mod lifecycle;
+pub(crate) mod lifecycle;
 
 use lifecycle::*;
 
@@ -476,7 +469,7 @@ pub fn register_initialized_pdas<'info>(
         return Err(invalid_light());
     }
     let system_program_info = &system_accounts[5];
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(invalid_light());
     }
     let address_tree = system_accounts

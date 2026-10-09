@@ -115,7 +115,7 @@ fn decode_canonical(
 }
 
 pub fn pack(logical: &[u8]) -> Option<Vec<u8>> {
-    if logical.len() != ALLOCATION || logical[BODY..].iter().any(|b| *b != 0) {
+    if logical.len() != ALLOCATION || !crate::bytes_are_zero(&logical[BODY..]) {
         return None;
     }
     let mut count: usize = 0;

@@ -84,7 +84,7 @@ pub(super) fn process_begin_oracle_recipe_weights_v2(
     month.weight_scheme_version = 255;
     month.effective_weight_total_bps = 0;
     month.weight_manifest_hash = [0; 32];
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     store_state(manifest_info, &manifest)?;
     store_oracle_month_state(month_info, &month)
 }
@@ -269,7 +269,7 @@ pub(super) fn process_finalize_oracle_recipe_weights_v2(
     month.weight_scheme_version = 1;
     month.effective_weight_total_bps = manifest.declared_weight_total_bps;
     month.weight_manifest_hash = manifest.rolling_manifest_hash;
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     manifest.phase = OracleRecipeWeightPhase::Finalized;
     store_state(manifest_info, &manifest)?;
     store_oracle_month_state(month_info, &month)

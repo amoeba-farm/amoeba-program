@@ -1,0 +1,90 @@
+{
+  "schema": "ameba-public-atomic-native-builds-v1",
+  "sourceCommit": "923692c717bad8460424122c0093fb399598436b",
+  "clientSourceCommit": "923692c717bad8460424122c0093fb399598436b",
+  "clientArchiveSha256": "8fe49244c389065f852a525baa551fb40459e7f8f2ec78641aa8b2f9e3b7496e",
+  "artifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+  "artifactBytes": 1961032,
+  "builds": [
+    {
+      "name": "production-a",
+      "artifactBytes": 1961032,
+      "artifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+      "stackDiagnostics": 0,
+      "reusedDependencyTarget": false
+    },
+    {
+      "name": "production-b",
+      "artifactBytes": 1961032,
+      "artifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+      "stackDiagnostics": 0,
+      "reusedDependencyTarget": false
+    }
+  ],
+  "nativeBuildReceiptSha256": "7b1445f8896dbd9dd5a9ecb1b2eeb4f4d5226107bd3723e5b51cf795c8155748",
+  "profileSha256": "8fe52bdb33111d5b8a700caf14c8dfd71caf278fce104839194a070bb78a1b2e",
+  "generatedProfileSha256": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",
+  "features": [
+    "mainnet-v3"
+  ],
+  "defaultFeatures": true,
+  "architecture": "v1",
+  "runtimeTests": [
+    {
+      "name": "g3_atomic_option_route::genuine_atomic_router_mixed_eight_market_owners",
+      "passed": true,
+      "exitCode": 0,
+      "sourceCommit": "923692c717bad8460424122c0093fb399598436b",
+      "artifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+      "profile": "mainnet-v3",
+      "evidence": "case-1.log"
+    },
+    {
+      "name": "g3_atomic_option_route::genuine_atomic_router_staged_full_proofs_and_order_delegation",
+      "passed": true,
+      "exitCode": 0,
+      "sourceCommit": "923692c717bad8460424122c0093fb399598436b",
+      "artifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+      "profile": "mainnet-v3",
+      "evidence": "case-2.log"
+    },
+    {
+      "name": "g3_atomic_option_route::genuine_atomic_router_direct_close_refunds_proceeds_with_one_fee",
+      "passed": true,
+      "exitCode": 0,
+      "sourceCommit": "923692c717bad8460424122c0093fb399598436b",
+      "artifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+      "profile": "mainnet-v3",
+      "evidence": "case-3.log"
+    },
+    {
+      "name": "g3_atomic_option_route::genuine_writer_cash_consolidation_preserves_donations_and_rolls_back",
+      "passed": true,
+      "exitCode": 0,
+      "sourceCommit": "923692c717bad8460424122c0093fb399598436b",
+      "artifactSha256": "9afb5fb2f6b5555165e157b7f681e6007e9d5354fd4ec935df4205cc0268c8a2",
+      "profile": "mainnet-v3",
+      "evidence": "case-4.log"
+    }
+  ],
+  "runtimeEvidence": {
+    "case-1.log": {
+      "sha256": "a1b775402e39a02ae9055e51b7259e63e36864de0539a959513031cc99c77d31",
+      "bytes": 22237
+    },
+    "case-2.log": {
+      "sha256": "06c3a1bf870b55b529a532f419fe3dbf63eddd9cdfa0c74e70821dabea34a3cd",
+      "bytes": 38798
+    },
+    "case-3.log": {
+      "sha256": "521a45460d00a2a7846c4e8438e57497c16f1e1183f37cb3dd864982d393b976",
+      "bytes": 8733
+    },
+    "case-4.log": {
+      "sha256": "4963854ee6db2eea1ebcd3865022d08f29396549709e3664fcc741228239cc5b",
+      "bytes": 8401
+    }
+  },
+  "deploymentIncluded": false,
+  "publicDockerEqualityClaimed": true
+}

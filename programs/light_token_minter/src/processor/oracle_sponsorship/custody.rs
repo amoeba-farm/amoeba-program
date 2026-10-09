@@ -15,7 +15,7 @@ pub(super) fn load_agent(
         || agent.bump != bump
         || agent.discriminator != AgentReserve::MAGIC
         || agent.agent_id == [0; 32]
-        || agent.authority == Pubkey::default()
+        || crate::pubkey_is_default(&agent.authority)
     {
         return invalid();
     }
@@ -111,7 +111,7 @@ pub(super) fn ensure_collateral<'a>(
             owner: *owner,
             available_balance: 0,
             position_locked_balance: 0,
-            last_action_slot: Clock::get()?.slot,
+            last_action_slot: crate::compact_error::slot()?,
         },
     )
 }
@@ -136,7 +136,7 @@ pub(super) fn move_cash(
         .checked_sub(amount)
         .ok_or(VaultError::InvalidOracleUsdcBond)?;
     credit.available_balance = add(credit.available_balance, amount)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     debit.last_action_slot = slot;
     credit.last_action_slot = slot;
     store_state(from, &debit)?;

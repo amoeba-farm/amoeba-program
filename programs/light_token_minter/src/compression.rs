@@ -783,6 +783,8 @@ pub(crate) enum ProgramLeafPrior<'a> {
 /// address can be reopened later). Light nullifies every consumed input, so a
 /// second transaction built from the same input fails without effect.
 #[inline(never)]
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_program_leaf_transition<'a>(
     fee_payer: &AccountInfo<'a>,
     remaining_accounts: &[AccountInfo<'a>],

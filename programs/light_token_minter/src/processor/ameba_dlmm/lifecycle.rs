@@ -32,7 +32,7 @@ pub(super) fn process_set_collective_pool_status_core(
     }
     let market = load_valid_market(program_id, market_info)?;
     let month = load_oracle_month_state(month_info, program_id)?;
-    let mut pool = load_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, accounts)?;
     if !pool.status.can_admin_transition_to(params.status) {
         return Err(VaultError::InvalidAmoebaDlmmStatusTransition.into());
     }
@@ -44,7 +44,17 @@ pub(super) fn process_set_collective_pool_status_core(
         option_vault_info,
         quote_vault_info,
     )?;
-    ensure_custody(&pool, &vaults.0, &vaults.1)?;
+    let resident = resident_for_pool(program_id, pool_info, accounts)?;
+    let ledger = resident.map(|(_, state)| {
+        pool_ledger(
+            program_id,
+            pool_info.key,
+            &pool,
+            state.pool_option,
+            state.pool_quote,
+        )
+    });
+    ensure_custody_with(&pool, &vaults.0, &vaults.1, ledger.as_ref())?;
     if params.status == AmoebaDlmmPoolStatus::Active {
         ensure_market_value_flow_unpaused(&config, &market)?;
         ensure_oracle_game_window(&market, &month)?;
@@ -78,10 +88,10 @@ pub(super) fn process_set_collective_pool_status_core(
         }
     }
     let old_status = pool.status;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     pool.status = params.status;
     pool.last_updated_slot = slot;
-    store_light_state(pool_info, &pool)?;
+    persist_pool(program_id, pool_info, accounts, &pool)?;
     emit_event(
         &EVENT_STATUS_CHANGED,
         AmoebaDlmmEvent::Status(StatusEvent {
@@ -100,6 +110,9 @@ pub(super) fn all_page_words_empty(bitmap: &u64) -> bool {
 
 #[inline(never)]
 pub(super) fn process_close_pool(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+    let supplied = accounts;
+    let pool_info = accounts.get(2).ok_or(VaultError::InvalidAccountList)?;
+    let accounts = without_market_tail(program_id, pool_info, accounts)?;
     if accounts.len() != 6 && accounts.len() != 8 {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -116,7 +129,7 @@ pub(super) fn process_close_pool(program_id: &Pubkey, accounts: &[AccountInfo]) 
     if config.admin != *admin_info.key {
         return Err(VaultError::Unauthorized.into());
     }
-    let mut pool = load_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, supplied)?;
     if pool.status != AmoebaDlmmPoolStatus::Settled
         || pool.position_count != 0
         || pool.accounted_option_reserve != 0
@@ -139,11 +152,11 @@ pub(super) fn process_close_pool(program_id: &Pubkey, accounts: &[AccountInfo]) 
     // an otherwise terminal pool live forever. The canonical vault accounts
     // remain bound to the closed pool and no value-flow lane admits them after
     // this status transition.
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     if accounts.len() == 8 {
         let page_info = &accounts[6];
         let share_info = &accounts[7];
-        let mut page = load_bin_page(program_id, pool_info.key, page_info)?;
+        let mut page = load_page_with_accounts(program_id, pool_info, page_info, supplied)?;
         let mut shares = load_share_page(program_id, pool_info.key, share_info)?;
         if page.page_index != shares.page_index
             || page.option_reserve.iter().any(|amount| *amount != 0)
@@ -164,9 +177,26 @@ pub(super) fn process_close_pool(program_id: &Pubkey, accounts: &[AccountInfo]) 
         page.last_updated_slot = slot;
         shares.last_updated_slot = slot;
         pool.last_updated_slot = slot;
-        store_light_state(page_info, &page)?;
+        let cached = commit_resident(program_id, pool_info, supplied, |state| {
+            state.pool = pool;
+            state.bin_pages.retain(|p| p.page_index != page.page_index);
+            Ok(())
+        })?;
+        if !cached || {
+            let raw: AmoebaDlmmBinPageV1 = load_light_state(
+                page_info,
+                program_id,
+                &AMOEBA_DLMM_BIN_PAGE_LIGHT_DISCRIMINATOR,
+                VaultError::InvalidAmoebaDlmmBinPage,
+            )?;
+            raw.account_version != crate::market_router::FORWARDED_PAGE_VERSION
+        } {
+            store_light_state(page_info, &page)?;
+        }
         store_light_state(share_info, &shares)?;
-        store_light_state(pool_info, &pool)?;
+        if !cached {
+            store_light_state(pool_info, &pool)?;
+        }
         return emit_event(
             &EVENT_POOL_CLOSED,
             AmoebaDlmmEvent::Closed(ClosedEvent {
@@ -182,7 +212,7 @@ pub(super) fn process_close_pool(program_id: &Pubkey, accounts: &[AccountInfo]) 
     }
     pool.status = AmoebaDlmmPoolStatus::Closed;
     pool.last_updated_slot = slot;
-    store_light_state(pool_info, &pool)?;
+    persist_pool(program_id, pool_info, supplied, &pool)?;
     emit_event(
         &EVENT_POOL_CLOSED,
         AmoebaDlmmEvent::Closed(ClosedEvent {

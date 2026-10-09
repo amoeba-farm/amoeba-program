@@ -13,6 +13,11 @@
 use core::{fmt, num::NonZeroU64};
 use solana_program::program_error::ProgramError as SolanaProgramError;
 
+mod account_info;
+pub(crate) use account_info::CompactAccountInfo;
+mod sysvars;
+pub(crate) use sysvars::{clock, rent, slot};
+
 /// The exact Solana error code, encoded so that every constructor is one immediate store.
 ///
 /// Builtin codes are `index << 32` (see `solana_instruction::error`); they are stored as the
@@ -145,7 +150,7 @@ impl From<solana_program::pubkey::PubkeyError> for ProgramError {
 /// transaction in the runtime; only pre-invoke validation errors are returned here, and their
 /// codes are preserved exactly.
 pub(crate) mod cpi {
-    use super::{ProgramError, ProgramResult};
+    use super::{CompactAccountInfo, ProgramError, ProgramResult};
     use solana_program::{account_info::AccountInfo, instruction::Instruction};
 
     #[inline(always)]
@@ -170,11 +175,11 @@ pub(crate) mod cpi {
             for account_info in account_infos.iter() {
                 if crate::pubkey_eq(&account_meta.pubkey, account_info.key) {
                     if account_meta.is_writable {
-                        let _ = account_info.try_borrow_mut_lamports()?;
-                        let _ = account_info.try_borrow_mut_data()?;
+                        let _ = account_info.try_lamports_mut()?;
+                        let _ = account_info.try_data_mut()?;
                     } else {
-                        let _ = account_info.try_borrow_lamports()?;
-                        let _ = account_info.try_borrow_data()?;
+                        let _ = account_info.try_lamports_ref()?;
+                        let _ = account_info.try_data()?;
                     }
                     break;
                 }

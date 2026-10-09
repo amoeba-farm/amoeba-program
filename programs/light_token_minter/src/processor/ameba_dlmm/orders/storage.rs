@@ -12,7 +12,7 @@ pub(super) fn witness_end(a: &[AccountInfo]) -> Result<usize, ProgramError> {
     let mut end = ORDER_SWAP_FIXED_ACCOUNTS;
     while let Some(info) = a.get(end) {
         if info.data_len() != DlmmOrderRecord::LEN
-            && !(info.owner == &system_program::id() && info.data_is_empty())
+            && !(crate::is_system_program(info.owner) && info.data_is_empty())
         {
             break;
         }
@@ -74,18 +74,13 @@ fn load_with_funding_mode(
         {
             return Err(VaultError::InvalidAccountList.into());
         }
-        if info.owner == &system_program::id() {
+        if crate::is_system_program(info.owner) {
             if *info.key != derive_order_record(program, a[31].key, book.header.next_sequence).0 {
                 return Err(VaultError::InvalidPda.into());
             }
             continue;
         }
-        let record = load_exact_zero_padded_state::<DlmmOrderRecord>(
-            info,
-            program,
-            DlmmOrderRecord::LEN,
-            VaultError::InvalidAmoebaDlmmPool,
-        )?;
+        let record = load_record_with_accounts(program, info, a)?;
         let order = &record.order;
         let (key, bump) = derive_order_record(program, a[31].key, order.sequence);
         if *info.key != key
@@ -152,33 +147,25 @@ fn before(a: &DlmmOrder, b: &DlmmOrder) -> bool {
 }
 
 pub(super) fn insert(book: &mut DlmmOrderBook, mut order: DlmmOrder) -> ProgramResult {
-    let mut peers: Vec<usize> = book
-        .orders
-        .iter()
-        .enumerate()
-        .filter(|(_, candidate)| {
-            candidate.order_side() == order.order_side()
-                && candidate.remaining_quantity > 0
-                && candidate.remaining_input > 0
-        })
-        .map(|(index, _)| index)
-        .collect();
-    peers.sort_unstable_by(|a, b| {
-        if before(&book.orders[*a], &book.orders[*b]) {
-            core::cmp::Ordering::Less
-        } else {
-            core::cmp::Ordering::Greater
+    // Only the adjacent live orders are needed. Retain the closest candidate
+    // on each side without allocating or sorting all supplied witnesses.
+    let mut previous: Option<usize> = None;
+    let mut next: Option<usize> = None;
+    for (index, candidate) in book.orders.iter().enumerate() {
+        if candidate.order_side() != order.order_side()
+            || candidate.remaining_quantity == 0
+            || candidate.remaining_input == 0
+        {
+            continue;
         }
-    });
-    let previous = peers
-        .iter()
-        .copied()
-        .filter(|i| before(&book.orders[*i], &order))
-        .next_back();
-    let next = peers
-        .iter()
-        .copied()
-        .find(|i| before(&order, &book.orders[*i]));
+        if before(candidate, &order) && previous.is_none_or(|i| before(&book.orders[i], candidate))
+        {
+            previous = Some(index);
+        }
+        if before(&order, candidate) && next.is_none_or(|i| before(candidate, &book.orders[i])) {
+            next = Some(index);
+        }
+    }
     let head = if order.order_side() == 0 {
         book.header.bid_head
     } else {
@@ -213,8 +200,21 @@ pub(super) fn insert(book: &mut DlmmOrderBook, mut order: DlmmOrder) -> ProgramR
     Ok(())
 }
 
+/// Unlink every loaded order with nothing remaining. The atomic option route leaves a filled
+/// order linked in its queue (persisting unlinks it later), and `insert` finds its neighbours
+/// among live orders only: a spent order at the head would refuse every placement in front of
+/// it. Unlinking is idempotent, so persisting after this changes nothing more.
+pub(super) fn unlink_spent(book: &mut DlmmOrderBook) -> ProgramResult {
+    for index in 0..book.orders.len() {
+        if book.orders[index].remaining_quantity == 0 || book.orders[index].remaining_input == 0 {
+            unlink(book, index)?;
+        }
+    }
+    Ok(())
+}
+
 fn unlink(book: &mut DlmmOrderBook, index: usize) -> ProgramResult {
-    let order = book.orders[index].clone();
+    let order = book.orders[index];
     let head = if order.order_side() == 0 {
         book.header.bid_head
     } else {
@@ -275,11 +275,24 @@ pub(super) fn persist_with_payer<'a>(
     book: &mut DlmmOrderBook,
     payer: &AccountInfo<'a>,
 ) -> ProgramResult {
-    for index in 0..book.orders.len() {
-        if book.orders[index].remaining_quantity == 0 || book.orders[index].remaining_input == 0 {
-            unlink(book, index)?;
-        }
+    persist_with_payer_staged(program, a, book, payer)?;
+    if !commit_resident(program, &a[7], a, |state| {
+        merge_resident_book(program, state, a, book)
+    })? {
+        store_state(&a[31], book)?;
     }
+    Ok(())
+}
+
+/// Apply record rent/FIFO effects, but leave the resident parent uncommitted
+/// until the caller includes reserve, page and writer changes in the same write.
+pub(super) fn persist_with_payer_staged<'a>(
+    program: &Pubkey,
+    a: &[AccountInfo<'a>],
+    book: &mut DlmmOrderBook,
+    payer: &AccountInfo<'a>,
+) -> ProgramResult {
+    unlink_spent(book)?;
     let end = witness_end(a)?;
     for info in &a[ORDER_SWAP_FIXED_ACCOUNTS..end] {
         let candidate = book
@@ -288,7 +301,7 @@ pub(super) fn persist_with_payer<'a>(
             .find(|order| derive_order_record(program, a[31].key, order.sequence).0 == *info.key);
         if let Some(order) = candidate {
             let (_, bump) = derive_order_record(program, a[31].key, order.sequence);
-            if info.owner == &system_program::id() {
+            if crate::is_system_program(info.owner) {
                 if order.owner != *a[0].key {
                     return Err(VaultError::Unauthorized.into());
                 }
@@ -307,24 +320,30 @@ pub(super) fn persist_with_payer<'a>(
                     ],
                 )?;
             }
-            store_state(
-                info,
-                &DlmmOrderRecord {
-                    initialized: true,
-                    bump,
-                    discriminator: *b"DOR",
-                    version: 3,
-                    book: *a[31].key,
-                    order: order.clone(),
-                },
-            )?;
+            let forwarded = info.owner == program
+                && load_exact_zero_padded_state::<DlmmOrderRecord>(
+                    info,
+                    program,
+                    DlmmOrderRecord::LEN,
+                    VaultError::InvalidAmoebaDlmmPool,
+                )?
+                .version
+                    == crate::market_router::FORWARDED_RECORD_VERSION;
+            if !forwarded {
+                store_state(
+                    info,
+                    &DlmmOrderRecord {
+                        initialized: true,
+                        bump,
+                        discriminator: *b"DOR",
+                        version: 3,
+                        book: *a[31].key,
+                        order: *order,
+                    },
+                )?;
+            }
         } else if info.owner == program {
-            let old = load_exact_zero_padded_state::<DlmmOrderRecord>(
-                info,
-                program,
-                DlmmOrderRecord::LEN,
-                VaultError::InvalidAmoebaDlmmPool,
-            )?;
+            let old = load_record_with_accounts(program, info, a)?;
             if old.order.owner != *a[0].key
                 || old.order.remaining_input != 0
                 || old.order.remaining_quantity != 0
@@ -352,5 +371,5 @@ pub(super) fn persist_with_payer<'a>(
             return Err(VaultError::InvalidAccountList.into());
         }
     }
-    store_state(&a[31], book)
+    Ok(())
 }

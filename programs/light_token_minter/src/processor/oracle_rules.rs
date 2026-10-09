@@ -21,7 +21,7 @@ pub(super) fn process_finalize_oracle_opening_phase(
         load_valid_oracle_active_weight_manifest(program_id, month_info.key, active_manifest_info)?;
     ensure_finalized_oracle_active_weight_manifest(&month, &active_manifest)?;
     month.phase = OraclePhase::Game;
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     store_oracle_month_state(month_info, &month)
 }
 
@@ -61,7 +61,7 @@ pub(super) fn process_expire_oracle_opening_source(
     }
     source.status = OracleSourceStatus::Inactive;
     month.opening_resolved_source_count = resolved_source_count;
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     store_state(source_info, &source)?;
     store_oracle_month_state(month_info, &month)
 }

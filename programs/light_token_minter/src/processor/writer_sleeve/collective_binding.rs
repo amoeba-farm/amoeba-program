@@ -44,6 +44,16 @@ pub(super) fn load_collective_market_binding(
     binding: &CollectiveGroupBinding,
 ) -> Result<CollectiveMarketBinding, ProgramError> {
     let market = load_valid_market(program_id, market_info)?;
+    collective_market_binding_from_loaded(market, binding)
+}
+
+/// The caller authenticates the live Market account before entering here. Both
+/// ordinary and atomic paths retain identical instrument, grid and group checks.
+#[inline(never)]
+pub(super) fn collective_market_binding_from_loaded(
+    market: Market,
+    binding: &CollectiveGroupBinding,
+) -> Result<CollectiveMarketBinding, ProgramError> {
     validate_instrument_definition(&market.instrument)
         .map_err(|_| VaultError::InvalidAmoebaDlmmGrid)?;
     validate_market_parameters(&market.params, market.instrument.max_payout_per_contract)

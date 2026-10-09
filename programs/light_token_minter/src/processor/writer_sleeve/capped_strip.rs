@@ -5,9 +5,14 @@ use super::collective_binding::{
 };
 use super::*;
 use crate::capped_strip::{self as strip, Lane, Row};
+use crate::compact_error::CompactAccountInfo;
 use crate::compressed_custody::{self as cash_custody, CustodyKind};
 use crate::constants::WRITER_SETTLEMENT_GROUP_PDA_SEED;
 use borsh::BorshSerialize;
+mod atomic_option_route;
+pub(in crate::processor) use atomic_option_route::close as close_option_routes;
+pub(in crate::processor) use atomic_option_route::fill as fill_option_routes;
+pub(in crate::processor) use atomic_option_route::prepare_projection;
 
 fn invalid() -> ProgramError {
     VaultError::InvalidAccountList.into()
@@ -25,19 +30,13 @@ fn compact_supply_reconciled(
     mint_supply: u64,
     outstanding: u64,
 ) -> bool {
-    let record = &book.records[index];
-    record.issuer_controlled_atoms == pool_inventory
-        && record.total_physical_supply_atoms == mint_supply
-        && record
-            .external_open_interest_atoms
-            .checked_add(pool_inventory)
-            .and_then(|v| v.checked_add(book.individual.compressed_retired_atoms[index]))
-            .and_then(|v| v.checked_add(book.individual.forfeited_atoms[index]))
-            == Some(mint_supply)
-        && record
-            .external_open_interest_atoms
-            .checked_add(pool_inventory)
-            == Some(outstanding)
+    crate::writer_supply::compact_supply_reconciled(
+        book,
+        index,
+        pool_inventory,
+        mint_supply,
+        outstanding,
+    )
 }
 
 fn cash_state(
@@ -46,13 +45,27 @@ fn cash_state(
     vault: &Pubkey,
     mint: &Pubkey,
 ) -> Result<cash_custody::CompressedCustodyV1, ProgramError> {
+    cash_state_checked(program, info, vault, mint, true)
+}
+fn cash_state_checked(
+    program: &Pubkey,
+    info: &AccountInfo,
+    vault: &Pubkey,
+    mint: &Pubkey,
+    writable: bool,
+) -> Result<cash_custody::CompressedCustodyV1, ProgramError> {
     let (key, bump) =
         cash_custody::derive_compressed_custody(program, CustodyKind::WriterCash, vault);
-    if *info.key != key || !info.is_writable || info.executable {
+    if *info.key != key || writable && !info.is_writable || info.executable {
         return Err(invalid());
     }
     if info.owner == program {
-        cash_custody::load(
+        let loader = if writable {
+            cash_custody::load
+        } else {
+            cash_custody::load_observation
+        };
+        loader(
             program,
             Some(info),
             CustodyKind::WriterCash,
@@ -62,7 +75,7 @@ fn cash_state(
         )?
         .ok_or_else(invalid)
     } else {
-        if info.owner != &system_program::id() || !info.data_is_empty() {
+        if !crate::is_system_program(info.owner) || !info.data_is_empty() {
             return Err(invalid());
         }
         Ok(cash_custody::CompressedCustodyV1::new(
@@ -91,21 +104,59 @@ fn load(
     hash: &[u8; 32],
     count: u8,
 ) -> Result<Box<Lane>, ProgramError> {
+    load_checked(program, info, sleeve, group, book, Some(hash), count, true)
+}
+
+/// Selector 11 carries the sleeve's lane: the amended policy's rolling hash replaces whichever
+/// hash the lane was bound to, so the rows stay executable under the amended terms (which the
+/// route reads from the policy). A lane bound by an earlier amendment is recovered the same
+/// way. A sleeve without a lane passes its empty canonical address.
+pub(super) fn rebind_to_policy(
+    program: &Pubkey,
+    info: &AccountInfo,
+    sleeve: &Pubkey,
+    group: &Pubkey,
+    book: &Pubkey,
+    hash: &[u8; 32],
+    count: u8,
+) -> ProgramResult {
+    if *info.key != strip::derive(program, sleeve).0 {
+        return Err(invalid());
+    }
+    if crate::is_system_program(info.owner) && info.data_is_empty() {
+        return Ok(());
+    }
+    let mut lane = load_checked(program, info, sleeve, group, book, None, count, true)?;
+    lane.policy_hash = *hash;
+    lane.last_updated_slot = crate::compact_error::slot()?;
+    store(info, &lane)
+}
+
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
+fn load_checked(
+    program: &Pubkey,
+    info: &AccountInfo,
+    sleeve: &Pubkey,
+    group: &Pubkey,
+    book: &Pubkey,
+    hash: Option<&[u8; 32]>,
+    count: u8,
+    writable: bool,
+) -> Result<Box<Lane>, ProgramError> {
     let (key, bump) = strip::derive(program, sleeve);
     if info.owner != program
         || info.executable
         || info.data_len() != strip::LEN
         || *info.key != key
-        || !info.is_writable
+        || writable && !info.is_writable
     {
         return Err(invalid());
     }
     // SAFETY: The exact canonical lane allocation was checked above.
     let lane = Box::new(
-        unsafe {
-            <Lane as crate::fixed_codec::FixedStateDecode>::decode_fixed(&info.try_borrow_data()?)
-        }
-        .map_err(|_| invalid())?,
+        unsafe { <Lane as crate::fixed_codec::FixedStateDecode>::decode_fixed(&info.try_data()?) }
+            .map_err(|_| invalid())?,
     );
     if lane.magic != strip::MAGIC
         || lane.version != 1
@@ -113,7 +164,7 @@ fn load(
         || lane.sleeve != *sleeve
         || lane.group != *group
         || lane.book != *book
-        || lane.policy_hash != *hash
+        || hash.is_some_and(|hash| lane.policy_hash != *hash)
         || lane.series_count != count
         || usize::from(count) > strip::SERIES
         || lane.rows[usize::from(count)..]
@@ -161,7 +212,7 @@ pub(super) fn manage(
         || a[1..].iter().any(|i| i.is_signer)
         || !a[0].is_writable
         || !a[8].is_writable
-        || *a[9].key != system_program::id()
+        || !crate::is_system_program(a[9].key)
     {
         return Err(invalid());
     }
@@ -220,8 +271,10 @@ pub(super) fn manage(
         {
             return Err(invalid());
         }
-        let mut row = Row::default();
-        row.bin_count = entries.len() as u8;
+        let mut row = Row {
+            bin_count: entries.len() as u8,
+            ..Row::default()
+        };
         for (i, entry) in entries.into_iter().enumerate() {
             if entry.bin_id == 0
                 || entry.bin_id > 100
@@ -268,7 +321,7 @@ pub(super) fn manage(
             last_updated_slot: 0,
         })
     };
-    lane.last_updated_slot = Clock::get()?.slot;
+    lane.last_updated_slot = crate::compact_error::slot()?;
     store(&a[8], &lane)
 }
 
@@ -291,15 +344,13 @@ pub(super) fn cleanup<'a>(
         || !a[0].is_writable
         || a[1..].iter().any(|i| i.is_signer)
         || [4, 8, 16, 17].iter().any(|i| !a[*i].is_writable)
-        || *a[9].key != system_program::id()
-        || *a[10].key != light_token_program_id()
-        || *a[11].key != cpi_authority()
-        || *a[12].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[13].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[14].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[15].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::is_system_program(a[9].key)
+        || !crate::light_token_instruction::is_program(a[10].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[11].key)
+        || !crate::light_token_instruction::is_light_system_program(a[12].key)
+        || !crate::light_token_instruction::is_registered_program(a[13].key)
+        || !crate::light_token_instruction::is_compression_authority(a[14].key)
+        || !crate::light_token_instruction::is_compression_program(a[15].key)
         || a[16].key == a[17].key
     {
         return Err(invalid());
@@ -513,16 +564,14 @@ fn trade_with_funding<'a>(
             .iter()
             .enumerate()
             .any(|(i, info)| !info.is_writable && (buy || i % 4 < 2))
-        || *a[17].key != light_token_program_id()
-        || *a[18].key != cpi_authority()
-        || *a[19].key != spl_token_program_id()
-        || *a[20].key != system_program::id()
-        || *a[21].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[22].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[23].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[24].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_program(a[17].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[18].key)
+        || !crate::token_instruction::check_id(a[19].key)
+        || !crate::is_system_program(a[20].key)
+        || !crate::light_token_instruction::is_light_system_program(a[21].key)
+        || !crate::light_token_instruction::is_registered_program(a[22].key)
+        || !crate::light_token_instruction::is_compression_authority(a[23].key)
+        || !crate::light_token_instruction::is_compression_program(a[24].key)
         || a[25].key == a[26].key
         || a[25..27].iter().any(|i| i.is_signer || i.executable)
     {
@@ -684,7 +733,7 @@ fn trade_with_funding<'a>(
         }
         let month = anchor_month.as_ref().ok_or_else(invalid)?;
         ensure_market_value_flow_unpaused(&config, &market)?;
-        ensure_oracle_game_window(&market, &month)?;
+        ensure_oracle_game_window(&market, month)?;
         let mint = validate_canonical_market_mint(&a[n], &mut market, &a[n + 1], 0)?;
         if *a[n + 1].key != record.contract_mint
             || *a[n].key != record.market
@@ -693,8 +742,8 @@ fn trade_with_funding<'a>(
             || market.instrument.cap_price != record.cap_or_floor_price_atomic
             || market.params.tick_size != strip::TICK
             || market.instrument.max_payout_per_contract != strip::WIDTH
-            || context.book.individual.series[index].issued != 0
-            || context.book.individual.series[index].outstanding != 0
+            || (context.book.individual.series[index].issued != 0
+                || context.book.individual.series[index].outstanding != 0)
             || !compact_supply_reconciled(
                 &context.book,
                 index,
@@ -722,7 +771,7 @@ fn trade_with_funding<'a>(
                 &a[19],
             )?));
         } else {
-            if *a[n + 2].key != system_program::id() || *a[n + 3].key != system_program::id() {
+            if !crate::is_system_program(a[n + 2].key) || !crate::is_system_program(a[n + 3].key) {
                 return Err(invalid());
             }
             staging_evidence.push(None);
@@ -1205,7 +1254,7 @@ fn trade_with_funding<'a>(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     lane.last_updated_slot = slot;
     context.sleeve.last_updated_slot = slot;
     context.book.last_updated_slot = slot;
@@ -1223,9 +1272,10 @@ fn trade_with_funding<'a>(
                 }
             || market_outstanding_contract_amount(market)?
                 != checked(
-                    context.book.records[index]
-                        .external_open_interest_atoms
-                        .checked_add(policy.series_pool_inventory_atoms[index]),
+                    context
+                        .book
+                        .external_total(index)
+                        .and_then(|v| v.checked_add(policy.series_pool_inventory_atoms[index])),
                 )?
         {
             return Err(VaultError::WriterSupplyMismatch.into());

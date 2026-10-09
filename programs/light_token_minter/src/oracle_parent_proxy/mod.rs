@@ -11,7 +11,6 @@ use crate::error::VaultError;
 
 mod profile;
 pub use profile::*;
-pub mod policy;
 pub mod september_bootstrap;
 
 pub const REGISTRY_DOMAIN: &[u8] = b"amoeba-cfm-registry-v1";
@@ -150,6 +149,8 @@ impl CfmRegistry {
     }
 
     /// Immutable, bounded parent walk in the registry's authenticated order.
+    // Keep this fixed authenticated result tuple explicit.
+    #[allow(clippy::type_complexity)]
     pub fn parent_at(
         &self,
         index: usize,

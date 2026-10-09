@@ -288,7 +288,7 @@ pub(super) fn process_configure_oracle_product_sku_manifest(
         params.expected_start_index,
         &params.sku_id_chunk,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     draft.last_updated_slot = slot;
 
     if draft_is_new {
@@ -345,14 +345,13 @@ pub(super) fn process_initialize_oracle_month_v5(
     accounts: &[AccountInfo],
     params: InitializeOracleMonthV5Params,
 ) -> ProgramResult {
-    process_initialize_oracle_month_with_registry(program_id, accounts, params, None)
+    initialize_oracle_month(program_id, accounts, params)
 }
 
-pub(super) fn process_initialize_oracle_month_with_registry(
+fn initialize_oracle_month(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    mut params: InitializeOracleMonthV5Params,
-    cfm: Option<&crate::oracle_parent_proxy::CfmRegistry>,
+    params: InitializeOracleMonthV5Params,
 ) -> ProgramResult {
     if accounts.len() != 10 {
         return Err(VaultError::InvalidAccountList.into());
@@ -389,46 +388,21 @@ pub(super) fn process_initialize_oracle_month_with_registry(
     {
         return Err(VaultError::InvalidOracleSkuCoverageManifest.into());
     }
-    let launch = false;
     if params.scramble_start_ts == 0 || params.listing_ts == 0 {
         return Err(VaultError::InvalidOracleState.into());
     }
-    if let Some(registry) = cfm {
-        cfm_parent_proxy::require_pending_month(program_id, market_info.key, month_info)?;
-        if !launch
-            || market.instrument.expiry_ts
-                != crate::oracle_parent_proxy::policy::SEPTEMBER_EXPIRY_TS
-        {
-            return Err(VaultError::InvalidOracleState.into());
-        }
-        params.required_sku_root = registry.economic_root();
-        params.required_sku_count = registry.parent_count() as u16;
-    }
     let (slot, current_ts) = current_slot_and_unix_timestamp()?;
-    if launch {
-        (params.scramble_start_ts, params.listing_ts) = initialize_launch_clock(
-            program_id,
-            &market,
-            payer_info,
-            maturity_ladder_info,
-            system_program_info,
-            current_ts,
-        )?;
-    } else {
-        validate_rolling_rulebook_schedule_params(
-            &market,
-            &InitializeOracleMonthV3Params {
-                scramble_start_ts: params.scramble_start_ts,
-                listing_ts: params.listing_ts,
-                settlement_base_oracle_atomic: params.settlement_base_oracle_atomic,
-            },
-        )?;
-    }
+    validate_rolling_rulebook_schedule_params(
+        &market,
+        &InitializeOracleMonthV3Params {
+            scramble_start_ts: params.scramble_start_ts,
+            listing_ts: params.listing_ts,
+            settlement_base_oracle_atomic: params.settlement_base_oracle_atomic,
+        },
+    )?;
     let economics_config = load_canonical_oracle_economics_config(program_id, economics_info)?;
     let underlying_id = market.instrument.underlying_id;
-    let maturity_ladder_update = if launch {
-        None
-    } else {
+    let maturity_ladder_update = {
         let (expected_maturity_ladder, maturity_ladder_bump) =
             derive_oracle_maturity_ladder_registry_pda(program_id, &underlying_id);
         if *maturity_ladder_info.key != expected_maturity_ladder {
@@ -496,7 +470,7 @@ pub(super) fn process_initialize_oracle_month_with_registry(
     }
     if month_info.owner == program_id {
         let existing = load_oracle_month_state(month_info, program_id)?;
-        if existing.is_initialized && cfm.is_none() {
+        if existing.is_initialized {
             return Err(VaultError::AlreadyInitialized.into());
         }
     } else {
@@ -544,16 +518,8 @@ pub(super) fn process_initialize_oracle_month_with_registry(
     let month = OracleMonthState {
         is_initialized: true,
         bump: month_bump,
-        account_discriminator: if cfm.is_some() {
-            OracleMonthState::CFM_DISCRIMINATOR
-        } else {
-            OracleMonthState::ACCOUNT_DISCRIMINATOR
-        },
-        account_version: if cfm.is_some() {
-            OracleMonthState::CFM_VERSION
-        } else {
-            OracleMonthState::ACCOUNT_VERSION
-        },
+        account_discriminator: OracleMonthState::ACCOUNT_DISCRIMINATOR,
+        account_version: OracleMonthState::ACCOUNT_VERSION,
         market: *market_info.key,
         authority: *authority_info.key,
         scramble_start_ts: params.scramble_start_ts,
@@ -565,22 +531,14 @@ pub(super) fn process_initialize_oracle_month_with_registry(
         candidate_count_tracking_version: OracleMonthState::CANDIDATE_COUNT_TRACKING_VERSION,
         active_weight_initialization_version:
             OracleMonthState::ACTIVE_WEIGHT_INITIALIZATION_VERSION,
-        schedule_version: if launch {
-            LAUNCH_SCHEDULE_VERSION
-        } else {
-            OracleMonthState::SKU_COVERAGE_SCHEDULE_VERSION
-        },
+        schedule_version: OracleMonthState::SKU_COVERAGE_SCHEDULE_VERSION,
         work_reward_currency_version: OracleMonthState::WORK_REWARD_CURRENCY_USDC_V1,
         ..OracleMonthState::default()
     };
     let coverage = OracleSkuCoverageManifest {
         is_initialized: true,
         bump: coverage_bump,
-        account_discriminator: if cfm.is_some() {
-            OracleSkuCoverageManifest::CFM_DISCRIMINATOR
-        } else {
-            OracleSkuCoverageManifest::ACCOUNT_DISCRIMINATOR
-        },
+        account_discriminator: OracleSkuCoverageManifest::ACCOUNT_DISCRIMINATOR,
         account_version: OracleSkuCoverageManifest::ACCOUNT_VERSION,
         month: *month_info.key,
         required_sku_root: params.required_sku_root,

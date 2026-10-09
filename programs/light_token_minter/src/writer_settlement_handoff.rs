@@ -3,7 +3,7 @@
 //! never authorizes an attestation or changes a group's frozen economic terms.
 use crate::constants::CURRENT_STATE_NAMESPACE_SEED;
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
+    fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
     FixedStateEncode, FixedWriter,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -35,7 +35,7 @@ impl WriterSettlementHandoffV3 {
     pub const VERSION: u8 = 3;
 }
 
-fixed_state_deserialize!(WriterSettlementHandoffV3, WriterSettlementHandoffV3::LEN, {
+fixed_state_deserialize_flat!(WriterSettlementHandoffV3, WriterSettlementHandoffV3::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8,
     group: Pubkey, group_commitment_before_settlement: [u8; 32],
     original_signer_set: Pubkey, original_version: u64,

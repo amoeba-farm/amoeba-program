@@ -31,12 +31,13 @@ pub(super) fn position_bin_index(
     Ok(offset as usize)
 }
 
-pub(super) fn load_page_pairs(
+pub(super) fn load_page_pairs<'info>(
     program_id: &Pubkey,
     pool: &Pubkey,
     initialized_page_bitmap: &u64,
-    accounts: &[AccountInfo],
+    accounts: &[AccountInfo<'info>],
     first_account_index: usize,
+    supplied: &[AccountInfo<'info>],
 ) -> Result<Vec<LoadedPagePair>, ProgramError> {
     let tail = accounts
         .get(first_account_index..)
@@ -50,7 +51,11 @@ pub(super) fn load_page_pairs(
         if !pair[0].is_writable || !pair[1].is_writable {
             return Err(VaultError::AmoebaDlmmAccountNotHot.into());
         }
-        let page = load_bin_page(program_id, pool, &pair[0])?;
+        let pool_info = supplied
+            .iter()
+            .find(|info| info.key == pool)
+            .ok_or(VaultError::InvalidAccountList)?;
+        let page = load_page_with_accounts(program_id, pool_info, &pair[0], supplied)?;
         let shares = load_share_page(program_id, pool, &pair[1])?;
         if shares.page_index != page.page_index || shares.first_bin_id != page.first_bin_id {
             return Err(VaultError::InvalidAmoebaDlmmSharePage.into());
@@ -231,10 +236,10 @@ pub(super) fn validate_position_owner_and_nonce(
     Ok(())
 }
 
-pub(super) fn validate_liquidity_fixed_accounts(
+pub(super) fn validate_liquidity_fixed_accounts<'info>(
     program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    pool_info: &AccountInfo,
+    accounts: &[AccountInfo<'info>],
+    pool_info: &AccountInfo<'info>,
     pool: &AmoebaDlmmPoolV1,
     compressed: Option<&crate::compressed_custody::CompressedCustodyV1>,
 ) -> Result<(TokenAccount, TokenAccount), ProgramError> {
@@ -292,7 +297,17 @@ pub(super) fn validate_liquidity_fixed_accounts(
         option_vault_info,
         quote_vault_info,
     )?;
-    ensure_custody_with(pool, &vaults.0, &vaults.1, compressed)?;
+    let resident = resident_for_pool(program_id, pool_info, accounts)?;
+    let ledger = resident.as_ref().map(|(_, state)| {
+        pool_ledger(
+            program_id,
+            pool_info.key,
+            pool,
+            state.pool_option,
+            state.pool_quote,
+        )
+    });
+    ensure_custody_with(pool, &vaults.0, &vaults.1, compressed.or(ledger.as_ref()))?;
     Ok(vaults)
 }
 
@@ -423,13 +438,18 @@ pub(super) fn process_liquidity_change(
         process_liquidity_change_core(program_id, &normalized, change, None, None)?;
         super::scoped_position::process_scoped_position_settlement(
             program_id,
-            &[
-                accounts[0].clone(),
-                accounts[1].clone(),
-                accounts[2].clone(),
-                accounts[16].clone(),
-                accounts[15].clone(),
-            ],
+            &with_resident_market(
+                program_id,
+                &accounts[1],
+                accounts,
+                vec![
+                    accounts[0].clone(),
+                    accounts[1].clone(),
+                    accounts[2].clone(),
+                    accounts[16].clone(),
+                    accounts[15].clone(),
+                ],
+            )?,
             0,
         )
     } else {
@@ -462,13 +482,15 @@ fn process_liquidity_change_core<'a>(
     if accounts.len() < 18 {
         return Err(VaultError::InvalidAccountList.into());
     }
+    let supplied = accounts;
+    let accounts = without_market_tail(program_id, &accounts[1], accounts)?;
     let owner_info = &accounts[0];
     let pool_info = &accounts[1];
     let position_info = &accounts[2];
     if !pool_info.is_writable || !position_info.is_writable {
         return Err(VaultError::AmoebaDlmmAccountNotHot.into());
     }
-    let mut pool = load_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, supplied)?;
     let mut position = load_position(program_id, pool_info.key, position_info)?;
     let (position_nonce, entry_count, is_add) = match &change {
         LiquidityChange::Add(params) => (params.position_nonce, params.entries.len(), true),
@@ -494,7 +516,7 @@ fn process_liquidity_change_core<'a>(
     }
     let before_vaults = validate_liquidity_fixed_accounts(
         program_id,
-        accounts,
+        supplied,
         pool_info,
         &pool,
         compressed.map(|context| &context.before),
@@ -505,6 +527,7 @@ fn process_liquidity_change_core<'a>(
         &pool.initialized_page_bitmap,
         accounts,
         16,
+        supplied,
     )?;
     let mut expected_page_indexes = Vec::with_capacity(entry_count);
     for index in 0..entry_count {
@@ -521,7 +544,7 @@ fn process_liquidity_change_core<'a>(
     let mut total_option = 0u64;
     let mut total_quote = 0u64;
     let mut total_shares = 0u128;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
 
     for index in 0..entry_count {
         let bin_id = match &change {
@@ -768,7 +791,12 @@ fn process_liquidity_change_core<'a>(
     if !physical_delta_ok {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
+    let resident = resident_for_pool(program_id, pool_info, supplied)?;
+    let resident_cold = resident.as_ref().map(|(_, state)| {
+        compressed.map_or((state.pool_option, state.pool_quote), |c| c.after_cold())
+    });
     let sidecar_after = compressed
+        .filter(|_| resident.is_none())
         .map(|context| {
             crate::compressed_custody::load(
                 program_id,
@@ -781,15 +809,46 @@ fn process_liquidity_change_core<'a>(
         })
         .transpose()?
         .flatten();
+    let resident_ledger = resident_cold
+        .map(|(option, quote)| pool_ledger(program_id, pool_info.key, &pool, option, quote));
     ensure_custody_with(
         &pool,
         &after_vaults.0,
         &after_vaults.1,
-        sidecar_after.as_ref(),
+        sidecar_after.as_ref().or(resident_ledger.as_ref()),
     )?;
-    store_page_pairs(accounts, &pages)?;
+    let cached = commit_resident(program_id, pool_info, supplied, |state| {
+        state.pool = pool;
+        state.pool_hot_option = after_vaults.0.amount;
+        state.pool_hot_quote = after_vaults.1.amount;
+        if let Some((option, quote)) = resident_cold {
+            state.pool_option = option;
+            state.pool_quote = quote;
+        }
+        for loaded in &pages {
+            if let Some(page) = state.page_mut(loaded.page.page_index) {
+                *page = loaded.page;
+            }
+        }
+        Ok(())
+    })?;
+    if cached {
+        for loaded in &pages {
+            if resident
+                .as_ref()
+                .is_none_or(|(_, s)| s.page(loaded.page.page_index).is_none())
+            {
+                store_light_state(&accounts[loaded.page_account_index], &loaded.page)?;
+            }
+            store_light_state(&accounts[loaded.share_account_index], &loaded.shares)?;
+        }
+    } else {
+        store_page_pairs(accounts, &pages)?;
+    }
     store_light_state(position_info, &position)?;
-    store_light_state(pool_info, &pool)?;
+    if !cached {
+        store_light_state(pool_info, &pool)?;
+    }
     let event_discriminator = if is_add {
         &EVENT_LIQUIDITY_ADDED
     } else {

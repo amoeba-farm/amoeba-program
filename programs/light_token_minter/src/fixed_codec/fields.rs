@@ -11,6 +11,10 @@ pub(crate) trait FixedField: Sized {
 pub(crate) trait FixedStateEncode {
     fn maximum_encoded_len(&self) -> usize;
     fn encode_fixed(&self, data: &mut [u8]);
+    /// Only the Market codec can preserve a versioned resident-router suffix.
+    fn preserves_market_router(&self) -> bool {
+        false
+    }
 }
 
 pub(crate) trait FixedStateDecode: Sized {
@@ -19,9 +23,22 @@ pub(crate) trait FixedStateDecode: Sized {
     /// # Safety
     /// `data` must contain at least `Self::REQUIRED_DATA_LEN` bytes.
     unsafe fn decode_fixed(data: &[u8]) -> std::io::Result<Self>;
+
+    /// Internal account loaders select their existing program error. Returning
+    /// only success/failure avoids carrying an unused IO error alongside state.
+    ///
+    /// # Safety
+    /// `data` must contain at least `Self::REQUIRED_DATA_LEN` bytes.
+    #[inline(always)]
+    unsafe fn decode_fixed_option(data: &[u8]) -> Option<Self> {
+        Self::decode_fixed(data).ok()
+    }
 }
 
 impl<T: FixedStateEncode + ?Sized> FixedStateEncode for Box<T> {
+    fn preserves_market_router(&self) -> bool {
+        self.as_ref().preserves_market_router()
+    }
     #[inline(always)]
     fn maximum_encoded_len(&self) -> usize {
         self.as_ref().maximum_encoded_len()
@@ -35,6 +52,9 @@ impl<T: FixedStateEncode + ?Sized> FixedStateEncode for Box<T> {
 
 macro_rules! primitive_fixed_field {
     ($type:ty, $reader:ident, $writer:ident) => {
+        primitive_fixed_field!($type, $reader, $writer, always);
+    };
+    ($type:ty, $reader:ident, $writer:ident, $writer_inline:ident) => {
         impl FixedField for $type {
             // Keep the shared cursor read out of line in SBF builds. Inlining this
             // shim into every generated state decoder materially duplicates code.
@@ -43,7 +63,7 @@ macro_rules! primitive_fixed_field {
                 input.$reader()
             }
 
-            #[inline(always)]
+            #[inline($writer_inline)]
             fn write(&self, output: &mut FixedWriter<'_>) {
                 output.$writer(*self);
             }
@@ -358,7 +378,7 @@ impl FixedField for WriterSeriesRecordV1 {
         }
     }
 
-    #[inline(always)]
+    #[inline(never)]
     fn write(&self, output: &mut FixedWriter<'_>) {
         FixedField::write(&self.active, output);
         FixedField::write(&self.option_kind, output);
@@ -401,12 +421,19 @@ impl FixedField for [WriterSeriesRecordV1; crate::constants::WRITER_MAX_LIVE_SER
 impl FixedField for Box<[WriterSeriesRecordV1; crate::constants::WRITER_MAX_LIVE_SERIES]> {
     #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
-        (0..crate::constants::WRITER_MAX_LIVE_SERIES)
-            .map(|_| WriterSeriesRecordV1::read(input))
-            .collect::<Vec<_>>()
-            .into_boxed_slice()
-            .try_into()
-            .expect("fixed writer series capacity")
+        let mut records =
+            Box::<[WriterSeriesRecordV1; crate::constants::WRITER_MAX_LIVE_SERIES]>::new_uninit();
+        let first = records.as_mut_ptr().cast::<WriterSeriesRecordV1>();
+        for index in 0..crate::constants::WRITER_MAX_LIVE_SERIES {
+            // SAFETY: the allocation is the exact fixed array, and this loop
+            // initializes each element once. These records own no resources.
+            unsafe {
+                first.add(index).write(WriterSeriesRecordV1::read(input));
+            }
+        }
+        // SAFETY: every element was initialized before this point, even if the
+        // cursor recorded an invalid wire value for its caller to reject.
+        unsafe { records.assume_init() }
     }
 
     #[inline(always)]

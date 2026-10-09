@@ -1,6 +1,7 @@
 //! A consumed council bootstrap receipt authenticates the two exceptional CFM
 //! cohorts. It permits earlier council application, never a different price rule.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 pub(in crate::processor) fn validate_settlement_council_cohort(
     program: &Pubkey,
@@ -18,7 +19,7 @@ pub(in crate::processor) fn validate_settlement_council_cohort(
     {
         return invalid();
     }
-    let raw = info.try_borrow_data()?;
+    let raw = info.try_data()?;
     let candidate = Receipt::try_from_slice(&raw).map_err(|_| VaultError::InvalidOracleState)?;
     drop(raw);
     let october = match market.instrument.expiry_ts {
@@ -69,7 +70,7 @@ pub(in crate::processor) fn validate_settlement_council_cohort(
         || r.cursor != count
         || r.registry_hash != registry_hash
         || r.initial_month_hash == [0; 32]
-        || r.proposer == Pubkey::default()
+        || crate::pubkey_is_default(&r.proposer)
         || r.seats_hash == [0; 32]
         || r.finished_at < r.begun_at
         || r.finished_at >= expiry(october)

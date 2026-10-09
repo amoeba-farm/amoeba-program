@@ -144,7 +144,7 @@ pub(super) fn process(
     // validation buffer on the stack so it does not consume the CPI heap budget.
     let mut fills: [Option<(crate::individual_writer::IndividualWriterPosition, u64)>;
         MAX_BUYBACK_LEGS] = std::array::from_fn(|_| None);
-    for i in 0..count {
+    for (i, fill) in fills.iter_mut().enumerate().take(count) {
         let view = fill_accounts(a, i);
         let leg = wire.legs[i];
         let mut ask = individual::load_position(program, &view, &book, &group)?;
@@ -166,7 +166,7 @@ pub(super) fn process(
             .ok_or(VaultError::InvalidInstructionData)?;
         payment = checked(payment.checked_add(price))?;
         quantities[index] = checked(quantities[index].checked_add(leg.quantity))?;
-        fills[i] = Some((ask, price));
+        *fill = Some((ask, price));
     }
     // No partial execution: even a multi-leg straddle is funded against its
     // final combined risk before any seller or custody state is committed.

@@ -1,5 +1,6 @@
 //! Exact loaders and create-only constructors for Earn Fund accounts.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 pub(super) fn fund_error(error: FundMathError) -> ProgramError {
     match error {
@@ -56,7 +57,7 @@ pub(in crate::processor::writer_sleeve) fn load_slot(
     sleeve: &Pubkey,
 ) -> Result<EarnFundSlotV1, ProgramError> {
     let value = if info.owner == program && info.is_writable {
-        EarnFundSlotV1::read(&info.try_borrow_data()?)
+        EarnFundSlotV1::read(&info.try_data()?)
     } else {
         None
     };
@@ -267,7 +268,7 @@ pub(super) fn create_fund_epoch<'a>(
     roll_ts: u64,
 ) -> ProgramResult {
     let (key, bump) = derive_earn_fund_epoch(program, outcome.closed_epoch);
-    if *info.key != key || *system.key != system_program::id() || !payer.is_writable {
+    if *info.key != key || !crate::is_system_program(system.key) || !payer.is_writable {
         return Err(VaultError::EarnFundInvalidAccount.into());
     }
     validate_create_only_program_account_target(program, info)?;
@@ -306,7 +307,7 @@ pub(super) fn settle_position(
     let pending_owed = owed.pending_owed(ledger);
     let queue_state = owed.queue_state(ledger).map_err(fund_error)?;
     let queue_completed = queue_state == QueueState::Completed;
-    let sentinel = |info: &AccountInfo| *info.key == system_program::id();
+    let sentinel = |info: &AccountInfo| crate::is_system_program(info.key);
     if pending_owed == sentinel(pending_info) || queue_completed == sentinel(queue_info) {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -437,21 +438,18 @@ impl<'x, 'a> Rails<'x, 'a> {
             return Err(VaultError::InvalidAccountList.into());
         };
         if *mint.key != *usdc_mint
-            || *spl_token.key != spl_token_program_id()
-            || *light_token.key != light_token_program_id()
-            || *token_cpi_authority.key != cpi_authority()
+            || !crate::token_instruction::check_id(spl_token.key)
+            || !crate::light_token_instruction::is_program(light_token.key)
+            || !crate::light_token_instruction::is_cpi_authority(token_cpi_authority.key)
             || !spl_interface.is_writable
             || !payer.is_signer
             || !payer.is_writable
             || light.len() < 7
-            || *light[0].key
-                != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-            || *light[2].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-            || *light[3].key
-                != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-            || *light[4].key
-                != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
-            || *light[5].key != system_program::id()
+            || !crate::light_token_instruction::is_light_system_program(light[0].key)
+            || !crate::light_token_instruction::is_registered_program(light[2].key)
+            || !crate::light_token_instruction::is_compression_authority(light[3].key)
+            || !crate::light_token_instruction::is_compression_program(light[4].key)
+            || !crate::is_system_program(light[5].key)
         {
             return Err(VaultError::InvalidAccountList.into());
         }

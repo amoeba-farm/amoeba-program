@@ -16,7 +16,7 @@ use crate::earn_fund_math::{
     SharePrice, SlotBook, SlotMark, MAX_COMPLETED_BATCHES, MAX_OPEN_BATCHES,
 };
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
+    fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
     FixedStateEncode, FixedWriter,
 };
 use crate::instruction::CompressionOutput;
@@ -322,7 +322,7 @@ impl SlotBook {
     }
 }
 
-fixed_state_deserialize!(EarnFundV1, EarnFundV1::LEN, {
+fixed_state_deserialize_flat!(EarnFundV1, EarnFundV1::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8,
     vault_config: Pubkey, usdc_mint: Pubkey, usdc_vault: Pubkey, usdc_vault_bump: u8,
     buffer_bps: u16, instant_daily_cap_bps: u16, max_third_party_bps: u16,
@@ -338,6 +338,25 @@ fixed_state_deserialize!(EarnFundV1, EarnFundV1::LEN, {
     window_updated_ts: u64, window_level_atoms: u64,
     marked_window_updated_ts: u64, marked_window_level_atoms: u64,
     book: SlotBook, entry_window: [u64; 2],
+}, flat {
+    initialized: bool, bump: u8, discriminator: [u8; 3], version: u8,
+    vault_config: Pubkey, usdc_mint: Pubkey, usdc_vault: Pubkey, usdc_vault_bump: u8,
+    buffer_bps: u16, instant_daily_cap_bps: u16, max_third_party_bps: u16,
+    min_tenor_secs: u64, max_tenor_secs: u64, min_epoch_secs: u64, min_allocation_atoms: u64,
+    allocator: Pubkey, paused: bool, buyback_params: [u8; BUYBACK_PARAMS_LEN],
+    total_shares: u64, epoch: u64, epoch_started_ts: u64, price_assets: u64, price_shares: u64,
+    cap_base_atoms: u64, free_cash_atoms: u64, pending_deposit_atoms: u64, pending_carry_from: u64,
+    reserved_withdrawal_atoms: u64, queued_shares: u64, accumulating_batch_id: u64,
+    accumulating_shares: u64, open_batch_count: u8,
+    open_batch_id: [u64; MAX_OPEN_BATCHES], open_batch_shares: [u64; MAX_OPEN_BATCHES],
+    open_batch_filled_shares: [u64; MAX_OPEN_BATCHES], open_batch_filled_atoms: [u64; MAX_OPEN_BATCHES],
+    open_batch_paid_atoms: [u64; MAX_OPEN_BATCHES],
+    window_updated_ts: u64, window_level_atoms: u64,
+    marked_window_updated_ts: u64, marked_window_level_atoms: u64,
+    book.slots: u64, book.live: u64, book.unpriced: u64, book.counted: u64,
+    book.sum_lower: u64, book.sum_upper: u64, book.round: u64, book.round_start_ts: u64,
+    book.round_min_ts: u64, book.fresh_since_ts: u64, book.next_lot_id: u64,
+    book.deployed_atoms: u64, entry_window: [u64; 2],
 });
 
 /// The fund's holding in one writer sleeve: its open lots (contiguous in the
@@ -798,7 +817,7 @@ impl EarnFundEpochV1 {
     }
 }
 
-fixed_state_deserialize!(EarnFundEpochV1, EarnFundEpochV1::LEN, {
+fixed_state_deserialize_flat!(EarnFundEpochV1, EarnFundEpochV1::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8,
     fund: Pubkey, epoch: u64, roll_ts: u64, price_assets: u64, price_shares: u64,
     pending_converted: bool, carry_from: u64, converted_atoms: u64, converted_shares: u64,

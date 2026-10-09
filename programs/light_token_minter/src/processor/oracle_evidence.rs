@@ -1,5 +1,6 @@
 //! Immutable public preimages and permanent publication receipts. No economic rights.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use solana_program::hash::hashv;
 
 const BYTES_SEED: &[u8] = b"g3-evidence-bytes-v1";
@@ -17,7 +18,7 @@ pub(super) fn validate_cleanup_link(
     if info.owner != program || info.executable || info.data_len() != LINK_LEN {
         return invalid();
     }
-    let d = info.try_borrow_data()?;
+    let d = info.try_data()?;
     let event = read_key(&d[70..102]);
     let commitment: [u8; 32] = d[187..219]
         .try_into()
@@ -98,13 +99,15 @@ fn max_bytes(kind: u8) -> Result<usize, ProgramError> {
     }
 }
 fn read_key(data: &[u8]) -> Pubkey {
-    Pubkey::new_from_array(data.try_into().expect("validated key slice"))
+    let mut key = [0; 32];
+    key.copy_from_slice(data);
+    Pubkey::new_from_array(key)
 }
 fn validate_object(program: &Pubkey, info: &AccountInfo) -> Result<(), ProgramError> {
     if info.owner != program || info.executable || info.is_signer || info.data_len() < HEADER {
         return invalid();
     }
-    let d = info.try_borrow_data()?;
+    let d = info.try_data()?;
     let payer = read_key(&d[6..38]);
     let kind = d[38];
     let hash: &[u8; 32] = d[39..71]
@@ -116,7 +119,7 @@ fn validate_object(program: &Pubkey, info: &AccountInfo) -> Result<(), ProgramEr
     if d[..5] != [b'O', b'E', b'B', 1, 1]
         || d[5] != bump
         || *info.key != key
-        || payer == Pubkey::default()
+        || crate::pubkey_is_default(&payer)
         || *hash == [0; 32]
         || total == 0
         || total > max_bytes(kind)?
@@ -124,7 +127,7 @@ fn validate_object(program: &Pubkey, info: &AccountInfo) -> Result<(), ProgramEr
         || written > total
         || d[75] > 1
         || (d[75] == 1) != (written == total)
-        || d[HEADER + written..].iter().any(|b| *b != 0)
+        || !crate::bytes_are_zero(&d[HEADER + written..])
     {
         return invalid();
     }
@@ -219,16 +222,6 @@ fn committed_hash(kind: u8, bytes: &[u8]) -> Result<[u8; 32], ProgramError> {
         _ => invalid(),
     }
 }
-/// Exact immutable kind-2 preimage for a pinned prospective registry.
-pub(super) fn sealed_definition_preimage(
-    program: &Pubkey,
-    object: &AccountInfo,
-    expected_commitment: &[u8; 32],
-) -> Result<Vec<u8>, ProgramError> {
-    with_sealed_definition_preimage(program, object, expected_commitment, |bytes| {
-        Ok(bytes.to_vec())
-    })
-}
 
 /// Decode while the authenticated account bytes are borrowed, without a heap copy.
 pub(super) fn with_sealed_definition_preimage<T>(
@@ -238,7 +231,7 @@ pub(super) fn with_sealed_definition_preimage<T>(
     decode: impl FnOnce(&[u8]) -> Result<T, ProgramError>,
 ) -> Result<T, ProgramError> {
     validate_object(program, object)?;
-    let data = object.try_borrow_data()?;
+    let data = object.try_data()?;
     if data[38] != 2
         || data[75] != 1
         || data[39..71] != expected_commitment[..]
@@ -260,7 +253,7 @@ pub(super) fn publication_url(
         return invalid();
     }
     validate_object(program, object)?;
-    let d = object.try_borrow_data()?;
+    let d = object.try_data()?;
     if d[38] != 3 || d[75] != 1 || committed_hash(3, &d[HEADER..])? != d[39..71] {
         return invalid();
     }
@@ -316,7 +309,7 @@ pub(super) fn write(
             HEADER + usize::from(total),
             &[BYTES_SEED, a[0].key.as_ref(), &[kind], &hash, &[bump]],
         )?;
-        let mut d = a[1].try_borrow_mut_data()?;
+        let mut d = a[1].try_data_mut()?;
         d[..6].copy_from_slice(&[b'O', b'E', b'B', 1, 1, bump]);
         d[6..38].copy_from_slice(a[0].key.as_ref());
         d[38] = kind;
@@ -324,7 +317,7 @@ pub(super) fn write(
         d[71..73].copy_from_slice(&total.to_le_bytes());
     }
     validate_object(program, &a[1])?;
-    let mut d = a[1].try_borrow_mut_data()?;
+    let mut d = a[1].try_data_mut()?;
     if d[6..38] != a[0].key.to_bytes()
         || d[38] != kind
         || d[39..71] != hash
@@ -362,7 +355,7 @@ pub(super) fn close_draft(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult 
     }
     validate_object(program, &a[1])?;
     {
-        let d = a[1].try_borrow_data()?;
+        let d = a[1].try_data()?;
         if d[75] != 0 || d[6..38] != a[0].key.to_bytes() {
             return invalid();
         }
@@ -394,7 +387,7 @@ pub(super) fn publish<'a>(
     validate_object(program, object)?;
     let kind = if role < 2 { role + 1 } else { 3 };
     {
-        let d = object.try_borrow_data()?;
+        let d = object.try_data()?;
         if d[75] != 1
             || d[38] != kind
             || d[39..71] != commitment
@@ -419,7 +412,7 @@ pub(super) fn publish<'a>(
     bytes.extend_from_slice(&evidence_hash);
     bytes.extend_from_slice(&source_id);
     if link.owner == program {
-        let d = link.try_borrow_data()?;
+        let d = link.try_data()?;
         if link.executable
             || d.len() != LINK_LEN
             || d[..102] != bytes[..102]
@@ -442,7 +435,7 @@ pub(super) fn publish<'a>(
         LINK_LEN,
         &[LINK_SEED, event.as_ref(), &[role], &evidence_hash, &[bump]],
     )?;
-    link.try_borrow_mut_data()?.copy_from_slice(&bytes);
+    link.try_data_mut()?.copy_from_slice(&bytes);
     Ok(())
 }
 
@@ -557,7 +550,7 @@ pub(super) fn backfill_claim(program: &Pubkey, a: &[AccountInfo], role: u8) -> P
     // Authenticate the exact archived source/value/time formula, not just the URL digest.
     validate_object(program, &a[5])?;
     {
-        let d = a[5].try_borrow_data()?;
+        let d = a[5].try_data()?;
         let url = std::str::from_utf8(&d[HEADER..])
             .map_err(|_| VaultError::InvalidOracleOpeningEvidence)?;
         validate_oracle_opening_archive_binding(url, time, &source.canonical_locator_hash)?;

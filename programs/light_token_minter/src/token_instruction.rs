@@ -17,8 +17,13 @@ pub(crate) const fn id() -> Pubkey {
     TOKEN_PROGRAM_ID
 }
 
+#[inline(never)]
+pub(crate) fn check_id(key: &Pubkey) -> bool {
+    crate::pubkey_eq(key, &TOKEN_PROGRAM_ID)
+}
+
 fn check_program_account(program_id: &Pubkey) -> Result<(), ProgramError> {
-    if *program_id == id() {
+    if check_id(program_id) {
         Ok(())
     } else {
         Err(ProgramError::IncorrectProgramId)

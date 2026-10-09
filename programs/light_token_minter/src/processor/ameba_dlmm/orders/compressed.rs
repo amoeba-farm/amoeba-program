@@ -58,14 +58,18 @@ pub(super) fn exit_with_authority(
     action: DlmmOrderAction,
     trading_owner: Option<Pubkey>,
 ) -> ProgramResult {
-    let (cancel, params) = match action {
-        DlmmOrderAction::CancelCompressedEscrow { params } => (true, params),
-        DlmmOrderAction::ClaimCompressedEscrow { params } => (false, params),
+    let (cancel, admin_refund, params) = match action {
+        DlmmOrderAction::CancelCompressedEscrow { params } => (true, false, params),
+        DlmmOrderAction::ClaimCompressedEscrow { params } => (false, false, params),
+        DlmmOrderAction::AdminRefundCompressedEscrow { params } => (true, true, params),
         _ => return Err(VaultError::InvalidAmoebaDlmmRoute.into()),
     };
-    let fee = if a
-        .get(ORDER_SWAP_FIXED_ACCOUNTS + usize::from(params.record_count) + 1)
-        .is_some_and(|s| s.key == a[0].key)
+    if a.len() < ORDER_SWAP_FIXED_ACCOUNTS {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    let fee = if admin_refund
+        || a.get(ORDER_SWAP_FIXED_ACCOUNTS + usize::from(params.record_count) + 1)
+            .is_some_and(|s| s.key == a[0].key)
     {
         0
     } else {
@@ -81,7 +85,7 @@ pub(super) fn exit_with_authority(
         || records > crate::dlmm_order_state::MAX_ORDER_WITNESSES
         || count < 2
         || a.len() != prefix_end + TAIL + count
-        || !a[0].is_signer
+        || !admin_refund && !a[0].is_signer
         || !a[0].is_writable
         || usize::from(params.output_tree_index) >= count
         || usize::from(params.output_queue_index) >= count
@@ -112,18 +116,16 @@ pub(super) fn exit_with_authority(
         || *tail[0].key != derive_compressed_custody(program, CustodyKind::OrderBook, a[31].key).0
         || !tail[0].is_writable
         || tail[0].is_signer
-        || *tail[1].key == Pubkey::default()
+        || crate::pubkey_is_default(tail[1].key)
         || !tail[1].is_signer
         || !tail[1].is_writable
-        || !(*tail[2].key == system_program::id() || *tail[2].key == *a[23].key)
+        || !(crate::is_system_program(tail[2].key) || *tail[2].key == *a[23].key)
         || tail[2].is_signer
         || tail[2].is_writable
-        || *tail[3].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *tail[4].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *tail[5].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *tail[6].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_light_system_program(tail[3].key)
+        || !crate::light_token_instruction::is_registered_program(tail[4].key)
+        || !crate::light_token_instruction::is_compression_authority(tail[5].key)
+        || !crate::light_token_instruction::is_compression_program(tail[6].key)
         || tail[3..7]
             .iter()
             .any(|info| info.is_signer || info.is_writable)
@@ -138,7 +140,16 @@ pub(super) fn exit_with_authority(
     {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let base: Vec<_> = prefix[..31].iter().cloned().collect();
+    let config = load_canonical_vault_config(program, &a[1])?;
+    if admin_refund && (trading_owner.is_some() || config.admin != *tail[1].key) {
+        return Err(VaultError::Unauthorized.into());
+    }
+    let mut base: Vec<_> = prefix[..31].to_vec();
+    // Only the privilege validator receives this view. The authenticated admin
+    // authorizes returning Book custody; no CPI requests the owner's signature.
+    if admin_refund {
+        base[0].is_signer = true;
+    }
     validate_collective_swap_base_privileges(program, &base)?;
     for index in 31..34 {
         if !prefix[index].is_writable
@@ -152,8 +163,8 @@ pub(super) fn exit_with_authority(
         }
     }
     assert_program_accounts(&a[15], &a[16], &a[19], &a[20])?;
-    let pool = load_pool(program, &a[7])?;
-    let config = load_canonical_vault_config(program, &a[1])?;
+    let pool = load_pool_with_accounts(program, &a[7], a)?;
+    let resident = resident_for_pool(program, &a[7], a)?;
     if pool.quote_mint != config.usdc_mint
         || *a[9].key != pool.option_mint
         || *a[10].key != pool.quote_mint
@@ -215,13 +226,51 @@ pub(super) fn exit_with_authority(
         .ok_or(VaultError::AmoebaDlmmInvariantViolation)?;
     if custody.option_atoms < option_return
         || custody.quote_atoms < quote_return
-        || params.book_option_input.is_some() != (custody.option_atoms > 0)
-        || params.book_quote_input.is_some() != (custody.quote_atoms > 0)
+        || params.book_option_input.is_some()
+            != (resident
+                .as_ref()
+                .map(|(_, s)| s.total_option())
+                .transpose()?
+                .unwrap_or(custody.option_atoms)
+                > 0)
+        || params.book_quote_input.is_some()
+            != (resident
+                .as_ref()
+                .map(|(_, s)| s.total_quote())
+                .transpose()?
+                .unwrap_or(custody.quote_atoms)
+                > 0)
     {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
     let option_after = custody.option_atoms - option_return;
     let quote_after = custody.quote_atoms - quote_return;
+    let pool_cold = resident
+        .as_ref()
+        .map(|(_, s)| (s.pool_option, s.pool_quote))
+        .unwrap_or((0, 0));
+    let aggregate_before = (
+        custody
+            .option_atoms
+            .checked_add(pool_cold.0)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+        custody
+            .quote_atoms
+            .checked_add(pool_cold.1)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+    );
+    let aggregate_after = (
+        option_after
+            .checked_add(pool_cold.0)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+        quote_after
+            .checked_add(pool_cold.1)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+    );
+    let custody_info = resident
+        .as_ref()
+        .map(|(market, _)| *market)
+        .unwrap_or(&tail[0]);
     let count = params.merkle_account_count;
     let wallet = count;
     let option = count.checked_add(1).ok_or(VaultError::InvalidAccountList)?;
@@ -231,20 +280,20 @@ pub(super) fn exit_with_authority(
     let delegate = count.checked_add(5).ok_or(VaultError::InvalidAccountList)?;
     let mut inputs = Vec::with_capacity(3);
     if let Some(w) = params.book_option_input {
-        inputs.push(input(w, book, custody.option_atoms, option, None));
+        inputs.push(input(w, book, aggregate_before.0, option, None));
     }
     if let Some(w) = params.book_quote_input {
-        inputs.push(input(w, book, custody.quote_atoms, quote, None));
+        inputs.push(input(w, book, aggregate_before.1, quote, None));
     }
     if let Some(w) = params.fee_input {
         inputs.push(input(w, wallet, params.fee_input_amount, quote, None));
     }
     let mut outputs = Vec::with_capacity(6);
-    if option_after > 0 {
-        outputs.push(output(book, option_after, option, None));
+    if aggregate_after.0 > 0 {
+        outputs.push(output(book, aggregate_after.0, option, None));
     }
-    if quote_after > 0 {
-        outputs.push(output(book, quote_after, quote, None));
+    if aggregate_after.1 > 0 {
+        outputs.push(output(book, aggregate_after.1, quote, None));
     }
     if option_return > 0 {
         outputs.push(output(
@@ -275,10 +324,10 @@ pub(super) fn exit_with_authority(
     ];
     metas.extend(merkle.iter().map(|info| AccountMeta::new(*info.key, false)));
     metas.extend([
-        AccountMeta::new_readonly(*a[0].key, true),
+        AccountMeta::new_readonly(*a[0].key, !admin_refund),
         AccountMeta::new_readonly(*a[9].key, false),
         AccountMeta::new_readonly(*a[10].key, false),
-        AccountMeta::new(*tail[0].key, true),
+        AccountMeta::new(*custody_info.key, true),
         AccountMeta::new(*tail[1].key, true),
         AccountMeta::new_readonly(*tail[2].key, false),
     ]);
@@ -304,7 +353,7 @@ pub(super) fn exit_with_authority(
         a[0].clone(),
         a[9].clone(),
         a[10].clone(),
-        tail[0].clone(),
+        custody_info.clone(),
         tail[1].clone(),
         tail[2].clone(),
         a[15].clone(),
@@ -318,6 +367,24 @@ pub(super) fn exit_with_authority(
         a[31].key.as_ref(),
         &bump,
     ];
+    let market = if resident.is_some() {
+        Some(load_valid_market(program, custody_info)?)
+    } else {
+        None
+    };
+    let market_bump = market.as_ref().map(|m| [m.bump]).unwrap_or([0]);
+    let market_id = market.as_ref().map(|m| m.market_id).unwrap_or([0; 32]);
+    let market_seeds: &[&[u8]] = &[
+        CURRENT_STATE_NAMESPACE_SEED,
+        crate::constants::MARKET_PDA_SEED,
+        &market_id,
+        &market_bump,
+    ];
+    let seeds = if resident.is_some() {
+        market_seeds
+    } else {
+        seeds
+    };
     if let Some(owner) = trading_owner {
         let (key, bump) = crate::trading_session::derive(program, &owner);
         if key != *a[0].key {
@@ -336,7 +403,9 @@ pub(super) fn exit_with_authority(
     }
     custody.option_atoms = option_after;
     custody.quote_atoms = quote_after;
-    crate::compressed_custody::store(&tail[0], &custody)?;
+    if resident.is_none() {
+        crate::compressed_custody::store(&tail[0], &custody)?;
+    }
     state.book.orders[index].set_balance(balance);
     state
         .book
@@ -351,5 +420,19 @@ pub(super) fn exit_with_authority(
     ) {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
-    persist_book(program, prefix, &mut state.book)
+    storage::persist_with_payer_staged(
+        program,
+        prefix,
+        &mut state.book,
+        if admin_refund { &tail[1] } else { &a[0] },
+    )?;
+    if !commit_resident(program, &a[7], prefix, |resident| {
+        merge_resident_book(program, resident, prefix, &state.book)?;
+        resident.book_option = option_after;
+        resident.book_quote = quote_after;
+        Ok(())
+    })? {
+        store_state(&a[31], &state.book)?;
+    }
+    Ok(())
 }

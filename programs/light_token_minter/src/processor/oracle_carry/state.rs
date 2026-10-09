@@ -1,5 +1,6 @@
 //! Prospective companion records. No existing funded account layout is reinterpreted.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub(super) const REGISTRY_SEED: &[u8] = b"g3-oracle-carry-registry";
@@ -141,8 +142,7 @@ pub(super) fn load<T: Record>(
     {
         return invalid();
     }
-    let value =
-        T::try_from_slice(&info.try_borrow_data()?).map_err(|_| VaultError::InvalidOracleState)?;
+    let value = T::try_from_slice(&info.try_data()?).map_err(|_| VaultError::InvalidOracleState)?;
     let h = value.header();
     if !h.initialized
         || h.discriminator != T::DISCRIMINATOR
@@ -158,7 +158,7 @@ pub(super) fn save<T: Record>(program: &Pubkey, info: &AccountInfo, value: &T) -
     if !info.is_writable || info.owner != program || info.executable || info.data_len() != T::LEN {
         return invalid();
     }
-    let mut data = info.try_borrow_mut_data()?;
+    let mut data = info.try_data_mut()?;
     let mut output = &mut data[..];
     value
         .serialize(&mut output)
@@ -195,7 +195,8 @@ pub(super) fn create<'a, T: Record>(
 }
 
 pub(super) fn now() -> Result<u64, ProgramError> {
-    u64::try_from(Clock::get()?.unix_timestamp).map_err(|_| VaultError::InvalidOracleState.into())
+    u64::try_from(crate::compact_error::clock()?.unix_timestamp)
+        .map_err(|_| VaultError::InvalidOracleState.into())
 }
 
 pub(super) fn invalid<T>() -> Result<T, ProgramError> {
@@ -243,7 +244,7 @@ pub(super) fn load_journal(
     if journal.source != *source
         || journal.count == 0
         || journal.count != journal.observation_count
-        || journal.head == Pubkey::default()
+        || crate::pubkey_is_default(&journal.head)
         || journal.observation_count == 0
         || journal.rolling_observation_hash == [0; 32]
     {

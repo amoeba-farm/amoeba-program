@@ -1,5 +1,6 @@
 //! Independent bounded certificates for populations larger than the inline fast path.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::oracle_rank::{encode_signed, MedianRank};
 use borsh::BorshSerialize;
 
@@ -45,16 +46,16 @@ fn load_rank(program: &Pubkey, info: &AccountInfo) -> Result<BucketRank, Program
     if info.owner != program || info.executable || info.data_len() != BucketRank::LEN {
         return invalid();
     }
-    let raw = BucketRank::try_from_slice(&info.try_borrow_data()?)
+    let raw = BucketRank::try_from_slice(&info.try_data()?)
         .map_err(|_| VaultError::InvalidOracleMedian)?;
     let value: BucketRank = load(
         program,
         info,
         rank_pda(program, &raw.root, &raw.payer, &raw.nonce),
     )?;
-    if value.root == Pubkey::default()
-        || value.month == Pubkey::default()
-        || value.payer == Pubkey::default()
+    if crate::pubkey_is_default(&value.root)
+        || crate::pubkey_is_default(&value.month)
+        || crate::pubkey_is_default(&value.payer)
         || value.total == 0
         || value.processed > value.total
         || value.eligible > value.processed
@@ -279,8 +280,8 @@ pub(super) fn close_bucket_rank(program: &Pubkey, a: &[AccountInfo]) -> ProgramR
         .lamports()
         .checked_add(a[1].lamports())
         .ok_or(VaultError::ArithmeticOverflow)?;
-    **a[0].try_borrow_mut_lamports()? = total;
-    **a[1].try_borrow_mut_lamports()? = 0;
+    **a[0].try_lamports_mut()? = total;
+    **a[1].try_lamports_mut()? = 0;
     a[1].resize(0)?;
     a[1].assign(&system_program::id());
     Ok(())

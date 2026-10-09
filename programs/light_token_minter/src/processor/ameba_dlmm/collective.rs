@@ -94,7 +94,7 @@ pub(super) fn process_set_collective_pool_status(
         &accounts[3],
     )?;
     let config = load_canonical_vault_config(program_id, &accounts[1])?;
-    let pool = load_pool(program_id, &accounts[9])?;
+    let pool = load_pool_with_accounts(program_id, &accounts[9], accounts)?;
     validate_collective_pool_binding(&config, &accounts[2], &accounts[3], &context, &pool)?;
     if context.group_status != WriterSettlementGroupStatus::Active
         || context.sleeve_status != WriterSleeveStatus::Active
@@ -148,7 +148,7 @@ pub(super) fn process_collective_swap_exact_in(
             &accounts[3],
         )?;
     let config = super::swap::load_swap_config(program_id, &accounts[1])?;
-    let pool = super::swap::load_swap_pool(program_id, &accounts[7])?;
+    let pool = super::swap::load_swap_pool(program_id, &accounts[7], accounts)?;
     if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -159,9 +159,10 @@ pub(super) fn process_collective_swap_exact_in(
     {
         return Err(VaultError::AmoebaDlmmMarketNotTradable.into());
     }
+    let resident_mode = forwarded_pool(program_id, &accounts[7])?;
     let ordinary_only = [2, 4, 6, 24, 26, 27, 28, 29]
         .iter()
-        .all(|index| !accounts[*index].is_writable);
+        .all(|index| (resident_mode && *index == 2) || !accounts[*index].is_writable);
     let mut writer = if ordinary_only {
         None
     } else {
@@ -234,7 +235,7 @@ fn process_collective_compressed_swap_with_authority<'a>(
             program_id, &base[4], &base[5], &base[6], &base[2], &base[3],
         )?;
     let config = super::swap::load_swap_config(program_id, &base[1])?;
-    let pool = super::swap::load_swap_pool(program_id, &base[7])?;
+    let pool = super::swap::load_swap_pool(program_id, &base[7], base)?;
     if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -301,7 +302,7 @@ pub(super) fn process_settle_collective_pool(
     let month = load_oracle_month_state(month_info, program_id)?;
     let (expected_month, expected_month_bump) =
         derive_oracle_month_pda(program_id, &group.anchor_market, group.expiry_ts);
-    let mut pool = load_pool(program_id, pool_info)?;
+    let mut pool = load_pool_with_accounts(program_id, pool_info, accounts)?;
     if group.status != WriterSettlementGroupStatus::Settled
         || crate::bytes32_is_zero(&group.final_settlement_commitment)
         || group.anchor_oracle_month != *month_info.key
@@ -330,12 +331,12 @@ pub(super) fn process_settle_collective_pool(
     {
         return Err(VaultError::InvalidAmoebaDlmmSettlement.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     pool.status = AmoebaDlmmPoolStatus::Settled;
     pool.settlement_price_atomic = group.settlement_price_atomic;
     pool.settled_slot = slot;
     pool.last_updated_slot = slot;
-    store_light_state(pool_info, &pool)?;
+    persist_pool(program_id, pool_info, accounts, &pool)?;
     emit_event(
         &EVENT_POOL_SETTLED,
         AmoebaDlmmEvent::Settled(SettledEvent {

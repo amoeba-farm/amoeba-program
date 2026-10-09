@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 /// Internal acceptance output, never deserialized from instruction bytes. The caller
 /// is the existing authenticated claim/emergency-resolution handler after its decision.
@@ -79,12 +80,12 @@ pub(super) fn append_checkpoint<'a>(
         || derive_oracle_source_pda(program, &source.month, &source.source_id).0 != *source_key
         || observations.month != source.month
         || observations.source != *source_key
-        || event.event == Pubkey::default()
+        || crate::pubkey_is_default(&event.event)
         || event.value == 0
         || event.observed_at == 0
         || event.evidence_hash == [0; 32]
         || event.archive_hash == [0; 32]
-        || event.contributor == Pubkey::default()
+        || crate::pubkey_is_default(&event.contributor)
     {
         return invalid();
     }
@@ -97,7 +98,7 @@ pub(super) fn append_checkpoint<'a>(
         return invalid();
     }
     let journal_pda = address(program, JOURNAL_SEED, source_key.as_ref());
-    let new_journal = tail[0].owner == &system_program::id();
+    let new_journal = crate::is_system_program(tail[0].owner);
     let (previous, count) = if new_journal {
         validate_canonical_system_zero_pda_proof(&journal_pda.0, &tail[0])?;
         if source.observation_count != 1 {
@@ -114,7 +115,7 @@ pub(super) fn append_checkpoint<'a>(
     };
     let record_pda = checkpoint_address(program, source_key, &event.event);
     let (origin_source, origin_checkpoint) = origin.unwrap_or((*source_key, record_pda.0));
-    if origin_source == Pubkey::default() || origin_checkpoint == Pubkey::default() {
+    if crate::pubkey_is_default(&origin_source) || crate::pubkey_is_default(&origin_checkpoint) {
         return invalid();
     }
     let sequence = count.checked_add(1).ok_or(VaultError::ArithmeticOverflow)?;
@@ -296,7 +297,7 @@ pub(super) fn load_checkpoint(
     if info.owner != program || info.data_len() != Checkpoint::LEN || info.executable {
         return invalid();
     }
-    let raw = <Checkpoint as borsh::BorshDeserialize>::try_from_slice(&info.try_borrow_data()?)
+    let raw = <Checkpoint as borsh::BorshDeserialize>::try_from_slice(&info.try_data()?)
         .map_err(|_| VaultError::InvalidOracleState)?;
     let record: Checkpoint = load(
         program,
@@ -310,10 +311,10 @@ pub(super) fn load_checkpoint(
         || record.accepted_at < record.observed_at
         || record.evidence_hash == [0; 32]
         || record.archive_hash == [0; 32]
-        || record.contributor == Pubkey::default()
-        || record.origin_source == Pubkey::default()
-        || record.origin_checkpoint == Pubkey::default()
-        || (record.sequence == 1) != (record.previous == Pubkey::default())
+        || crate::pubkey_is_default(&record.contributor)
+        || crate::pubkey_is_default(&record.origin_source)
+        || crate::pubkey_is_default(&record.origin_checkpoint)
+        || (record.sequence == 1) != (crate::pubkey_is_default(&record.previous))
     {
         return invalid();
     }

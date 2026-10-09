@@ -166,7 +166,7 @@ impl BorshDeserialize for Trade {
             legs: Vec::new(),
         };
         let count = u32::deserialize_reader(r)? as usize;
-        if !(2..=8).contains(&count) {
+        if !(1..=8).contains(&count) {
             return Err(std::io::ErrorKind::InvalidData.into());
         }
         value.legs.reserve(count);
@@ -205,7 +205,7 @@ impl crate::fixed_codec::CursorField for Trade {
             legs: Vec::new(),
         };
         let count = c.u32() as usize;
-        if c.invalid || !(2..=8).contains(&count) {
+        if c.invalid || !(1..=8).contains(&count) {
             c.invalid = true;
             return value;
         }
@@ -261,7 +261,15 @@ pub fn derive(program: &Pubkey, sleeve: &Pubkey) -> (Pubkey, u8) {
 }
 
 pub fn validate_strip(series: &[WriterSeries], legs: &[Leg]) -> bool {
-    if !(2..=8).contains(&legs.len()) {
+    validate_position(series, legs, 2)
+}
+
+pub fn validate_atomic_position_close(series: &[WriterSeries], legs: &[Leg]) -> bool {
+    validate_position(series, legs, 1)
+}
+
+fn validate_position(series: &[WriterSeries], legs: &[Leg], minimum: usize) -> bool {
+    if !(minimum..=8).contains(&legs.len()) {
         return false;
     }
     let mut previous: Option<WriterSeries> = None;

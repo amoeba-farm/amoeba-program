@@ -22,6 +22,7 @@ local-ceremony-governance-controller = ["reviewed-governance-controller"]
 [dependencies]
 borsh = "0.10.4"
 light-compressed-account = { version = "0.11.0", default-features = false, features = ["std"] }
+light-batched-merkle-tree = "0.11.0"
 light-compressible = { version = "0.6.0", default-features = false }
 light-sdk = "=0.23.0"
 light-sdk-types = { version = "=0.23.0", default-features = false, features = ["std"] }

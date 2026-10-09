@@ -18,7 +18,7 @@ pub(in crate::processor) fn process_initialize_settlement_group(
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     let config = load_canonical_vault_config(program_id, config_info)?;
@@ -97,7 +97,7 @@ pub(in crate::processor) fn process_initialize_settlement_group(
         full_collateral_capacity: false,
         shared_reserve: false,
         reserved: [0; 4],
-        last_updated_slot: Clock::get()?.slot,
+        last_updated_slot: crate::compact_error::slot()?,
     };
     let _ = signer_registry;
     store_state(group_info, &group)
@@ -124,8 +124,8 @@ pub(in crate::processor) fn process_initialize_sleeve(
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *token_program_info.key != spl_token_program_id()
-        || *system_program_info.key != system_program::id()
+    if !crate::token_instruction::check_id(token_program_info.key)
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -195,7 +195,7 @@ pub(in crate::processor) fn process_initialize_sleeve(
         ],
     )?;
     validate_vault_token_account(sleeve_vault_info, settlement_mint_info.key, sleeve_info.key)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let mut book = WriterSeriesBookV1 {
         is_initialized: true,
         bump: book_bump,
@@ -392,7 +392,7 @@ pub(in crate::processor) fn process_register_series(
         .ok_or(VaultError::ArithmeticOverflow)?;
     sleeve.series_count = book.series_count;
     group.series_count = book.series_count;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     book.last_updated_slot = slot;
     book.book_digest = writer_book_digest(&book);
     sleeve.last_updated_slot = slot;

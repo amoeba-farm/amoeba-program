@@ -26,10 +26,10 @@ pub(super) fn validate_writer_program_accounts(
     token_program_info: &AccountInfo,
     system_program_info: &AccountInfo,
 ) -> ProgramResult {
-    if *light_program_info.key != light_token_program_id()
-        || *cpi_authority_info.key != cpi_authority()
-        || *token_program_info.key != spl_token_program_id()
-        || *system_program_info.key != system_program::id()
+    if !crate::light_token_instruction::is_program(light_program_info.key)
+        || !crate::light_token_instruction::is_cpi_authority(cpi_authority_info.key)
+        || !crate::token_instruction::check_id(token_program_info.key)
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -60,7 +60,7 @@ pub(super) fn validate_writer_compression_accounts(
     Ok(())
 }
 
-pub(super) struct WriterPolicyContext {
+pub(in crate::processor) struct WriterPolicyContext {
     pub group: Box<WriterSettlementGroupV1>,
     pub sleeve: Box<WriterSleeveV1>,
     pub book: Box<WriterSeriesBookV1>,

@@ -68,7 +68,8 @@ pub enum ManageWriterDlmmV1Params {
 /// management authority (not amendable), the hash chain of the amended
 /// policy, and the new sleeve caps, release ratio and separation; series
 /// `start_index .. start_index + entries.len()` take `entries` (1..=8); other
-/// series keep their terms.
+/// series keep their terms. The sleeve's shared strip lane, when it exists,
+/// is rebound to the amended chain in the same instruction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AmendWriterDlmmPolicyV1Params {
     pub header: BeginWriterDlmmPolicyV1Params,

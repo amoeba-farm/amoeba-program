@@ -102,6 +102,11 @@ pub fn floor_mul_div(a: u64, b: u64, denominator: u64) -> MathResult<u64> {
     if denominator == 0 {
         return Err(AmoebaDlmmMathError::DivisionByZero);
     }
+    // Preserve full-width behavior while using native division for products
+    // that already fit in one machine word.
+    if let Some(product) = a.checked_mul(b) {
+        return Ok(product / denominator);
+    }
     let value = (a as u128)
         .checked_mul(b as u128)
         .ok_or(AmoebaDlmmMathError::ArithmeticOverflow)?
@@ -113,6 +118,11 @@ pub fn floor_mul_div(a: u64, b: u64, denominator: u64) -> MathResult<u64> {
 pub fn ceil_mul_div(a: u64, b: u64, denominator: u64) -> MathResult<u64> {
     if denominator == 0 {
         return Err(AmoebaDlmmMathError::DivisionByZero);
+    }
+    if let Some(product) = a.checked_mul(b) {
+        // Adding denominator - 1 could overflow u64. A nonzero remainder
+        // implies denominator >= 2, so this rounded quotient always fits.
+        return Ok(product / denominator + u64::from(!product.is_multiple_of(denominator)));
     }
     let product = (a as u128)
         .checked_mul(b as u128)

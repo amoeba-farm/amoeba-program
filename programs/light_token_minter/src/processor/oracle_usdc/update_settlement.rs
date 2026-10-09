@@ -76,7 +76,7 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     ensure_current_cash_update_continuation_window(&market, &month)?;
     ensure_oracle_opening_resolution_complete(&month)?;
     let mut source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
-    let source_before = source.clone();
+    let source_before = source;
     let mut observations = load_valid_oracle_source_observations(
         program_id,
         month_info.key,
@@ -198,7 +198,7 @@ pub(in crate::processor) fn process_finalize_oracle_update_claim_v2(
     if params.current_step == 0 || params.current_step <= source.last_finalized_step {
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     match params.outcome {
         OracleUpdateClaimOutcome::AcceptClaim => {
             append_oracle_source_observation(
@@ -376,7 +376,7 @@ pub(in crate::processor) fn process_cancel_stale_oracle_update_claim_v2(
 
     let (expected_guard, _) =
         derive_oracle_update_challenge_guard_pda(program_id, month_info.key, claim_info.key);
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let slot = clock.slot;
     let now = u64::try_from(clock.unix_timestamp)
         .map_err(|_| ProgramError::from(VaultError::InvalidSettlementRecord))?;
@@ -472,7 +472,7 @@ pub(in crate::processor) fn process_settle_expired_oracle_update_commitment_v3(
         source_info.key,
         claim_info,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     if claim.claim.source_id != source.source_id
         || claim.claim.status != OracleClaimStatus::Committed
         || claim.claim.escrow_disposition != OracleEscrowDisposition::Unsettled
@@ -625,7 +625,7 @@ pub(in crate::processor) fn process_challenge_oracle_update_claim_v2(
             &[guard_bump],
         ],
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let challenge = OracleUpdateChallenge {
         is_initialized: true,
         bump,

@@ -20,12 +20,10 @@ use crate::{
 
 mod accounts;
 mod capped_strip;
+pub(super) use capped_strip::close_option_routes as process_atomic_position_close;
 pub(super) use capped_strip::direct_wallet_trade as process_direct_wallet_strip_trade;
+pub(super) use capped_strip::prepare_projection as prepare_atomic_projection;
 pub(super) use capped_strip::trade as process_shared_strip_trade;
-mod october_ladder;
-pub(super) use october_ladder::process_install_october_ladder;
-mod october_outer_ladder;
-pub(super) use october_outer_ladder::process_extend_october_ladder;
 mod buyback_issuance;
 mod classic_order_settlement;
 mod compressed_settlement;
@@ -102,6 +100,30 @@ struct CollectiveMarketBinding {
 mod collective_binding;
 mod commitments;
 mod custody;
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn prepare_market_staging<'a>(
+    program: &Pubkey,
+    payer: &AccountInfo<'a>,
+    market_info: &AccountInfo<'a>,
+    market: &Market,
+    staging: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
+    token: &AccountInfo<'a>,
+    system: &AccountInfo<'a>,
+) -> ProgramResult {
+    custody::load_or_create_market_staging(
+        program,
+        payer,
+        market_info,
+        market,
+        staging,
+        mint,
+        token,
+        system,
+    )?;
+    Ok(())
+}
 mod dispatch;
 pub(super) mod earn_fund;
 mod initialization;
@@ -135,3 +157,11 @@ use metrics::{writer_activation_assets_are_sufficient, writer_math_error};
 pub(super) use policy::process_initialize_policy_registry;
 pub(super) use policy::{process_manage_policy_authority, process_seal_policy};
 use privileges::validate_pack_writer_account_privileges;
+
+pub(in crate::processor) fn fill_multi_order_from_option_routes(
+    program: &Pubkey,
+    a: &[AccountInfo],
+    wire: crate::atomic_option_route::Fill,
+) -> ProgramResult {
+    capped_strip::fill_option_routes(program, a, wire)
+}

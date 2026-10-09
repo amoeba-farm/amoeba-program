@@ -3,7 +3,9 @@ mod account_io;
 mod account_io_tokens;
 mod active_weights;
 mod ameba_dlmm;
-mod ameba_dlmm_light;
+pub(crate) mod ameba_dlmm_light;
+mod atomic_projection;
+mod atomic_proof;
 mod bucket_medians;
 mod cfm_parent_proxy;
 mod collateral_accounts;
@@ -15,8 +17,10 @@ mod instruction_dispatch;
 mod instruction_payloads;
 mod launch_schedule;
 mod market_admin;
+mod market_router;
 mod market_settlement;
 mod median;
+mod multi_order;
 mod oracle_carry;
 pub(crate) mod oracle_core;
 mod oracle_council;
@@ -26,6 +30,7 @@ mod oracle_membership;
 mod oracle_rules;
 mod oracle_sponsorship;
 mod september_bootstrap;
+mod writer_cash_consolidation;
 use oracle_core::*;
 mod oracle_schedule_validation;
 use launch_schedule::*;
@@ -155,7 +160,7 @@ use crate::{
         UpsertMarketPageParams, UpsertSettlementParams, VaultInstructionTag,
     },
     light_token_instruction::{
-        self, cpi_authority, has_canonical_compressible_token_layout, light_token_program_id,
+        self, has_canonical_compressible_token_layout, light_token_program_id,
     },
     state::{
         derive_oracle_active_weight_manifest_pda, derive_oracle_bucket_median_pda,
@@ -185,13 +190,8 @@ use crate::{
 };
 use borsh::BorshDeserialize;
 use solana_program::{
-    account_info::AccountInfo,
-    hash::hashv,
-    instruction::Instruction,
-    program_option::COption,
-    pubkey::Pubkey,
-    rent::Rent,
-    sysvar::{clock::Clock, instructions, Sysvar},
+    account_info::AccountInfo, hash::hashv, instruction::Instruction, program_option::COption,
+    pubkey::Pubkey, sysvar::instructions,
 };
 use solana_sdk_ids::{ed25519_program, system_program};
 use token_instruction::id as spl_token_program_id;

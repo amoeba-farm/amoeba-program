@@ -216,7 +216,7 @@ fn serialize_compact_access_leaf<W: io::Write>(
         return Err(io::ErrorKind::InvalidData.into());
     }
     let zero_history = leaf.domain == CompressedStateDomain::OracleSourceState
-        && leaf.data[SOURCE_HISTORY_OFFSET..].iter().all(|v| *v == 0);
+        && crate::bytes_are_zero(&leaf.data[SOURCE_HISTORY_OFFSET..]);
     if zero_history {
         ((leaf.domain as u8) | ZERO_HISTORY_DOMAIN_BIT).serialize(writer)?;
     } else {

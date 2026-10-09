@@ -64,7 +64,7 @@ pub(in crate::processor) fn validate_typed_state_data(
             VaultError::InvalidOracleObservation,
         ),
     };
-    if data.len() != account_len || data[encoded_len..].iter().any(|byte| *byte != 0) {
+    if data.len() != account_len || !crate::bytes_are_zero(&data[encoded_len..]) {
         return Err(error.into());
     }
 
@@ -272,7 +272,7 @@ pub(in crate::processor) fn validate_typed_state_data(
 
 #[inline(never)]
 pub(in crate::processor) fn fixed_bytes32_is_zero(data: &[u8], offset: usize) -> bool {
-    data[offset..offset + 32].iter().all(|byte| *byte == 0)
+    crate::bytes_are_zero(&data[offset..offset + 32])
 }
 
 #[inline(never)]
@@ -348,7 +348,7 @@ pub(in crate::processor) fn validate_compact_state_data(
             VaultError::InvalidOracleObservation,
         ),
     };
-    if data.len() < required_len || data[required_len..].iter().any(|byte| *byte != 0) {
+    if data.len() < required_len || !crate::bytes_are_zero(&data[required_len..]) {
         return Err(error.into());
     }
 

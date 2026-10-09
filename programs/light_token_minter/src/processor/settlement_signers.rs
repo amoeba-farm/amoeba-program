@@ -112,7 +112,7 @@ pub(super) fn process_initialize_settlement_signer_registry(
         || crate::pubkey_is_default(&params.recovery_authority)
         || recovery_authority_info.key == admin_info.key
         || recovery_authority_info.key == oracle_authority_info.key
-        || *system_program_info.key != system_program::id()
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(VaultError::InvalidSettlementSignerConfiguration.into());
     }
@@ -128,7 +128,7 @@ pub(super) fn process_initialize_settlement_signer_registry(
         registry_info,
         signer_set_info,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let set = build_settlement_signer_set(
         expected_registry,
         set_bump,
@@ -284,7 +284,7 @@ pub(super) fn process_propose_settlement_signer_rotation(
     let pending_set_info = &accounts[base + 3];
     let instructions_sysvar_info = if emergency { None } else { Some(&accounts[6]) };
     let system_program_info = &accounts[7];
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidAccountList.into());
     }
     let config = load_dual_settlement_governance(
@@ -339,7 +339,7 @@ pub(super) fn process_propose_settlement_signer_rotation(
     if *pending_set_info.key != expected_pending {
         return Err(VaultError::InvalidPda.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let proposal_nonce = registry
         .proposal_nonce
         .checked_add(1)
@@ -439,7 +439,7 @@ pub(super) fn process_activate_settlement_signer_rotation(
     let pending_set =
         load_canonical_settlement_signer_set(program_id, registry_info.key, pending_set_info)?;
     let config = load_canonical_vault_config(program_id, config_info)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     validate_settlement_signer_activation(
         &registry,
         pending_set_info.key,

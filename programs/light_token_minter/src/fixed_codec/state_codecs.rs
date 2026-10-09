@@ -46,7 +46,7 @@ fixed_state_deserialize_flat!(VaultConfig, 135, {
     account_version: u8,
 });
 
-fixed_state_deserialize!(OracleBucketMedianState, 245, {
+fixed_state_deserialize_flat!(OracleBucketMedianState, 245, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -70,7 +70,7 @@ fixed_state_deserialize!(OracleBucketMedianState, 245, {
     opening_source_deltas_bps: [i64; crate::constants::INLINE_ORACLE_BUCKET_MEDIAN_CAPACITY],
 });
 
-fixed_state_deserialize!(OracleActiveWeightManifest, 159, {
+fixed_state_deserialize_flat!(OracleActiveWeightManifest, 159, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -91,7 +91,7 @@ fixed_state_deserialize!(OracleActiveWeightManifest, 159, {
     max_open_interest_payout: u64,
 });
 
-fixed_state_deserialize!(OracleSettlementSourceManifest, 113, {
+fixed_state_deserialize_flat!(OracleSettlementSourceManifest, 113, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -107,7 +107,7 @@ fixed_state_deserialize!(OracleSettlementSourceManifest, 113, {
     rolling_source_digest: [u8; 32],
 });
 
-fixed_state_deserialize!(OracleRecipeWeightManifest, 181, {
+fixed_state_deserialize_flat!(OracleRecipeWeightManifest, 181, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -127,7 +127,7 @@ fixed_state_deserialize!(OracleRecipeWeightManifest, 181, {
     last_collected_source_id: [u8; 32],
 });
 
-fixed_state_deserialize!(OracleSourceState, 346, {
+fixed_state_deserialize_flat!(OracleSourceState, 346, {
     is_initialized: bool,
     bump: u8,
     month: Pubkey,
@@ -162,7 +162,7 @@ fixed_state_deserialize_flat!(OracleSourceObservations, 582, {
     source_times: [u64; crate::constants::MAX_ORACLE_SOURCE_OBSERVATIONS],
 });
 
-fixed_state_deserialize!(OracleSourceChallenge, 295, {
+fixed_state_deserialize_flat!(OracleSourceChallenge, 295, {
     is_initialized: bool,
     bump: u8,
     month: Pubkey,
@@ -184,7 +184,7 @@ fixed_state_deserialize!(OracleSourceChallenge, 295, {
     failed_schedule_escrow_counted: bool,
 });
 
-fixed_state_deserialize!(OracleUsdcSourceReward, 278, {
+fixed_state_deserialize_flat!(OracleUsdcSourceReward, 278, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -234,7 +234,7 @@ fixed_state_deserialize_flat!(OracleUsdcSkuPool, 226, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleUsdcRewardSchedule, 158, {
+fixed_state_deserialize_flat!(OracleUsdcRewardSchedule, 158, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -276,7 +276,7 @@ fixed_state_deserialize_flat!(WriterPolicyRegistryV1, 134, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(WriterPolicySnapshotV1, 298, {
+fixed_state_deserialize_flat!(WriterPolicySnapshotV1, 298, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -308,7 +308,7 @@ fixed_state_deserialize!(WriterPolicySnapshotV1, 298, {
     sealed_slot: u64,
 });
 
-fixed_state_deserialize!(WriterSettlementGroupV1, 558, {
+fixed_state_deserialize_flat!(WriterSettlementGroupV1, 558, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],

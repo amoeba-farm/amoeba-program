@@ -33,12 +33,12 @@ pub(super) fn apply_scan_transition(
     // value.  The classic path used to discover this after local mutation and
     // before save; prechecking preserves the same error while making the
     // storage-neutral adapter fail without an in-memory partial transition.
-    if (carry.remaining == 1) != (checkpoint.previous == Pubkey::default()) {
+    if (carry.remaining == 1) != (crate::pubkey_is_default(&checkpoint.previous)) {
         return invalid();
     }
     if checkpoint.observed_at <= carry.cutoff
         && checkpoint.accepted_at < carry.deadline
-        && (carry.selected_checkpoint == Pubkey::default()
+        && (crate::pubkey_is_default(&carry.selected_checkpoint)
             || (checkpoint.observed_at, checkpoint.sequence)
                 > (carry.observed_at, carry.selected_sequence))
     {
@@ -58,10 +58,10 @@ pub(super) fn apply_scan_transition(
         .remaining
         .checked_sub(1)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    if (carry.remaining == 0) != (carry.cursor == Pubkey::default()) {
+    if (carry.remaining == 0) != (crate::pubkey_is_default(&carry.cursor)) {
         return invalid();
     }
-    if carry.remaining == 0 && carry.selected_checkpoint == Pubkey::default() {
+    if carry.remaining == 0 && crate::pubkey_is_default(&carry.selected_checkpoint) {
         carry.status = NO_ELIGIBLE_CHECKPOINT;
     }
     Ok(())
@@ -94,10 +94,10 @@ pub(super) fn validate_authenticated_checkpoint(
         || read.record.accepted_at < read.record.observed_at
         || read.record.evidence_hash == [0; 32]
         || read.record.archive_hash == [0; 32]
-        || read.record.contributor == Pubkey::default()
-        || read.record.origin_source == Pubkey::default()
-        || read.record.origin_checkpoint == Pubkey::default()
-        || (read.record.sequence == 1) != (read.record.previous == Pubkey::default())
+        || crate::pubkey_is_default(&read.record.contributor)
+        || crate::pubkey_is_default(&read.record.origin_source)
+        || crate::pubkey_is_default(&read.record.origin_checkpoint)
+        || (read.record.sequence == 1) != (crate::pubkey_is_default(&read.record.previous))
     {
         return invalid();
     }

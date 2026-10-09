@@ -75,11 +75,12 @@ pub(super) fn load_swap_config(
 }
 
 #[inline(never)]
-pub(super) fn load_swap_pool(
+pub(super) fn load_swap_pool<'info>(
     program_id: &Pubkey,
-    pool_info: &AccountInfo,
+    pool_info: &AccountInfo<'info>,
+    accounts: &[AccountInfo<'info>],
 ) -> Result<Box<AmoebaDlmmPoolV1>, ProgramError> {
-    load_pool(program_id, pool_info).map(Box::new)
+    load_pool_with_accounts(program_id, pool_info, accounts).map(Box::new)
 }
 
 #[inline(never)]
@@ -251,7 +252,7 @@ pub(super) fn process_collective_swap_with_orders<'a>(
             input_mint_info.key,
         )?;
         if direction != AmoebaDlmmSwapDirection::QuoteForOption
-            && output_user_info.owner == &system_program::id()
+            && crate::is_system_program(output_user_info.owner)
         {
             if output_user_info.executable || output_user_info.data_len() != 0 {
                 return Err(VaultError::InvalidLightTokenAccount.into());
@@ -270,12 +271,24 @@ pub(super) fn process_collective_swap_with_orders<'a>(
             )?;
         }
     }
-    let pool_custody_before = if let Some((context, _)) = compressed {
+    let resident = resident_for_pool(program_id, pool_info, accounts)?;
+    let resident_ledger = resident.as_ref().map(|(_, state)| {
+        pool_ledger(
+            program_id,
+            pool_info.key,
+            &pool,
+            state.pool_option,
+            state.pool_quote,
+        )
+    });
+    let pool_custody_before = if resident.is_some() {
+        None
+    } else if let Some((context, _)) = compressed {
         compressed_swap::existing_sidecar(program_id, context.pool_custody)?
     } else {
         None
     };
-    let (validated_vaults, before_vault_amounts) = validate_pool_vaults_once(
+    let (validated_vaults, before_vault_amounts) = validate_pool_vaults_once_with_ledger(
         program_id,
         pool_info,
         &pool,
@@ -283,6 +296,7 @@ pub(super) fn process_collective_swap_with_orders<'a>(
         option_vault_info,
         quote_vault_info,
         pool_custody_before,
+        resident_ledger.as_ref(),
     )?;
 
     let (route_bitmap, ascending) = match direction {
@@ -303,7 +317,7 @@ pub(super) fn process_collective_swap_with_orders<'a>(
         if !page_info.is_writable {
             return Err(VaultError::UnexpectedAmoebaDlmmWritableAccount.into());
         }
-        let page = load_bin_page(program_id, pool_info.key, page_info)?;
+        let page = load_page_with_accounts(program_id, pool_info, page_info, accounts)?;
         if !page_bit(&pool.initialized_page_bitmap, page.page_index)
             || Some(page.page_index) != expected_page
             || pages
@@ -431,7 +445,7 @@ pub(super) fn process_collective_swap_with_orders<'a>(
         page.bid_bitmap =
             (page.bid_bitmap & !bit) | if fill.quote_reserve_after > 0 { bit } else { 0 };
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     for loaded in &mut pages {
         set_page_bit(
             &mut pool.bid_page_bitmap,
@@ -552,7 +566,7 @@ pub(super) fn process_collective_swap_with_orders<'a>(
     };
     if !compressed_mode
         && direction != AmoebaDlmmSwapDirection::QuoteForOption
-        && output_user.owner == &system_program::id()
+        && crate::is_system_program(output_user.owner)
     {
         let _ = load_or_create_light_associated_token_account(
             trader_info,
@@ -653,17 +667,33 @@ pub(super) fn process_collective_swap_with_orders<'a>(
             compressed_mode && direction == AmoebaDlmmSwapDirection::OptionForQuote,
         )?;
     }
-    let after_vault_amounts = validated_vaults.read_amounts(
+    let staged_pool = orders
+        .as_ref()
+        .and_then(|(_, context)| context.after_balances.get())
+        .map(|(o, q, _, _)| (o, q))
+        .or_else(|| compressed.and_then(|(context, _)| context.after_pool.get()));
+    let resident_ledger_after = resident.as_ref().map(|(_, state)| {
+        let (o, q) = staged_pool.unwrap_or((state.pool_option, state.pool_quote));
+        pool_ledger(program_id, pool_info.key, &pool, o, q)
+    });
+    let after_vault_amounts = validated_vaults.read_amounts_with_ledger(
         program_id,
         pool_info,
         &pool,
         authority_info,
         option_vault_info,
         quote_vault_info,
-        compressed
-            .map(|(context, _)| compressed_swap::existing_sidecar(program_id, context.pool_custody))
-            .transpose()?
-            .flatten(),
+        if resident.is_some() {
+            None
+        } else {
+            compressed
+                .map(|(context, _)| {
+                    compressed_swap::existing_sidecar(program_id, context.pool_custody)
+                })
+                .transpose()?
+                .flatten()
+        },
+        resident_ledger_after.as_ref(),
     )?;
     let (before_input, before_output, after_input, after_output) = match direction {
         AmoebaDlmmSwapDirection::QuoteForOption => (
@@ -708,10 +738,66 @@ pub(super) fn process_collective_swap_with_orders<'a>(
             .book_after;
         orders::trading::persist(program_id, context, state)?;
     }
-    for loaded in &pages {
-        store_light_state(&accounts[loaded.account_index], &loaded.page)?;
+    let cached = commit_resident(program_id, pool_info, accounts, |resident| {
+        resident.pool = *pool.as_ref();
+        if let Some((o, q)) = staged_pool {
+            resident.pool_option = o;
+            resident.pool_quote = q;
+        }
+        resident.pool_hot_option = after_vault_amounts
+            .0
+            .checked_sub(resident.pool_option)
+            .ok_or(VaultError::ArithmeticOverflow)?;
+        resident.pool_hot_quote = after_vault_amounts
+            .1
+            .checked_sub(resident.pool_quote)
+            .ok_or(VaultError::ArithmeticOverflow)?;
+        for loaded in &pages {
+            if let Some(page) = resident.page_mut(loaded.page.page_index) {
+                *page = loaded.page;
+            }
+        }
+        if let Some((state, context)) = orders.as_ref() {
+            merge_resident_book(program_id, resident, context.prefix, &state.book)?;
+            if let Some((_, _, o, q)) = context.after_balances.get() {
+                resident.book_option = o;
+                resident.book_quote = q;
+            }
+            resident.book_hot_option = orders::custody(
+                &context.prefix[32],
+                context.prefix[31].key,
+                &pool.option_mint,
+            )?;
+            resident.book_hot_quote = orders::custody(
+                &context.prefix[33],
+                context.prefix[31].key,
+                &pool.quote_mint,
+            )?;
+        }
+        if let Some(writer) = writer.as_ref() {
+            if resident.writer_position.is_some() {
+                resident.writer_position = Some(*writer.position());
+            }
+        }
+        Ok(())
+    })?;
+    if !cached {
+        if let Some((state, context)) = orders.as_ref() {
+            store_state(&context.prefix[31], &state.book)?;
+        }
     }
-    store_light_state(pool_info, pool.as_ref())?;
+    for loaded in &pages {
+        let forwarded = cached
+            && resident
+                .as_ref()
+                .is_some_and(|(_, state)| state.page(loaded.page.page_index).is_some());
+        if !forwarded {
+            store_light_state(&accounts[loaded.account_index], &loaded.page)?;
+        }
+    }
+    if !cached {
+        store_light_state(pool_info, pool.as_ref())?;
+    }
     emit_event(
         &EVENT_SWAP_EXECUTED,
         AmoebaDlmmEvent::Swap(SwapEvent {

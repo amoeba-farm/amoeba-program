@@ -149,7 +149,13 @@ fn check_drawdown(assets: u64, principal: u64, liability: u64, limit: u64) -> Re
         .checked_sub(liability)
         .ok_or(WriterDlmmAdmissionError::Insolvent)?;
     let loss = principal.saturating_sub(equity);
-    if loss > mul_floor(principal, limit, WRITER_RATIO_SCALE_PPM)? {
+    // For integer loss, loss > floor(P * limit / scale) is exactly
+    // loss * scale > P * limit. Both u64 products fit in u128. The policy
+    // guard also proves the original quotient fits in u64, so this removes
+    // no arithmetic error and preserves the checks above in their order.
+    if u128::from(loss) * u128::from(WRITER_RATIO_SCALE_PPM)
+        > u128::from(principal) * u128::from(limit)
+    {
         return Err(WriterDlmmAdmissionError::Drawdown);
     }
     Ok(())
@@ -272,6 +278,8 @@ pub fn admit_writer_sleeve_cash_retirement(
     )
 }
 
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn admit_writer_sleeve_retirement_prepared(
     book: &[WriterSeries],
     cash: WriterDlmmCash,
@@ -282,18 +290,7 @@ pub(crate) fn admit_writer_sleeve_retirement_prepared(
     month_spent_atoms: u64,
     prepared: &crate::writer_sleeve_math::PreparedWriterReserve,
 ) -> Result<WriterDlmmAdmission> {
-    if retirements.len() != 1
-        || !prepared.matches_bounds(
-            risk.lower_tail_max_settlement_atomic,
-            risk.upper_tail_min_settlement_atomic,
-        )
-        || retirements[0].series_index != prepared.target
-        || book
-            .get(prepared.target)
-            .is_none_or(|s| s.external_oi_atoms != prepared.initial_oi)
-    {
-        return Err(WriterDlmmAdmissionError::InvalidPolicy);
-    }
+    validate_prepared_retirement(book, risk, retirements, prepared)?;
     admit_writer_retirement_inner(
         book,
         cash,
@@ -307,6 +304,59 @@ pub(crate) fn admit_writer_sleeve_retirement_prepared(
         true,
         Some(prepared),
     )
+}
+
+/// Reuse the authenticated reserve grid for ordinary pooled-cash retirement.
+/// Every pooled-cash, allocation, price, budget and reserve-release check remains
+/// in the same admission path as `admit_writer_dlmm_retirement`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn admit_writer_dlmm_retirement_prepared(
+    book: &[WriterSeries],
+    cash: WriterDlmmCash,
+    risk: &WriterDlmmRiskLimits,
+    policy: &WriterDlmmBuybackLimits,
+    series_limits: &[WriterDlmmSeriesLimits],
+    retirements: &[WriterDlmmRetirement],
+    month_spent_atoms: u64,
+    allocated_lp_quote_after_atoms: u64,
+    close_pending: bool,
+    prepared: &crate::writer_sleeve_math::PreparedWriterReserve,
+) -> Result<WriterDlmmAdmission> {
+    validate_prepared_retirement(book, risk, retirements, prepared)?;
+    admit_writer_retirement_inner(
+        book,
+        cash,
+        risk,
+        policy,
+        series_limits,
+        retirements,
+        month_spent_atoms,
+        allocated_lp_quote_after_atoms,
+        close_pending,
+        false,
+        Some(prepared),
+    )
+}
+
+fn validate_prepared_retirement(
+    book: &[WriterSeries],
+    risk: &WriterDlmmRiskLimits,
+    retirements: &[WriterDlmmRetirement],
+    prepared: &crate::writer_sleeve_math::PreparedWriterReserve,
+) -> Result<()> {
+    if retirements.len() != 1
+        || !prepared.matches_bounds(
+            risk.lower_tail_max_settlement_atomic,
+            risk.upper_tail_min_settlement_atomic,
+        )
+        || retirements[0].series_index != prepared.target
+        || book
+            .get(prepared.target)
+            .is_none_or(|s| s.external_oi_atoms != prepared.initial_oi)
+    {
+        return Err(WriterDlmmAdmissionError::InvalidPolicy);
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -442,24 +492,18 @@ fn admit_writer_retirement_inner(
     } else {
         admit_writer_dlmm_cash(&after[..book.len()], after_cash, risk)?
     };
-    let released = before
-        .reserve_atoms
-        .checked_sub(summary.reserve_atoms)
-        .filter(|value| *value > 0)
-        .ok_or(WriterDlmmAdmissionError::NoReserveReduction)?;
+    // A retirement need not free reserve. The reserve is the worst stress scenario, so retiring
+    // contracts on the side that does not bind frees nothing even at fair value (a short's puts
+    // while the call side binds); such a buyback is funded from the sleeve's free cash instead,
+    // still within the price bound, the claim value, both buy-back caps and the cash left after
+    // every remaining obligation, with the post-trade risk admission above.
+    let released = before.reserve_atoms.saturating_sub(summary.reserve_atoms);
     let monthly_after = add(month_spent_atoms, total_cost)?;
-    // Cost is funded from cash made free by the exact complete retirement set.
     let post_retirement_available = cash
         .assets_atoms
         .checked_sub(add(summary.reserve_atoms, risk.operational_buffer_atoms)?)
         .ok_or(WriterDlmmAdmissionError::Insolvent)?;
     if total_cost > conservative_value
-        || total_cost
-            > mul_floor(
-                released,
-                policy.reserve_release_spend_ratio_ppm,
-                WRITER_RATIO_SCALE_PPM,
-            )?
         || total_cost > policy.transaction_buyback_cap_atoms
         || monthly_after > policy.monthly_buyback_cap_atoms
         || total_cost > post_retirement_available

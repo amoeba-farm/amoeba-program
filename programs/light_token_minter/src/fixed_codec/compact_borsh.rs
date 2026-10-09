@@ -40,6 +40,12 @@ impl CursorField for u128 {
     }
 }
 
+impl CursorField for i128 {
+    fn read(input: &mut CheckedCursor<'_>) -> Self {
+        i128::from_le_bytes(input.bytes())
+    }
+}
+
 impl<const LENGTH: usize> CursorField for [u8; LENGTH] {
     #[inline(always)]
     fn read(input: &mut CheckedCursor<'_>) -> Self {

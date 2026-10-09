@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Debug, Eq, PartialEq)]
 pub struct OracleSourceState {
     pub is_initialized: bool,
     pub bump: u8,
@@ -23,6 +23,13 @@ pub struct OracleSourceState {
     pub observation_count: u32,
     pub latest_source_time: u64,
     pub rolling_observation_hash: [u8; 32],
+}
+
+impl Clone for OracleSourceState {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl Default for OracleSourceState {

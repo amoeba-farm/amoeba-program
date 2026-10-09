@@ -2,6 +2,7 @@
 //! The action body retains deployed 3cb40d6 semantics and canonical Light CPI
 //! checks. Classic record admission is isolated from the compressed trade loader.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::scoped_settlement::derive_collective_settlement_delegate;
 
 pub(super) fn process(
@@ -35,7 +36,7 @@ pub(super) fn process(
         }
     }
     assert_program_accounts(&a[15], &a[16], &a[19], &a[20])?;
-    let mut pool = load_pool(program, &a[7])?;
+    let mut pool = load_pool_with_accounts(program, &a[7], a)?;
     let config = load_canonical_vault_config(program, &a[1])?;
     if pool.quote_mint != config.usdc_mint
         || *a[9].key != pool.option_mint
@@ -52,13 +53,21 @@ pub(super) fn process(
     validate_spl_interface_account(a[9].key, &a[17])?;
     validate_spl_interface_account(a[10].key, &a[18])?;
     // Pause/expiry do not extinguish deployed owner recovery rights.
-    let mut book = load_book(program, &a[31], &a[7], &pool)?;
+    let mut book = load_book_with_accounts(program, &a[31], &a[7], &pool, a)?;
     storage::load_classic_recovery(program, a, &mut book, &pool)?;
     let before_option = custody(&a[32], a[31].key, &pool.option_mint)?;
     let before_quote = custody(&a[33], a[31].key, &pool.quote_mint)?;
-    if before_option < book.header.option_obligations
-        || before_quote < book.header.quote_obligations
-    {
+    let resident = resident_for_pool(program, &a[7], a)?;
+    let cold = resident
+        .as_ref()
+        .map(|(_, s)| book_ledger(program, a[31].key, &pool, s.book_option, s.book_quote));
+    if !crate::compressed_custody::backs(
+        cold.as_ref(),
+        before_option,
+        before_quote,
+        book.header.option_obligations,
+        book.header.quote_obligations,
+    ) {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
     let mut state = OrderSwapState {
@@ -108,7 +117,7 @@ pub(super) fn process(
                         if amount == 0 {
                             continue;
                         }
-                        if destination.owner == &system_program::id() {
+                        if crate::is_system_program(destination.owner) {
                             load_or_create_light_associated_token_account(
                                 &a[0],
                                 &a[0],
@@ -187,13 +196,25 @@ pub(super) fn process(
                 .book
                 .recompute_obligations(pool.tick_size_quote_atomic)
                 .map_err(order_error)?;
-            if custody(&a[32], a[31].key, &pool.option_mint)? < state.book.header.option_obligations
-                || custody(&a[33], a[31].key, &pool.quote_mint)?
-                    < state.book.header.quote_obligations
-            {
+            if !crate::compressed_custody::backs(
+                cold.as_ref(),
+                custody(&a[32], a[31].key, &pool.option_mint)?,
+                custody(&a[33], a[31].key, &pool.quote_mint)?,
+                state.book.header.option_obligations,
+                state.book.header.quote_obligations,
+            ) {
                 return Err(VaultError::AmoebaDlmmInvariantViolation.into());
             }
-            persist_book(program, a, &mut state.book)
+            storage::persist_with_payer_staged(program, a, &mut state.book, &a[0])?;
+            if !commit_resident(program, &a[7], a, |resident| {
+                merge_resident_book(program, resident, a, &state.book)?;
+                resident.book_hot_option = custody(&a[32], a[31].key, &pool.option_mint)?;
+                resident.book_hot_quote = custody(&a[33], a[31].key, &pool.quote_mint)?;
+                Ok(())
+            })? {
+                store_state(&a[31], &state.book)?;
+            }
+            Ok(())
         }
         DlmmOrderAction::CloseBook => {
             if a.len() != ORDER_SWAP_FIXED_ACCOUNTS
@@ -213,7 +234,16 @@ pub(super) fn process(
                 .checked_sub(1)
                 .ok_or(VaultError::AmoebaDlmmInvariantViolation)?;
             pool.account_version = AMOEBA_DLMM_ACCOUNT_VERSION;
-            store_light_state(&a[7], &pool)?;
+            if !commit_resident(program, &a[7], a, |resident| {
+                resident.pool = pool;
+                resident.book = None;
+                resident.records.clear();
+                // Custody donations retain their Book source identity; closure
+                // does not grant them to LPs or to the rent payer.
+                Ok(())
+            })? {
+                store_light_state(&a[7], &pool)?;
+            }
             close_program_account(program, &a[31], &a[0])
         }
         _ => Err(VaultError::InvalidAmoebaDlmmRoute.into()),
@@ -226,7 +256,7 @@ fn load_recovery_destination(
     owner: &Pubkey,
     mint: &Pubkey,
 ) -> Result<TokenAccount, ProgramError> {
-    if info.owner == &spl_token_program_id() {
+    if crate::token_instruction::check_id(info.owner) {
         validate_vault_token_account(info, mint, owner)
     } else {
         load_scoped_holder_token_account(program, info, owner, mint)
@@ -242,7 +272,7 @@ fn load_scoped_holder_token_account(
 ) -> Result<TokenAccount, ProgramError> {
     validate_light_token_account(account)?;
     validate_light_associated_token_address(owner, mint, account)?;
-    let data = account.try_borrow_data()?;
+    let data = account.try_data()?;
     if !has_canonical_compressible_token_layout(&data) {
         return Err(VaultError::InvalidLightTokenAccount.into());
     }
@@ -286,12 +316,12 @@ fn authorize_collective_settlement(
     }
     if market.long_contract_mint != Some(*mint.key)
         || *delegate.key != derive_collective_settlement_delegate(program_id, owner.key, mint.key).0
-        || *light.key != light_token_program_id()
+        || !crate::light_token_instruction::is_program(light.key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
     validate_collateral_mint_account(mint, &spl_token_program_id())?;
-    if !revoke && source.owner == &system_program::id() {
+    if !revoke && crate::is_system_program(source.owner) {
         load_or_create_light_associated_token_account(
             owner,
             owner,

@@ -1,8 +1,8 @@
 //! Owner-portfolio collateralized asks. Each record is a price/quantity witness;
 //! its `collateral` wire field records only that Open's initial cash top-up.
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
-    FixedStateEncode, FixedWriter,
+    fixed_state_deserialize, fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor,
+    FixedField, FixedStateDecode, FixedStateEncode, FixedWriter,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::pubkey::Pubkey;
@@ -224,7 +224,7 @@ impl IndividualWriterPosition {
         Some(premium)
     }
 }
-fixed_state_deserialize!(IndividualWriterPosition, IndividualWriterPosition::LEN, {
+fixed_state_deserialize_flat!(IndividualWriterPosition, IndividualWriterPosition::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8,
     book: Pubkey, owner: Pubkey, nonce: u64, series_index: u8, payoff_digest: [u8; 32],
     expiry_ts: u64, price: u64, quantity: u64, filled: u64, collateral: u64, premium: u64,

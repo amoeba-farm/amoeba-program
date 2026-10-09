@@ -425,7 +425,7 @@ pub(super) fn validate_market_parameters(
 }
 
 pub(super) fn current_unix_timestamp() -> Result<u64, ProgramError> {
-    let timestamp = Clock::get()?.unix_timestamp;
+    let timestamp = crate::compact_error::clock()?.unix_timestamp;
     if timestamp < 0 {
         return Err(VaultError::InvalidSettlementRecord.into());
     }
@@ -433,7 +433,7 @@ pub(super) fn current_unix_timestamp() -> Result<u64, ProgramError> {
 }
 
 pub(super) fn current_slot_and_unix_timestamp() -> Result<(u64, u64), ProgramError> {
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     if clock.unix_timestamp < 0 {
         return Err(VaultError::InvalidSettlementRecord.into());
     }
@@ -476,7 +476,7 @@ pub(super) fn ensure_settlement_finalization_ready(market: &Market) -> ProgramRe
 }
 
 pub(super) fn validate_light_token_account(account_info: &AccountInfo) -> ProgramResult {
-    if account_info.owner != &light_token_program_id() {
+    if !crate::light_token_instruction::is_program(account_info.owner) {
         return Err(VaultError::InvalidLightTokenAccount.into());
     }
     Ok(())
@@ -503,11 +503,11 @@ pub(super) fn validate_light_associated_token_destination(
     account_info: &AccountInfo,
 ) -> ProgramResult {
     validate_light_associated_token_address(owner, mint, account_info)?;
-    if account_info.owner == &light_token_program_id() {
+    if crate::light_token_instruction::is_program(account_info.owner) {
         let _ = load_canonical_light_token_account(account_info, owner, mint)?;
         return Ok(());
     }
-    if account_info.owner != &system_program::id()
+    if !crate::is_system_program(account_info.owner)
         || account_info.executable
         || account_info.data_len() != 0
     {
@@ -528,10 +528,10 @@ pub(super) fn load_or_create_light_associated_token_account<'a>(
     system_program_info: &AccountInfo<'a>,
 ) -> Result<TokenAccount, ProgramError> {
     validate_light_associated_token_destination(owner_info.key, mint_info.key, account_info)?;
-    if account_info.owner == &light_token_program_id() {
+    if crate::light_token_instruction::is_program(account_info.owner) {
         return load_canonical_light_token_account(account_info, owner_info.key, mint_info.key);
     }
-    if account_info.owner != &system_program::id()
+    if !crate::is_system_program(account_info.owner)
         || account_info.executable
         || account_info.data_len() != 0
         || !account_info.is_writable
@@ -541,10 +541,10 @@ pub(super) fn load_or_create_light_associated_token_account<'a>(
     if !payer_info.is_signer || !payer_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *light_token_program_info.key != light_token_program_id() {
+    if !crate::light_token_instruction::is_program(light_token_program_info.key) {
         return Err(VaultError::InvalidLightTokenProgram.into());
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     if *compressible_config_info.key != light_token_instruction::compressible_config()

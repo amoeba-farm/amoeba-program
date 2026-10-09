@@ -18,7 +18,7 @@ pub(super) fn process_upsert_market_page(
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
 
@@ -102,7 +102,7 @@ pub(super) fn process_upsert_settlement(
     if !authority_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     if *instructions_sysvar_info.key != instructions::id() {

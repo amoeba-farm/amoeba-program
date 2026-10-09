@@ -6,15 +6,18 @@
 //! position or policy. See `crate::buyback_mark_math` for the statistic and the
 //! viability rules, and `docs/earn-fund/EARN_FUND_V2.md` for the interface.
 use super::*;
-use crate::ameba_dlmm_state::AmoebaDlmmPoolStatus;
+use crate::ameba_dlmm_state::{AmoebaDlmmPoolStatus, AmoebaDlmmPoolV1};
 use crate::buyback_mark_math::{
     ask_bin_at_depth, bid_at_depth, bin_price, depth_atoms, fold_sample, marked_range_value,
     series_head, series_viable, whole_usd_delta, BucketEntry, BuybackParams, SaleCapacity,
     BUCKET_SECS, CONTRACT_ATOMS, MAX_MARK_SERIES, NO_ASK, NO_BID, RING_BUCKETS,
 };
 use crate::buyback_mark_state::*;
-use crate::processor::ameba_dlmm::load_pool;
-use crate::processor::writer_sleeve::dlmm::{observe_writer_lane, WriterLaneAccounts};
+use crate::compact_error::CompactAccountInfo;
+use crate::processor::ameba_dlmm::{load_pool, resident_for_pool};
+use crate::processor::writer_sleeve::dlmm::{
+    observe_writer_lane, resolve_position_with, WriterLaneAccounts,
+};
 use crate::state::{
     derive_writer_dlmm_position_pda, OraclePhase, OracleSettlementStatus, WriterDlmmPolicyV1,
     WriterDlmmPositionV1,
@@ -41,7 +44,7 @@ fn invalid() -> ProgramError {
 }
 
 fn account_hash(account: &AccountInfo) -> Result<[u8; 32], ProgramError> {
-    let data = account.try_borrow_data()?;
+    let data = account.try_data()?;
     Ok(
         solana_program::hash::hashv(&[account.key.as_ref(), account.owner.as_ref(), &data])
             .to_bytes(),
@@ -52,13 +55,17 @@ fn account_hash(account: &AccountInfo) -> Result<[u8; 32], ProgramError> {
 /// dependencies include authenticated book/policy bytes, not caller versions.
 fn fixed_commitment(program: &Pubkey, a: &[AccountInfo]) -> Result<[u8; 32], ProgramError> {
     let fund = load_fund(program, &a[1])?;
-    let mut hash = solana_program::hash::Hasher::default();
-    hash.hash(a[1].key.as_ref());
-    hash.hash(&fund.buyback_params);
-    for index in [2, 3, 4, 5, 6, 7, 8, 10, 11] {
-        hash.hash(&account_hash(&a[index])?);
+    // The streaming Hasher uses software SHA-256 on SBF. This exact, fixed
+    // preimage lets hash() use Solana's syscall without changing round bytes.
+    let mut preimage = [0u8; 32 + crate::buyback_mark_math::BUYBACK_PARAMS_LEN + 9 * 32];
+    preimage[..32].copy_from_slice(a[1].key.as_ref());
+    let prefix = 32 + fund.buyback_params.len();
+    preimage[32..prefix].copy_from_slice(&fund.buyback_params);
+    for (ordinal, index) in [2, 3, 4, 5, 6, 7, 8, 10, 11].into_iter().enumerate() {
+        let start = prefix + ordinal * 32;
+        preimage[start..start + 32].copy_from_slice(&account_hash(&a[index])?);
     }
-    Ok(hash.result().to_bytes())
+    Ok(solana_program::hash::hash(&preimage).to_bytes())
 }
 
 fn check_round(program: &Pubkey, a: &[AccountInfo], data: &[u8], count: usize) -> ProgramResult {
@@ -84,7 +91,7 @@ fn begin_round(program: &Pubkey, a: &[AccountInfo], create: bool) -> ProgramResu
         || !a[0].is_writable
         || !a[8].is_writable
         || !a[13].is_writable
-        || *a[9].key != system_program::id()
+        || !crate::is_system_program(a[9].key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -102,7 +109,7 @@ fn begin_round(program: &Pubkey, a: &[AccountInfo], create: bool) -> ProgramResu
         VaultError::InvalidWriterPolicySnapshot,
     )?;
     let count = usize::from(book.series_count);
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let now = u64::try_from(clock.unix_timestamp).map_err(|_| VaultError::EarnFundNotReady)?;
     if count == 0
         || count > MAX_MARK_SERIES
@@ -143,7 +150,7 @@ fn begin_round(program: &Pubkey, a: &[AccountInfo], create: bool) -> ProgramResu
             mark_len(count),
             &[BUYBACK_MARK_SEED, a[5].key.as_ref(), &[bump]],
         )?;
-        let mut data = a[8].try_borrow_mut_data()?;
+        let mut data = a[8].try_data_mut()?;
         data[0] = 1;
         data[1] = bump;
         data[2..5].copy_from_slice(&BUYBACK_MARK_DISCRIMINATOR);
@@ -168,7 +175,7 @@ fn begin_round(program: &Pubkey, a: &[AccountInfo], create: bool) -> ProgramResu
     if a[8].owner != program {
         return Err(invalid());
     }
-    let mark = a[8].try_borrow_data()?;
+    let mark = a[8].try_data()?;
     if valid_mark(program, a[8].key, a[5].key, &mark) != Some(count)
         || get_key(&mark, OFF_BOOK) != *a[6].key
         || get_key(&mark, OFF_POLICY) != *a[7].key
@@ -190,7 +197,7 @@ fn begin_round(program: &Pubkey, a: &[AccountInfo], create: bool) -> ProgramResu
             round_len(count),
             &[BUYBACK_ROUND_SEED, a[5].key.as_ref(), &[bump]],
         )?;
-        let mut data = a[13].try_borrow_mut_data()?;
+        let mut data = a[13].try_data_mut()?;
         data[0] = 1;
         data[1] = bump;
         data[2..5].copy_from_slice(b"BBR");
@@ -200,7 +207,7 @@ fn begin_round(program: &Pubkey, a: &[AccountInfo], create: bool) -> ProgramResu
         data[ROUND_COUNT] = count as u8;
     }
     let commitment = fixed_commitment(program, a)?;
-    let mut data = a[13].try_borrow_mut_data()?;
+    let mut data = a[13].try_data_mut()?;
     if valid_round(program, a[13].key, a[5].key, &data) != Some(count) {
         return Err(invalid());
     }
@@ -223,7 +230,7 @@ fn finish_round(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     if a.len() < 14 {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let mut round = a[13].try_borrow_mut_data()?;
+    let mut round = a[13].try_data_mut()?;
     let count = valid_round(program, a[13].key, a[5].key, &round).ok_or_else(invalid)?;
     check_round(program, a, &round, count)?;
     if a.len() != 14 + 2 * count || usize::from(round[ROUND_NEXT]) != count {
@@ -232,8 +239,8 @@ fn finish_round(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     let book = load_writer_series_book(program, &a[6], a[5].key, a[3].key)?;
     let params = BuybackParams::decode(&load_fund(program, &a[1])?.buyback_params)
         .unwrap_or(BuybackParams::INVALID);
-    let now =
-        u64::try_from(Clock::get()?.unix_timestamp).map_err(|_| VaultError::EarnFundNotReady)?;
+    let now = u64::try_from(crate::compact_error::clock()?.unix_timestamp)
+        .map_err(|_| VaultError::EarnFundNotReady)?;
     let started = get_u64(&round, ROUND_TS);
     if now / BUCKET_SECS != started / BUCKET_SECS
         || now.saturating_sub(started) > u64::from(params.max_head_age_secs)
@@ -255,7 +262,7 @@ fn finish_round(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
             return Err(VaultError::EarnFundMarkUnavailable.into());
         }
     }
-    a[8].try_borrow_mut_data()?.copy_from_slice(mark);
+    a[8].try_data_mut()?.copy_from_slice(mark);
     round[ROUND_PENDING] = 0;
     Ok(())
 }
@@ -265,7 +272,7 @@ fn close_round(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     if a.len() != 4 || !a[0].is_signer || a[2].owner != program {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let data = a[2].try_borrow_data()?;
+    let data = a[2].try_data()?;
     if valid_round(program, a[2].key, a[1].key, &data).is_none() || get_key(&data, 38) != *a[3].key
     {
         return Err(invalid());
@@ -295,9 +302,10 @@ fn close_round(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
 ///
 /// Writes only the mark. One sample per slot, refused when the sleeve, book,
 /// a pool or a position was written in the current slot. The policy must be
-/// sealed; every pool must be the canonical non-order pool of the series'
-/// market, bound to the sleeve's anchor month and expiry; positions must be
-/// the canonical fund-lane PDAs stored at creation. An ask counts only while
+/// sealed; every pool must be the canonical pool of the series' market
+/// (ordinary, order-book, or resident in the Market: `load_series`), bound
+/// to the sleeve's anchor month and expiry; positions must be the canonical
+/// fund-lane PDAs stored at creation. An ask counts only while
 /// the lane is eligible exactly as the swap path decides
 /// (`observe_writer_lane`). A bid counts only on the same tradable, eligible
 /// lane, when the highest bid is within the buy-back path's per-contract
@@ -314,7 +322,7 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
     if a.len() < SAMPLE_FIXED
         || !a[0].is_signer
         || !a[8].is_writable
-        || *a[9].key != system_program::id()
+        || !crate::is_system_program(a[9].key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -336,7 +344,7 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
     let count = usize::from(book.series_count);
     let fixed = SAMPLE_FIXED + usize::from(chunk);
     let (start, take, round_ts, round_slot, round_fresh) = if chunk {
-        let data = a.get(13).ok_or_else(invalid)?.try_borrow_data()?;
+        let data = a.get(13).ok_or_else(invalid)?.try_data()?;
         check_round(program, a, &data, count)?;
         let start = usize::from(data[ROUND_NEXT]);
         let take = a.len().saturating_sub(fixed) / SERIES_ACCOUNTS;
@@ -380,7 +388,7 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
             && month.settlement_record.is_none()
             && month.settlement_status != OracleSettlementStatus::Final
     };
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let current_now =
         u64::try_from(clock.unix_timestamp).map_err(|_| VaultError::EarnFundNotReady)?;
     let now = if chunk { round_ts } else { current_now };
@@ -411,7 +419,7 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
             mark_len(count),
             &[BUYBACK_MARK_SEED, a[5].key.as_ref(), &[bump]],
         )?;
-        let mut data = a[8].try_borrow_mut_data()?;
+        let mut data = a[8].try_data_mut()?;
         data[0] = 1;
         data[1] = bump;
         data[2..5].copy_from_slice(&BUYBACK_MARK_DISCRIMINATOR);
@@ -435,17 +443,17 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
     } else if a[8].owner != program {
         return Err(invalid());
     }
-    let mut storage = a[if chunk { 13 } else { 8 }].try_borrow_mut_data()?;
-    let mut data = &mut storage[if chunk { round_mark_offset(count) } else { 0 }..];
-    if valid_mark(program, a[8].key, a[5].key, &data) != Some(count)
-        || get_key(&data, OFF_BOOK) != *a[6].key
-        || get_key(&data, OFF_POLICY) != *a[7].key
+    let mut storage = a[if chunk { 13 } else { 8 }].try_data_mut()?;
+    let data = &mut storage[if chunk { round_mark_offset(count) } else { 0 }..];
+    if valid_mark(program, a[8].key, a[5].key, data) != Some(count)
+        || get_key(data, OFF_BOOK) != *a[6].key
+        || get_key(data, OFF_POLICY) != *a[7].key
     {
         return Err(invalid());
     }
     if sleeve.last_updated_slot >= sample_slot
         || book.last_updated_slot >= sample_slot
-        || sample_slot <= get_u64(&data, OFF_HEAD_SLOT)
+        || sample_slot <= get_u64(data, OFF_HEAD_SLOT)
     {
         return Err(VaultError::EarnFundMarkUnavailable.into());
     }
@@ -471,14 +479,14 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
     let fresh = if chunk {
         round_fresh
     } else {
-        read_bucket(&data, count, ring_slot, 0).index != current
+        read_bucket(data, count, ring_slot, 0).index != current
     };
     // The first sample, and the first after a gap of more than one bucket,
     // only re-seed the turnover counters: turnover from the gap is never
     // booked as recent flow.
-    let seed = get_u64(&data, OFF_SAMPLE_COUNT) == 0
-        || current > get_u64(&data, OFF_LAST_BUCKET).saturating_add(1);
-    let month_rolled = policy.spending_month_start_ts != get_u64(&data, OFF_SPEND_MONTH);
+    let seed = get_u64(data, OFF_SAMPLE_COUNT) == 0
+        || current > get_u64(data, OFF_LAST_BUCKET).saturating_add(1);
+    let month_rolled = policy.spending_month_start_ts != get_u64(data, OFF_SPEND_MONTH);
     let mut numerator = 0u128;
     let mut bid_numerator = 0u128;
     let mut all_viable = true;
@@ -492,25 +500,22 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
         // pool, writer position, Market, option mint, market staging
         // custody, writer retirement custody.
         let s = &a[fixed + SERIES_ACCOUNTS * (index - start)..][..SERIES_ACCOUNTS];
-        let (pool_info, position_info) = (&s[0], &s[1]);
-        if *pool_info.key != get_key(&data, at + S_POOL)
-            || *position_info.key != get_key(&data, at + S_POSITION)
+        if *s[0].key != get_key(data, at + S_POOL)
+            || *s[1].key != get_key(data, at + S_POSITION)
             || *s[2].key != record.market
         {
             return Err(invalid());
         }
-        // `load_pool` binds the pool to the canonical PDA of `pool.market`.
-        let pool = load_pool(program, pool_info)?;
-        if pool.account_version == crate::dlmm_order_state::ORDER_POOL_VERSION
-            || pool.market != record.market
-            || pool.oracle_month != group.anchor_oracle_month
-            || pool.expiry_ts != sleeve.expiry_ts
-        {
-            return Err(VaultError::InvalidAmoebaDlmmPool.into());
-        }
-        if pool.last_updated_slot >= sample_slot {
-            return Err(VaultError::EarnFundMarkUnavailable.into());
-        }
+        let (pool, position) = load_series(
+            program,
+            s,
+            &group.anchor_oracle_month,
+            sleeve.expiry_ts,
+            a[5].key,
+            a[7].key,
+            index,
+            sample_slot,
+        )?;
         let tick = pool.tick_size_quote_atomic;
         let open_interest = record.external_open_interest_atoms;
         let max_payout = record.max_payout_per_contract_atoms;
@@ -531,29 +536,7 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
                 .seller_floor_quote_atoms
                 .saturating_sub(tick.saturating_mul(u64::from(policy.price_separation_ticks))),
         );
-        let (ask, bid) = if position_info.owner == program {
-            // The key is the canonical PDA stored at creation. Decoded on the
-            // stack: one boxed position per series would exhaust the 32 KiB
-            // heap at 16 series.
-            let position = load_exact_zero_padded_state::<WriterDlmmPositionV1>(
-                position_info,
-                program,
-                WriterDlmmPositionV1::LEN,
-                VaultError::InvalidWriterSleeve,
-            )?;
-            if !position.is_initialized
-                || !position.has_current_layout()
-                || position.pool != *pool_info.key
-                || position.sleeve != *a[5].key
-                || position.policy != *a[7].key
-                || position.market != record.market
-                || usize::from(position.series_index) != index
-            {
-                return Err(VaultError::InvalidWriterSleeve.into());
-            }
-            if position.last_updated_slot >= sample_slot {
-                return Err(VaultError::EarnFundMarkUnavailable.into());
-            }
+        let (ask, bid) = if let Some(position) = &position {
             // An ask counts only if the lane can execute it: the swap path's
             // own eligibility (`load_swap_state_with_cash`; a frozen lane's
             // asks are unbuyable). Sleeve and group status are in `open`.
@@ -634,35 +617,35 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
         let premium_from = if seed {
             premium
         } else {
-            get_u64(&data, at + S_CUM_PREMIUM)
+            get_u64(data, at + S_CUM_PREMIUM)
         };
         let spend_from = if seed {
             spend
         } else if month_rolled {
             0
         } else {
-            get_u64(&data, at + S_CUM_SPEND)
+            get_u64(data, at + S_CUM_SPEND)
         };
         let (sale_usd, premium_counted) = whole_usd_delta(premium, premium_from);
         let (buy_usd, spend_counted) = whole_usd_delta(spend, spend_from);
-        put_u64(&mut data, at + S_CUM_PREMIUM, premium_counted);
-        put_u64(&mut data, at + S_CUM_SPEND, spend_counted);
+        put_u64(data, at + S_CUM_PREMIUM, premium_counted);
+        put_u64(data, at + S_CUM_SPEND, spend_counted);
         let mut entry = if fresh {
             BucketEntry::default()
         } else {
-            read_bucket(&data, count, ring_slot, index)
+            read_bucket(data, count, ring_slot, index)
         };
         fold_sample(&mut entry, current, bin, bid_bin, valid, sale_usd, buy_usd);
-        write_bucket(&mut data, count, ring_slot, index, &entry);
+        write_bucket(data, count, ring_slot, index, &entry);
         let head = series_head(
-            (0..RING_BUCKETS).map(|slot| read_bucket(&data, count, slot, index)),
+            (0..RING_BUCKETS).map(|slot| read_bucket(data, count, slot, index)),
             current,
             tick,
             max_payout,
         );
         let viable = series_viable(&params, &head, sleeve.writer_principal_atoms, valid);
-        put_u64(&mut data, at + S_HEAD_PRICE, head.price);
-        put_u64(&mut data, at + S_HEAD_BID_PRICE, head.bid_price);
+        put_u64(data, at + S_HEAD_PRICE, head.price);
+        put_u64(data, at + S_HEAD_BID_PRICE, head.bid_price);
         data[at + S_VIABLE] = u8::from(viable);
         data[at + S_VALID_BUCKETS] = head.valid_buckets;
     }
@@ -680,9 +663,9 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
     for (index, record) in book.records[..count].iter().enumerate() {
         let at = series_offset(index);
         numerator += u128::from(record.external_open_interest_atoms)
-            * u128::from(get_u64(&data, at + S_HEAD_PRICE));
+            * u128::from(get_u64(data, at + S_HEAD_PRICE));
         bid_numerator += u128::from(record.external_open_interest_atoms)
-            * u128::from(get_u64(&data, at + S_HEAD_BID_PRICE));
+            * u128::from(get_u64(data, at + S_HEAD_BID_PRICE));
         all_viable &= record.external_open_interest_atoms == 0 || data[at + S_VIABLE] == 1;
     }
     let liability = slot_liability_atoms(numerator)?;
@@ -690,15 +673,15 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
     // (the same rounding as `L`; at most one atom in the entrant's favour).
     let upper_liability = slot_liability_atoms(bid_numerator)?.min(liability);
     data[OFF_HEAD_ALL_VIABLE] = u8::from(all_viable);
-    put_u64(&mut data, OFF_HEAD_UPPER_LIABILITY, upper_liability);
-    put_u64(&mut data, OFF_HEAD_TS, now);
-    put_u64(&mut data, OFF_HEAD_SLOT, sample_slot);
-    put_u64(&mut data, OFF_HEAD_BOOK_SLOT, book.last_updated_slot);
-    put_u64(&mut data, OFF_HEAD_LIABILITY, liability);
-    put_u64(&mut data, OFF_SPEND_MONTH, policy.spending_month_start_ts);
-    put_u64(&mut data, OFF_LAST_BUCKET, current);
-    let samples = get_u64(&data, OFF_SAMPLE_COUNT).saturating_add(1);
-    put_u64(&mut data, OFF_SAMPLE_COUNT, samples);
+    put_u64(data, OFF_HEAD_UPPER_LIABILITY, upper_liability);
+    put_u64(data, OFF_HEAD_TS, now);
+    put_u64(data, OFF_HEAD_SLOT, sample_slot);
+    put_u64(data, OFF_HEAD_BOOK_SLOT, book.last_updated_slot);
+    put_u64(data, OFF_HEAD_LIABILITY, liability);
+    put_u64(data, OFF_SPEND_MONTH, policy.spending_month_start_ts);
+    put_u64(data, OFF_LAST_BUCKET, current);
+    let samples = get_u64(data, OFF_SAMPLE_COUNT).saturating_add(1);
+    put_u64(data, OFF_SAMPLE_COUNT, samples);
     if chunk {
         let _ = data;
         for offset in 0..take {
@@ -710,6 +693,92 @@ fn sample(program: &Pubkey, a: &[AccountInfo], create: bool, chunk: bool) -> Pro
         storage[ROUND_NEXT] = count as u8;
     }
     Ok(())
+}
+
+/// One series' pool and the sleeve's fund-lane position (`None` while never
+/// created), read as the writer swap path reads them, refused when written
+/// in or after `sample_slot`. `s` is the series' six accounts, whose pool,
+/// position and Market keys the caller has bound to the mark and the book.
+///
+/// The pool is the canonical pool account (ordinary or order-book; public
+/// orders never change the fund lane's bins, the only quotes sampled), or,
+/// behind its authenticated forwarding marker, the pool resident in the
+/// series' Market (`load_pool_with_accounts`). The position resolves against
+/// that Market's resident writer row exactly as `load_position` does: a
+/// forwarded marker only to the row, an ordinary position only while the
+/// Market holds none. Positions are decoded on the stack: one boxed position
+/// per series would exhaust the 32 KiB heap at 16 series.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn load_series(
+    program: &Pubkey,
+    s: &[AccountInfo],
+    anchor_month: &Pubkey,
+    expiry_ts: u64,
+    sleeve: &Pubkey,
+    policy: &Pubkey,
+    index: usize,
+    sample_slot: u64,
+) -> Result<(AmoebaDlmmPoolV1, Option<WriterDlmmPositionV1>), ProgramError> {
+    let (pool_info, position_info, market) = (&s[0], &s[1], &s[2]);
+    let (pool, row) = series_pool(program, pool_info, market)?;
+    if pool.market != *market.key
+        || pool.oracle_month != *anchor_month
+        || pool.expiry_ts != expiry_ts
+    {
+        return Err(VaultError::InvalidAmoebaDlmmPool.into());
+    }
+    if pool.last_updated_slot >= sample_slot {
+        return Err(VaultError::EarnFundMarkUnavailable.into());
+    }
+    if position_info.owner != program {
+        return Ok((pool, None));
+    }
+    let external = load_exact_zero_padded_state::<WriterDlmmPositionV1>(
+        position_info,
+        program,
+        WriterDlmmPositionV1::LEN,
+        VaultError::InvalidWriterSleeve,
+    )?;
+    let position = resolve_position_with(program, position_info, market.key, row, external)?;
+    if !position.is_initialized
+        || !position.has_current_layout()
+        || position.pool != *pool_info.key
+        || position.sleeve != *sleeve
+        || position.policy != *policy
+        || position.market != *market.key
+        || usize::from(position.series_index) != index
+    {
+        return Err(VaultError::InvalidWriterSleeve.into());
+    }
+    if position.last_updated_slot >= sample_slot {
+        return Err(VaultError::EarnFundMarkUnavailable.into());
+    }
+    Ok((pool, Some(position)))
+}
+
+/// The series' pool and its Market's resident writer row, from one read of
+/// the Market's resident state. Only the series' Market is searched.
+#[inline(never)]
+fn series_pool<'info>(
+    program: &Pubkey,
+    pool_info: &AccountInfo<'info>,
+    market: &AccountInfo<'info>,
+) -> Result<(AmoebaDlmmPoolV1, Option<WriterDlmmPositionV1>), ProgramError> {
+    if let Some((_, state)) = resident_for_pool(program, pool_info, core::slice::from_ref(market))?
+    {
+        return Ok((state.pool, state.writer_position));
+    }
+    // `load_pool` binds the pool to the canonical PDA of `pool.market`.
+    let pool = load_pool(program, pool_info)?;
+    // An unextended Market allocation holds no resident row (the router
+    // envelope is exactly the Market); any other is decoded and validated.
+    let row = if market.data_len() == crate::market_router_account::PREFIX_LEN {
+        None
+    } else {
+        crate::market_router::load(program, market)?.and_then(|state| state.writer_position)
+    };
+    Ok((pool, row))
 }
 
 /// `ceil(numerator / 10^6)` quote atoms (`Σ OI_i × price_i` over the series).
@@ -727,7 +796,7 @@ fn close(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
         return Err(VaultError::InvalidAccountList.into());
     }
     {
-        let data = a[2].try_borrow_data()?;
+        let data = a[2].try_data()?;
         if valid_mark(program, a[2].key, a[1].key, &data).is_none()
             || get_key(&data, OFF_RENT_PAYER) != *a[3].key
         {
@@ -769,7 +838,7 @@ fn value_slot(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     let mut fund = load_fund(program, &a[1])?;
     let mut slot = load_slot(program, &a[2], a[3].key)?;
     let params = BuybackParams::decode(&fund.buyback_params).unwrap_or(BuybackParams::INVALID);
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let now = u64::try_from(clock.unix_timestamp).map_err(|_| VaultError::EarnFundNotReady)?;
     match slot_value(program, &slot, &params, &a[3..], now, clock.slot)? {
         Some(value) => {
@@ -791,7 +860,7 @@ fn value_slot(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
         }
         None => fund.book.invalidate(&mut slot.mark),
     }
-    slot.write(&mut a[2].try_borrow_mut_data()?);
+    slot.write(&mut a[2].try_data_mut()?);
     store_state(&a[1], fund.as_ref())
 }
 
@@ -834,7 +903,7 @@ pub(super) fn slot_value(
         return Ok(None);
     };
     let book_slot = {
-        let data = book_info.try_borrow_data()?;
+        let data = book_info.try_data()?;
         if *book_info.key != sleeve.series_book
             || book_info.owner != program
             || data.len() != WriterSeriesBookV1::LEN
@@ -878,7 +947,7 @@ pub(super) fn slot_value(
                     }
                     return Ok(None);
                 }
-                let data = mark_info.try_borrow_data()?;
+                let data = mark_info.try_data()?;
                 if valid_mark(program, mark_info.key, sleeve_info.key, &data).is_none() {
                     return Err(invalid());
                 }

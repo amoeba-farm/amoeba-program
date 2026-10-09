@@ -194,7 +194,7 @@ fn process_propose_oracle_source_for(
         ],
     )?;
 
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let source = OracleSourceState {
         is_initialized: true,
         bump: source_bump,
@@ -444,7 +444,7 @@ pub(in crate::processor) fn process_support_oracle_source(
         escrow_disposition: OracleEscrowDisposition::Unsettled,
         failed_schedule_escrow_counted: false,
     };
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     schedule.outstanding_prelisting_escrow_count = schedule
         .outstanding_prelisting_escrow_count
         .checked_add(1)
@@ -507,7 +507,7 @@ pub(in crate::processor) fn process_timeout_unsupported_oracle_source_v2(
     let coverage =
         load_valid_oracle_sku_coverage_manifest(program_id, month_info.key, coverage_info)?;
     let mut source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let now = u64::try_from(clock.unix_timestamp)
         .map_err(|_| ProgramError::from(VaultError::InvalidSettlementRecord))?;
     timeout_unsupported_oracle_source_state(&mut month, &coverage, &mut source, now, clock.slot)?;
@@ -760,7 +760,7 @@ pub(in crate::processor) fn process_challenge_oracle_source_v2(
             )?;
         }
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let challenge = OracleSourceChallenge {
         is_initialized: true,
         bump: challenge_bump,

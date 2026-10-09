@@ -40,6 +40,8 @@ crate::fixed_codec::compact_borsh_struct! {
     }
 }
 #[derive(Clone, Debug, PartialEq, BorshSerialize, BorshDeserialize)]
+// Keep this wire action allocation free.
+#[allow(clippy::large_enum_variant)]
 pub enum OracleSponsoredActionV1 {
     Activate {
         terms: crate::oracle_sponsorship::SponsorTerms,
@@ -91,6 +93,8 @@ crate::fixed_codec::compact_borsh_struct! {
 /// unbounded Borsh Vec prefix; the wire shape matches the client carry builders.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OracleCarryForwardActionV1 {
+    /// Historical setup payloads retained for archived wire construction.
+    /// Their retired selectors are rejected by every decoder.
     ExtendOctoberLadder(ExtendOctoberLadderParams),
     InstallOctoberLadder(InstallOctoberLadderParams),
     TerminalCleanup(TerminalCleanupParams),
@@ -113,10 +117,12 @@ pub enum OracleCarryForwardActionV1 {
         row: u8,
         plan_hash: [u8; 32],
     },
+    /// Retired September-only setup wire; decoding rejects selector 20.
     InitializeCfmMonth {
         product: u8,
         settlement_base_oracle_atomic: u64,
     },
+    /// Retired September-only setup wire; decoding rejects selector 19.
     InitializeCfmPolicy {
         product: u8,
     },
@@ -173,18 +179,7 @@ impl OracleCarryForwardActionV1 {
         use crate::fixed_codec::CursorField;
         let invalid = || Err(io::Error::from(io::ErrorKind::InvalidData));
         Ok(match c.u8() {
-            26 => {
-                if c.bytes::<4>() != *b"OCE1" {
-                    return invalid();
-                }
-                Self::ExtendOctoberLadder(CursorField::read(c))
-            }
-            25 => {
-                if c.bytes::<4>() != *b"OCL1" {
-                    return invalid();
-                }
-                Self::InstallOctoberLadder(CursorField::read(c))
-            }
+            19 | 20 | 25 | 26 => return invalid(),
             24 => {
                 if c.bytes::<4>() != *b"TRC1" {
                     return invalid();
@@ -230,30 +225,6 @@ impl OracleCarryForwardActionV1 {
                         plan_hash,
                     }
                 }
-            }
-            20 => {
-                if c.bytes::<4>() != *b"CFM1" {
-                    return invalid();
-                }
-                let product = c.u8();
-                let settlement_base_oracle_atomic = c.u64();
-                if product > 1 || settlement_base_oracle_atomic == 0 {
-                    return invalid();
-                }
-                Self::InitializeCfmMonth {
-                    product,
-                    settlement_base_oracle_atomic,
-                }
-            }
-            19 => {
-                if c.bytes::<4>() != *b"CFM1" {
-                    return invalid();
-                }
-                let product = c.u8();
-                if product > 1 {
-                    return invalid();
-                }
-                Self::InitializeCfmPolicy { product }
             }
             18 => {
                 if c.bytes::<4>() != *b"CV01" {
@@ -370,18 +341,7 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
 
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         Ok(match u8::deserialize_reader(reader)? {
-            26 => {
-                if <[u8; 4]>::deserialize_reader(reader)? != *b"OCE1" {
-                    return Err(io::ErrorKind::InvalidData.into());
-                }
-                Self::ExtendOctoberLadder(ExtendOctoberLadderParams::deserialize_reader(reader)?)
-            }
-            25 => {
-                if <[u8; 4]>::deserialize_reader(reader)? != *b"OCL1" {
-                    return Err(io::ErrorKind::InvalidData.into());
-                }
-                Self::InstallOctoberLadder(InstallOctoberLadderParams::deserialize_reader(reader)?)
-            }
+            19 | 20 | 25 | 26 => return Err(io::ErrorKind::InvalidData.into()),
             24 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"TRC1" {
                     return Err(io::ErrorKind::InvalidData.into());
@@ -441,30 +401,6 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
                     row,
                     plan_hash,
                 }
-            }
-            20 => {
-                if <[u8; 4]>::deserialize_reader(reader)? != *b"CFM1" {
-                    return Err(io::ErrorKind::InvalidData.into());
-                }
-                let product = u8::deserialize_reader(reader)?;
-                let settlement_base_oracle_atomic = u64::deserialize_reader(reader)?;
-                if product > 1 || settlement_base_oracle_atomic == 0 {
-                    return Err(io::ErrorKind::InvalidData.into());
-                }
-                Self::InitializeCfmMonth {
-                    product,
-                    settlement_base_oracle_atomic,
-                }
-            }
-            19 => {
-                if <[u8; 4]>::deserialize_reader(reader)? != *b"CFM1" {
-                    return Err(io::ErrorKind::InvalidData.into());
-                }
-                let product = u8::deserialize_reader(reader)?;
-                if product > 1 {
-                    return Err(io::ErrorKind::InvalidData.into());
-                }
-                Self::InitializeCfmPolicy { product }
             }
             18 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"CV01" {

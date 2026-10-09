@@ -2,6 +2,10 @@ pub mod ameba_dlmm_instruction;
 pub mod ameba_dlmm_math;
 pub mod ameba_dlmm_state;
 pub mod associated_token;
+pub mod atomic_option_quote;
+pub mod atomic_option_route;
+pub mod atomic_projection;
+pub mod atomic_proof;
 mod bounded_heap;
 pub mod business_generation;
 pub mod buyback_mark_math;
@@ -12,6 +16,7 @@ pub mod compressed_option_settlement;
 pub mod compressed_swap_plan;
 pub mod compression;
 pub mod constants;
+pub mod dlmm_light_codec;
 pub mod dlmm_order_math;
 pub mod dlmm_order_state;
 pub mod earn_fund_math;
@@ -24,6 +29,9 @@ pub mod individual_writer;
 pub mod instruction;
 mod light_token_instruction;
 mod local_direct_address;
+pub mod market_router;
+pub mod market_router_account;
+pub mod multi_order;
 pub(crate) mod observation_wire;
 pub mod oracle_parent_proxy;
 pub mod oracle_rank;
@@ -44,6 +52,7 @@ pub mod writer_participation_state;
 pub mod writer_portfolio;
 pub mod writer_settlement_handoff;
 pub mod writer_sleeve_math;
+pub mod writer_supply;
 
 #[cfg(not(feature = "mainnet-v3"))]
 use light_sdk::derive_light_cpi_signer;
@@ -151,9 +160,23 @@ pub(crate) fn pubkey_is_default(value: &Pubkey) -> bool {
     bytes32_is_zero(value.as_array())
 }
 
+/// Share the existing System Program identity comparison without constructing
+/// a temporary 32-byte key at each call site.
+#[inline(never)]
+pub(crate) fn is_system_program(value: &Pubkey) -> bool {
+    pubkey_eq(value, &solana_sdk_ids::system_program::ID)
+}
+
 #[inline(never)]
 pub(crate) fn bytes32_is_zero(value: &[u8; 32]) -> bool {
     (word32(value, 0) | word32(value, 1) | word32(value, 2) | word32(value, 3)) == 0
+}
+
+/// Share byte-padding checks without a separate byte loop at each call site.
+#[inline(never)]
+pub(crate) fn bytes_are_zero(value: &[u8]) -> bool {
+    let (words, tail) = value.as_chunks::<8>();
+    words.iter().all(|word| u64::from_le_bytes(*word) == 0) && tail.iter().all(|byte| *byte == 0)
 }
 
 #[cfg(not(feature = "no-entrypoint"))]

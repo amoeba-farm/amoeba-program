@@ -4,6 +4,36 @@ use crate::state::{
     WRITER_DLMM_POSITION_BINS,
 };
 
+// This row consists only of four u64 values in exact wire order. The assertions
+// establish that its complete representation has no padding or restricted
+// bytes, so the existing array descriptor can copy it as one scalar field.
+const _: () = {
+    assert!(core::mem::size_of::<WriterDlmmSeriesPolicyV1>() == 32);
+    assert!(core::mem::align_of::<WriterDlmmSeriesPolicyV1>() == core::mem::align_of::<u64>());
+    assert!(core::mem::offset_of!(WriterDlmmSeriesPolicyV1, conservative_claim_value_atoms) == 0);
+    assert!(core::mem::offset_of!(WriterDlmmSeriesPolicyV1, seller_floor_quote_atoms) == 8);
+    assert!(core::mem::offset_of!(WriterDlmmSeriesPolicyV1, monthly_buyback_cap_atoms) == 16);
+    assert!(core::mem::offset_of!(WriterDlmmSeriesPolicyV1, transaction_buyback_cap_atoms) == 24);
+};
+const _: fn(&WriterDlmmSeriesPolicyV1) = |row| {
+    let WriterDlmmSeriesPolicyV1 {
+        conservative_claim_value_atoms,
+        seller_floor_quote_atoms,
+        monthly_buyback_cap_atoms,
+        transaction_buyback_cap_atoms,
+    } = row;
+    let _: (&u64, &u64, &u64, &u64) = (
+        conservative_claim_value_atoms,
+        seller_floor_quote_atoms,
+        monthly_buyback_cap_atoms,
+        transaction_buyback_cap_atoms,
+    );
+};
+impl FlatFieldType for WriterDlmmSeriesPolicyV1 {
+    const WIRE_LEN: usize = 32;
+    const BYTE_DOMAIN: u16 = 0;
+}
+
 impl FixedField for [WriterDlmmSeriesPolicyV1; WRITER_SERIES_STORAGE_CAPACITY] {
     #[inline(always)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
@@ -37,7 +67,7 @@ fixed_state_deserialize!(WriterDlmmSeriesPolicyV1, WriterDlmmSeriesPolicyV1::LEN
     transaction_buyback_cap_atoms: u64,
 });
 
-fixed_state_deserialize!(WriterDlmmPolicyV1, WriterDlmmPolicyV1::LEN, {
+fixed_state_deserialize_flat!(WriterDlmmPolicyV1, WriterDlmmPolicyV1::LEN, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],

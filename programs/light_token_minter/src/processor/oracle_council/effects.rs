@@ -119,7 +119,7 @@ pub(in crate::processor) fn apply_cash_emergency_resolution(
                 coverage.as_mut(),
                 coverage_record.as_mut(),
             ) {
-                let slot = Clock::get()?.slot;
+                let slot = crate::compact_error::slot()?;
                 coverage.last_updated_slot = slot;
                 record.last_updated_slot = slot;
                 store_state(coverage_info, coverage)?;

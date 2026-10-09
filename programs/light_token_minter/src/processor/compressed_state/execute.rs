@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 #[inline(never)]
 pub(in crate::processor) fn process_execute_compressed_state_v1(
@@ -350,7 +351,7 @@ fn process_scan_checkpoint_readonly(
     let light_accounts = suffix
         .get(2..)
         .ok_or(VaultError::InvalidRemainingAccounts)?;
-    if *system_program_info.key != system_program::id()
+    if !crate::is_system_program(system_program_info.key)
         || !fee_payer.is_signer
         || !fee_payer.is_writable
         || light_accounts.len() < 6
@@ -543,7 +544,7 @@ fn bind_context_bytes(destination: &mut [u8], expected: &[u8]) -> ProgramResult 
     if destination.len() != 32 || expected.len() != 32 {
         return Err(VaultError::InvalidOracleObservation.into());
     }
-    if destination.iter().all(|byte| *byte == 0) {
+    if crate::bytes_are_zero(destination) {
         destination.copy_from_slice(expected);
     } else if destination != expected {
         return Err(VaultError::InvalidOracleObservation.into());
@@ -690,7 +691,7 @@ pub(in crate::processor) fn retain_classic_merged_reward(
     if domain != CompressedStateDomain::OracleUsdcSourceReward {
         return Ok(false);
     }
-    let data = target.try_borrow_data()?;
+    let data = target.try_data()?;
     Ok(!fixed_bytes32_is_zero(&data, 244))
 }
 
@@ -724,7 +725,8 @@ pub(in crate::processor) fn validate_session_shape(
         return Err(VaultError::InvalidInstructionData.into());
     }
     let payer = &accounts[usize::from(params.rent_payer_index)];
-    if !payer.is_signer || !payer.is_writable || *accounts[core_count].key != system_program::id() {
+    if !payer.is_signer || !payer.is_writable || !crate::is_system_program(accounts[core_count].key)
+    {
         return Err(VaultError::InvalidAccountList.into());
     }
     let mut previous_access: Option<&CompressedStateAccess> = None;

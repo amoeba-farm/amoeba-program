@@ -14,7 +14,7 @@ fn optional_canonical_token_amount(
     if info.key != expected_key {
         return Err(VaultError::InvalidPda.into());
     }
-    if info.owner == &system_program::id() && !info.executable && info.data_len() == 0 {
+    if crate::is_system_program(info.owner) && !info.executable && info.data_len() == 0 {
         return Ok(0);
     }
     validate_vault_token_account(info, expected_mint, expected_owner)?;
@@ -326,7 +326,7 @@ pub(super) fn process_reconcile_writer_supply(
     }
 
     book.book_digest = writer_book_digest(&book);
-    book.last_updated_slot = Clock::get()?.slot;
+    book.last_updated_slot = crate::compact_error::slot()?;
     if sleeve.status == WriterSleeveStatus::SettlementFinalized {
         let partition_remaining = sleeve
             .long_liability_remaining_atoms
@@ -404,8 +404,8 @@ pub(super) fn process_cleanup_writer_custody(
     if !cranker_info.is_signer || !cranker_info.is_writable {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *token_program_info.key != spl_token_program_id()
-        || *system_program_info.key != system_program::id()
+    if !crate::token_instruction::check_id(token_program_info.key)
+        || !crate::is_system_program(system_program_info.key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -499,7 +499,7 @@ pub(super) fn process_cleanup_writer_custody(
         cranker_info,
         token_program_info,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     book.book_digest = writer_book_digest(&book);
     book.last_updated_slot = slot;
     sleeve.last_updated_slot = slot;

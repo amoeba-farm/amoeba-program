@@ -2,6 +2,7 @@
 //! Financial and shared evidence accounts are never cleanup targets. A permanent
 //! receipt binds the recipient and commits every removed account's bytes and SOL.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::instruction::TerminalCleanupParams;
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::hash::hashv;
@@ -44,7 +45,7 @@ fn save_receipt(program: &Pubkey, info: &AccountInfo, value: &CleanupReceipt) ->
     {
         return Err(VaultError::InvalidPda.into());
     }
-    let mut data = info.try_borrow_mut_data()?;
+    let mut data = info.try_data_mut()?;
     let mut output = &mut data[..];
     value
         .serialize(&mut output)
@@ -131,7 +132,7 @@ pub(super) fn process(
     if params.kind == 0 {
         oracle_carry::require_cleanup_dependencies(program, &market, a[3].key, &a[12], &a[13])?;
         validate_create_only_program_account_target(program, &a[10])?;
-        let slot = Clock::get()?.slot;
+        let slot = crate::compact_error::slot()?;
         let receipt = CleanupReceipt {
             initialized: true,
             bump,
@@ -173,8 +174,8 @@ pub(super) fn process(
     if a[10].owner != program || a[10].data_len() != RECEIPT_LEN {
         return Err(VaultError::InvalidPda.into());
     }
-    let mut receipt = CleanupReceipt::try_from_slice(&a[10].try_borrow_data()?)
-        .map_err(|_| VaultError::InvalidPda)?;
+    let mut receipt =
+        CleanupReceipt::try_from_slice(&a[10].try_data()?).map_err(|_| VaultError::InvalidPda)?;
     if !receipt.initialized
         || receipt.bump != bump
         || receipt.discriminator != *b"TRC"
@@ -188,7 +189,7 @@ pub(super) fn process(
         return Err(VaultError::InvalidPda.into());
     }
     targets::validate(program, a[3].key, &month, &a[14..], &params)?;
-    let hash = hashv(&[&a[14].try_borrow_data()?]).to_bytes();
+    let hash = hashv(&[&a[14].try_data()?]).to_bytes();
     let lamports = a[14].lamports();
     if hash != params.expected_data_hash || lamports != params.expected_lamports {
         return Err(VaultError::InvalidOracleState.into());

@@ -1,7 +1,7 @@
 //! Owner-scoped collateral for written options and options locked in program custody.
 //! A single signed payoff function covers every strategy; no wallet balance is a hedge.
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
+    fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
     FixedStateEncode, FixedWriter,
 };
 use crate::writer_sleeve_math::{
@@ -176,7 +176,7 @@ pub fn portfolio_settlement_partition(
     })
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Debug, Default, Eq, PartialEq)]
 pub struct IndividualWriterPortfolio {
     pub initialized: bool,
     pub bump: u8,
@@ -200,6 +200,13 @@ pub struct IndividualWriterPortfolio {
     pub settlement_credit: u64,
     /// Prevents counting an owner twice when it first fills or locks a hedge.
     pub funding_registered: bool,
+}
+
+impl Clone for IndividualWriterPortfolio {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl IndividualWriterPortfolio {
@@ -262,7 +269,7 @@ impl IndividualWriterPortfolio {
         if quantity == 0 || index >= series.len() || index >= 20 {
             return Err(WriterMathError::InvalidSeries);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.committed[index] = next.committed[index]
             .checked_add(quantity)
             .ok_or(WriterMathError::ArithmeticOverflow)?;
@@ -276,7 +283,7 @@ impl IndividualWriterPortfolio {
         if quantity == 0 || index >= 20 {
             return Err(WriterMathError::InvalidSeries);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.filled[index] = next.filled[index]
             .checked_add(quantity)
             .ok_or(WriterMathError::ArithmeticOverflow)?;
@@ -304,7 +311,7 @@ impl IndividualWriterPortfolio {
         if index >= series.len() || index >= 20 {
             return Err(WriterMathError::InvalidSeries);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.committed[index] = next.committed[index]
             .checked_sub(unfilled)
             .ok_or(WriterMathError::InvalidClaimAmount)?;
@@ -324,7 +331,7 @@ impl IndividualWriterPortfolio {
         if quantity == 0 || index >= series.len() || index >= 20 {
             return Err(WriterMathError::InvalidSeries);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.locked[index] = next.locked[index]
             .checked_add(quantity)
             .ok_or(WriterMathError::ArithmeticOverflow)?;
@@ -342,7 +349,7 @@ impl IndividualWriterPortfolio {
         if quantity == 0 || index >= series.len() || index >= 20 {
             return Err(WriterMathError::InvalidSeries);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.locked[index] = next.locked[index]
             .checked_sub(quantity)
             .ok_or(WriterMathError::InvalidClaimAmount)?;
@@ -365,7 +372,7 @@ impl IndividualWriterPortfolio {
         if payment == 0 || payment > maximum_payment || quantities.iter().all(|q| *q == 0) {
             return Err(WriterMathError::InvalidClaimAmount);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.cash_atoms = next
             .cash_atoms
             .checked_sub(payment)
@@ -396,7 +403,7 @@ impl IndividualWriterPortfolio {
         if self.settlement_funded || self.claimed || quantity == 0 || index >= 20 {
             return Err(WriterMathError::InvalidClaimAmount);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.retired[index] = next.retired[index]
             .checked_add(quantity)
             .ok_or(WriterMathError::ArithmeticOverflow)?;
@@ -428,7 +435,7 @@ impl IndividualWriterPortfolio {
         {
             return Err(WriterMathError::InvalidClaimAmount);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.cash_atoms = next
             .cash_atoms
             .checked_sub(debit)
@@ -445,7 +452,7 @@ impl IndividualWriterPortfolio {
         if !self.settlement_funded || self.claimed {
             return Err(WriterMathError::InvalidClaimAmount);
         }
-        let mut next = self.clone();
+        let mut next = *self;
         next.cash_atoms = 0;
         next.settlement_credit = 0;
         next.claimed = true;
@@ -453,7 +460,7 @@ impl IndividualWriterPortfolio {
     }
 }
 
-fixed_state_deserialize!(IndividualWriterPortfolio, IndividualWriterPortfolio::LEN, {
+fixed_state_deserialize_flat!(IndividualWriterPortfolio, IndividualWriterPortfolio::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8, book: Pubkey, owner: Pubkey,
     expiry_ts: u64, cash_atoms: u64, committed: [u64; 20], filled: [u64; 20], open_positions: u64,
     settlement_funded: bool, claimed: bool, funding_debit: u64, premium_received: u64,

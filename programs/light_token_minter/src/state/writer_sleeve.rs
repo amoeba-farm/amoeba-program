@@ -5,10 +5,11 @@ pub use crate::constants::{
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[repr(u8)]
 pub enum WriterSecurityMode {
     #[default]
-    GrossExternalMaxPayout,
-    ExactExternalEnvelope,
+    GrossExternalMaxPayout = 0,
+    ExactExternalEnvelope = 1,
 }
 
 stable_borsh_enum!(WriterSecurityMode {
@@ -17,9 +18,10 @@ stable_borsh_enum!(WriterSecurityMode {
 });
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[repr(u8)]
 pub enum WriterReserveRoundingMode {
     #[default]
-    AggregateBookCeiling,
+    AggregateBookCeiling = 0,
 }
 
 stable_borsh_enum!(WriterReserveRoundingMode {
@@ -27,13 +29,14 @@ stable_borsh_enum!(WriterReserveRoundingMode {
 });
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[repr(u8)]
 pub enum WriterSettlementGroupStatus {
     #[default]
-    Anchored,
-    Active,
-    Settled,
-    Closed,
-    FundingExpired,
+    Anchored = 0,
+    Active = 1,
+    Settled = 2,
+    Closed = 3,
+    FundingExpired = 4,
 }
 
 stable_borsh_enum!(WriterSettlementGroupStatus {
@@ -45,16 +48,17 @@ stable_borsh_enum!(WriterSettlementGroupStatus {
 });
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[repr(u8)]
 pub enum WriterSleeveStatus {
     #[default]
-    Draft,
-    PolicyFrozen,
-    Funding,
-    Active,
-    Expired,
-    SettlementFinalized,
-    Closed,
-    FundingRefunds,
+    Draft = 0,
+    PolicyFrozen = 1,
+    Funding = 2,
+    Active = 3,
+    Expired = 5,
+    SettlementFinalized = 6,
+    Closed = 7,
+    FundingRefunds = 8,
 }
 
 stable_borsh_enum!(WriterSleeveStatus {

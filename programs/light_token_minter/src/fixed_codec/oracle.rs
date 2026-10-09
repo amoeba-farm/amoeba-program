@@ -1,7 +1,7 @@
 use super::*;
 use super::{fixed_state_deserialize, fixed_state_deserialize_flat};
 
-fixed_state_deserialize!(OracleUpdateChallenge, 280, {
+fixed_state_deserialize_flat!(OracleUpdateChallenge, 280, {
     is_initialized: bool,
     bump: u8,
     month: Pubkey,
@@ -73,7 +73,7 @@ fixed_state_deserialize_flat!(OracleSourceChallengeGuard, 206, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleUsdcRewardRegistration, 176, {
+fixed_state_deserialize_flat!(OracleUsdcRewardRegistration, 176, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -88,7 +88,7 @@ fixed_state_deserialize!(OracleUsdcRewardRegistration, 176, {
     last_updated_slot: u64,
 });
 
-fixed_state_deserialize!(OracleUsdcRewardReceipt, 151, {
+fixed_state_deserialize_flat!(OracleUsdcRewardReceipt, 151, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],

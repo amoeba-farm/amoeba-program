@@ -16,7 +16,7 @@ pub(in crate::processor) fn process_initialize_policy_registry(
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     let config = load_canonical_vault_config(program_id, config_info)?;
@@ -45,7 +45,7 @@ pub(in crate::processor) fn process_initialize_policy_registry(
             &[registry_bump],
         ],
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let registry = WriterPolicyRegistryV1 {
         is_initialized: true,
         bump: registry_bump,
@@ -78,7 +78,7 @@ pub(in crate::processor) fn process_manage_policy_authority(
     }
     let config = load_canonical_vault_config(program_id, config_info)?;
     let mut registry = load_writer_policy_registry(program_id, registry_info, config_info.key)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     match params.action {
         ManageWriterPolicyAuthorityActionV1::Propose => {
             if *actor_info.key != config.admin
@@ -137,7 +137,7 @@ pub(in crate::processor) fn process_seal_policy(
     if !authority_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     let _config = load_canonical_vault_config(program_id, config_info)?;
@@ -210,7 +210,7 @@ pub(in crate::processor) fn process_seal_policy(
             &[bump],
         ],
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let snapshot = WriterPolicySnapshotV1 {
         is_initialized: true,
         bump,

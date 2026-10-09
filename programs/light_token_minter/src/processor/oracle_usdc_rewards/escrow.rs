@@ -17,7 +17,7 @@ pub(in crate::processor) fn settle_cash_listing_bond_loaded(
     }
     let mut proposer_collateral =
         load_canonical_user_collateral(program_id, proposer_collateral_info, &source.proposer)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     credit_cash_collateral_at_slot(&mut proposer_collateral, source.listing_bond_locked, slot)?;
     source.listing_bond_locked = 0;
     store_state(source_info, &source)?;
@@ -120,7 +120,7 @@ pub(in crate::processor) fn settle_counted_v5_source_challenge(
         challenger_collateral_info,
         &challenge.challenger,
     )?;
-    let clock = Clock::get()?;
+    let clock = crate::compact_error::clock()?;
     let slot = clock.slot;
     let now = u64::try_from(clock.unix_timestamp)
         .map_err(|_| ProgramError::from(VaultError::InvalidSettlementRecord))?;
@@ -237,7 +237,7 @@ pub(in crate::processor) fn settle_cash_opening_claim(
     }
     let mut collateral =
         load_canonical_user_collateral(program_id, claimant_collateral_info, &claim.claimant)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     credit_cash_collateral_at_slot(&mut collateral, claim.stake, slot)?;
     claim.escrow_disposition = OracleEscrowDisposition::Refunded;
     store_state(claim_info, &claim)?;
@@ -291,7 +291,7 @@ pub(in crate::processor) fn settle_cash_opening_challenge(
         challenger_collateral_info,
         &challenge.challenger,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     match (challenge.status, claim.status) {
         (OracleChallengeStatus::Rejected, OracleOpeningClaimStatus::Challenged) => {
             credit_cash_collateral_at_slot(&mut claimant_collateral, challenge.bond, slot)?;
@@ -382,7 +382,7 @@ pub(in crate::processor) fn settle_cash_update_claim(
     }
     let mut collateral =
         load_canonical_user_collateral(program_id, claimant_collateral_info, &claim.claimant)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     credit_cash_collateral_at_slot(&mut collateral, claim.stake, slot)?;
     claim.escrow_disposition = OracleEscrowDisposition::Refunded;
     store_oracle_update_claim(claim_info, &claim)?;
@@ -436,7 +436,7 @@ pub(in crate::processor) fn settle_cash_update_challenge(
         challenger_collateral_info,
         &challenge.challenger,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let pot = claim
         .stake
         .checked_add(challenge.bond)
@@ -534,7 +534,7 @@ pub(in crate::processor) fn settle_counted_v5_listing_bond(
     }
     require_signed_cranker(&accounts[0])?;
     settle_cash_listing_bond_loaded(program_id, &accounts[4], &accounts[6], source)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     reward.listing_escrow_counted = true;
     reward.last_updated_slot = slot;
     decrement_counted_v5_schedule_at(&mut schedule, 1, slot)?;
@@ -584,7 +584,7 @@ pub(in crate::processor) fn settle_counted_v5_support_stake(
     }
     let mut collateral =
         load_canonical_user_collateral(program_id, collateral_info, &support.supporter)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     credit_cash_collateral_at_slot(&mut collateral, support.support_stake, slot)?;
     support.released = true;
     support.escrow_disposition = OracleEscrowDisposition::Refunded;
@@ -675,7 +675,7 @@ pub(in crate::processor) fn process_abort_oracle_usdc_reward_schedule_v2(
         return Err(VaultError::InvalidOracleUsdcRewardSchedule.into());
     }
     release_aborted_reward_reservation(&mut reward_vault, &mut schedule)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     schedule.last_updated_slot = slot;
     reward_vault.last_updated_slot = slot;
     store_state(&accounts[4], &reward_vault)?;

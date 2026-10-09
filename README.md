@@ -4,7 +4,7 @@ Solana smart contracts for Amoeba's index options protocol. The program implemen
 collateral custody, oracle source selection, contract issuance, settlement, and
 an integrated discrete liquidity market maker (DLMM).
 
-[Website](https://amoeba.farm) Â· [Governance](https://github.com/amoeba-farm/amoeba-governance) Â· [Security](SECURITY.md)
+[Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
 ## Source
 
@@ -31,15 +31,20 @@ cargo check --manifest-path programs/light_token_minter/Cargo.toml \
 
 ## Deployment and verification
 
-The Mainnet program [`2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw`](https://explorer.solana.com/address/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw) is Solana Verified by OtterSec for deployment slot **453609919**. Both the global status and the upgrade authority status matched the installed executable on 2026-10-05T15:13:22.626Z.
+This source tree supports Devnet and Mainnet profiles. The latest attested Mainnet
+artifact, deployment slot, build inputs, and gate snapshot are recorded in
+[`MAINNET_BUILD.json`](MAINNET_BUILD.json); historical Devnet configuration remains
+in [Devnet configuration](deployments/devnet-v3.json).
 
-- [Verified immutable source](https://github.com/amoeba-farm/amoeba-program/tree/65e20d96369a2732b3e718c6470ab23880ce0380) (`65e20d96369a2732b3e718c6470ab23880ce0380`).
-- [Live verification status](https://verify.osec.io/status/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw) and [authority verification records](https://verify.osec.io/status-all/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw).
-- [Public deployment attestation](deployment-evidence/basic-magic-direct-mainnet-20261005.json) and [build recipe](MAINNET_BUILD.json).
+This is a source preview. The private current release selection and its
+qualification bundle are omitted: they include operator evidence and generated
+artifacts outside this source export. The preview does not assert that this
+source revision is the installed Mainnet program or authorize deployment.
 
-The verified source is commit `65e20d96369a2732b3e718c6470ab23880ce0380`. Later documentation commits record this verification; they are separate from the immutable source revision OtterSec verified. The live status links show the current verifier records.
-
-Historical [Devnet configuration](deployments/devnet-v3.json) and [earlier build verification](deployment-evidence/writer-dlmm-verified-build-20260910.json) retain their original scope.
+[Source provenance](PUBLIC_SOURCE_PROVENANCE.json) identifies the source revision
+and exported file digest. [Historical build verification](deployment-evidence/writer-dlmm-verified-build-20260910.json)
+records an earlier artifact. Deployment records describe the revisions they
+attest; they do not establish current chain state or gate activation.
 
 ## License
 

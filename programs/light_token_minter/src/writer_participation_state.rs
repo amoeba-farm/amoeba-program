@@ -1,7 +1,7 @@
 //! Versioned, owner-controlled receipts. No fungible Flat is minted for a lot.
 use crate::constants::CURRENT_STATE_NAMESPACE_SEED;
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
+    fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
     FixedStateEncode, FixedWriter,
 };
 use crate::state::WriterSleeveV1;
@@ -43,7 +43,7 @@ impl WriterContributionV2 {
         }
     }
 }
-fixed_state_deserialize!(WriterContributionV2, WriterContributionV2::LEN, {
+fixed_state_deserialize_flat!(WriterContributionV2, WriterContributionV2::LEN, {
     initialized: bool, bump: u8, discriminator: [u8; 3], version: u8,
     sleeve: Pubkey, creator: Pubkey, owner: Pubkey, rent_payer: Pubkey,
     nonce: u64, policy_version: u64, policy_hash: [u8; 32], principal: u64,

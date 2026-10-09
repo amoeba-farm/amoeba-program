@@ -14,7 +14,7 @@ pub(in crate::processor) fn validate_carry_body(
             if !valid_header::<Journal>(&value.header)
                 || value.count == 0
                 || value.count != value.observation_count
-                || value.head == Pubkey::default()
+                || crate::pubkey_is_default(&value.head)
                 || value.observation_count == 0
                 || value.rolling_observation_hash == [0; 32]
             {
@@ -31,10 +31,10 @@ pub(in crate::processor) fn validate_carry_body(
                 || value.accepted_at < value.observed_at
                 || value.evidence_hash == [0; 32]
                 || value.archive_hash == [0; 32]
-                || value.contributor == Pubkey::default()
-                || value.origin_source == Pubkey::default()
-                || value.origin_checkpoint == Pubkey::default()
-                || (value.sequence == 1) != (value.previous == Pubkey::default())
+                || crate::pubkey_is_default(&value.contributor)
+                || crate::pubkey_is_default(&value.origin_source)
+                || crate::pubkey_is_default(&value.origin_checkpoint)
+                || (value.sequence == 1) != (crate::pubkey_is_default(&value.previous))
             {
                 return invalid();
             }

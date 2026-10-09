@@ -164,7 +164,7 @@ pub(super) fn process_begin_oracle_active_weights(
     month.active_weight_scheme_version = 255;
     month.active_weight_group_count = 0;
     month.active_weight_manifest_hash = [0; 32];
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     store_state(active_manifest_info, &manifest)?;
     store_oracle_month_state(month_info, &month)
 }
@@ -406,7 +406,7 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
                 )?
             };
         bucket.eligible_source_count = bucket.active_source_count;
-        bucket.last_recomputed_ts = u64::try_from(Clock::get()?.unix_timestamp)
+        bucket.last_recomputed_ts = u64::try_from(crate::compact_error::clock()?.unix_timestamp)
             .map_err(|_| VaultError::InvalidOracleMedian)?;
         bucket.status = OracleBucketMedianStatus::Live;
         month.index_delta_bps = month
@@ -474,7 +474,7 @@ pub(super) fn process_finalize_oracle_active_weights(
     manifest.phase = OracleRecipeWeightPhase::Finalized;
     month.active_weight_scheme_version = OracleMonthState::ACTIVE_MEDIAN_SCHEME_VERSION;
     month.active_weight_manifest_hash = manifest.rolling_manifest_hash;
-    month.last_updated_slot = Clock::get()?.slot;
+    month.last_updated_slot = crate::compact_error::slot()?;
     store_state(manifest_info, &manifest)?;
     store_oracle_month_state(month_info, &month)
 }

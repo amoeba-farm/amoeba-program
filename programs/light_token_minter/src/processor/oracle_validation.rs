@@ -1,7 +1,8 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 pub(super) fn validate_system_program(system_program_info: &AccountInfo) -> ProgramResult {
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     Ok(())
@@ -67,7 +68,7 @@ pub(super) fn validate_market_account(
 ) -> ProgramResult {
     let (expected_market, expected_bump) = derive_market_pda(program_id, &market.market_id);
     if market_info.owner != program_id
-        || market_info.data_len() != Market::LEN
+        || crate::market_router_account::prefix(&market_info.try_data()?).is_err()
         || *market_info.key != expected_market
         || !market.is_initialized
         || market.bump != expected_bump
@@ -106,7 +107,7 @@ pub(super) fn load_oracle_month_state(
     if account_info.owner != program_id || account_info.data_len() != OracleMonthState::LEN {
         return Err(VaultError::InvalidOracleMonthAccount.into());
     }
-    let data = account_info.try_borrow_data()?;
+    let data = account_info.try_data()?;
     let month = crate::fixed_codec::decode_oracle_month(
         data.as_ref(),
         VaultError::InvalidOracleMonthAccount,
@@ -144,13 +145,21 @@ pub(super) fn load_valid_oracle_month(
     {
         return Err(VaultError::InvalidOracleMonthAccount.into());
     }
-    if matches!(
+    #[cfg(feature = "mainnet-v3")]
+    let launch_schedule = matches!(
+        month.schedule_version,
+        LAUNCH_SCHEDULE_VERSION | COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
+    );
+    #[cfg(not(feature = "mainnet-v3"))]
+    let launch_schedule = matches!(
         month.schedule_version,
         LAUNCH_SCHEDULE_VERSION
             | COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
             | OCTOBER_BOOTSTRAP_PENDING_SCHEDULE_VERSION
-    ) {
+    );
+    if launch_schedule {
         validate_launch_market(market)?;
+        #[cfg(not(feature = "mainnet-v3"))]
         if month.schedule_version == OCTOBER_BOOTSTRAP_PENDING_SCHEDULE_VERSION {
             if market.instrument.expiry_ts
                 != crate::oracle_parent_proxy::september_bootstrap::OCTOBER_EXPIRY
@@ -163,6 +172,8 @@ pub(super) fn load_valid_oracle_month(
         } else {
             rulebook_schedule_boundaries(&month)?;
         }
+        #[cfg(feature = "mainnet-v3")]
+        rulebook_schedule_boundaries(&month)?;
         if month.schedule_version == COUNCIL_BOOTSTRAP_SCHEDULE_VERSION
             && (!matches!(
                 market.instrument.expiry_ts,

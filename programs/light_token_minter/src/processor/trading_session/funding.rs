@@ -16,15 +16,13 @@ pub(super) fn validate_accounts(
         || !a[4].is_writable
         || a[4].key != sponsor
         || a[3].key != mint
-        || *a[5].key != light_token_program_id()
-        || *a[6].key != cpi_authority()
-        || *a[7].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[8].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[9].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[10].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
-        || *a[11].key != system_program::id()
+        || !crate::light_token_instruction::is_program(a[5].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[6].key)
+        || !crate::light_token_instruction::is_light_system_program(a[7].key)
+        || !crate::light_token_instruction::is_registered_program(a[8].key)
+        || !crate::light_token_instruction::is_compression_authority(a[9].key)
+        || !crate::light_token_instruction::is_compression_program(a[10].key)
+        || !crate::is_system_program(a[11].key)
         || a[12..]
             .iter()
             .any(|i| !i.is_writable || i.is_signer || i.executable)
@@ -63,7 +61,7 @@ pub(super) fn owner_record(
         return Ok(record);
     }
     if !allow_create
-        || a[1].owner != &system_program::id()
+        || !crate::is_system_program(a[1].owner)
         || !a[1].data_is_empty()
         || a[1].executable
     {

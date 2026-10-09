@@ -10,6 +10,7 @@
 //! use light_token_minter::governance_gate::GateValidated;
 //! ```
 
+use crate::compact_error::CompactAccountInfo;
 use crate::ProgramError;
 #[cfg(feature = "governance-gate-v1")]
 use solana_program::account_info::AccountInfo;
@@ -240,7 +241,7 @@ impl ProtocolGateV1 {
     }
 
     fn validate_canonical_status(&self) -> Result<(), ProgramError> {
-        let proposal_is_default = self.active_proposal == Pubkey::default();
+        let proposal_is_default = crate::pubkey_is_default(&self.active_proposal);
         let freeze_is_clear = self.freeze_slot == 0 && self.freeze_reason_code == 0;
         let freeze_is_set = self.freeze_slot != 0 && self.freeze_reason_code != 0;
         let canonical = match self.status {
@@ -355,7 +356,7 @@ pub(crate) fn validate_top_level_envelope<'accounts, 'info, 'data>(
 
     let gate = {
         let data = gate_info
-            .try_borrow_data()
+            .try_data()
             .map_err(|_| VaultError::InvalidGovernanceGateData)?;
         ProtocolGateV1::decode_exact(&data)?
     };

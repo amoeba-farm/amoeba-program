@@ -93,6 +93,8 @@ pub(super) fn load_portfolio(
     Ok(portfolio)
 }
 
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn load_or_create_portfolio<'a>(
     program: &Pubkey,
     payer: &AccountInfo<'a>,
@@ -137,7 +139,7 @@ pub(super) fn load_or_create_portfolio<'a>(
 }
 
 pub(super) fn persist_book(a: &[AccountInfo], book: &mut WriterSeriesBookV1) -> ProgramResult {
-    book.last_updated_slot = Clock::get()?.slot;
+    book.last_updated_slot = crate::compact_error::slot()?;
     book.book_digest = writer_book_digest(book);
     store_state(&a[4], book)
 }
@@ -160,25 +162,23 @@ fn claim_portfolio(
         || [3, 5, 6, 7, 8, 10, 16, 21, 24]
             .iter()
             .any(|&i| !a[i].is_writable)
-        || *a[11].key != light_token_program_id()
-        || *a[12].key != cpi_authority()
-        || *a[13].key != spl_token_program_id()
-        || *a[14].key != system_program::id()
+        || !crate::light_token_instruction::is_program(a[11].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[12].key)
+        || !crate::token_instruction::check_id(a[13].key)
+        || !crate::is_system_program(a[14].key)
         || *a[15].key != light_token_instruction::compressible_config()
         || *a[16].key != light_token_instruction::rent_sponsor()
-        || *a[17].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[18].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[19].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[20].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_light_system_program(a[17].key)
+        || !crate::light_token_instruction::is_registered_program(a[18].key)
+        || !crate::light_token_instruction::is_compression_authority(a[19].key)
+        || !crate::light_token_instruction::is_compression_program(a[20].key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
     if cash_witness.is_some_and(|w| w.amount == 0 || (!w.prove_by_index && w.proof.is_none()))
         || (cash_witness.is_some() && (!a[22].is_writable || !a[23].is_writable))
         || (cash_witness.is_none()
-            && (*a[22].key != system_program::id() || *a[23].key != system_program::id()))
+            && (!crate::is_system_program(a[22].key) || !crate::is_system_program(a[23].key)))
     {
         return Err(VaultError::InvalidInstructionData.into());
     }
@@ -219,7 +219,7 @@ fn claim_portfolio(
     {
         return Err(VaultError::WriterSolvencyViolation.into());
     }
-    let book_before = if a[7].owner == &system_program::id() && a[7].data_is_empty() {
+    let book_before = if crate::is_system_program(a[7].owner) && a[7].data_is_empty() {
         validate_light_associated_token_address(a[5].key, a[9].key, &a[7])?;
         0
     } else {
@@ -231,7 +231,7 @@ fn claim_portfolio(
     let sleeve_before = validate_token_account(&a[8])?.amount;
     let cash_key = custody::derive_compressed_custody(program, CustodyKind::WriterCash, a[8].key).0;
     let absent =
-        *a[21].key == cash_key && a[21].owner == &system_program::id() && a[21].data_is_empty();
+        *a[21].key == cash_key && crate::is_system_program(a[21].owner) && a[21].data_is_empty();
     let mut cash_custody = custody::load(
         program,
         if absent { None } else { Some(&a[21]) },
@@ -380,9 +380,9 @@ fn claim_portfolio(
         .long_liability_remaining_atoms
         .checked_add(book.individual.remaining_portfolio_credit)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    sleeve.last_updated_slot = Clock::get()?.slot;
+    sleeve.last_updated_slot = crate::compact_error::slot()?;
     store_state(&a[6], &next)?;
-    book.last_updated_slot = Clock::get()?.slot;
+    book.last_updated_slot = crate::compact_error::slot()?;
     book.book_digest = writer_book_digest(&book);
     store_state(&a[5], &book)?;
     store_state(&a[3], &sleeve)
@@ -757,6 +757,8 @@ pub(super) fn validate_issue(
 }
 
 #[inline(never)]
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn issue_to<'a>(
     program: &Pubkey,
     a: &[AccountInfo<'a>],
@@ -891,8 +893,7 @@ fn fund_settlement(program: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    let cash_before = if a[5].owner == &solana_program::system_program::id() && a[5].data_len() == 0
-    {
+    let cash_before = if crate::is_system_program(a[5].owner) && a[5].data_len() == 0 {
         validate_light_associated_token_address(a[4].key, a[7].key, &a[5])?;
         0
     } else {

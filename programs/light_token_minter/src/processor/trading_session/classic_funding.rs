@@ -14,7 +14,7 @@ pub(super) fn deposit(program: &Pubkey, a: &[AccountInfo], amount: u64) -> Progr
         || !a[16].is_writable
         || a[17].is_signer
         || a[17].is_writable
-        || *a[17].key != spl_token_program_id()
+        || !crate::token_instruction::check_id(a[17].key)
     {
         return Err(invalid());
     }
@@ -24,7 +24,7 @@ pub(super) fn deposit(program: &Pubkey, a: &[AccountInfo], amount: u64) -> Progr
         a[3].key,
         &spl_token_program_id(),
     );
-    if *a[15].key != canonical || a[15].owner != &spl_token_program_id() {
+    if *a[15].key != canonical || !crate::token_instruction::check_id(a[15].owner) {
         return Err(invalid());
     }
     validate_vault_token_account(&a[15], a[3].key, a[0].key)?;

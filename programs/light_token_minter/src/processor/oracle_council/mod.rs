@@ -1,5 +1,6 @@
 //! Council-only oracle adjudication. No token electorate, deposits, or voter payouts.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use borsh::{BorshDeserialize, BorshSerialize};
 mod authority;
 mod effects;
@@ -66,7 +67,7 @@ fn evidence(target: &AccountInfo) -> Result<[u8; 32], ProgramError> {
     Ok(hashv(&[
         b"amoeba-council-evidence-v1",
         target.key.as_ref(),
-        &target.try_borrow_data()?,
+        &target.try_data()?,
     ])
     .to_bytes())
 }
@@ -131,7 +132,7 @@ pub(super) fn process(
                 && action.kind == OracleEmergencyDisputeKind::Update
                 && i == 16
                 && accounts.len() == 17
-                && a.key == &system_program::id()
+                && crate::is_system_program(a.key)
                 && !a.is_writable
                 && !a.is_signer)
         {
@@ -153,7 +154,7 @@ pub(super) fn process(
         return Err(VaultError::InvalidAccountList.into());
     }
     let remaining = &accounts[start..];
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let (expected, bump) = case_address(program, accounts[2].key, accounts[4].key);
     if expected != *accounts[3].key {
         return Err(VaultError::InvalidOracleEmergencyDispute.into());
@@ -598,7 +599,7 @@ fn load_council_state<T: BorshDeserialize>(
     if info.owner != program || info.data_len() != len || info.executable {
         return Err(VaultError::InvalidOracleEmergencyDispute.into());
     }
-    T::try_from_slice(&info.try_borrow_data()?)
+    T::try_from_slice(&info.try_data()?)
         .map_err(|_| VaultError::InvalidOracleEmergencyDispute.into())
 }
 #[inline(never)]
@@ -611,6 +612,6 @@ fn save_council_state<T: BorshSerialize>(
     if info.owner != program || !info.is_writable || bytes.len() != info.data_len() {
         return Err(VaultError::InvalidAccountList.into());
     }
-    info.try_borrow_mut_data()?.copy_from_slice(&bytes);
+    info.try_data_mut()?.copy_from_slice(&bytes);
     Ok(())
 }

@@ -6,24 +6,27 @@ use crate::writer_dlmm_math::{WriterDlmmBuybackLimits, WriterDlmmCash, WriterDlm
 use crate::writer_dlmm_quote::{WriterDlmmRouteQuote, WriterDlmmSwapPolicy};
 
 pub(in crate::processor) struct WriterSwapState {
-    context: WriterPolicyContext,
-    policy: Box<WriterDlmmPolicyV1>,
-    position: Box<WriterDlmmPositionV1>,
-    market: Market,
-    series_index: usize,
-    series: Vec<WriterSeries>,
-    series_limits: Vec<WriterDlmmSeriesLimits>,
-    eligible: bool,
-    before_cash: u64,
-    before_hot_cash: u64,
+    pub(in crate::processor) context: WriterPolicyContext,
+    pub(in crate::processor) policy: Box<WriterDlmmPolicyV1>,
+    pub(in crate::processor) position: Box<WriterDlmmPositionV1>,
+    pub(in crate::processor) market: Market,
+    pub(in crate::processor) series_index: usize,
+    pub(in crate::processor) series: Vec<WriterSeries>,
+    pub(in crate::processor) series_limits: Vec<WriterDlmmSeriesLimits>,
+    pub(in crate::processor) eligible: bool,
+    pub(in crate::processor) before_cash: u64,
+    pub(in crate::processor) before_hot_cash: u64,
 
-    before_mint_supply: u64,
-    before_retirement: u64,
-    round_trip_fee: u64,
-    risk: crate::writer_dlmm_math::WriterDlmmRiskLimits,
+    pub(in crate::processor) before_mint_supply: u64,
+    pub(in crate::processor) before_retirement: u64,
+    pub(in crate::processor) round_trip_fee: u64,
+    pub(in crate::processor) risk: crate::writer_dlmm_math::WriterDlmmRiskLimits,
 }
 
 impl WriterSwapState {
+    pub(in crate::processor) fn position(&self) -> &WriterDlmmPositionV1 {
+        &self.position
+    }
     pub(in crate::processor) fn bins(&self) -> &[WriterDlmmBinV1] {
         &self.position.bins[..usize::from(self.position.bin_count)]
     }
@@ -101,7 +104,7 @@ pub(in crate::processor) fn load_swap_state_with_cash<'a, 'info>(
         book: book_context.book,
         snapshot,
     };
-    let mut policy = load_policy(
+    let policy = load_policy(
         program_id,
         policy_info,
         sleeve_info,
@@ -126,26 +129,17 @@ pub(in crate::processor) fn load_swap_state_with_cash<'a, 'info>(
         accounts[7].key,
         sleeve_info.key,
         policy_info.key,
-        accounts[2].key,
+        &accounts[2],
         index as u8,
     )?;
-    if position.option_inventory_atoms != policy.series_pool_inventory_atoms[index]
-        || policy.total_pool_quote_atoms
-            < position
-                .allocated_quote_atoms
-                .checked_add(position.uncommitted_quote_atoms)
-                .ok_or(VaultError::ArithmeticOverflow)?
-        || position.bins[..usize::from(position.bin_count)]
-            .iter()
-            .any(|bin| bin.bin_id > pool.maximum_bin_id)
-        || context.sleeve.vault_config != *accounts[1].key
+    if context.sleeve.vault_config != *accounts[1].key
         || context.sleeve.usdc_vault != *accounts[27].key
         || context.sleeve.policy_snapshot != *accounts[25].key
     {
         return Err(VaultError::InvalidWriterSleeve.into());
     }
     let _registry = load_writer_policy_registry(program_id, &accounts[30], accounts[1].key)?;
-    let mut market = validated_market.clone();
+    let mut market = *validated_market;
     let lane = observe_writer_lane(
         program_id,
         &WriterLaneAccounts {
@@ -166,6 +160,116 @@ pub(in crate::processor) fn load_swap_state_with_cash<'a, 'info>(
         position.option_inventory_atoms,
         &mut market,
     )?;
+    swap_state_from_authenticated(
+        context,
+        policy,
+        position,
+        market,
+        pool,
+        index,
+        lane,
+        current_unix_timestamp()?,
+    )
+    .map(Some)
+}
+
+/// Build the writer route view from canonical state and authenticated custody.
+/// Physical loaders own PDA/owner/policy-chain/oracle checks and the observation
+/// of issuer custody. Ordinary and resident routes share every financial check.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+pub(in crate::processor) fn swap_state_from_authenticated(
+    context: WriterPolicyContext,
+    policy: Box<WriterDlmmPolicyV1>,
+    position: Box<WriterDlmmPositionV1>,
+    market: Market,
+    pool: &AmoebaDlmmPoolV1,
+    index: usize,
+    lane: WriterLane,
+    now: u64,
+) -> Result<WriterSwapState, ProgramError> {
+    swap_state_from_authenticated_view(
+        context,
+        policy,
+        position,
+        market,
+        pool,
+        index,
+        lane,
+        now,
+        Vec::new(),
+        Vec::new(),
+        false,
+    )
+}
+
+/// Retain the atomic action's authenticated quote view. Its geometry and policy
+/// terms were loaded once, and every intervening canonical projection updates
+/// the matching book and cached OI together. This is only for that owned view;
+/// ordinary account loaders continue to reconstruct it in the strict wrapper.
+/// The owning action must advance this policy spending month once at the same
+/// captured `now` before constructing any cached chunk; projections preserve it.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::processor) fn swap_state_from_authenticated_cached(
+    context: WriterPolicyContext,
+    policy: Box<WriterDlmmPolicyV1>,
+    position: Box<WriterDlmmPositionV1>,
+    market: Market,
+    pool: &AmoebaDlmmPoolV1,
+    index: usize,
+    lane: WriterLane,
+    now: u64,
+    series: Vec<WriterSeries>,
+    series_limits: Vec<WriterDlmmSeriesLimits>,
+) -> Result<WriterSwapState, ProgramError> {
+    swap_state_from_authenticated_view(
+        context,
+        policy,
+        position,
+        market,
+        pool,
+        index,
+        lane,
+        now,
+        series,
+        series_limits,
+        true,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn swap_state_from_authenticated_view(
+    context: WriterPolicyContext,
+    mut policy: Box<WriterDlmmPolicyV1>,
+    position: Box<WriterDlmmPositionV1>,
+    market: Market,
+    pool: &AmoebaDlmmPoolV1,
+    index: usize,
+    lane: WriterLane,
+    now: u64,
+    mut series: Vec<WriterSeries>,
+    mut series_limits: Vec<WriterDlmmSeriesLimits>,
+    cached: bool,
+) -> Result<WriterSwapState, ProgramError> {
+    if index >= usize::from(context.book.series_count)
+        || index >= usize::from(policy.series_count)
+        || usize::from(position.bin_count) > position.bins.len()
+        || usize::from(position.series_index) != index
+        || context.book.records[index].market != pool.market
+        || position.market != pool.market
+        || position.option_inventory_atoms != policy.series_pool_inventory_atoms[index]
+        || policy.total_pool_quote_atoms
+            < position
+                .allocated_quote_atoms
+                .checked_add(position.uncommitted_quote_atoms)
+                .ok_or(VaultError::ArithmeticOverflow)?
+        || position.bins[..usize::from(position.bin_count)]
+            .iter()
+            .any(|bin| bin.bin_id > pool.maximum_bin_id)
+    {
+        return Err(VaultError::InvalidWriterSleeve.into());
+    }
     // Supply reconciliation and writer cash deficits make only this lane ineligible.
     // Ordinary LP custody is checked independently by the shared pool loader.
     let mut eligible = lane.reconciled
@@ -182,19 +286,50 @@ pub(in crate::processor) fn load_swap_state_with_cash<'a, 'info>(
             0
         }
     };
-    advance_spending_month(&mut policy, current_unix_timestamp()?)?;
-    let series = writer_book_math_series(&context.book)?;
+    if !cached {
+        advance_spending_month(&mut policy, now)?;
+    }
+    let count = usize::from(context.book.series_count);
+    if count == 0 || count > crate::constants::WRITER_MAX_LIVE_SERIES {
+        return Err(VaultError::InvalidWriterSeriesBook.into());
+    }
+    if cached {
+        if series.len() != count
+            || series_limits.len() != usize::from(policy.series_count)
+            || series[index].external_oi_atoms
+                != context.book.records[index].external_open_interest_atoms
+        {
+            return Err(VaultError::InvalidWriterSeriesBook.into());
+        }
+    } else {
+        series.clear();
+        for record in &context.book.records[..count] {
+            if !record.active {
+                return Err(VaultError::InvalidWriterSeriesBook.into());
+            }
+            series.push(WriterSeries {
+                kind: record.option_kind,
+                strike_price_atomic: record.strike_price_atomic,
+                cap_price_atomic: record.cap_or_floor_price_atomic,
+                contract_size_atoms: record.contract_size_atoms,
+                max_payout_per_contract_atoms: record.max_payout_per_contract_atoms,
+                external_oi_atoms: record.external_open_interest_atoms,
+            });
+        }
+        series_limits.clear();
+        series_limits.extend(
+            policy.series[..usize::from(policy.series_count)]
+                .iter()
+                .map(|terms| WriterDlmmSeriesLimits {
+                    conservative_claim_value_atoms: terms.conservative_claim_value_atoms,
+                    seller_floor_quote_atoms: terms.seller_floor_quote_atoms,
+                    monthly_buyback_cap_atoms: terms.monthly_buyback_cap_atoms,
+                    transaction_buyback_cap_atoms: terms.transaction_buyback_cap_atoms,
+                }),
+        );
+    }
     let risk = risk_limits(&context.snapshot, &context.group);
-    let series_limits = policy.series[..usize::from(policy.series_count)]
-        .iter()
-        .map(|terms| WriterDlmmSeriesLimits {
-            conservative_claim_value_atoms: terms.conservative_claim_value_atoms,
-            seller_floor_quote_atoms: terms.seller_floor_quote_atoms,
-            monthly_buyback_cap_atoms: terms.monthly_buyback_cap_atoms,
-            transaction_buyback_cap_atoms: terms.transaction_buyback_cap_atoms,
-        })
-        .collect();
-    Ok(Some(WriterSwapState {
+    Ok(WriterSwapState {
         context,
         policy,
         position,
@@ -210,7 +345,7 @@ pub(in crate::processor) fn load_swap_state_with_cash<'a, 'info>(
         before_retirement: lane.retired,
         round_trip_fee,
         risk,
-    }))
+    })
 }
 
 /// The accounts a writer lane's custody, supply and cash are read from.
@@ -247,6 +382,8 @@ pub(in crate::processor) struct WriterLane {
 /// ineligible when it does not reconcile; a liquidity action is rejected.
 /// `market` is the caller's loaded `a.market`; its canonical mint is validated here.
 #[inline(never)]
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn observe_writer_lane(
     program_id: &Pubkey,
     a: &WriterLaneAccounts,
@@ -341,32 +478,89 @@ pub(in crate::processor) fn writer_lane_reconciled(
         && external.checked_add(inventory) == Some(market_outstanding)
 }
 
-/// Apply only the already-admitted writer portion after the ordinary trader transfers.
-/// Pool totals are adjusted for canonical sweeps/burns before final shared custody validation.
-pub(in crate::processor) fn finish_swap(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+/// Project the normal writer portion without token CPIs or account writes.
+/// The caller quotes against authenticated state, projects Pool/FIFO effects,
+/// then applies this same accounting before batching the physical transfers.
+/// `slot` is the instruction's runtime slot; compressed retirement preserves
+/// physical mint supply while recording the retired contracts in the book.
+pub(in crate::processor) fn project_swap_effects(
     state: &mut WriterSwapState,
     route: &WriterDlmmRouteQuote,
     direction: AmoebaDlmmSwapDirection,
     pool: &mut AmoebaDlmmPoolV1,
+    retirement_is_compressed: bool,
+    slot: u64,
 ) -> ProgramResult {
-    finish_swap_with_cash(
-        program_id, accounts, state, route, direction, pool, None, false, false,
+    if route.writer_fills.is_empty() {
+        return Ok(());
+    }
+    project_swap_effects_deferred(
+        state,
+        route,
+        direction,
+        pool,
+        retirement_is_compressed,
+        slot,
+    )?;
+    finalize_projected_swap(state, route)
+}
+
+/// Apply the exact admitted financial effects while leaving derived reserve metrics and
+/// the book digest for the atomic caller's final state. Every progressive quote must still
+/// admit its updated book and cash; before storing, the caller must recompute those metrics
+/// with the last admitted route and then refresh the book digest. This permits several
+/// source chunks in one instruction without repeatedly hashing the entire writer book.
+pub(in crate::processor) fn project_swap_effects_deferred(
+    state: &mut WriterSwapState,
+    route: &WriterDlmmRouteQuote,
+    direction: AmoebaDlmmSwapDirection,
+    pool: &mut AmoebaDlmmPoolV1,
+    retirement_is_compressed: bool,
+    slot: u64,
+) -> ProgramResult {
+    project_swap_effects_inner(
+        state,
+        route,
+        direction,
+        pool,
+        retirement_is_compressed,
+        slot,
+        true,
+    )
+}
+
+/// The private atomic path validates the complete policy once after every
+/// progressive projection and before its first CPI. Per-fill price, solvency,
+/// spending, position layout and physical-supply checks remain unchanged.
+pub(in crate::processor) fn project_swap_effects_cached(
+    state: &mut WriterSwapState,
+    route: &WriterDlmmRouteQuote,
+    direction: AmoebaDlmmSwapDirection,
+    pool: &mut AmoebaDlmmPoolV1,
+    retirement_is_compressed: bool,
+    slot: u64,
+) -> ProgramResult {
+    project_swap_effects_inner(
+        state,
+        route,
+        direction,
+        pool,
+        retirement_is_compressed,
+        slot,
+        false,
     )
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(in crate::processor) fn finish_swap_with_cash(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+#[inline(never)]
+fn project_swap_effects_inner(
     state: &mut WriterSwapState,
     route: &WriterDlmmRouteQuote,
     direction: AmoebaDlmmSwapDirection,
     pool: &mut AmoebaDlmmPoolV1,
-    cash_sidecar_info: Option<&AccountInfo>,
-    premium_is_compressed: bool,
     retirement_is_compressed: bool,
+    slot: u64,
+    validate_policy_layout: bool,
 ) -> ProgramResult {
     if route.writer_fills.is_empty() {
         return Ok(());
@@ -374,31 +568,6 @@ pub(in crate::processor) fn finish_swap_with_cash(
     if !state.eligible {
         return Err(VaultError::WriterSolvencyViolation.into());
     }
-    let actor = &accounts[0];
-    let market_info = &accounts[2];
-    let sleeve_info = &accounts[4];
-    let pool_info = &accounts[7];
-    let authority_info = &accounts[8];
-    let mint_info = &accounts[9];
-    let option_vault = &accounts[11];
-    let quote_vault = &accounts[12];
-    let light_info = &accounts[15];
-    let cpi_info = &accounts[16];
-    let option_interface = &accounts[17];
-    let quote_interface = &accounts[18];
-    let token_info = &accounts[19];
-    let system_info = &accounts[20];
-    let cash_info = &accounts[27];
-    let retirement_info = &accounts[29];
-
-    let (_, bump) = derive_ameba_dlmm_authority_pda(program_id, pool_info.key);
-    let bump_bytes = [bump];
-    let pool_seeds: &[&[u8]] = &[
-        CURRENT_STATE_NAMESPACE_SEED,
-        crate::constants::AMOEBA_DLMM_AUTHORITY_PDA_SEED,
-        pool_info.key.as_ref(),
-        &bump_bytes,
-    ];
     let totals = route.writer;
     for fill in &route.writer_fills {
         let bin = state.position.bins[..usize::from(state.position.bin_count)]
@@ -422,24 +591,6 @@ pub(in crate::processor) fn finish_swap_with_cash(
             if writer_cash != swept {
                 return Err(VaultError::WriterSupplyMismatch.into());
             }
-            if writer_cash > 0 && !premium_is_compressed {
-                invoke_light_token_account_transfer_with_signer_seeds(
-                    writer_cash,
-                    MarketMintAccounting::CANONICAL_DECIMALS,
-                    light_info,
-                    cpi_info,
-                    actor,
-                    quote_vault,
-                    cash_info,
-                    authority_info,
-                    &accounts[10],
-                    quote_interface,
-                    token_info,
-                    system_info,
-                    &[pool_seeds],
-                )?;
-            }
-
             state.context.sleeve.accounted_asset_atoms = state
                 .context
                 .sleeve
@@ -473,92 +624,15 @@ pub(in crate::processor) fn finish_swap_with_cash(
                 .accounted_quote_reserve
                 .checked_sub(swept)
                 .ok_or(VaultError::ArithmeticOverflow)?;
-            let hot_after = validate_token_account(cash_info)?.amount;
-            let compressed_after = crate::compressed_custody::load(
-                program_id,
-                cash_sidecar_info,
-                crate::compressed_custody::CustodyKind::WriterCash,
-                cash_info.key,
-                &Pubkey::default(),
-                &pool.quote_mint,
-            )?
-            // Classic delivery does not move the validated compressed balance.
-            .map_or(state.before_cash - state.before_hot_cash, |cash| {
-                cash.quote_atoms
-            });
-            if hot_after
-                .checked_add(compressed_after)
-                .and_then(|total| total.checked_sub(state.before_cash))
-                != Some(writer_cash)
-                || (premium_is_compressed && hot_after != state.before_hot_cash)
-            {
-                return Err(VaultError::WriterSupplyMismatch.into());
-            }
         }
         AmoebaDlmmSwapDirection::OptionForQuote => {
             if retirement_is_compressed {
-                // The aggregate Light transfer has already moved the exact option
-                // input into program-bound retirement custody. Physical mint supply
-                // remains outstanding until terminal cleanup.
+                // The caller moves this exact input into program-bound retirement
+                // custody. Physical mint supply stays outstanding until cleanup.
                 state.context.book.individual.compressed_retired_atoms[state.series_index] =
                     state.context.book.individual.compressed_retired_atoms[state.series_index]
                         .checked_add(totals.retired_option_atoms)
                         .ok_or(VaultError::ArithmeticOverflow)?;
-            } else {
-                let retirement = load_or_create_writer_retirement_custody(
-                    program_id,
-                    actor,
-                    sleeve_info,
-                    market_info,
-                    retirement_info,
-                    mint_info,
-                    token_info,
-                    system_info,
-                )?;
-                if retirement.amount != state.before_retirement {
-                    return Err(VaultError::WriterSupplyMismatch.into());
-                }
-                invoke_light_token_account_transfer_with_signer_seeds(
-                    totals.retired_option_atoms,
-                    MarketMintAccounting::CANONICAL_DECIMALS,
-                    light_info,
-                    cpi_info,
-                    actor,
-                    option_vault,
-                    retirement_info,
-                    authority_info,
-                    mint_info,
-                    option_interface,
-                    token_info,
-                    system_info,
-                    &[pool_seeds],
-                )?;
-                let sleeve_bump = [state.context.sleeve.bump];
-                let sleeve_seeds = writer_sleeve_signer_seeds(
-                    &state.context.sleeve.settlement_group,
-                    &sleeve_bump,
-                );
-                invoke_token_burn_checked(
-                    token_info,
-                    retirement_info,
-                    mint_info,
-                    sleeve_info,
-                    totals.retired_option_atoms,
-                    MarketMintAccounting::CANONICAL_DECIMALS,
-                    &[&sleeve_seeds],
-                )?;
-                if validate_token_account(retirement_info)?.amount != state.before_retirement {
-                    return Err(VaultError::WriterSupplyMismatch.into());
-                }
-                if state.before_retirement == 0 {
-                    custody::close_sleeve_token_custody(
-                        &state.context.sleeve,
-                        sleeve_info,
-                        retirement_info,
-                        actor,
-                        token_info,
-                    )?;
-                }
             }
             consume_market_contracts(
                 &mut state.market,
@@ -624,6 +698,213 @@ pub(in crate::processor) fn finish_swap_with_cash(
     state.position.bins[count..].fill(WriterDlmmBinV1::default());
     state.position.bin_count = count as u8;
     if !state.position.has_current_layout()
+        || (validate_policy_layout && !state.policy.has_current_layout())
+        || market_outstanding_contract_amount(&state.market)?
+            != state
+                .context
+                .book
+                .external_total(state.series_index)
+                .and_then(|value| value.checked_add(state.position.option_inventory_atoms))
+                .ok_or(VaultError::ArithmeticOverflow)?
+    {
+        return Err(VaultError::WriterSupplyMismatch.into());
+    }
+    state.context.sleeve.last_updated_slot = slot;
+    state.context.book.last_updated_slot = slot;
+    state.position.last_updated_slot = slot;
+    // Only this series' OI changed; payoff terms and the other series are immutable
+    // throughout this projection. Retain the allocation across progressive chunks.
+    if state.series.len() != usize::from(state.context.book.series_count) {
+        return Err(VaultError::InvalidWriterSeriesBook.into());
+    }
+    state.series[state.series_index].external_oi_atoms =
+        state.context.book.records[state.series_index].external_open_interest_atoms;
+    Ok(())
+}
+
+fn finalize_projected_swap(
+    state: &mut WriterSwapState,
+    route: &WriterDlmmRouteQuote,
+) -> ProgramResult {
+    update_cash_metrics_with_admission(
+        &mut state.context.sleeve,
+        &state.context.group,
+        &state.context.book,
+        &state.context.snapshot,
+        &state.policy,
+        true,
+        route.admitted_cash(),
+    )?;
+    state.context.book.book_digest = writer_book_digest(&state.context.book);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::processor) fn finish_swap_with_cash(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    state: &mut WriterSwapState,
+    route: &WriterDlmmRouteQuote,
+    direction: AmoebaDlmmSwapDirection,
+    pool: &mut AmoebaDlmmPoolV1,
+    cash_sidecar_info: Option<&AccountInfo>,
+    premium_is_compressed: bool,
+    retirement_is_compressed: bool,
+) -> ProgramResult {
+    if route.writer_fills.is_empty() {
+        return Ok(());
+    }
+    if !state.eligible {
+        return Err(VaultError::WriterSolvencyViolation.into());
+    }
+    let actor = &accounts[0];
+    let market_info = &accounts[2];
+    let sleeve_info = &accounts[4];
+    let pool_info = &accounts[7];
+    let authority_info = &accounts[8];
+    let mint_info = &accounts[9];
+    let option_vault = &accounts[11];
+    let quote_vault = &accounts[12];
+    let light_info = &accounts[15];
+    let cpi_info = &accounts[16];
+    let option_interface = &accounts[17];
+    let quote_interface = &accounts[18];
+    let token_info = &accounts[19];
+    let system_info = &accounts[20];
+    let cash_info = &accounts[27];
+    let retirement_info = &accounts[29];
+
+    let (_, bump) = derive_ameba_dlmm_authority_pda(program_id, pool_info.key);
+    let bump_bytes = [bump];
+    let pool_seeds: &[&[u8]] = &[
+        CURRENT_STATE_NAMESPACE_SEED,
+        crate::constants::AMOEBA_DLMM_AUTHORITY_PDA_SEED,
+        pool_info.key.as_ref(),
+        &bump_bytes,
+    ];
+    let totals = route.writer;
+    match direction {
+        AmoebaDlmmSwapDirection::QuoteForOption => {
+            let writer_cash = totals
+                .net_premium_atoms
+                .checked_add(totals.lp_fee_atoms)
+                .ok_or(VaultError::ArithmeticOverflow)?;
+            let swept = totals
+                .gross_premium_atoms
+                .checked_add(totals.lp_fee_atoms)
+                .ok_or(VaultError::ArithmeticOverflow)?;
+            if writer_cash != swept {
+                return Err(VaultError::WriterSupplyMismatch.into());
+            }
+            if writer_cash > 0 && !premium_is_compressed {
+                invoke_light_token_account_transfer_with_signer_seeds(
+                    writer_cash,
+                    MarketMintAccounting::CANONICAL_DECIMALS,
+                    light_info,
+                    cpi_info,
+                    actor,
+                    quote_vault,
+                    cash_info,
+                    authority_info,
+                    &accounts[10],
+                    quote_interface,
+                    token_info,
+                    system_info,
+                    &[pool_seeds],
+                )?;
+            }
+
+            let hot_after = validate_token_account(cash_info)?.amount;
+            let compressed_after = crate::compressed_custody::load(
+                program_id,
+                cash_sidecar_info,
+                crate::compressed_custody::CustodyKind::WriterCash,
+                cash_info.key,
+                &Pubkey::default(),
+                &pool.quote_mint,
+            )?
+            // Classic delivery does not move the validated compressed balance.
+            .map_or(state.before_cash - state.before_hot_cash, |cash| {
+                cash.quote_atoms
+            });
+            if hot_after
+                .checked_add(compressed_after)
+                .and_then(|total| total.checked_sub(state.before_cash))
+                != Some(writer_cash)
+                || (premium_is_compressed && hot_after != state.before_hot_cash)
+            {
+                return Err(VaultError::WriterSupplyMismatch.into());
+            }
+        }
+        AmoebaDlmmSwapDirection::OptionForQuote => {
+            if !retirement_is_compressed {
+                let retirement = load_or_create_writer_retirement_custody(
+                    program_id,
+                    actor,
+                    sleeve_info,
+                    market_info,
+                    retirement_info,
+                    mint_info,
+                    token_info,
+                    system_info,
+                )?;
+                if retirement.amount != state.before_retirement {
+                    return Err(VaultError::WriterSupplyMismatch.into());
+                }
+                invoke_light_token_account_transfer_with_signer_seeds(
+                    totals.retired_option_atoms,
+                    MarketMintAccounting::CANONICAL_DECIMALS,
+                    light_info,
+                    cpi_info,
+                    actor,
+                    option_vault,
+                    retirement_info,
+                    authority_info,
+                    mint_info,
+                    option_interface,
+                    token_info,
+                    system_info,
+                    &[pool_seeds],
+                )?;
+                let sleeve_bump = [state.context.sleeve.bump];
+                let sleeve_seeds = writer_sleeve_signer_seeds(
+                    &state.context.sleeve.settlement_group,
+                    &sleeve_bump,
+                );
+                invoke_token_burn_checked(
+                    token_info,
+                    retirement_info,
+                    mint_info,
+                    sleeve_info,
+                    totals.retired_option_atoms,
+                    MarketMintAccounting::CANONICAL_DECIMALS,
+                    &[&sleeve_seeds],
+                )?;
+                if validate_token_account(retirement_info)?.amount != state.before_retirement {
+                    return Err(VaultError::WriterSupplyMismatch.into());
+                }
+                if state.before_retirement == 0 {
+                    custody::close_sleeve_token_custody(
+                        &state.context.sleeve,
+                        sleeve_info,
+                        retirement_info,
+                        actor,
+                        token_info,
+                    )?;
+                }
+            }
+        }
+    }
+    project_swap_effects(
+        state,
+        route,
+        direction,
+        pool,
+        retirement_is_compressed,
+        crate::compact_error::slot()?,
+    )?;
+    let record = &state.context.book.records[state.series_index];
+    if !state.position.has_current_layout()
         || !state.policy.has_current_layout()
         || validate_mint_account(mint_info, token_info.key)?.supply
             != record.total_physical_supply_atoms
@@ -644,23 +925,13 @@ pub(in crate::processor) fn finish_swap_with_cash(
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
-    update_cash_metrics_with_admission(
-        &mut state.context.sleeve,
-        &state.context.group,
-        &state.context.book,
-        &state.context.snapshot,
-        &state.policy,
-        true,
-        route.admitted_cash(),
-    )?;
-    let slot = Clock::get()?.slot;
-    state.context.sleeve.last_updated_slot = slot;
-    state.context.book.last_updated_slot = slot;
-    state.context.book.book_digest = writer_book_digest(&state.context.book);
-    state.position.last_updated_slot = slot;
     store_state(&accounts[4], state.context.sleeve.as_ref())?;
     store_state(&accounts[6], state.context.book.as_ref())?;
     store_state(&accounts[24], state.policy.as_ref())?;
-    store_state(&accounts[26], state.position.as_ref())?;
+    // The ordinary router commits the staged writer position together with
+    // pool/page/order balances. An imported physical account is only a marker.
+    if !resident::position_is_resident(program_id, market_info, state.position.as_ref())? {
+        store_state(&accounts[26], state.position.as_ref())?;
+    }
     store_state(market_info, &state.market)
 }

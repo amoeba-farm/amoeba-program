@@ -10,7 +10,7 @@ use crate::constants::{
     CURRENT_STATE_NAMESPACE_SEED,
 };
 use crate::fixed_codec::{
-    fixed_state_deserialize, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
+    fixed_state_deserialize_flat, invalid_fixed_borsh, FixedCursor, FixedField, FixedStateDecode,
     FixedStateEncode, FixedWriter,
 };
 
@@ -63,7 +63,7 @@ impl AmoebaDlmmPoolStatus {
 /// One `u64` covers 64 logical pages. A pool's immutable `maximum_bin_id`
 /// bounds its real addressable grid; the current 12-USDC pools use only pages
 /// 0 through 7 and create them lazily.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Debug, PartialEq)]
 pub struct AmoebaDlmmPoolV1 {
     pub is_initialized: bool,
     pub bump: u8,
@@ -97,6 +97,13 @@ pub struct AmoebaDlmmPoolV1 {
     pub settled_slot: u64,
     pub last_updated_slot: u64,
     pub compression_info: CompressionInfo,
+}
+
+impl Clone for AmoebaDlmmPoolV1 {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl Default for AmoebaDlmmPoolV1 {
@@ -155,7 +162,7 @@ impl AmoebaDlmmPoolV1 {
 
 /// Reserve-only hot path page.  Shares are split into the companion page below
 /// because the literal combined layout is larger than Light 0.23's 800-byte cap.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Debug, PartialEq)]
 pub struct AmoebaDlmmBinPageV1 {
     pub is_initialized: bool,
     pub bump: u8,
@@ -170,6 +177,13 @@ pub struct AmoebaDlmmBinPageV1 {
     pub quote_reserve: [u64; 32],
     pub last_updated_slot: u64,
     pub compression_info: CompressionInfo,
+}
+
+impl Clone for AmoebaDlmmBinPageV1 {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl Default for AmoebaDlmmBinPageV1 {
@@ -300,7 +314,7 @@ impl AmoebaDlmmPositionV1 {
     }
 }
 
-fixed_state_deserialize!(AmoebaDlmmPoolV1, AmoebaDlmmPoolV1::BODY_LEN, {
+fixed_state_deserialize_flat!(AmoebaDlmmPoolV1, AmoebaDlmmPoolV1::BODY_LEN, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -333,9 +347,51 @@ fixed_state_deserialize!(AmoebaDlmmPoolV1, AmoebaDlmmPoolV1::BODY_LEN, {
     settled_slot: u64,
     last_updated_slot: u64,
     compression_info: CompressionInfo,
+}, flat {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    market: Pubkey,
+    oracle_month: Pubkey,
+    liquidity_manager: Pubkey,
+    option_mint: Pubkey,
+    quote_mint: Pubkey,
+    option_vault: Pubkey,
+    quote_vault: Pubkey,
+    expiry_ts: u64,
+    tick_size_quote_atomic: u64,
+    maximum_price_quote_atomic: u64,
+    maximum_bin_id: u16,
+    best_bid_bin_id: u16,
+    best_ask_bin_id: u16,
+    last_trade_bin_id: u16,
+    initialized_page_bitmap: u64,
+    bid_page_bitmap: u64,
+    ask_page_bitmap: u64,
+
+    maximum_bins_per_swap: u8,
+    accounted_option_reserve: u64,
+    accounted_quote_reserve: u64,
+
+    position_count: u32,
+    status: AmoebaDlmmPoolStatus,
+    settlement_price_atomic: u64,
+    settled_slot: u64,
+    last_updated_slot: u64,
+    compression_info.last_claimed_slot: u64,
+    compression_info.lamports_per_write: u32,
+    compression_info.config_version: u16,
+    compression_info.state: CompressionState,
+    compression_info._padding: u8,
+    compression_info.rent_config.base_rent: u16,
+    compression_info.rent_config.compression_cost: u16,
+    compression_info.rent_config.lamports_per_byte_per_epoch: u8,
+    compression_info.rent_config.max_funded_epochs: u8,
+    compression_info.rent_config.max_top_up: u16,
 });
 
-fixed_state_deserialize!(AmoebaDlmmBinPageV1, AmoebaDlmmBinPageV1::BODY_LEN, {
+fixed_state_deserialize_flat!(AmoebaDlmmBinPageV1, AmoebaDlmmBinPageV1::BODY_LEN, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -349,9 +405,32 @@ fixed_state_deserialize!(AmoebaDlmmBinPageV1, AmoebaDlmmBinPageV1::BODY_LEN, {
     quote_reserve: [u64; 32],
     last_updated_slot: u64,
     compression_info: CompressionInfo,
+}, flat {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    pool: Pubkey,
+    page_index: u16,
+    first_bin_id: u16,
+    bid_bitmap: u32,
+    ask_bitmap: u32,
+    option_reserve: [u64; 32],
+    quote_reserve: [u64; 32],
+    last_updated_slot: u64,
+    compression_info.last_claimed_slot: u64,
+    compression_info.lamports_per_write: u32,
+    compression_info.config_version: u16,
+    compression_info.state: CompressionState,
+    compression_info._padding: u8,
+    compression_info.rent_config.base_rent: u16,
+    compression_info.rent_config.compression_cost: u16,
+    compression_info.rent_config.lamports_per_byte_per_epoch: u8,
+    compression_info.rent_config.max_funded_epochs: u8,
+    compression_info.rent_config.max_top_up: u16,
 });
 
-fixed_state_deserialize!(AmoebaDlmmSharePageV1, AmoebaDlmmSharePageV1::BODY_LEN, {
+fixed_state_deserialize_flat!(AmoebaDlmmSharePageV1, AmoebaDlmmSharePageV1::BODY_LEN, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -362,9 +441,29 @@ fixed_state_deserialize!(AmoebaDlmmSharePageV1, AmoebaDlmmSharePageV1::BODY_LEN,
     total_liquidity_shares: [u128; 32],
     last_updated_slot: u64,
     compression_info: CompressionInfo,
+}, flat {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    pool: Pubkey,
+    page_index: u16,
+    first_bin_id: u16,
+    total_liquidity_shares: [u128; 32],
+    last_updated_slot: u64,
+    compression_info.last_claimed_slot: u64,
+    compression_info.lamports_per_write: u32,
+    compression_info.config_version: u16,
+    compression_info.state: CompressionState,
+    compression_info._padding: u8,
+    compression_info.rent_config.base_rent: u16,
+    compression_info.rent_config.compression_cost: u16,
+    compression_info.rent_config.lamports_per_byte_per_epoch: u8,
+    compression_info.rent_config.max_funded_epochs: u8,
+    compression_info.rent_config.max_top_up: u16,
 });
 
-fixed_state_deserialize!(AmoebaDlmmPositionV1, AmoebaDlmmPositionV1::BODY_LEN, {
+fixed_state_deserialize_flat!(AmoebaDlmmPositionV1, AmoebaDlmmPositionV1::BODY_LEN, {
     is_initialized: bool,
     bump: u8,
     account_discriminator: [u8; 3],
@@ -378,6 +477,29 @@ fixed_state_deserialize!(AmoebaDlmmPositionV1, AmoebaDlmmPositionV1::BODY_LEN, {
     liquidity_shares: [u128; 32],
     last_updated_slot: u64,
     compression_info: CompressionInfo,
+}, flat {
+    is_initialized: bool,
+    bump: u8,
+    account_discriminator: [u8; 3],
+    account_version: u8,
+    pool: Pubkey,
+    owner: Pubkey,
+    position_nonce: u64,
+    lower_bin_id: u16,
+    bin_count: u8,
+    initialized_bitmap: u32,
+    liquidity_shares: [u128; 32],
+    last_updated_slot: u64,
+    compression_info.last_claimed_slot: u64,
+    compression_info.lamports_per_write: u32,
+    compression_info.config_version: u16,
+    compression_info.state: CompressionState,
+    compression_info._padding: u8,
+    compression_info.rent_config.base_rent: u16,
+    compression_info.rent_config.compression_cost: u16,
+    compression_info.rent_config.lamports_per_byte_per_epoch: u8,
+    compression_info.rent_config.max_funded_epochs: u8,
+    compression_info.rent_config.max_top_up: u16,
 });
 
 pub(crate) trait AmoebaDlmmLightState: Clone + FixedStateDecode + FixedStateEncode {

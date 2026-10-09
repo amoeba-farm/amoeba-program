@@ -1,6 +1,7 @@
 //! Leaf-to-leaf option retirement and compressed USDC payout. No holder account
 //! is created or restored. Light authenticates and nullifies the consumed leaf.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::{
     compressed_custody::{self as custody, CustodyKind},
     compressed_option_settlement::{self as compressed, CompressedCashOptionClaim},
@@ -88,11 +89,11 @@ fn settle_with_trading_owner(
         || !a[0].is_signer
         || !a[0].is_writable
         || (!keeper && !a[1].is_signer)
-        || *a[12].key != light_token_program_id()
-        || *a[13].key != cpi_authority()
-        || *a[14].key != spl_token_program_id()
-        || *a[15].key != system_program::id()
-        || *a[16].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
+        || !crate::light_token_instruction::is_program(a[12].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[13].key)
+        || !crate::token_instruction::check_id(a[14].key)
+        || !crate::is_system_program(a[15].key)
+        || !crate::light_token_instruction::is_light_system_program(a[16].key)
         || [3, 5, 6, 9, 11, 20, 21, 22]
             .iter()
             .any(|&i| !a[i].is_writable)
@@ -104,12 +105,33 @@ fn settle_with_trading_owner(
     if sponsored && (a[sponsor_index].key != a[0].key || a[0].key == a[1].key) {
         return Err(VaultError::InvalidAccountList.into());
     }
-    let (delegate, delegate_bump) = crate::scoped_settlement::derive_collective_settlement_delegate(
-        program, a[1].key, a[7].key,
-    );
-    if *a[8].key != delegate
-        || *a[24].key != compressed::retirement_owner(program, a[3].key, a[6].key)
-        || (!claim.has_delegate && *a[23].key != system_program::id())
+    let (mint_delegate, mint_delegate_bump) =
+        crate::scoped_settlement::derive_collective_settlement_delegate(
+            program, a[1].key, a[7].key,
+        );
+    let order_scope = if *a[8].key == mint_delegate {
+        None
+    } else {
+        if a[8].owner != program || a[8].executable {
+            return Err(VaultError::InvalidAccountList.into());
+        }
+        let order = crate::multi_order::Order::try_from_slice(&a[8].try_data()?)
+            .map_err(|_| VaultError::InvalidAccountList)?;
+        let expiry = order
+            .settlement_scope(
+                program,
+                a[8].key,
+                a[1].key,
+                a[6].key,
+                a[7].key,
+                claim.amount,
+            )
+            .ok_or(VaultError::InvalidAccountList)?;
+        Some((order, expiry))
+    };
+    let delegate = *a[8].key;
+    if *a[24].key != compressed::retirement_owner(program, a[3].key, a[6].key)
+        || (!claim.has_delegate && !crate::is_system_program(a[23].key))
         || (keeper && (!claim.has_delegate || *a[23].key != delegate))
     {
         return Err(VaultError::InvalidAccountList.into());
@@ -141,6 +163,9 @@ fn settle_with_trading_owner(
     if market.market_id != record.series_id
         || market.long_contract_mint != Some(*a[7].key)
         || market_outstanding_contract_amount(&market)? != record.external_open_interest_atoms
+        || order_scope
+            .as_ref()
+            .is_some_and(|(_, expiry)| *expiry != market.instrument.expiry_ts)
     {
         return Err(VaultError::WriterSupplyMismatch.into());
     }
@@ -169,7 +194,7 @@ fn settle_with_trading_owner(
     let cash_before = validate_token_account(&a[9])?.amount;
     let cash_key = custody::derive_compressed_custody(program, CustodyKind::WriterCash, a[9].key).0;
     let cash_absent =
-        a[25].key == &cash_key && a[25].owner == &system_program::id() && a[25].data_is_empty();
+        a[25].key == &cash_key && crate::is_system_program(a[25].owner) && a[25].data_is_empty();
     let mut cash_custody = custody::load(
         program,
         if cash_absent { None } else { Some(&a[25]) },
@@ -202,7 +227,7 @@ fn settle_with_trading_owner(
     {
         let c = &cash_claim;
         if (c.cash_amount == 0
-            && (a[26].key != &system_program::id() || a[27].key != &system_program::id()))
+            && (!crate::is_system_program(a[26].key) || !crate::is_system_program(a[27].key)))
             || (c.cash_amount != 0 && (!a[26].is_writable || !a[27].is_writable))
         {
             return Err(VaultError::InvalidAccountList.into());
@@ -211,14 +236,26 @@ fn settle_with_trading_owner(
 
     // The instruction constructs both owner and mint from authenticated series state.
     // A false amount, delegate, tree position or proof fails inside Light before payout.
-    let bump = [delegate_bump];
-    let seeds: &[&[u8]] = &[
+    let bump = [order_scope
+        .as_ref()
+        .map_or(mint_delegate_bump, |(order, _)| order.bump)];
+    let mint_seeds: &[&[u8]] = &[
         CURRENT_STATE_NAMESPACE_SEED,
         crate::scoped_settlement::COLLECTIVE_SETTLEMENT_DELEGATE_SEED,
         a[1].key.as_ref(),
         a[7].key.as_ref(),
         &bump,
     ];
+    let order_seeds = order_scope.as_ref().map(|(order, _)| {
+        vec![
+            CURRENT_STATE_NAMESPACE_SEED,
+            crate::multi_order::SEED,
+            order.owner.as_ref(),
+            &order.nonce,
+            &bump,
+        ]
+    });
+    let seeds = order_seeds.as_deref().unwrap_or(mint_seeds);
     let trading_bump = [trading_owner
         .map(|owner| crate::trading_session::derive(program, &owner).1)
         .unwrap_or(0)];
@@ -249,12 +286,10 @@ fn settle_with_trading_owner(
         infos.push(a[12].clone());
         if keeper {
             invoke_signed(&retirement, &infos, &[seeds])?;
+        } else if let Some(trading) = trading_seeds.as_deref() {
+            invoke_signed(&retirement, &infos, &[trading])?;
         } else {
-            if let Some(trading) = trading_seeds.as_deref() {
-                invoke_signed(&retirement, &infos, &[trading])?;
-            } else {
-                invoke(&retirement, &infos)?;
-            }
+            invoke(&retirement, &infos)?;
         }
     }
     for (recipient, amount) in [
@@ -304,7 +339,7 @@ fn settle_with_trading_owner(
         claim.amount,
         payout,
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     book.book_digest = writer_book_digest(&book);
     book.last_updated_slot = slot;
     sleeve.last_updated_slot = slot;
@@ -316,6 +351,8 @@ fn settle_with_trading_owner(
 /// One Light invocation consumes both mints. It cannot retire an option while
 /// leaving its cash input unspent, or pay cash without nullifying the option.
 #[inline(never)]
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 fn retire_and_pay_cash<'a>(
     a: &[AccountInfo<'a>],
     cash: &CompressedCashOptionClaim,
@@ -402,12 +439,10 @@ fn retire_and_pay_cash<'a>(
     ];
     if keeper {
         invoke_signed(&ix, &infos, &[cash_seeds, delegate_seeds])
+    } else if let Some(trading) = trading_seeds {
+        invoke_signed(&ix, &infos, &[cash_seeds, trading])
     } else {
-        if let Some(trading) = trading_seeds {
-            invoke_signed(&ix, &infos, &[cash_seeds, trading])
-        } else {
-            invoke_signed(&ix, &infos, &[cash_seeds])
-        }
+        invoke_signed(&ix, &infos, &[cash_seeds])
     }
 }
 
@@ -523,7 +558,7 @@ fn expire(program: &Pubkey, a: &[AccountInfo], index: usize) -> ProgramResult {
         .long_liability_remaining_atoms
         .checked_add(book.individual.remaining_portfolio_credit)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     book.book_digest = writer_book_digest(&book);
     book.last_updated_slot = slot;
     sleeve.last_updated_slot = slot;

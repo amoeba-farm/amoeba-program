@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn load_or_create_custody<'a>(
@@ -29,7 +30,7 @@ pub(super) fn load_or_create_custody<'a>(
         )?
         .ok_or(VaultError::InvalidAccountList.into());
     }
-    if account.owner != &solana_program::system_program::id()
+    if !crate::is_system_program(account.owner)
         || account.data_len() != 0
         || account.executable
         || !payer.is_signer
@@ -59,6 +60,7 @@ pub(super) fn load_or_create_custody<'a>(
     Ok(state)
 }
 
+#[inline(never)]
 pub(super) fn load_light_state<T: AmoebaDlmmLightState>(
     account_info: &AccountInfo,
     program_id: &Pubkey,
@@ -71,12 +73,12 @@ pub(super) fn load_light_state<T: AmoebaDlmmLightState>(
     {
         return Err(invalid_error.into());
     }
-    let data = account_info.try_borrow_data()?;
+    let data = account_info.try_data()?;
     if data.get(..8) != Some(discriminator.as_slice()) {
         return Err(invalid_error.into());
     }
     // SAFETY: the exact account-length check above covers the codec's rigid body.
-    unsafe { T::decode_fixed(&data[8..]) }.map_err(|_| invalid_error.into())
+    unsafe { T::decode_fixed_option(&data[8..]) }.ok_or_else(|| invalid_error.into())
 }
 
 pub(super) fn store_light_state<T: AmoebaDlmmLightState>(
@@ -88,7 +90,7 @@ pub(super) fn store_light_state<T: AmoebaDlmmLightState>(
     {
         return Err(VaultError::InvalidInstructionData.into());
     }
-    let mut data = account_info.try_borrow_mut_data()?;
+    let mut data = account_info.try_data_mut()?;
     if data.len() != T::ACCOUNT_LEN {
         return Err(VaultError::InvalidInstructionData.into());
     }
@@ -107,6 +109,15 @@ pub(in crate::processor) fn load_pool(
         &AMOEBA_DLMM_POOL_LIGHT_DISCRIMINATOR,
         VaultError::InvalidAmoebaDlmmPool,
     )?;
+    validate_pool_identity(program_id, pool_info.key, &pool)?;
+    Ok(pool)
+}
+
+pub(super) fn validate_pool_identity(
+    program_id: &Pubkey,
+    logical_key: &Pubkey,
+    pool: &AmoebaDlmmPoolV1,
+) -> ProgramResult {
     let (expected, bump) = derive_ameba_dlmm_pool_pda(program_id, &pool.market);
     let grid_matches = pool
         .tick_size_quote_atomic
@@ -142,7 +153,7 @@ pub(in crate::processor) fn load_pool(
                 && bin_to_page(pool.best_bid_bin_id).is_ok_and(|location| location.0 == page_index)
         }
     };
-    if *pool_info.key != expected
+    if *logical_key != expected
         || pool.bump != bump
         || !pool.has_current_layout()
         || crate::pubkey_is_default(&pool.market)
@@ -170,7 +181,7 @@ pub(in crate::processor) fn load_pool(
     {
         return Err(VaultError::InvalidAmoebaDlmmPool.into());
     }
-    Ok(pool)
+    Ok(())
 }
 
 pub(super) fn load_bin_page(
@@ -305,16 +316,16 @@ pub(super) fn assert_program_accounts(
     spl_token_program_info: &AccountInfo,
     system_program_info: &AccountInfo,
 ) -> ProgramResult {
-    if *light_token_program_info.key != light_token_program_id() {
+    if !crate::light_token_instruction::is_program(light_token_program_info.key) {
         return Err(VaultError::InvalidLightTokenProgram.into());
     }
-    if *compressed_token_authority_info.key != cpi_authority() {
+    if !crate::light_token_instruction::is_cpi_authority(compressed_token_authority_info.key) {
         return Err(VaultError::InvalidCompressedTokenAuthority.into());
     }
-    if *spl_token_program_info.key != spl_token_program_id() {
+    if !crate::token_instruction::check_id(spl_token_program_info.key) {
         return Err(VaultError::InvalidTokenProgram.into());
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     Ok(())
@@ -326,7 +337,7 @@ pub(super) fn load_user_transfer_account(
     owner: &Pubkey,
     mint: &Pubkey,
 ) -> Result<TokenAccount, ProgramError> {
-    if account_info.owner == &spl_token_program_id() {
+    if crate::token_instruction::check_id(account_info.owner) {
         validate_vault_token_account(account_info, mint, owner)
     } else {
         validate_light_associated_token_address(owner, mint, account_info)?;
@@ -386,14 +397,6 @@ pub(super) fn load_pool_vault(
         .map_err(|_| ProgramError::from(VaultError::InvalidAmoebaDlmmVault))
 }
 
-pub(super) fn ensure_custody(
-    pool: &AmoebaDlmmPoolV1,
-    option_vault: &TokenAccount,
-    quote_vault: &TokenAccount,
-) -> ProgramResult {
-    ensure_custody_with(pool, option_vault, quote_vault, None)
-}
-
 pub(super) fn ensure_custody_with(
     pool: &AmoebaDlmmPoolV1,
     option_vault: &TokenAccount,
@@ -412,65 +415,6 @@ pub(super) fn ensure_custody_with(
     Ok(())
 }
 
-#[inline(never)]
-pub(super) fn validate_pool_vault_amounts(
-    program_id: &Pubkey,
-    pool_info: &AccountInfo,
-    pool: &AmoebaDlmmPoolV1,
-    authority_info: &AccountInfo,
-    option_vault_info: &AccountInfo,
-    quote_vault_info: &AccountInfo,
-) -> Result<(u64, u64), ProgramError> {
-    validate_pool_vault_amounts_with(
-        program_id,
-        pool_info,
-        pool,
-        authority_info,
-        option_vault_info,
-        quote_vault_info,
-        None,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(super) fn validate_pool_vault_amounts_with(
-    program_id: &Pubkey,
-    pool_info: &AccountInfo,
-    pool: &AmoebaDlmmPoolV1,
-    authority_info: &AccountInfo,
-    option_vault_info: &AccountInfo,
-    quote_vault_info: &AccountInfo,
-    sidecar_info: Option<&AccountInfo>,
-) -> Result<(u64, u64), ProgramError> {
-    let (option_vault, quote_vault) = validate_pool_vaults(
-        program_id,
-        pool_info,
-        pool,
-        authority_info,
-        option_vault_info,
-        quote_vault_info,
-    )?;
-    let sidecar = crate::compressed_custody::load(
-        program_id,
-        sidecar_info,
-        crate::compressed_custody::CustodyKind::Pool,
-        pool_info.key,
-        &pool.option_mint,
-        &pool.quote_mint,
-    )?;
-    ensure_custody_with(pool, &option_vault, &quote_vault, sidecar.as_ref())?;
-    Ok((
-        option_vault
-            .amount
-            .checked_add(sidecar.as_ref().map_or(0, |state| state.option_atoms))
-            .ok_or(VaultError::ArithmeticOverflow)?,
-        quote_vault
-            .amount
-            .checked_add(sidecar.as_ref().map_or(0, |state| state.quote_atoms))
-            .ok_or(VaultError::ArithmeticOverflow)?,
-    ))
-}
-
 /// Instruction-local proof of canonical immutable vault identities.
 /// Token state and custody are freshly read on every use.
 pub(super) struct ValidatedPoolVaults {
@@ -485,7 +429,7 @@ pub(super) struct ValidatedPoolVaults {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn validate_pool_vaults_once(
+pub(super) fn validate_pool_vaults_once_with_ledger(
     program_id: &Pubkey,
     pool_info: &AccountInfo,
     pool: &AmoebaDlmmPoolV1,
@@ -493,6 +437,7 @@ pub(super) fn validate_pool_vaults_once(
     option_vault_info: &AccountInfo,
     quote_vault_info: &AccountInfo,
     sidecar_info: Option<&AccountInfo>,
+    resident_ledger: Option<&crate::compressed_custody::CompressedCustodyV1>,
 ) -> Result<(ValidatedPoolVaults, (u64, u64)), ProgramError> {
     let (authority, authority_bump) = derive_ameba_dlmm_authority_pda(program_id, pool_info.key);
     let option_vault = derive_ameba_dlmm_vault_pda(program_id, pool_info.key, &pool.option_mint).0;
@@ -507,7 +452,7 @@ pub(super) fn validate_pool_vaults_once(
         option_vault,
         quote_vault,
     };
-    let amounts = proof.read_amounts(
+    let amounts = proof.read_amounts_with_ledger(
         program_id,
         pool_info,
         pool,
@@ -515,13 +460,14 @@ pub(super) fn validate_pool_vaults_once(
         option_vault_info,
         quote_vault_info,
         sidecar_info,
+        resident_ledger,
     )?;
     Ok((proof, amounts))
 }
 
 impl ValidatedPoolVaults {
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn read_amounts(
+    pub(super) fn read_amounts_with_ledger(
         &self,
         program_id: &Pubkey,
         pool_info: &AccountInfo,
@@ -530,6 +476,7 @@ impl ValidatedPoolVaults {
         option_vault_info: &AccountInfo,
         quote_vault_info: &AccountInfo,
         sidecar_info: Option<&AccountInfo>,
+        resident_ledger: Option<&crate::compressed_custody::CompressedCustodyV1>,
     ) -> Result<(u64, u64), ProgramError> {
         if *program_id != self.program
             || *pool_info.key != self.pool
@@ -552,14 +499,18 @@ impl ValidatedPoolVaults {
         let quote =
             load_canonical_light_token_account(quote_vault_info, &self.authority, &self.quote_mint)
                 .map_err(|_| ProgramError::from(VaultError::InvalidAmoebaDlmmVault))?;
-        let sidecar = crate::compressed_custody::load(
-            program_id,
-            sidecar_info,
-            crate::compressed_custody::CustodyKind::Pool,
-            &self.pool,
-            &self.option_mint,
-            &self.quote_mint,
-        )?;
+        let sidecar = if let Some(ledger) = resident_ledger {
+            Some(ledger.clone())
+        } else {
+            crate::compressed_custody::load(
+                program_id,
+                sidecar_info,
+                crate::compressed_custody::CustodyKind::Pool,
+                &self.pool,
+                &self.option_mint,
+                &self.quote_mint,
+            )?
+        };
         ensure_custody_with(pool, &option, &quote, sidecar.as_ref())?;
         Ok((
             option
@@ -575,7 +526,7 @@ impl ValidatedPoolVaults {
 }
 
 pub(super) fn validate_new_token_vault_target(account_info: &AccountInfo) -> ProgramResult {
-    if account_info.owner != &system_program::id()
+    if !crate::is_system_program(account_info.owner)
         || account_info.executable
         || account_info.data_len() != 0
     {

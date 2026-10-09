@@ -3,6 +3,7 @@
 //! Parent rows, not aliases, carry economic weight. No participant funds or
 //! invented public ballots are created. Tag 30 remains governance-gated.
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::constants::*;
 use crate::oracle_parent_proxy::september_bootstrap::{
     SeptemberBootstrapPlan, DOMAIN, EXPIRY, MAX_PAYOUT_PER_CONTRACT_ATOMS, OCTOBER_DOMAIN,
@@ -78,7 +79,7 @@ fn save(info: &AccountInfo, value: &Receipt) -> ProgramResult {
     if info.data_len() != RECEIPT_LEN {
         return invalid();
     }
-    let mut data = info.try_borrow_mut_data()?;
+    let mut data = info.try_data_mut()?;
     let mut output = &mut data[..];
     value
         .serialize(&mut output)
@@ -104,8 +105,8 @@ fn receipt(
     {
         return invalid();
     }
-    let r = Receipt::try_from_slice(&info.try_borrow_data()?)
-        .map_err(|_| VaultError::InvalidOracleState)?;
+    let r =
+        Receipt::try_from_slice(&info.try_data()?).map_err(|_| VaultError::InvalidOracleState)?;
     if market > 3
         || *digest == [0; 32]
         || r.magic != if october { *b"OCBR" } else { *b"SCBR" }
@@ -136,7 +137,7 @@ fn validate_bootstrap_market(market: &Market, market_index: u8, october: bool) -
     } else {
         b"nand-standardized-baskets"
     };
-    let side = if market_index % 2 == 0 {
+    let side = if market_index.is_multiple_of(2) {
         OptionKind::CallSpread
     } else {
         OptionKind::PutSpread
@@ -388,6 +389,8 @@ fn process_cohort(
 /// reward schedule, coverage, product manifest, vault config, council config,
 /// three distinct current seats, System.
 #[inline(never)]
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 fn begin(
     program: &Pubkey,
     a: &[AccountInfo],
@@ -473,7 +476,7 @@ fn begin(
     }
     validate_system_program(&a[16])?;
     let now = current_unix_timestamp()?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let count = registry.parent_count() as u16;
     let (manifest_hash, recipe_hash) = hashes(&registry, a[2].key)?;
     if october {
@@ -520,7 +523,7 @@ fn begin(
         month: *a[2].key,
         plan_hash: digest,
         registry_hash: registry.digest(),
-        initial_month_hash: hashv(&[&a[2].try_borrow_data()?]).to_bytes(),
+        initial_month_hash: hashv(&[&a[2].try_data()?]).to_bytes(),
         proposer: *a[0].key,
         council_epoch: council.epoch,
         seats_hash: council.digest,
@@ -610,6 +613,8 @@ fn begin(
 /// Common 0..8 as begin; source, observations, SKU reward policy, source reward,
 /// median, journal, checkpoint, System, locator object, definition object, two links.
 #[inline(never)]
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 fn append(
     program: &Pubkey,
     a: &[AccountInfo],
@@ -650,7 +655,7 @@ fn append(
     }
     validate_system_program(&a[16])?;
     let now = current_unix_timestamp()?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let (value, timestamp) = plan.opening(market_index / 2, row)?;
     if timestamp > now {
         return invalid();
@@ -666,7 +671,7 @@ fn append(
         &[a[2].key.as_ref(), &source.source_id],
     )?;
     source.is_initialized = true;
-    let before = Box::new(source.clone());
+    let before = Box::new(source);
     source.status = OracleSourceStatus::Active;
     source.opening_submitted = true;
     source.baseline_state = value;
@@ -919,7 +924,7 @@ fn finish(
         return invalid();
     }
     let now = current_unix_timestamp()?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let game = now.checked_add(1).ok_or(VaultError::ArithmeticOverflow)?;
     if game >= expiry(october) {
         return invalid();
@@ -957,6 +962,7 @@ fn finish(
 }
 
 /// Pending October months are accessible only by their bootstrap or authenticated index construction.
+#[cfg(not(feature = "mainnet-v3"))]
 pub(super) fn reject_pending_october(
     program: &Pubkey,
     accounts: &[AccountInfo],
@@ -965,7 +971,7 @@ pub(super) fn reject_pending_october(
 ) -> ProgramResult {
     for info in accounts {
         if info.owner == program && info.data_len() == OracleMonthState::LEN {
-            let data = info.try_borrow_data()?;
+            let data = info.try_data()?;
             if data[2..5] == OracleMonthState::ACCOUNT_DISCRIMINATOR {
                 let month =
                     crate::fixed_codec::decode_oracle_month(&data, VaultError::InvalidOracleState)?;
@@ -994,6 +1000,7 @@ pub(super) fn reject_pending_october(
     Ok(())
 }
 
+#[cfg(not(feature = "mainnet-v3"))]
 pub(super) fn require_october_membership_receipt(
     program: &Pubkey,
     market: &Market,
@@ -1008,8 +1015,8 @@ pub(super) fn require_october_membership_receipt(
         return invalid();
     }
     validate_launch_market(market)?;
-    let raw = Receipt::try_from_slice(&info.try_borrow_data()?)
-        .map_err(|_| VaultError::InvalidOracleState)?;
+    let raw =
+        Receipt::try_from_slice(&info.try_data()?).map_err(|_| VaultError::InvalidOracleState)?;
     let r = receipt(
         program,
         info,

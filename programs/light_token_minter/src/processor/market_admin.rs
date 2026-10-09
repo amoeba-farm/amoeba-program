@@ -16,7 +16,7 @@ pub(super) fn process_init_market_v2(
     if !admin_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     let config = load_canonical_vault_config(program_id, config_info)?;
@@ -81,16 +81,16 @@ pub(super) fn process_create_market_contract_mint_v3(
     if !payer_info.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if *light_token_program_info.key != light_token_program_id() {
+    if !crate::light_token_instruction::is_program(light_token_program_info.key) {
         return Err(VaultError::InvalidLightTokenProgram.into());
     }
-    if *cpi_authority_info.key != cpi_authority() {
+    if !crate::light_token_instruction::is_cpi_authority(cpi_authority_info.key) {
         return Err(VaultError::InvalidCompressedTokenAuthority.into());
     }
-    if *token_program_info.key != spl_token_program_id() {
+    if !crate::token_instruction::check_id(token_program_info.key) {
         return Err(VaultError::InvalidTokenProgram.into());
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
 
@@ -110,7 +110,7 @@ pub(super) fn process_create_market_contract_mint_v3(
     if *mint_info.key != expected_mint {
         return Err(VaultError::InvalidPda.into());
     }
-    if mint_info.owner == &spl_token_program_id() {
+    if crate::token_instruction::check_id(mint_info.owner) {
         return Err(VaultError::AlreadyInitialized.into());
     }
     create_program_account(
@@ -138,7 +138,7 @@ pub(super) fn process_create_market_contract_mint_v3(
     if *spl_interface_info.key != expected_spl_interface {
         return Err(VaultError::InvalidSplInterfaceAccount.into());
     }
-    if spl_interface_info.owner != &system_program::id()
+    if !crate::is_system_program(spl_interface_info.owner)
         || spl_interface_info.executable
         || spl_interface_info.data_len() != 0
     {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::state::{OptionKind, SettlementStyle};
 
 #[derive(BorshSerialize, Clone, Debug, Eq, PartialEq)]
 pub struct InitMarketV2Params {
@@ -12,6 +13,22 @@ crate::fixed_codec::fixed_instruction_deserialize!(InitMarketV2Params, 171, {
     market_id: [u8; 32],
     instrument: InstrumentDefinition,
     params: MarketParameters,
+    collateral_mint: Pubkey,
+}, flat {
+    market_id: [u8; 32],
+    instrument.underlying_id: [u8; 32],
+    instrument.expiry_ts: u64,
+    instrument.strike_price: u64,
+    instrument.cap_price: u64,
+    instrument.contract_size: u64,
+    instrument.max_payout_per_contract: u64,
+    instrument.kind: OptionKind,
+    instrument.settlement: SettlementStyle,
+    params.tick_size: u64,
+    params.lot_size: u64,
+    params.min_order_qty: u64,
+    params.min_cancel_slots: u64,
+    params.max_fills_per_instruction: u8,
     collateral_mint: Pubkey,
 });
 

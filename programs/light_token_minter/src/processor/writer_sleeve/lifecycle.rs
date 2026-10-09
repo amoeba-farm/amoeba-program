@@ -50,7 +50,7 @@ pub(in crate::processor) fn process_open_funding(
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
     sleeve.status = WriterSleeveStatus::Funding;
-    sleeve.last_updated_slot = Clock::get()?.slot;
+    sleeve.last_updated_slot = crate::compact_error::slot()?;
     store_state(sleeve_info, &sleeve)
 }
 
@@ -110,7 +110,7 @@ pub(in crate::processor) fn process_activate_sleeve(
     // Retain its canonical future address in the ABI without creating a placeholder.
     if *settlement_source_info.key
         != crate::state::derive_oracle_settlement_source_manifest_pda(program_id, month_info.key).0
-        || settlement_source_info.owner != &system_program::id()
+        || !crate::is_system_program(settlement_source_info.owner)
         || !settlement_source_info.data_is_empty()
         || settlement_source_info.executable
         || settlement_source_info.is_signer
@@ -177,7 +177,7 @@ pub(in crate::processor) fn process_activate_sleeve(
     {
         return Err(VaultError::InvalidWriterLifecycle.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     group.product_manifest_root = coverage.required_sku_root;
     group.coverage_manifest_hash = writer_coverage_manifest_hash(&coverage);
     group.recipe_hash = recipe.recipe_hash;

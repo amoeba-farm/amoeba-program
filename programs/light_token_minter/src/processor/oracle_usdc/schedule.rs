@@ -83,7 +83,7 @@ pub(in crate::processor) fn process_begin_oracle_usdc_reward_schedule(
             &[bump],
         ],
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let schedule = OracleUsdcRewardSchedule {
         is_initialized: true,
         bump,
@@ -177,7 +177,7 @@ pub(in crate::processor) fn process_add_oracle_usdc_sku_budget(
             &[bump],
         ],
     )?;
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     let sku = OracleUsdcSkuPool {
         is_initialized: true,
         bump,
@@ -269,7 +269,7 @@ pub(in crate::processor) fn process_finalize_oracle_usdc_reward_schedule(
     if reward_token.amount < required_custody {
         return Err(VaultError::OracleUsdcRewardScheduleUnderfunded.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     vault.total_reserved = required_custody;
     vault.last_updated_slot = slot;
     schedule.phase = OracleUsdcRewardSchedulePhase::Funded;

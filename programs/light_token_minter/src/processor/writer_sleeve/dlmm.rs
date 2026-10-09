@@ -1,3 +1,4 @@
+pub(in crate::processor) use super::accounts::WriterPolicyContext;
 use super::*;
 use crate::state::{
     derive_writer_dlmm_policy_pda, derive_writer_dlmm_position_pda, WriterDlmmPolicyV1,
@@ -8,14 +9,17 @@ use crate::writer_dlmm_instruction::ManageWriterDlmmV1Params;
 
 mod capacity;
 mod liquidity;
+mod resident;
 mod swap;
 pub(in crate::processor) use capacity::{
     process_enable_full_collateral_capacity, process_enable_shared_reserve,
 };
 pub(in crate::processor) use liquidity::{process_initialize_position, process_liquidity_action};
+pub(in crate::processor) use resident::resolve_position_with;
 pub(in crate::processor) use swap::{
-    finish_swap_with_cash, load_swap_state_with_cash, observe_writer_lane, WriterLaneAccounts,
-    WriterSwapState,
+    finish_swap_with_cash, load_swap_state_with_cash, observe_writer_lane,
+    project_swap_effects_cached, swap_state_from_authenticated_cached, writer_lane_reconciled,
+    WriterLane, WriterLaneAccounts, WriterSwapState,
 };
 
 #[inline(never)]
@@ -229,7 +233,8 @@ pub(in crate::processor) fn load_policy(
 /// Selector 11, AmendPolicy. Accounts: management authority (s, w), sleeve,
 /// group, book, policy snapshot, writer DLMM policy (w), the sleeve's Earn
 /// Fund slot (w: the shared slot loader requires it; never written), the
-/// Earn Fund, the fund's allocator (s).
+/// Earn Fund, the fund's allocator (s), the sleeve's canonical shared strip
+/// lane (w when it exists; the empty address otherwise).
 ///
 /// The management authority, co-signed by the fund's allocator (so a stolen
 /// management key alone moves nothing), rewrites a sealed policy's operational terms
@@ -247,7 +252,8 @@ pub(in crate::processor) fn load_policy(
 /// below the month's spend or an out-of-bounds term is refused here instead
 /// of making the policy unloadable everywhere (including settlement).
 /// Counters, custody totals, identities, `sealed` and the risk snapshot bound
-/// into receipts are untouched.
+/// into receipts are untouched. An existing shared strip lane is rebound to
+/// the amended chain; its rows are unchanged.
 #[inline(never)]
 pub(in crate::processor) fn process_amend_policy(
     program_id: &Pubkey,
@@ -255,7 +261,7 @@ pub(in crate::processor) fn process_amend_policy(
     amend: crate::writer_dlmm_instruction::AmendWriterDlmmPolicyV1Params,
 ) -> ProgramResult {
     let header = &amend.header;
-    let [authority, sleeve_info, group_info, book_info, snapshot_info, policy_info, slot_info, fund_info, allocator] =
+    let [authority, sleeve_info, group_info, book_info, snapshot_info, policy_info, slot_info, fund_info, allocator, lane_info] =
         accounts
     else {
         return Err(VaultError::InvalidAccountList.into());
@@ -317,8 +323,18 @@ pub(in crate::processor) fn process_amend_policy(
         &context.snapshot,
         &context.book,
         true,
+    )?;
+    // Without this the shared lane would stay bound to the old hash, and no capped-futures
+    // order on the sleeve could execute again.
+    super::capped_strip::rebind_to_policy(
+        program_id,
+        lane_info,
+        sleeve_info.key,
+        group_info.key,
+        book_info.key,
+        &header.expected_policy_hash,
+        context.book.series_count,
     )
-    .map(drop)
 }
 
 /// Funding reads the already-sealed create-once record without expanding the
@@ -367,14 +383,17 @@ pub(in crate::processor) fn load_position(
     pool: &Pubkey,
     sleeve: &Pubkey,
     policy: &Pubkey,
-    market: &Pubkey,
+    market: &AccountInfo,
     series_index: u8,
 ) -> Result<Box<WriterDlmmPositionV1>, ProgramError> {
-    let value = Box::new(load_exact_zero_padded_state::<WriterDlmmPositionV1>(
+    let external = load_exact_zero_padded_state::<WriterDlmmPositionV1>(
         info,
         program_id,
         WriterDlmmPositionV1::LEN,
         VaultError::InvalidWriterSleeve,
+    )?;
+    let value = Box::new(resident::resolve_position(
+        program_id, info, market, external,
     )?);
     let (address, bump) = derive_writer_dlmm_position_pda(program_id, pool, sleeve);
     if info.executable
@@ -385,7 +404,7 @@ pub(in crate::processor) fn load_position(
         || value.pool != *pool
         || value.sleeve != *sleeve
         || value.policy != *policy
-        || value.market != *market
+        || value.market != *market.key
         || value.series_index != series_index
     {
         return Err(VaultError::InvalidWriterSleeve.into());
@@ -496,7 +515,7 @@ pub(in crate::processor) fn activation_sides(
         accounts[9].key,
         accounts[6].key,
         accounts[13].key,
-        accounts[2].key,
+        &accounts[2],
         index as u8,
     )?;
     if position.option_inventory_atoms != policy.series_pool_inventory_atoms[index]
@@ -582,7 +601,7 @@ pub(in crate::processor) fn process_policy_action(
     let snapshot_info = &accounts[6];
     let policy_info = &accounts[7];
     let system_info = &accounts[8];
-    if *system_info.key != system_program::id() {
+    if !crate::is_system_program(system_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
     let _config = load_canonical_vault_config(program_id, config_info)?;
@@ -602,7 +621,7 @@ pub(in crate::processor) fn process_policy_action(
     {
         return Err(VaultError::InvalidWriterPolicySnapshot.into());
     }
-    let slot = Clock::get()?.slot;
+    let slot = crate::compact_error::slot()?;
     match action {
         ManageWriterDlmmV1Params::BeginPolicy(params) => {
             if registry.policy_authority != *actor.key

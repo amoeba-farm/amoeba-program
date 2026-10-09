@@ -9,38 +9,43 @@ pub(super) fn process(
     a: &[AccountInfo],
     sequence: u64,
     count: u8,
+    admin_refund: bool,
 ) -> ProgramResult {
     if !(1..=3).contains(&count) || a.len() != FIXED + usize::from(count) {
         return Err(VaultError::InvalidAccountList.into());
     }
+    let admin_is_owner = admin_refund && a[0].key == a[1].key;
     for (i, info) in a.iter().enumerate() {
-        let writable =
-            matches!(i, 0 | 3 | 4 | 5 | 6 | 7 | 10 | 11 | 12 | 14 | 15 | 25) || i >= FIXED;
-        if info.is_signer != (i == 0)
+        let owner_alias = i == 1 && admin_is_owner;
+        let writable = matches!(i, 0 | 3 | 4 | 5 | 6 | 7 | 10 | 11 | 12 | 14 | 15 | 25)
+            || i >= FIXED
+            || owner_alias;
+        if info.is_signer != (i == 0 || owner_alias)
             || info.is_writable != writable
-            || a[..i].iter().any(|prior| prior.key == info.key)
+            || !owner_alias && a[..i].iter().any(|prior| prior.key == info.key)
         {
             return Err(VaultError::InvalidAccountList.into());
         }
     }
     if a[1].executable
         || crate::pubkey_is_default(a[1].key)
-        || *a[17].key != light_token_program_id()
-        || *a[18].key != cpi_authority()
-        || *a[19].key != spl_token_program_id()
-        || *a[20].key != system_program::id()
-        || *a[21].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *a[22].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *a[23].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *a[24].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_program(a[17].key)
+        || !crate::light_token_instruction::is_cpi_authority(a[18].key)
+        || !crate::token_instruction::check_id(a[19].key)
+        || !crate::is_system_program(a[20].key)
+        || !crate::light_token_instruction::is_light_system_program(a[21].key)
+        || !crate::light_token_instruction::is_registered_program(a[22].key)
+        || !crate::light_token_instruction::is_compression_authority(a[23].key)
+        || !crate::light_token_instruction::is_compression_program(a[24].key)
     {
         return Err(VaultError::InvalidAccountList.into());
     }
     let config = load_canonical_vault_config(program, &a[2])?;
-    let pool = load_pool(program, &a[3])?;
-    if current_unix_timestamp()? < pool.expiry_ts
+    if admin_refund && config.admin != *a[0].key {
+        return Err(VaultError::Unauthorized.into());
+    }
+    let pool = load_pool_with_accounts(program, &a[3], a)?;
+    if !admin_refund && current_unix_timestamp()? < pool.expiry_ts
         || pool.market != *a[7].key
         || pool.option_mint != *a[8].key
         || pool.quote_mint != *a[9].key
@@ -57,12 +62,13 @@ pub(super) fn process(
     {
         return Err(VaultError::InvalidPda.into());
     }
-    let mut book = load_book(program, &a[4], &a[3], &pool)?;
+    let mut book = load_book_with_accounts(program, &a[4], &a[3], &pool, a)?;
     // The storage engine authenticates the unchanged DORv3 bytes and neighbors.
     // This internal view supplies only its book/pool/payer/system/record roles;
     // it never goes through a swap or owner-recovery privilege validator.
     let mut storage_accounts = vec![a[0].clone(); ORDER_SWAP_FIXED_ACCOUNTS];
     storage_accounts[7] = a[3].clone();
+    storage_accounts[2] = a[7].clone();
     storage_accounts[20] = a[20].clone();
     storage_accounts[31] = a[4].clone();
     storage_accounts.extend_from_slice(&a[FIXED..]);
@@ -80,9 +86,17 @@ pub(super) fn process(
     }
     let option_before = custody(&a[5], a[4].key, a[8].key)?;
     let quote_before = custody(&a[6], a[4].key, a[9].key)?;
-    if option_before < book.header.option_obligations
-        || quote_before < book.header.quote_obligations
-    {
+    let resident = resident_for_pool(program, &a[3], a)?;
+    let cold = resident
+        .as_ref()
+        .map(|(_, s)| book_ledger(program, a[4].key, &pool, s.book_option, s.book_quote));
+    if !crate::compressed_custody::backs(
+        cold.as_ref(),
+        option_before,
+        quote_before,
+        book.header.option_obligations,
+        book.header.quote_obligations,
+    ) {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
     let mut balance = book.orders[index]
@@ -98,7 +112,11 @@ pub(super) fn process(
         &bump,
     ];
     if options != 0 {
-        crate::processor::writer_sleeve::settle_classic_order(program, a, options, &seeds)?;
+        if admin_refund {
+            compress(a, 5, 8, 10, 4, 1, options, &seeds)?;
+        } else {
+            crate::processor::writer_sleeve::settle_classic_order(program, a, options, &seeds)?;
+        }
     }
     compress(a, 6, 9, 11, 4, 1, quote, &seeds)?;
     if option_before.checked_sub(custody(&a[5], a[4].key, a[8].key)?) != Some(options)
@@ -109,15 +127,30 @@ pub(super) fn process(
     book.orders[index].set_balance(balance);
     book.recompute_obligations(pool.tick_size_quote_atomic)
         .map_err(order_error)?;
-    if custody(&a[5], a[4].key, a[8].key)? < book.header.option_obligations
-        || custody(&a[6], a[4].key, a[9].key)? < book.header.quote_obligations
-    {
+    if !crate::compressed_custody::backs(
+        cold.as_ref(),
+        custody(&a[5], a[4].key, a[8].key)?,
+        custody(&a[6], a[4].key, a[9].key)?,
+        book.header.option_obligations,
+        book.header.quote_obligations,
+    ) {
         return Err(VaultError::AmoebaDlmmInvariantViolation.into());
     }
     // Empty records remain replay-safe, with rent recovery still owner signed.
-    persist_book(program, &storage_accounts, &mut book)
+    storage::persist_with_payer_staged(program, &storage_accounts, &mut book, &a[0])?;
+    if !commit_resident(program, &a[3], a, |resident| {
+        merge_resident_book(program, resident, &storage_accounts, &book)?;
+        resident.book_hot_option = custody(&a[5], a[4].key, a[8].key)?;
+        resident.book_hot_quote = custody(&a[6], a[4].key, a[9].key)?;
+        Ok(())
+    })? {
+        store_state(&a[4], &book)?;
+    }
+    Ok(())
 }
 
+// Keep the existing accounting interface and its explicit inputs.
+#[allow(clippy::too_many_arguments)]
 pub(in crate::processor) fn compress(
     a: &[AccountInfo],
     source: usize,
@@ -132,7 +165,7 @@ pub(in crate::processor) fn compress(
         return Ok(());
     }
     let balance = || {
-        if a[source].owner == &spl_token_program_id() {
+        if crate::token_instruction::check_id(a[source].owner) {
             validate_vault_token_account(&a[source], a[mint].key, a[authority].key)
         } else {
             load_canonical_light_token_account(&a[source], a[authority].key, a[mint].key)

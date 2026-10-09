@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn invoke_light_token_account_transfer<'a>(
@@ -48,10 +49,10 @@ pub(super) fn invoke_light_token_account_transfer_with_signer_seeds<'a>(
     system_program_info: &AccountInfo<'a>,
     signer_seeds: &[&[&[u8]]],
 ) -> ProgramResult {
-    if *light_token_program_info.key != light_token_program_id() {
+    if !crate::light_token_instruction::is_program(light_token_program_info.key) {
         return Err(VaultError::InvalidLightTokenProgram.into());
     }
-    if *compressed_token_authority_info.key != cpi_authority() {
+    if !crate::light_token_instruction::is_cpi_authority(compressed_token_authority_info.key) {
         return Err(VaultError::InvalidCompressedTokenAuthority.into());
     }
     let (expected_spl_interface_pda, spl_interface_bump) =
@@ -177,7 +178,7 @@ pub(super) fn invoke_create_or_allocate_account<'a>(
     size: usize,
     signer_seeds: &[&[u8]],
 ) -> ProgramResult {
-    let rent = Rent::get()?;
+    let rent = crate::compact_error::rent()?;
     let rent_lamports = rent.minimum_balance(size);
     let existing_lamports = target_info.lamports();
     if existing_lamports == 0 {
@@ -217,10 +218,10 @@ pub(super) fn create_program_account<'a>(
     if target_info.owner == owner {
         return Ok(());
     }
-    if *system_program_info.key != system_program::id() {
+    if !crate::is_system_program(system_program_info.key) {
         return Err(VaultError::InvalidSystemProgram.into());
     }
-    if target_info.owner != &system_program::id()
+    if !crate::is_system_program(target_info.owner)
         || target_info.executable
         || target_info.data_len() != 0
     {
@@ -257,8 +258,8 @@ pub(super) fn close_program_account(
         .lamports()
         .checked_add(target_lamports)
         .ok_or(VaultError::ArithmeticOverflow)?;
-    **recipient_info.try_borrow_mut_lamports()? = recipient_lamports;
-    **target_info.try_borrow_mut_lamports()? = 0;
+    **recipient_info.try_lamports_mut()? = recipient_lamports;
+    **target_info.try_lamports_mut()? = 0;
     target_info.resize(0)?;
     target_info.assign(&system_program::id());
     Ok(())
@@ -272,7 +273,7 @@ pub(super) fn validate_create_only_program_account_target(
         return Err(VaultError::AlreadyInitialized.into());
     }
     if !target_info.is_writable
-        || target_info.owner != &system_program::id()
+        || !crate::is_system_program(target_info.owner)
         || target_info.executable
         || target_info.data_len() != 0
     {
@@ -286,7 +287,7 @@ pub(super) fn validate_canonical_system_zero_pda_proof(
     account_info: &AccountInfo,
 ) -> ProgramResult {
     if account_info.key != expected
-        || account_info.owner != &system_program::id()
+        || !crate::is_system_program(account_info.owner)
         || account_info.executable
         || account_info.data_len() != 0
     {
@@ -502,6 +503,12 @@ pub(super) fn validate_settlement_signer_registry_initialization_targets(
 /// construction.
 pub(super) trait CanonicalStateLength {
     const CANONICAL_LEN: usize;
+    const ALLOWS_MARKET_ROUTER: bool = false;
+}
+
+impl CanonicalStateLength for Market {
+    const CANONICAL_LEN: usize = Market::LEN;
+    const ALLOWS_MARKET_ROUTER: bool = true;
 }
 
 macro_rules! impl_canonical_state_length {
@@ -515,7 +522,6 @@ macro_rules! impl_canonical_state_length {
 }
 
 impl_canonical_state_length!(
-    Market,
     OracleSourceChallenge,
     OracleSourceState,
     OracleSupportPosition,
@@ -538,6 +544,7 @@ pub(super) fn validate_state_account_allocation(
     Ok(())
 }
 
+#[inline(never)]
 pub(super) fn load_state<T>(
     account_info: &AccountInfo,
     program_id: &Pubkey,
@@ -545,17 +552,29 @@ pub(super) fn load_state<T>(
 where
     T: crate::fixed_codec::FixedStateDecode + CanonicalStateLength,
 {
+    if T::ALLOWS_MARKET_ROUTER {
+        if account_info.owner != program_id {
+            return Err(VaultError::InvalidConfigAccount.into());
+        }
+        let data = account_info.try_data()?;
+        let prefix = crate::market_router_account::prefix(&data)
+            .map_err(|_| VaultError::InvalidConfigAccount)?;
+        // SAFETY: only Market opts in, and its exact canonical prefix length was checked.
+        return unsafe { T::decode_fixed_option(prefix) }
+            .ok_or_else(|| VaultError::InvalidConfigAccount.into());
+    }
     validate_state_account_allocation(
         account_info,
         program_id,
         T::CANONICAL_LEN,
         VaultError::InvalidConfigAccount,
     )?;
-    let data = account_info.try_borrow_data()?;
+    let data = account_info.try_data()?;
     // SAFETY: The exact canonical allocation was checked above.
-    unsafe { T::decode_fixed(&data) }.map_err(|_| VaultError::InvalidConfigAccount.into())
+    unsafe { T::decode_fixed_option(&data) }.ok_or_else(|| VaultError::InvalidConfigAccount.into())
 }
 
+#[inline(never)]
 pub(super) fn load_exact_zero_padded_state<T>(
     account_info: &AccountInfo,
     program_id: &Pubkey,
@@ -566,9 +585,9 @@ where
     T: crate::fixed_codec::FixedStateDecode,
 {
     validate_state_account_allocation(account_info, program_id, expected_len, invalid_error)?;
-    let data = account_info.try_borrow_data()?;
+    let data = account_info.try_data()?;
     // SAFETY: The exact requested allocation was checked above.
-    unsafe { T::decode_fixed(&data) }.map_err(|_| invalid_error.into())
+    unsafe { T::decode_fixed_option(&data) }.ok_or_else(|| invalid_error.into())
 }
 
 pub(super) fn load_valid_oracle_opening_challenge(
@@ -718,7 +737,7 @@ pub(super) fn store_oracle_update_claim(
     if account_info.data_len() != OracleUpdateClaimV2::LEN {
         return Err(VaultError::InvalidOracleUpdateAccount.into());
     }
-    let data = account_info.try_borrow_data()?;
+    let data = account_info.try_data()?;
     // SAFETY: The exact claim allocation was checked above.
     let mut current = unsafe {
         <OracleUpdateClaimV2 as crate::fixed_codec::FixedStateDecode>::decode_fixed(&data)

@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::instruction::IndexOracleRecipeSourceV1Params;
 use crate::state::{
     derive_oracle_bucket_source_index_pda, derive_oracle_recipe_source_index_pda,
@@ -23,7 +24,7 @@ pub(super) fn validate_cleanup_bucket_index(
     if target.data_len() != OracleBucketSourceIndex::LEN {
         return Err(VaultError::InvalidOracleWeightManifest.into());
     }
-    let data = target.try_borrow_data()?;
+    let data = target.try_data()?;
     let bucket_id = data[70..102]
         .try_into()
         .map_err(|_| VaultError::InvalidOracleWeightManifest)?;
@@ -41,7 +42,7 @@ pub(super) fn validate_cleanup_member_page(
     if target.data_len() != PAGE_LEN {
         return Err(VaultError::InvalidOracleWeightManifest.into());
     }
-    let data = target.try_borrow_data()?;
+    let data = target.try_data()?;
     let page = u16::from_le_bytes([data[38], data[39]]);
     drop(data);
     if usize::from(page)
@@ -82,14 +83,14 @@ fn load_member_page(
     {
         return Err(VaultError::InvalidOracleWeightManifest.into());
     }
-    let data = info.try_borrow_data()?;
+    let data = info.try_data()?;
     let count = usize::from(data[40]);
     if data[..6] != [1, bump, b'O', b'M', b'P', 1]
         || data[6..38] != bucket.to_bytes()
         || data[38..40] != page.to_le_bytes()
         || count == 0
         || count > crate::constants::ORACLE_BUCKET_MEMBERS_PER_PAGE
-        || data[41 + count * 32..].iter().any(|b| *b != 0)
+        || !crate::bytes_are_zero(&data[41 + count * 32..])
     {
         return Err(VaultError::InvalidOracleWeightManifest.into());
     }
@@ -139,7 +140,7 @@ fn append_member_page<'a>(
             return Err(VaultError::InvalidOracleWeightOrder.into());
         }
     }
-    let mut data = info.try_borrow_mut_data()?;
+    let mut data = info.try_data_mut()?;
     data[..6].copy_from_slice(&[1, bump, b'O', b'M', b'P', 1]);
     data[6..38].copy_from_slice(bucket.as_ref());
     data[38..40].copy_from_slice(&page.to_le_bytes());
@@ -315,6 +316,11 @@ pub(super) fn process_index_oracle_recipe_source(
     accounts: &[AccountInfo],
     params: IndexOracleRecipeSourceV1Params,
 ) -> ProgramResult {
+    #[cfg(feature = "mainnet-v3")]
+    if accounts.len() != 8 {
+        return Err(VaultError::InvalidAccountList.into());
+    }
+    #[cfg(not(feature = "mainnet-v3"))]
     if !matches!(accounts.len(), 8 | 9) {
         return Err(VaultError::InvalidAccountList.into());
     }
@@ -331,17 +337,19 @@ pub(super) fn process_index_oracle_recipe_source(
     let bucket_info = &accounts[5];
     let system_info = &accounts[6];
     validate_system_program(system_info)?;
-    let (market, month) = load_valid_market_and_oracle_month(program_id, &accounts[1], month_info)?;
+    let (_market, month) =
+        load_valid_market_and_oracle_month(program_id, &accounts[1], month_info)?;
     if month.phase == OraclePhase::Closed {
         return Err(VaultError::InvalidOraclePhase.into());
     }
+    #[cfg(not(feature = "mainnet-v3"))]
     if month.schedule_version == 5 {
         if accounts.len() != 9 {
             return Err(VaultError::InvalidAccountList.into());
         }
         super::september_bootstrap::require_october_membership_receipt(
             program_id,
-            &market,
+            &_market,
             month_info.key,
             &month,
             &accounts[8],

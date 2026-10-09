@@ -1,4 +1,5 @@
 use super::*;
+use crate::compact_error::CompactAccountInfo;
 use crate::{
     ameba_dlmm_instruction::{
         CompressedSwapLeafWitnessV1, SwapCollectiveCompressedExactInV1Params,
@@ -19,13 +20,14 @@ pub(super) fn existing_sidecar<'a, 'info>(
     if info.owner == program {
         return Ok(Some(info));
     }
-    if info.owner == &system_program::id() && info.data_len() == 0 && !info.executable {
+    if crate::is_system_program(info.owner) && info.data_len() == 0 && !info.executable {
         return Ok(None);
     }
     Err(VaultError::InvalidAccountList.into())
 }
 
 pub(super) struct CompressedSwapAccounts<'a, 'info> {
+    pub(super) after_pool: core::cell::Cell<Option<(u64, u64)>>,
     pub(super) trading_owner: Option<Pubkey>,
     pub(super) base: &'a [AccountInfo<'info>],
     pub(super) pool_custody: &'a AccountInfo<'info>,
@@ -111,18 +113,36 @@ pub(super) fn parse<'a, 'info>(
         program, a[0].key, a[9].key,
     )
     .0;
+    let input_scope_valid = *tail[2].key == scope
+        || (tail[2].owner == program
+            && !tail[2].executable
+            && <crate::multi_order::Order as borsh::BorshDeserialize>::try_from_slice(
+                &tail[2].try_data()?,
+            )
+            .ok()
+            .and_then(|order| {
+                order.settlement_scope(
+                    program,
+                    tail[2].key,
+                    a[0].key,
+                    a[2].key,
+                    a[9].key,
+                    params.user_input_amount,
+                )
+            })
+            .is_some());
     if *tail[0].key != derive_compressed_custody(program, CustodyKind::Pool, a[7].key).0
         || *tail[1].key != derive_compressed_custody(program, CustodyKind::WriterCash, a[27].key).0
         || !tail[0].is_writable
         || !tail[1].is_writable
         || tail[0].is_signer
         || tail[1].is_signer
-        || (params.user_input_has_delegate && *tail[2].key == system_program::id())
-        || (!params.user_input_has_delegate && *tail[2].key != system_program::id())
+        || (params.user_input_has_delegate && crate::is_system_program(tail[2].key))
+        || (!params.user_input_has_delegate && !crate::is_system_program(tail[2].key))
         || (params.user_input_has_delegate
             && (params.swap.direction
                 != crate::ameba_dlmm_instruction::AmoebaDlmmSwapDirection::OptionForQuote
-                || *tail[2].key != scope))
+                || !input_scope_valid))
         || tail[2].is_writable
         || tail[2].is_signer
         || *a[23].key != scope
@@ -130,18 +150,16 @@ pub(super) fn parse<'a, 'info>(
             != crate::compressed_option_settlement::retirement_owner(program, a[4].key, a[2].key)
         || tail[3].is_writable
         || tail[3].is_signer
-        || *tail[4].key != Pubkey::new_from_array(light_sdk::constants::LIGHT_SYSTEM_PROGRAM_ID)
-        || *tail[5].key != Pubkey::new_from_array(light_sdk::constants::REGISTERED_PROGRAM_PDA)
-        || *tail[6].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_AUTHORITY_PDA)
-        || *tail[7].key
-            != Pubkey::new_from_array(light_sdk::constants::ACCOUNT_COMPRESSION_PROGRAM_ID)
+        || !crate::light_token_instruction::is_light_system_program(tail[4].key)
+        || !crate::light_token_instruction::is_registered_program(tail[5].key)
+        || !crate::light_token_instruction::is_compression_authority(tail[6].key)
+        || !crate::light_token_instruction::is_compression_program(tail[7].key)
         || tail[4..8]
             .iter()
             .any(|info| info.is_writable || info.is_signer)
         || !tail[8].is_writable
         || !tail[8].is_signer
-        || *tail[8].key == Pubkey::default()
+        || crate::pubkey_is_default(tail[8].key)
         || merkle
             .iter()
             .any(|info| !info.is_writable || info.is_signer || info.executable)
@@ -154,6 +172,7 @@ pub(super) fn parse<'a, 'info>(
         return Err(VaultError::InvalidAccountList.into());
     }
     Ok(CompressedSwapAccounts {
+        after_pool: core::cell::Cell::new(None),
         trading_owner: None,
         base,
         pool_custody: &tail[0],
@@ -234,14 +253,25 @@ pub(super) fn settle<'a>(
     } else {
         &a[18]
     };
-    let pool_before = crate::compressed_custody::load(
-        program,
-        existing_sidecar(program, context.pool_custody)?,
-        CustodyKind::Pool,
-        pool_info.key,
-        &pool.option_mint,
-        &pool.quote_mint,
-    )?
+    let resident = resident_for_pool(program, pool_info, a)?;
+    let pool_before = if let Some((_, state)) = &resident {
+        Some(pool_ledger(
+            program,
+            pool_info.key,
+            pool,
+            state.pool_option,
+            state.pool_quote,
+        ))
+    } else {
+        crate::compressed_custody::load(
+            program,
+            existing_sidecar(program, context.pool_custody)?,
+            CustodyKind::Pool,
+            pool_info.key,
+            &pool.option_mint,
+            &pool.quote_mint,
+        )?
+    }
     .unwrap_or_else(|| {
         let (_, bump) = derive_compressed_custody(program, CustodyKind::Pool, pool_info.key);
         crate::compressed_custody::CompressedCustodyV1::new(
@@ -339,10 +369,38 @@ pub(super) fn settle<'a>(
     } else {
         params.sponsor_fee_atoms - sponsor_from_compressed
     };
-    let use_pool_option = pool_before.option_atoms > 0
+    let book_cold = resident
+        .as_ref()
+        .map(|(_, s)| (s.book_option, s.book_quote))
+        .unwrap_or((0, 0));
+    let aggregate_before = (
+        pool_before
+            .option_atoms
+            .checked_add(book_cold.0)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+        pool_before
+            .quote_atoms
+            .checked_add(book_cold.1)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+    );
+    let aggregate_after = (
+        split
+            .pool_option_after
+            .checked_add(book_cold.0)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+        split
+            .pool_quote_after
+            .checked_add(book_cold.1)
+            .ok_or(VaultError::ArithmeticOverflow)?,
+    );
+    let custody_info = resident
+        .as_ref()
+        .map(|(market, _)| *market)
+        .unwrap_or(context.pool_custody);
+    let use_pool_option = aggregate_before.0 > 0
         && (direction == AmoebaDlmmSwapDirection::OptionForQuote
             || split.output_from_compressed_pool > 0);
-    let use_pool_quote = pool_before.quote_atoms > 0
+    let use_pool_quote = aggregate_before.1 > 0
         && (direction == AmoebaDlmmSwapDirection::QuoteForOption
             || split.output_from_compressed_pool > 0);
     let use_writer_quote = writer_premium > 0 && cash_before.quote_atoms > 0;
@@ -352,8 +410,9 @@ pub(super) fn settle<'a>(
     {
         return Err(VaultError::InvalidAccountList.into());
     }
-    if split.pool_option_after != pool_before.option_atoms
-        || split.pool_quote_after != pool_before.quote_atoms
+    if resident.is_none()
+        && (split.pool_option_after != pool_before.option_atoms
+            || split.pool_quote_after != pool_before.quote_atoms)
     {
         load_or_create_custody(
             program,
@@ -416,22 +475,10 @@ pub(super) fn settle<'a>(
         params.user_input_has_delegate.then_some(user_delegate),
     ));
     if let Some(witness) = params.pool_option_input {
-        inputs.push(input(
-            witness,
-            pool_owner,
-            pool_before.option_atoms,
-            option,
-            None,
-        ));
+        inputs.push(input(witness, pool_owner, aggregate_before.0, option, None));
     }
     if let Some(witness) = params.pool_quote_input {
-        inputs.push(input(
-            witness,
-            pool_owner,
-            pool_before.quote_atoms,
-            quote,
-            None,
-        ));
+        inputs.push(input(witness, pool_owner, aggregate_before.1, quote, None));
     }
     if let Some(witness) = params.writer_quote_input {
         inputs.push(input(
@@ -442,17 +489,17 @@ pub(super) fn settle<'a>(
             None,
         ));
     }
-    if split.pool_option_after > 0
+    if aggregate_after.0 > 0
         && (direction == AmoebaDlmmSwapDirection::OptionForQuote
             || split.output_from_compressed_pool > 0)
     {
-        outputs.push(output(pool_owner, split.pool_option_after, option, None));
+        outputs.push(output(pool_owner, aggregate_after.0, option, None));
     }
-    if split.pool_quote_after > 0
+    if aggregate_after.1 > 0
         && (direction == AmoebaDlmmSwapDirection::QuoteForOption
             || split.output_from_compressed_pool > 0)
     {
-        outputs.push(output(pool_owner, split.pool_quote_after, quote, None));
+        outputs.push(output(pool_owner, aggregate_after.1, quote, None));
     }
     if writer_premium > 0 {
         outputs.push(output(cash_owner, split.writer_quote_after, quote, None));
@@ -514,7 +561,7 @@ pub(super) fn settle<'a>(
         AccountMeta::new_readonly(*trader.key, true),
         AccountMeta::new_readonly(*a[9].key, false),
         AccountMeta::new_readonly(*a[10].key, false),
-        AccountMeta::new(*context.pool_custody.key, true),
+        AccountMeta::new(*custody_info.key, true),
         AccountMeta::new(*context.writer_cash_custody.key, true),
         AccountMeta::new_readonly(*context.retirement.key, false),
         AccountMeta::new_readonly(*context.user_delegate.key, false),
@@ -543,7 +590,7 @@ pub(super) fn settle<'a>(
         trader.clone(),
         a[9].clone(),
         a[10].clone(),
-        context.pool_custody.clone(),
+        custody_info.clone(),
         context.writer_cash_custody.clone(),
         context.retirement.clone(),
         context.user_delegate.clone(),
@@ -562,6 +609,24 @@ pub(super) fn settle<'a>(
         pool_info.key.as_ref(),
         &pool_bump,
     ];
+    let market = if resident.is_some() {
+        Some(load_valid_market(program, custody_info)?)
+    } else {
+        None
+    };
+    let market_id = market.as_ref().map(|m| m.market_id).unwrap_or([0; 32]);
+    let market_bump = market.as_ref().map(|m| [m.bump]).unwrap_or([0]);
+    let market_seeds: &[&[u8]] = &[
+        CURRENT_STATE_NAMESPACE_SEED,
+        crate::constants::MARKET_PDA_SEED,
+        &market_id,
+        &market_bump,
+    ];
+    let pool_seeds = if resident.is_some() {
+        market_seeds
+    } else {
+        pool_seeds
+    };
     let cash_seeds: &[&[u8]] = &[
         CURRENT_STATE_NAMESPACE_SEED,
         crate::compressed_custody::COMPRESSED_CUSTODY_SEED,
@@ -585,11 +650,16 @@ pub(super) fn settle<'a>(
     } else {
         invoke_signed(&ix, &infos, &[pool_seeds, cash_seeds])?;
     }
-    if context.pool_custody.owner == program {
+    if resident.is_none() && context.pool_custody.owner == program {
         let mut pool_after = pool_before;
         pool_after.option_atoms = split.pool_option_after;
         pool_after.quote_atoms = split.pool_quote_after;
         crate::compressed_custody::store(context.pool_custody, &pool_after)?;
+    }
+    if resident.is_some() {
+        context
+            .after_pool
+            .set(Some((split.pool_option_after, split.pool_quote_after)));
     }
     if writer_premium > 0 {
         let mut cash_after = cash_before;
