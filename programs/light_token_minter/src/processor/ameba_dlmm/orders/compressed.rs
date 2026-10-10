@@ -67,7 +67,13 @@ pub(super) fn exit_with_authority(
     if a.len() < ORDER_SWAP_FIXED_ACCOUNTS {
         return Err(VaultError::InvalidAccountList.into());
     }
+    // A claim (never a cancel) may be submitted by anyone: a keeper or the
+    // sponsor signs and pays as tail[1]. It moves only the order's claimable
+    // balances to the order owner, account zero, which must equal the record's
+    // owner below. It charges the owner no sponsor fee and pays the caller nothing.
+    let keeper = !cancel && !a[0].is_signer;
     let fee = if admin_refund
+        || keeper
         || a.get(ORDER_SWAP_FIXED_ACCOUNTS + usize::from(params.record_count) + 1)
             .is_some_and(|s| s.key == a[0].key)
     {
@@ -85,7 +91,7 @@ pub(super) fn exit_with_authority(
         || records > crate::dlmm_order_state::MAX_ORDER_WITNESSES
         || count < 2
         || a.len() != prefix_end + TAIL + count
-        || !admin_refund && !a[0].is_signer
+        || !admin_refund && !keeper && !a[0].is_signer
         || !a[0].is_writable
         || usize::from(params.output_tree_index) >= count
         || usize::from(params.output_queue_index) >= count
@@ -146,8 +152,9 @@ pub(super) fn exit_with_authority(
     }
     let mut base: Vec<_> = prefix[..31].to_vec();
     // Only the privilege validator receives this view. The authenticated admin
-    // authorizes returning Book custody; no CPI requests the owner's signature.
-    if admin_refund {
+    // authorizes returning Book custody, and a keeper claim only returns claimable
+    // custody to the owner; no CPI requests the owner's signature in either case.
+    if admin_refund || keeper {
         base[0].is_signer = true;
     }
     validate_collective_swap_base_privileges(program, &base)?;
@@ -324,7 +331,7 @@ pub(super) fn exit_with_authority(
     ];
     metas.extend(merkle.iter().map(|info| AccountMeta::new(*info.key, false)));
     metas.extend([
-        AccountMeta::new_readonly(*a[0].key, !admin_refund),
+        AccountMeta::new_readonly(*a[0].key, !admin_refund && !keeper),
         AccountMeta::new_readonly(*a[9].key, false),
         AccountMeta::new_readonly(*a[10].key, false),
         AccountMeta::new(*custody_info.key, true),
@@ -424,7 +431,11 @@ pub(super) fn exit_with_authority(
         program,
         prefix,
         &mut state.book,
-        if admin_refund { &tail[1] } else { &a[0] },
+        if admin_refund || keeper {
+            &tail[1]
+        } else {
+            &a[0]
+        },
     )?;
     if !commit_resident(program, &a[7], prefix, |resident| {
         merge_resident_book(program, resident, prefix, &state.book)?;
