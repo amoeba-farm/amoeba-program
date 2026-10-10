@@ -35,7 +35,9 @@ pub const INSTANT_WINDOW_SECS: u64 = DAY_SECS;
 /// Admin bounds (spec v2 "Admin bounds").
 pub const MIN_TENOR_FLOOR_SECS: u64 = 3_600;
 pub const MAX_TENOR_SECS: u64 = 120 * DAY_SECS;
-pub const MIN_EPOCH_SECS: u64 = 20 * DAY_SECS;
+// Epoch cadence is independent of writer maturity. A zero interval permits
+// immediate rolls while existing longer configurations remain readable.
+pub const MIN_EPOCH_SECS: u64 = 0;
 pub const MAX_EPOCH_SECS: u64 = 35 * DAY_SECS;
 pub const MIN_BUFFER_BPS: u16 = 500;
 pub const MAX_BUFFER_BPS: u16 = 5_000;

@@ -16,25 +16,25 @@
   "defaultFeatures": true,
   "baseImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
   "nativeToolchain": "cargo-build-sbf 4.0.0; platform-tools v1.53; SBF rustc 1.89.0",
-  "sourceCommit": "5cea68a23eda9fb2f1620744cd5b8909c2ba516b",
-  "publicExportSourceCommit": "5cea68a23eda9fb2f1620744cd5b8909c2ba516b",
-  "clientSourceCommit": "5cea68a23eda9fb2f1620744cd5b8909c2ba516b",
-  "exportedTreeSha256": "dccbd87b5f18f273af1b88c55a7c76b7a131339007279f361626ed1d0c90f312",
+  "sourceCommit": "da51b6ea5ff0e7c9bf10af50d04839a5bdfce657",
+  "publicExportSourceCommit": "da51b6ea5ff0e7c9bf10af50d04839a5bdfce657",
+  "clientSourceCommit": "923692c717bad8460424122c0093fb399598436b",
+  "exportedTreeSha256": "24b15323be230217aefca221315d862300fdadd1a1ac437e98551dcf45fef82b",
   "profileSha256": "8fe52bdb33111d5b8a700caf14c8dfd71caf278fce104839194a070bb78a1b2e",
   "generatedProfileRsSha256": "3a85f64e8ae32811e0f990a980aff7b06ad1b0f26245170e70e6d0bcbe64a213",
   "artifactBytes": 1961288,
-  "artifactSha256": "edc87424b4709283d52ec36b8cf8a6162d910ff4447e1178c1c101376abc3cf1",
+  "artifactSha256": "970fa15b85f6c15dd3605410e39935ef99c9b11b89914299d903cd9fcef8e6a9",
   "deployedSlot": null,
   "publicationStatus": "prepared",
   "deploymentStatus": "pending",
   "publicDockerBuildMatchesQualifiedArtifact": true,
   "hostedVerificationClaimed": false,
-  "buildInstructions": "release/mainnet-earn-zero-20261010/README.md",
+  "buildInstructions": "release/mainnet-da51b6e-20261010/README.md",
   "evidence": {
-    "publicationInventory": "release/mainnet-earn-zero-20261010/publication-inventory.json",
-    "nativeBuilds": "release/mainnet-earn-zero-20261010/native-builds.json",
-    "publicDockerBuild": "release/mainnet-earn-zero-20261010/public-docker-build.json"
+    "publicationInventory": "release/mainnet-da51b6e-20261010/publication-inventory.json",
+    "nativeBuilds": "release/mainnet-da51b6e-20261010/native-builds.json",
+    "publicDockerBuild": "release/mainnet-da51b6e-20261010/public-docker-build.json"
   },
-  "change": "5cea68a: Earn minimum epoch permits zero for immediate processing; default client interval is zero",
-  "normalizedExecutableHash": "d1ed5f2c1a90d18c51164626aca0b719f05b3effa009c1e18e497f7d69140eb7"
+  "change": "da51b6e: permissionless, fee-free claims deliver filled compressed orders only to their recorded owner; cancellation still requires owner authorization",
+  "normalizedExecutableHash": "ff562b211f05a390eabac13aff7b4c39dc1286bd9822490ea9f409d544527897"
 }
