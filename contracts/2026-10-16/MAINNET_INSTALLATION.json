@@ -1,0 +1,121 @@
+{
+  "status": "mainnet-contracts-installed-governed-active",
+  "completedAt": "2026-10-16T06:06:29.191Z",
+  "finalizedSlot": 457531138,
+  "network": "mainnet-beta",
+  "sourceCommit": "4caf83f080f7541b1f741e63871c8d701b398e9b",
+  "release": "2026-10-16-mainnet-contracts",
+  "governance": {
+    "program": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+    "programData": "7eW9UXcCDrpEAQ93fP7o2zgGMKhAKi3zJLihELjR8xYd",
+    "payloadSha256": "b9b3371b6807378938178e336a7f0d304aa6c74a081864d21b30fead1548a453",
+    "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+    "configEpoch": 1,
+    "configStableSha256": "cccf813705b04bab3018b46d8e166882d7a8856c1d7db4ffa61ee1c5733da68f",
+    "councilEpoch": "1",
+    "timingVersion": "2",
+    "timing": {
+      "reviewSlots": "1512000",
+      "delaySlots": "150",
+      "expirySlots": "2592000"
+    }
+  },
+  "programs": [
+    {
+      "name": "oracle",
+      "program": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+      "programData": "DyDtjYRs7sZbJyLEsq1sT4ynzS2ob3zrZMS3dLBuiGq1",
+      "authority": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+      "gate": "DzmEhZxxmHHu8HArfWexanfcfMyUrbXqprwu3Yee1GwR",
+      "deployedSlot": 457528207,
+      "artifactBytes": 707424,
+      "artifactSha256": "4ebbb73b8c0aaac0e07f74b640325c1bae5f990dff9ce7faff36d0a56e4cabb7",
+      "programLamports": 833120,
+      "programDataLamports": 3594592760,
+      "bufferClosed": true,
+      "upgradeTransactionName": "oracle-upgrade-replacement-1",
+      "upgradeSignature": "2Loam4wxQWWeLVdPimdbBfnupp9mo8Ao6fgcMWyaSWXFYeEB4kB11pu3btmJWLJtgpuVu23kL8nahWXLcDfRnPAV",
+      "registrationSignature": "3Xc466wkHL6kehGZFPL2YTWZfK8LikgkGEZEQQwrmorh1TPrFF1q7Qo48u4ZQuE4Xd87DLyw4wbEAm1kU7EwRXVu",
+      "activationSignature": "fdyFgYSdjaNreZELbLHdrm39A24u6dzB5nUXT6iuo1iMjmN8yQbGn6EnMjr1jAWX4udgFyXM6cLe8zh9SNgj3dv",
+      "gateStatus": "Active",
+      "gateEpoch": "2",
+      "activationProposal": {
+        "address": "E5K4CjVXyB9sdkdPySwBjqc53h1FJaQkkbGZFjU1GuWF",
+        "id": "62",
+        "digest": "88008480c9eb8d7325d2ba9ed860fef9f460bd162ab6bf1da8bb1ea5f95ecf1a",
+        "createdSlot": "457530427",
+        "notBeforeSlot": "457530577",
+        "executedSlot": "457530925",
+        "approvalMask": 7,
+        "approvalCount": 3
+      }
+    },
+    {
+      "name": "futures",
+      "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+      "programData": "RqYipon2KYuhBCUSg9GSdyYfH5B7bdQ9ThoeAJyhZeJ",
+      "authority": "Gi964re8sQK2Z1fNszd2c7RVUxLeK6nbc6jok6dBkpLx",
+      "gate": "4WiuZP4CpHjRNa37Y5kLmSrgct2PzvHN8Q2DRhUrSjTP",
+      "deployedSlot": 457530127,
+      "artifactBytes": 420984,
+      "artifactSha256": "2f1fc1077b8b77ef28b29994084537fcfd093741bd01944a41fa2ff99ab56f4f",
+      "programLamports": 833120,
+      "programDataLamports": 2139477560,
+      "bufferClosed": true,
+      "upgradeTransactionName": "futures-upgrade",
+      "upgradeSignature": "4YFpnK3XvN4RjPRhCVLrWrvyzNknpPkvPqYqph7F2smH6rVUk5QXggUBbQXu7X7pL5rwjSuiZczyt49yUzQ4B1hP",
+      "registrationSignature": "2mNhcqnmfxrrTj2EnqDuaRfq8tFN1EjsvxxPQ4DcbHTnnsr5yixNmUhYnZQYpRtxvL85Vu8dQ3kfzB1Lv1Y5UyHv",
+      "activationSignature": "H1Xg1MtTmQnXQgxdE3YLQCRzAn6gSh9n4HzfJckqnCQMQNbXrgqo3m94FvQy7ypVfDwkNK8bT9Lh2JmMNJ2Cnqg",
+      "gateStatus": "Active",
+      "gateEpoch": "2",
+      "activationProposal": {
+        "address": "4bRxWbTRtiLC5ybhV2YUS5q9q8GQTQKadxgugMKcR9h8",
+        "id": "63",
+        "digest": "9a35f10524b0461b75802e8a708e62179bb74a7297e13cd6431d89f0d57480b8",
+        "createdSlot": "457530565",
+        "notBeforeSlot": "457530715",
+        "executedSlot": "457530955",
+        "approvalMask": 7,
+        "approvalCount": 3
+      }
+    }
+  ],
+  "transactionCount": 1432,
+  "additionalProgramDataRentLamports": 5723128000,
+  "quotedTransactionFeesLamports": 7289120,
+  "payerRestoredToInitialBalance": true,
+  "spareUnchanged": true,
+  "unresolvedTransactions": [],
+  "expiredWithoutExecution": [
+    {
+      "name": "oracle-upgrade",
+      "signature": "2GU79eAvZ3AHQoNvUumxkwimw6DvVryChmB8ArA33gJUd8axv7BLqmGhfTnVoNeiXzAD79MApgSxezC1DXaZo984",
+      "replacementName": "oracle-upgrade-replacement-1",
+      "proofFile": "oracle-upgrade-expiry-proof.json",
+      "reason": "Both RPCs finalized beyond expiry; signature absent; program remains extended placeholder and exact upload buffer remains intact.",
+      "proof": {
+        "name": "oracle-upgrade",
+        "signature": "2GU79eAvZ3AHQoNvUumxkwimw6DvVryChmB8ArA33gJUd8axv7BLqmGhfTnVoNeiXzAD79MApgSxezC1DXaZo984",
+        "status": "expired-without-finalized-execution",
+        "lastValidBlockHeight": 435562299,
+        "providerFinalizedBlockHeight": 435563447,
+        "publicFinalizedBlockHeight": 435563449,
+        "providerSignatureStatus": null,
+        "publicSignatureStatus": null,
+        "finalizedTransaction": null,
+        "finalizedAccountSlot": 457527618,
+        "programPayloadSha256": "441623ca143c8602f036d4d5c5aed4f2bfb775adadc719a53dd2dcf633422f84",
+        "placeholderSha256": "4fd457e5240a3f5cbba3e44818a9129df9376f4a2ffa24a620d8ea02f0685d19",
+        "remainingProgramBytesZero": true,
+        "bufferPayloadSha256": "4ebbb73b8c0aaac0e07f74b640325c1bae5f990dff9ce7faff36d0a56e4cabb7",
+        "bufferIntact": true,
+        "authority": "8XUjnzVzR71DaVuqbSHaNev5H4vrxofyFP4iZt2FXa1j",
+        "recordedAt": "2026-10-16T05:53:52.812Z",
+        "replacementName": "oracle-upgrade-replacement-1"
+      }
+    }
+  ],
+  "economicStateInitialized": false,
+  "apiWebDeployed": false,
+  "publicSourceVerificationMetadataPublished": false
+}

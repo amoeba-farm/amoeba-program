@@ -1,0 +1,50 @@
+[package]
+name = "ameba_oracle"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+no-entrypoint = []
+# Integration tests run against the built SBF artifact; also shortens the
+# rulebook calendar day for host-side unit tests.
+test-sbf = []
+# Requires the controller-owned governance gate on every top-level instruction.
+# It cannot be compiled without exactly one pinned controller identity.
+governance-gate-v1 = []
+# Governed loopback profile: real controller with shortened council timings.
+localnet-governance = ["ameba-governance-interface/localnet-governance", "governance_controller_v3/localnet-governance"]
+# Test-only synthetic controller identity. Never released.
+synthetic-governance-controller = ["governance-gate-v1"]
+# Localnet dev chain only (genesis A5ZLaudxEFvFScV6RzNtNN7fzshRxQgXhC6JB6dishHX): plain-key
+# authorities without a governance tail, the dev bootstrap instructions, and a program id read
+# from AMEBA_ORACLE_PROGRAM_ID at build time. Never built for any other cluster.
+localnet-dev-authority = []
+
+[dependencies]
+ameba-governance-interface = { path = "../../../governance/crates/governance-interface" }
+ameba-oracle-interface.workspace = true
+borsh = "0.10.4"
+solana-program = { workspace = true, features = ["borsh"] }
+solana-sdk-ids.workspace = true
+thiserror = "2.0"
+
+[dev-dependencies]
+governance_controller_v3 = { path = "../../../governance/programs/governance_controller_v3", features = ["no-entrypoint"] }
+proptest = "1.6.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+solana-program-test = "2.3"
+solana-sdk = "2.3"
+solana-system-interface.workspace = true
+spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
+spl-token = { version = "7.0.0", features = ["no-entrypoint"] }
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+
+[lints.rust.unexpected_cfgs]
+level = "allow"
+check-cfg = ['cfg(target_os, values("solana"))']

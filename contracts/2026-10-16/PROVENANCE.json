@@ -1,0 +1,38 @@
+{
+  "schema": "amoeba.oracle-futures-public-source.v1",
+  "sourceCommit": "4caf83f080f7541b1f741e63871c8d701b398e9b",
+  "sourceRepository": "spacematter78/amoeba",
+  "publicRepository": "amoeba-farm/amoeba-program",
+  "publicBaseCommit": "1dce467cbc077e209c524b0d09f74e6bf3b0abd8",
+  "exportedFileCount": 358,
+  "sourceInventorySha256": "5f6c9d0c39e2d096583aecff868270168f009f46eb51e135e033fa7c96c6eec9",
+  "installationReceiptSha256": "c4a91bf8825a7a0bb0b7d9a652485d4becfa72ffa42cd2b2e0d57df64f5a97d3",
+  "installedPrograms": [
+    {
+      "program": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+      "artifactSha256": "4ebbb73b8c0aaac0e07f74b640325c1bae5f990dff9ce7faff36d0a56e4cabb7",
+      "artifactBytes": 707424
+    },
+    {
+      "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+      "artifactSha256": "2f1fc1077b8b77ef28b29994084537fcfd093741bd01944a41fa2ff99ab56f4f",
+      "artifactBytes": 420984
+    }
+  ],
+  "laterHostOpsCommit": "37af722bb47ffa44a5f14dea9cba6bf25212cb49",
+  "laterHostOpsIncluded": false,
+  "binaryIncludedInGit": false,
+  "independentDeployedByteReproductionClaimed": false,
+  "publicVerifierRegistrationClaimed": false,
+  "validation": {
+    "sourceInventoryAndGitBlobs": "passed",
+    "localCargoPathAndStaticIncludeClosure": "passed",
+    "cargoMetadataLockedOffline": [
+      "futures",
+      "oracle",
+      "governance"
+    ],
+    "highConfidenceCredentialPatternsFound": 0,
+    "sbfBuildRerun": false
+  }
+}

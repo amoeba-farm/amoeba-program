@@ -6,6 +6,11 @@ an integrated discrete liquidity market maker (DLMM).
 
 [Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
+The newer Mainnet oracle and range-futures programs are distributed separately
+under [contracts/2026-10-16](contracts/2026-10-16), with their exact source
+inventory, installed-artifact hashes and build qualification boundaries. The
+existing root below preserves the historical index-options / Spread program.
+
 ## Source
 
 The Rust program is in [`programs/light_token_minter`](programs/light_token_minter).

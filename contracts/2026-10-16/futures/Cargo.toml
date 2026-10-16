@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/futures-client",
+    "crates/futures-math",
+    "programs/futures",
+]
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+borsh = "0.10.4"
+solana-program = "=2.3.0"
+solana-system-interface = { version = "1.0.0", features = ["bincode"] }
+spl-token = { version = "=7.0.0", features = ["no-entrypoint"] }
+# The oracle's consumer contract, from this monorepo.
+ameba-oracle-interface = { path = "../oracle/crates/oracle-interface" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+overflow-checks = true
+
+[workspace.lints.rust.unexpected_cfgs]
+level = "allow"
+check-cfg = ['cfg(target_os, values("solana"))']

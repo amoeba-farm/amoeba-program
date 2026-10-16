@@ -1,0 +1,28 @@
+[workspace]
+members = ["crates/governance-interface", "programs/upgrade_controller", "programs/governance_controller_v3"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.89"
+
+[workspace.dependencies]
+borsh = "=0.10.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+solana-program = { version = "=2.3.0", default-features = false }
+solana-loader-v3-interface = { version = "=5.0.0", features = ["bincode"] }
+solana-pubkey = { version = "=2.4.0", default-features = false, features = ["borsh"] }
+solana-sdk-ids = "=2.2.1"
+solana-system-interface = { version = "=1.0.0", features = ["bincode"] }
+thiserror = "=2.0.18"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+incremental = false
+debug = 0
+strip = "debuginfo"

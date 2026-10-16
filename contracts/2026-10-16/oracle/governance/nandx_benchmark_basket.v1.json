@@ -1,0 +1,200 @@
+{
+  "schema": "amoeba.nandx-benchmark-basket",
+  "schemaVersion": 1,
+  "basketVersion": 1,
+  "product": {
+    "marketId": "nandx",
+    "symbol": "NANDX",
+    "underlyingId": "nand-standardized-baskets"
+  },
+  "provenance": {
+    "sourceDescription": "NANDX Manufacturer Item SKU Registry v0.1 (1 August 2026)",
+    "sourceSha256": "14e31bd83e0c92c5b3894df5d68aec1091373c0ae48b53775d12640b92cb1be7"
+  },
+  "weightScale": {
+    "unit": "percent",
+    "decimalPlaces": 2,
+    "total": "100.00"
+  },
+  "aggregationPolicy": {
+    "terminalIdentityWeightField": "weightPct",
+    "terminalIdentityWeightValue": null,
+    "observationAggregation": "within-parent-row-before-basket-weight",
+    "monthlySourceWeights": "separate-governed-oracle-recipe",
+    "monthlyActiveSourceSet": "validated-subset-of-governed-terminal-identities"
+  },
+  "groups": [
+    {
+      "name": "Channel-market SSD gauges",
+      "rowCount": 6,
+      "terminalMpnCount": 18,
+      "weightPct": "30.00",
+      "rows": [
+        {
+          "name": "256GB SSD PCIe 3.0",
+          "terminalMpnCount": 3,
+          "weightPct": "3.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "512GB SSD PCIe 3.0",
+          "terminalMpnCount": 3,
+          "weightPct": "5.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "1TB SSD PCIe 3.0",
+          "terminalMpnCount": 3,
+          "weightPct": "6.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "512GB SSD PCIe 4.0",
+          "terminalMpnCount": 3,
+          "weightPct": "5.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "1TB SSD PCIe 4.0",
+          "terminalMpnCount": 3,
+          "weightPct": "7.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "2TB SSD PCIe 4.0",
+          "terminalMpnCount": 3,
+          "weightPct": "4.00",
+          "sourceMode": "candidate-mpn"
+        }
+      ]
+    },
+    {
+      "name": "Industry/OEM SSD gauges",
+      "rowCount": 6,
+      "terminalMpnCount": 18,
+      "weightPct": "25.00",
+      "rows": [
+        {
+          "name": "256GB SSD PCIe 3.0",
+          "terminalMpnCount": 3,
+          "weightPct": "2.50",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "512GB SSD PCIe 3.0",
+          "terminalMpnCount": 3,
+          "weightPct": "4.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "1TB SSD PCIe 3.0",
+          "terminalMpnCount": 3,
+          "weightPct": "5.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "512GB SSD PCIe 4.0",
+          "terminalMpnCount": 3,
+          "weightPct": "4.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "1TB SSD PCIe 4.0",
+          "terminalMpnCount": 3,
+          "weightPct": "6.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "2TB SSD PCIe 4.0",
+          "terminalMpnCount": 3,
+          "weightPct": "3.50",
+          "sourceMode": "candidate-mpn"
+        }
+      ]
+    },
+    {
+      "name": "eMMC 5.1 gauges",
+      "rowCount": 3,
+      "terminalMpnCount": 6,
+      "weightPct": "10.00",
+      "rows": [
+        {
+          "name": "eMMC 64GB 5.1",
+          "terminalMpnCount": 2,
+          "weightPct": "2.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "eMMC 128GB 5.1",
+          "terminalMpnCount": 2,
+          "weightPct": "3.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "eMMC 256GB 5.1",
+          "terminalMpnCount": 2,
+          "weightPct": "5.00",
+          "sourceMode": "candidate-mpn"
+        }
+      ]
+    },
+    {
+      "name": "UFS 2.2 gauges",
+      "rowCount": 3,
+      "terminalMpnCount": 6,
+      "weightPct": "10.00",
+      "rows": [
+        {
+          "name": "UFS 2.2 64GB",
+          "terminalMpnCount": 2,
+          "weightPct": "2.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "UFS 2.2 128GB",
+          "terminalMpnCount": 2,
+          "weightPct": "3.00",
+          "sourceMode": "candidate-mpn"
+        },
+        {
+          "name": "UFS 2.2 256GB",
+          "terminalMpnCount": 2,
+          "weightPct": "5.00",
+          "sourceMode": "candidate-mpn"
+        }
+      ]
+    },
+    {
+      "name": "Raw NAND wafer gauges",
+      "rowCount": 4,
+      "terminalMpnCount": 0,
+      "weightPct": "25.00",
+      "rows": [
+        {
+          "name": "1Tb QLC wafer gauge",
+          "terminalMpnCount": 0,
+          "weightPct": "7.50",
+          "sourceMode": "assessment-only"
+        },
+        {
+          "name": "1Tb TLC wafer gauge",
+          "terminalMpnCount": 0,
+          "weightPct": "10.00",
+          "sourceMode": "assessment-only"
+        },
+        {
+          "name": "512Gb TLC wafer gauge",
+          "terminalMpnCount": 0,
+          "weightPct": "5.00",
+          "sourceMode": "assessment-only"
+        },
+        {
+          "name": "256Gb TLC wafer gauge",
+          "terminalMpnCount": 0,
+          "weightPct": "2.50",
+          "sourceMode": "assessment-only"
+        }
+      ]
+    }
+  ]
+}

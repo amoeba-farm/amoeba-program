@@ -1,0 +1,666 @@
+{
+  "schema": "amoeba.cfm-parent-proxy-registry.v1",
+  "mode": "CFM_PARENT_PROXY_V1",
+  "provenance": {
+    "attachment": "Amoeba_CFM_Oracle_Handoff_2026-09-16.zip",
+    "mappingSha256": "83f4fe999cb18d706a8fb350d411090c21415c7692fafcaab76c2cd259b66856"
+  },
+  "parentRows": [
+    {
+      "id": "R01",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100262:LATEST:USD",
+      "parentSourceId": "d29f5a159e87a06da4e5514d105a220111eed1afda5ef7801d1dcc8dff4cda59",
+      "publisher": "CFM",
+      "weightBps": 800,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/rdimm",
+      "locatorHash": "3caae55bcc13f62b4c495b89d18fe6c4f7839b098556a77764520be256ce5e2e",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"monthly\",\"canonical_locator\":\"https://www.memorymarket.com/price/rdimm\",\"catalog_row_id\":\"R01\",\"cfm_series_id\":100262,\"currency\":\"USD\",\"exact_row_label\":\"DDR5 RDIMM 32GB\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100262:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "184144520600c4e7d4d5cd41edcf15034bbf078220a1ab48c1d2ed209caef315",
+      "detailUrl": "https://www.memorymarket.com/price/ems/100262",
+      "children": [
+        "MTC20F2085S1RC48BR",
+        "M321R4GA3BB6-CQK",
+        "MTC20F2085S1RC56BR",
+        "HMCG84AGBRA191N",
+        "KSM64R52BD8-32HA"
+      ]
+    },
+    {
+      "id": "R02",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100263:LATEST:USD",
+      "parentSourceId": "dcb5e9b0e1018c9a66457d1f0b71df3e782f8d5e2a2f43202fd62784b3215dcf",
+      "publisher": "CFM",
+      "weightBps": 1500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/rdimm",
+      "locatorHash": "3caae55bcc13f62b4c495b89d18fe6c4f7839b098556a77764520be256ce5e2e",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"monthly\",\"canonical_locator\":\"https://www.memorymarket.com/price/rdimm\",\"catalog_row_id\":\"R02\",\"cfm_series_id\":100263,\"currency\":\"USD\",\"exact_row_label\":\"DDR5 RDIMM 64GB\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100263:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "df98d64beeff647f46223a7a3f3fca7dd5afcc66d55178bccb0c89df9a145e39",
+      "detailUrl": "https://www.memorymarket.com/price/ems/100263",
+      "children": [
+        "MTC40F2046S1RC48BR",
+        "M321R8GA0BB0-CQK",
+        "MTC40F2046S1RC56BR",
+        "HMCG94AGBRA184N",
+        "KSM64R52BD4-64HA"
+      ]
+    },
+    {
+      "id": "R03",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100264:LATEST:USD",
+      "parentSourceId": "40c8c489a05a280fd9c5353a16a23da107003aaea802038268015d31540eb4bb",
+      "publisher": "CFM",
+      "weightBps": 2000,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/rdimm",
+      "locatorHash": "3caae55bcc13f62b4c495b89d18fe6c4f7839b098556a77764520be256ce5e2e",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"monthly\",\"canonical_locator\":\"https://www.memorymarket.com/price/rdimm\",\"catalog_row_id\":\"R03\",\"cfm_series_id\":100264,\"currency\":\"USD\",\"exact_row_label\":\"DDR5 RDIMM 96GB\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100264:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "0b88bcca7cabe251df79e4b4b8434db15d3a6782bcc601dbed0330b774bdb99e",
+      "detailUrl": "https://www.memorymarket.com/price/ems/100264",
+      "children": [
+        "MTC40F204WS1RC48BR",
+        "M321RAGA0B20-CWK",
+        "MTC40F204WS1RC56BR",
+        "ST8G8RM5444-HB"
+      ]
+    },
+    {
+      "id": "R04",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100254:LATEST:USD",
+      "parentSourceId": "b0bf2302bd593a4bab44b3e0de26e1cbd02b7d4f9dbe7d5e561cc2c313882aaf",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/rdimm",
+      "locatorHash": "3caae55bcc13f62b4c495b89d18fe6c4f7839b098556a77764520be256ce5e2e",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"monthly\",\"canonical_locator\":\"https://www.memorymarket.com/price/rdimm\",\"catalog_row_id\":\"R04\",\"cfm_series_id\":100254,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 RDIMM 16GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100254:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "1dc275444f69603a2de65b2d229f3e1a57af46390bd5fdbad1677bfca45a54b1",
+      "detailUrl": "https://www.memorymarket.com/price/ems/100254",
+      "children": [
+        "M393A2K43DB3-CWE",
+        "MTA18ASF2G72PZ-3G2E2",
+        "HMA82GR7CJR4N-XN",
+        "KSM32RD8/16MRR"
+      ]
+    },
+    {
+      "id": "R05",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100255:LATEST:USD",
+      "parentSourceId": "19872c50986293f9fae9a0bb97dad83043c7e13a2fc1b800cfe8c3e8b27ae545",
+      "publisher": "CFM",
+      "weightBps": 800,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/rdimm",
+      "locatorHash": "3caae55bcc13f62b4c495b89d18fe6c4f7839b098556a77764520be256ce5e2e",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"monthly\",\"canonical_locator\":\"https://www.memorymarket.com/price/rdimm\",\"catalog_row_id\":\"R05\",\"cfm_series_id\":100255,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 RDIMM 32GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100255:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "7ed8cf011f69383a4cc59b6fcd8a2c6deb17fd1b396eee2a7af9c5877d0fd760",
+      "detailUrl": "https://www.memorymarket.com/price/ems/100255",
+      "children": [
+        "M393A4K40DB3-CWE",
+        "MTA18ASF4G72PZ-3G2E1",
+        "HMA84GR7CJR4N-XN",
+        "KSM32RD4/32MRR"
+      ]
+    },
+    {
+      "id": "R06",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100256:LATEST:USD",
+      "parentSourceId": "28bcdb7740e11dd90393524b3be778479b2daa7158d2d42020837d8cd743f13e",
+      "publisher": "CFM",
+      "weightBps": 1200,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/rdimm",
+      "locatorHash": "3caae55bcc13f62b4c495b89d18fe6c4f7839b098556a77764520be256ce5e2e",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"monthly\",\"canonical_locator\":\"https://www.memorymarket.com/price/rdimm\",\"catalog_row_id\":\"R06\",\"cfm_series_id\":100256,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 RDIMM 64GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100256:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "72a3d27a66ec80f4c8211909e9c274b9ecf6a7faa2d4065982b6f24fc4a11686",
+      "detailUrl": "https://www.memorymarket.com/price/ems/100256",
+      "children": [
+        "M393A8G40AB2-CWE",
+        "MTA36ASF8G72PZ-3G2B2",
+        "HMAA8GR7AJR4N-XN",
+        "KSM32RD4/64MFR"
+      ]
+    },
+    {
+      "id": "R07",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100268:LATEST:USD",
+      "parentSourceId": "60eb54acfdc33fc57de7e7086407fb4d71183176b10ee44c7ab0905931dd3b38",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/udimm",
+      "locatorHash": "a658559516247e3bd2f2ad8bb83a494f1f8ed0c97146abe3a20c0effc9fe9289",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/udimm\",\"catalog_row_id\":\"R07\",\"cfm_series_id\":100268,\"currency\":\"USD\",\"exact_row_label\":\"DDR5 UDIMM 16GB 5600\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100268:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "3d6b474c33f8ecac17dc7c90686c39f8a3519c29401867414ec5ef62a0456184",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100268",
+      "children": [
+        "CT16G56C46U5",
+        "KVR56U46BS8-16",
+        "M323R2GA3BB0-CQK"
+      ]
+    },
+    {
+      "id": "R08",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100270:LATEST:USD",
+      "parentSourceId": "59d9bc31d6b3c99a8679c0f7e9b16bf92e21cae90c78019ea8ee36ea09686468",
+      "publisher": "CFM",
+      "weightBps": 400,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/udimm",
+      "locatorHash": "a658559516247e3bd2f2ad8bb83a494f1f8ed0c97146abe3a20c0effc9fe9289",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/udimm\",\"catalog_row_id\":\"R08\",\"cfm_series_id\":100270,\"currency\":\"USD\",\"exact_row_label\":\"DDR5 UDIMM 32GB 5600\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100270:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "968411329410a489cb34be5ac04d4161c45c0fe50d5e58f8f5e5cc178b928734",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100270",
+      "children": [
+        "CT32G56C46U5",
+        "KVR56U46BD8-32",
+        "M323R4GA3BB0-CQK"
+      ]
+    },
+    {
+      "id": "R09",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100223:LATEST:USD",
+      "parentSourceId": "a165995eac5c94f7b6570849cc27c731fc6006fd6af12db1c97a38f9af4e4f11",
+      "publisher": "CFM",
+      "weightBps": 300,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/udimm",
+      "locatorHash": "a658559516247e3bd2f2ad8bb83a494f1f8ed0c97146abe3a20c0effc9fe9289",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/udimm\",\"catalog_row_id\":\"R09\",\"cfm_series_id\":100223,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 UDIMM 8GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100223:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "0f76e2412443fb55b79ccd363f3d3000ff206403663b598b87a0404920838da6",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100223",
+      "children": [
+        "CT8G4DFRA32A",
+        "KVR32N22S8/8",
+        "M378A1K43EB2-CWE",
+        "MTA8ATF1G64AZ-3G2E1"
+      ]
+    },
+    {
+      "id": "R10",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100224:LATEST:USD",
+      "parentSourceId": "691d8271bbad278678d390ee61aa64cf89a43ce975751a5d38ea8cddfa979f17",
+      "publisher": "CFM",
+      "weightBps": 700,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/udimm",
+      "locatorHash": "a658559516247e3bd2f2ad8bb83a494f1f8ed0c97146abe3a20c0effc9fe9289",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/udimm\",\"catalog_row_id\":\"R10\",\"cfm_series_id\":100224,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 UDIMM 16GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100224:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "0301b9832eebacc0ee8a7eff8619570f51384714decc0c7ab25ec4f9e5066a14",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100224",
+      "children": [
+        "CT16G4DFRA32A",
+        "KVR32N22D8/16",
+        "M378A2K43EB2-CWE",
+        "MTA16ATF2G64AZ-3G2E1"
+      ]
+    },
+    {
+      "id": "R11",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100225:LATEST:USD",
+      "parentSourceId": "97ee285fc55afd86d068c2e7b71102971723f1879339a2b0368852fd473a2a03",
+      "publisher": "CFM",
+      "weightBps": 400,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/udimm",
+      "locatorHash": "a658559516247e3bd2f2ad8bb83a494f1f8ed0c97146abe3a20c0effc9fe9289",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/udimm\",\"catalog_row_id\":\"R11\",\"cfm_series_id\":100225,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 UDIMM 32GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100225:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "c0c4883a00aa3e7721cd2d698ed0d43ef7d79ba01ed5eb1f1e0eaf85bf8c7738",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100225",
+      "children": [
+        "CT32G4DFD832A",
+        "KVR32N22D8/32",
+        "M378A4G43AB2-CWE",
+        "MTA16ATF4G64AZ-3G2E1"
+      ]
+    },
+    {
+      "id": "R12",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100227:LATEST:USD",
+      "parentSourceId": "21b638035e041b8b7fdbc967c592df0f60e7a415802e4b0c0f41b2c7701381ee",
+      "publisher": "CFM",
+      "weightBps": 400,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/sodimm",
+      "locatorHash": "41cfca00c40fb1e3b858a43150934962e8f1adda305d4bce31d400d69d83507a",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/sodimm\",\"catalog_row_id\":\"R12\",\"cfm_series_id\":100227,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 SODIMM 8GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100227:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "6c7648b102d8c93b2cd21541f3bb1492d3e42fe867221e961b6c12dfd24c5731",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100227",
+      "children": [
+        "CT8G4SFRA32A",
+        "KVR32S22S8/8",
+        "M471A1K43DB1-CWE",
+        "MTA8ATF1G64HZ-3G2E1"
+      ]
+    },
+    {
+      "id": "R13",
+      "product": "RAMX",
+      "parentSourceKey": "CFM:RAMX:100228:LATEST:USD",
+      "parentSourceId": "e5fe992fcc3b8a641d9912c4b146a82cbbce903897ad562e138a916e53a9a6b3",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/sodimm",
+      "locatorHash": "41cfca00c40fb1e3b858a43150934962e8f1adda305d4bce31d400d69d83507a",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/sodimm\",\"catalog_row_id\":\"R13\",\"cfm_series_id\":100228,\"currency\":\"USD\",\"exact_row_label\":\"DDR4 SODIMM 16GB 3200\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"RAMX\",\"parent_source_key\":\"CFM:RAMX:100228:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "329862ef217c0712c6a72399be738420d5489d25fbc78f9d6539dbb2f1097036",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100228",
+      "children": [
+        "CT16G4SFRA32A",
+        "KVR32S22D8/16",
+        "M471A2K43DB1-CWE",
+        "MTA16ATF2G64HZ-3G2E1"
+      ]
+    },
+    {
+      "id": "N01",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100231:LATEST:USD",
+      "parentSourceId": "ae347f6b43befd4619b67674867bda22cfcd5932095c81a15230aefc891c2199",
+      "publisher": "CFM",
+      "weightBps": 300,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/channel-ssd",
+      "locatorHash": "398d4c327376581c86251fa6ee212d56f989881a495a18d06d6a5af63dfecf91",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/channel-ssd\",\"catalog_row_id\":\"N01\",\"cfm_series_id\":100231,\"currency\":\"USD\",\"exact_row_label\":\"Channel SSD 256GB PCIe 3.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100231:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "a24ac1aff0984248bcfc486e54e15a88dfd08fb1cc1c3c6f13a0a7264d3dbd50",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100231",
+      "children": [
+        "TS256GMTE110S",
+        "ASX8200PNP-256GT-C",
+        "TM8FP6256G0C101"
+      ]
+    },
+    {
+      "id": "N02",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100232:LATEST:USD",
+      "parentSourceId": "0c4a2bbf35d63b370fe1b3e4fef1ed43b96b53c76e2169e53c51b0bfe9cdf57a",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/channel-ssd",
+      "locatorHash": "398d4c327376581c86251fa6ee212d56f989881a495a18d06d6a5af63dfecf91",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/channel-ssd\",\"catalog_row_id\":\"N02\",\"cfm_series_id\":100232,\"currency\":\"USD\",\"exact_row_label\":\"Channel SSD 512GB PCIe 3.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100232:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "e6868e9e1bd755c1dfb6ef0efebd1e9281ab64d0507616399a3d88a0f81cf432",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100232",
+      "children": [
+        "TS512GMTE110S",
+        "ASX8200PNP-512GT-C",
+        "TM8FP6512G0C101"
+      ]
+    },
+    {
+      "id": "N03",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100233:LATEST:USD",
+      "parentSourceId": "de5b8bb343e5cfe853efcc5f49552f9a96af031cd6e15f7c6936a47c7b6189e9",
+      "publisher": "CFM",
+      "weightBps": 600,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/channel-ssd",
+      "locatorHash": "398d4c327376581c86251fa6ee212d56f989881a495a18d06d6a5af63dfecf91",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/channel-ssd\",\"catalog_row_id\":\"N03\",\"cfm_series_id\":100233,\"currency\":\"USD\",\"exact_row_label\":\"Channel SSD 1TB PCIe 3.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100233:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "c7e3b980ed3c89b79ff4f167fdddf23263bc86efc2f435eadafe03f2cd33503a",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100233",
+      "children": [
+        "TS1TMTE110S",
+        "ASX8200PNP-1TT-C",
+        "TM8FP6001T0C101"
+      ]
+    },
+    {
+      "id": "N04",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100243:LATEST:USD",
+      "parentSourceId": "878fd3324de8227565f2cbd33ea0c4dcf973749cb678247ceaca458232d4f7dc",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/channel-ssd",
+      "locatorHash": "398d4c327376581c86251fa6ee212d56f989881a495a18d06d6a5af63dfecf91",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/channel-ssd\",\"catalog_row_id\":\"N04\",\"cfm_series_id\":100243,\"currency\":\"USD\",\"exact_row_label\":\"Channel SSD 512GB PCIe 4.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100243:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "47f53dd0c4f963ac85fa6b1b32c7247ba4efd076619e9255ee7afc737482bb91",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100243",
+      "children": [
+        "SLEG-900-512GCS",
+        "SKC3000S/512G",
+        "TM8FPW512G0C101"
+      ]
+    },
+    {
+      "id": "N05",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100244:LATEST:USD",
+      "parentSourceId": "52ed9bcd32e1c4630d82334d3b48209f81a892421611590c5c3e047bd568e961",
+      "publisher": "CFM",
+      "weightBps": 700,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/channel-ssd",
+      "locatorHash": "398d4c327376581c86251fa6ee212d56f989881a495a18d06d6a5af63dfecf91",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/channel-ssd\",\"catalog_row_id\":\"N05\",\"cfm_series_id\":100244,\"currency\":\"USD\",\"exact_row_label\":\"Channel SSD 1TB PCIe 4.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100244:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "bc78271b53d4dbeafd9a819f3c25e8d10962430ec3f2922b73947cf26763756e",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100244",
+      "children": [
+        "SLEG-900-1TCS",
+        "SKC3000S/1024G",
+        "TM8FPW001T0C101"
+      ]
+    },
+    {
+      "id": "N06",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100245:LATEST:USD",
+      "parentSourceId": "40a6c6b01f758d51c7bebf212f7d503d5bce9a40fe2a9588b12db63327156de3",
+      "publisher": "CFM",
+      "weightBps": 400,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/channel-ssd",
+      "locatorHash": "398d4c327376581c86251fa6ee212d56f989881a495a18d06d6a5af63dfecf91",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/channel-ssd\",\"catalog_row_id\":\"N06\",\"cfm_series_id\":100245,\"currency\":\"USD\",\"exact_row_label\":\"Channel SSD 2TB PCIe 4.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100245:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "2c1f9c459791e2f924233aa22d58adbe825add6b919c9fed4a18808ddb385d7d",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100245",
+      "children": [
+        "SLEG-900-2TCS",
+        "SKC3000D/2048G",
+        "TM8FPW002T0C101"
+      ]
+    },
+    {
+      "id": "N07",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100172:LATEST:USD",
+      "parentSourceId": "adb677ee1cda09566180263e68c6595e50aaa88c7d9e8c376acf9806596bd74a",
+      "publisher": "CFM",
+      "weightBps": 250,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/oem-ssd",
+      "locatorHash": "905b85d54fee56e598f4e79c25ad340263a10c75f762c5ac15e9168aed9997f6",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/oem-ssd\",\"catalog_row_id\":\"N07\",\"cfm_series_id\":100172,\"currency\":\"USD\",\"exact_row_label\":\"OEM SSD 256GB PCIe 3.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100172:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "e65f94c975bbf571b992d23af1f3843614b0f167996f48ad403f1b98f5b459de",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100172",
+      "children": [
+        "KXG60ZNV256G",
+        "MTFDHBA256TDV-1AY1AABYY",
+        "SDBQNTY-256G"
+      ]
+    },
+    {
+      "id": "N08",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100173:LATEST:USD",
+      "parentSourceId": "e80d5e78a9d603f83c994cebd62a6bc3b9e5ee6c60f5d8e596907c902596d672",
+      "publisher": "CFM",
+      "weightBps": 400,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/oem-ssd",
+      "locatorHash": "905b85d54fee56e598f4e79c25ad340263a10c75f762c5ac15e9168aed9997f6",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/oem-ssd\",\"catalog_row_id\":\"N08\",\"cfm_series_id\":100173,\"currency\":\"USD\",\"exact_row_label\":\"OEM SSD 512GB PCIe 3.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100173:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "a63b17287319d76f9e79cd6f8bf72684d2f9db7555449fbf5f408ba98cc75c54",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100173",
+      "children": [
+        "KXG60ZNV512G",
+        "MTFDHBA512TDV-1AZ1AABYY",
+        "SDBQNTY-512G"
+      ]
+    },
+    {
+      "id": "N09",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100250:LATEST:USD",
+      "parentSourceId": "ec712a7850db3a6eda843c2818cf51c800677a1ae3531416910b4ea0d0e018fc",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/oem-ssd",
+      "locatorHash": "905b85d54fee56e598f4e79c25ad340263a10c75f762c5ac15e9168aed9997f6",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/oem-ssd\",\"catalog_row_id\":\"N09\",\"cfm_series_id\":100250,\"currency\":\"USD\",\"exact_row_label\":\"OEM SSD 1TB PCIe 3.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100250:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "49d555e9d2ddb728d9ec1b574e986cfd1ebe5ce1f9813b18a8b0954eb6899a31",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100250",
+      "children": [
+        "KXG60ZNV1T02",
+        "MTFDHBA1T0TDV-1AZ1AABYY",
+        "SDBQNTY-1T00"
+      ]
+    },
+    {
+      "id": "N10",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100251:LATEST:USD",
+      "parentSourceId": "51dc9a1d4545bc09e6f410f2f0a00819b4e0d0b08e4181bffe02c8a6efd69ff9",
+      "publisher": "CFM",
+      "weightBps": 400,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/oem-ssd",
+      "locatorHash": "905b85d54fee56e598f4e79c25ad340263a10c75f762c5ac15e9168aed9997f6",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/oem-ssd\",\"catalog_row_id\":\"N10\",\"cfm_series_id\":100251,\"currency\":\"USD\",\"exact_row_label\":\"OEM SSD 512GB PCIe 4.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100251:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "6585fa2646ed8a2930a32ba392a28cbe088913cc15e56dda549d99911006b88e",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100251",
+      "children": [
+        "KBG60ZNV512G",
+        "MTFDKBA512TGD-1BK1AABYY",
+        "SDDPNQD-512G"
+      ]
+    },
+    {
+      "id": "N11",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100252:LATEST:USD",
+      "parentSourceId": "2baa3324a8aef91a89e165124d15f7057d84b4568f3bd94019ea0709869105e9",
+      "publisher": "CFM",
+      "weightBps": 600,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/oem-ssd",
+      "locatorHash": "905b85d54fee56e598f4e79c25ad340263a10c75f762c5ac15e9168aed9997f6",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/oem-ssd\",\"catalog_row_id\":\"N11\",\"cfm_series_id\":100252,\"currency\":\"USD\",\"exact_row_label\":\"OEM SSD 1TB PCIe 4.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100252:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "2073d0248bd0d22a6b74028bff67ea46188edc53d3af179604b979b0cf5aeb73",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100252",
+      "children": [
+        "KBG60ZNV1T02",
+        "MTFDKBA1T0TGD-1BK1AABYY",
+        "SDDPNQD-1T00"
+      ]
+    },
+    {
+      "id": "N12",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100253:LATEST:USD",
+      "parentSourceId": "51f6d0e88746416194c61a8c320aa3767f343ae55bf8f538d99fb27105396ba5",
+      "publisher": "CFM",
+      "weightBps": 350,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/oem-ssd",
+      "locatorHash": "905b85d54fee56e598f4e79c25ad340263a10c75f762c5ac15e9168aed9997f6",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/oem-ssd\",\"catalog_row_id\":\"N12\",\"cfm_series_id\":100253,\"currency\":\"USD\",\"exact_row_label\":\"OEM SSD 2TB PCIe 4.0\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100253:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "3f0d8f1a9aa2e8ddb90f76996fac483f491bccc279be45a12c410c5d1c14dc9f",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100253",
+      "children": [
+        "KBG60ZNV2T04",
+        "MTFDKBA2T0TGD-1BK1AABYY",
+        "SDDPNQE-2T00"
+      ]
+    },
+    {
+      "id": "N13",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100142:LATEST:USD",
+      "parentSourceId": "bcce486602545cbd0c238c82e9e05162ef3f46c5670bfdfb5fb95e8bf46db91d",
+      "publisher": "CFM",
+      "weightBps": 200,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/emmc",
+      "locatorHash": "19430c66c01d4f0790539bb6f73405fa842cd36de4ce6a528b11049785f2135c",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/emmc\",\"catalog_row_id\":\"N13\",\"cfm_series_id\":100142,\"currency\":\"USD\",\"exact_row_label\":\"eMMC 64GB 5.1\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100142:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "ee6914720743d593e13c1d94c86ccf08e4b0e4ce3b3450c6ea552cfc2d23785a",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100142",
+      "children": [
+        "MTFC64GBCAQTC-WT",
+        "EMMC64G-TY29"
+      ]
+    },
+    {
+      "id": "N14",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100143:LATEST:USD",
+      "parentSourceId": "56030684b122f96bee8c6340751930355e08cd570bdea33345ea5c3cee14c778",
+      "publisher": "CFM",
+      "weightBps": 300,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/emmc",
+      "locatorHash": "19430c66c01d4f0790539bb6f73405fa842cd36de4ce6a528b11049785f2135c",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/emmc\",\"catalog_row_id\":\"N14\",\"cfm_series_id\":100143,\"currency\":\"USD\",\"exact_row_label\":\"eMMC 128GB 5.1\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100143:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "14e22dbef93005d68a2f3bb928fe72ca82f2ac620c28dff6f7fa4245e90721ff",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100143",
+      "children": [
+        "MTFC128GBCAQTC-WT",
+        "EMMC128-TY29"
+      ]
+    },
+    {
+      "id": "N15",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100260:LATEST:USD",
+      "parentSourceId": "d4809e158973146b6a273a46e77430e47d3a32ace985e28185cd7213a79f4313",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/emmc",
+      "locatorHash": "19430c66c01d4f0790539bb6f73405fa842cd36de4ce6a528b11049785f2135c",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/emmc\",\"catalog_row_id\":\"N15\",\"cfm_series_id\":100260,\"currency\":\"USD\",\"exact_row_label\":\"eMMC 256GB 5.1\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100260:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "68754ae704d02ba61c3a909f0c7f1cc2c60f8e3a43c5abc299d7853e43b33bd8",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100260",
+      "children": [
+        "MTFC256GBCAQTC-WT",
+        "EMMC256-TY29"
+      ]
+    },
+    {
+      "id": "N16",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100234:LATEST:USD",
+      "parentSourceId": "d1eea6bfce0559415c0cc88283983ab8112ebc21b2ef71ede19685f02c36c0dc",
+      "publisher": "CFM",
+      "weightBps": 200,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/ufs",
+      "locatorHash": "fd144b850f912a36a03ed57172a54d18a47193cc057f9a7589c81a075148740c",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/ufs\",\"catalog_row_id\":\"N16\",\"cfm_series_id\":100234,\"currency\":\"USD\",\"exact_row_label\":\"UFS 2.2 64GB\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100234:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "18e382dc8641c93c89afad5a5b08032912aab91b59877282fd7dd6189d7973b6",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100234",
+      "children": [
+        "MTFC64GAXAUEA-WT",
+        "FEUDNN064G-C2A46"
+      ]
+    },
+    {
+      "id": "N17",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100185:LATEST:USD",
+      "parentSourceId": "ba0d555ad5e32fbed41b509323f2f8c31bb6320f348a670c54309f80c175dd80",
+      "publisher": "CFM",
+      "weightBps": 300,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/ufs",
+      "locatorHash": "fd144b850f912a36a03ed57172a54d18a47193cc057f9a7589c81a075148740c",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/ufs\",\"catalog_row_id\":\"N17\",\"cfm_series_id\":100185,\"currency\":\"USD\",\"exact_row_label\":\"UFS 2.2 128GB\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100185:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "fb51f78caf08165b2c46869369ec7d182b1c0466ea1f3d4b5a19609b539a39da",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100185",
+      "children": [
+        "MTFC128GAXAUEA-WT",
+        "FEUDNN128G-C2A44"
+      ]
+    },
+    {
+      "id": "N18",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100186:LATEST:USD",
+      "parentSourceId": "9fb2f5ac8552dab9bbed76db70dad636c71fb6f2ab9c1769a0a85cfff0729fff",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": false,
+      "canonicalLocator": "https://www.memorymarket.com/price/ufs",
+      "locatorHash": "fd144b850f912a36a03ed57172a54d18a47193cc057f9a7589c81a075148740c",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"weekly\",\"canonical_locator\":\"https://www.memorymarket.com/price/ufs\",\"catalog_row_id\":\"N18\",\"cfm_series_id\":100186,\"currency\":\"USD\",\"exact_row_label\":\"UFS 2.2 256GB\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100186:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":null}",
+      "definitionHash": "36679c56a9fb95655e32d1cd7b9acca5644a2fc97f2fe9eaf4274d67666b48ce",
+      "detailUrl": "https://www.memorymarket.com/price/ews/100186",
+      "children": [
+        "MTFC256GAXAUEA-WT",
+        "FEUDNN256G-C2A44"
+      ]
+    },
+    {
+      "id": "N19",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100257:LATEST:USD",
+      "parentSourceId": "81306e350819b5c0a0d98af35b0ee01bbbff6a8480523a4d7bd4f9833f79484b",
+      "publisher": "CFM",
+      "weightBps": 750,
+      "directAssessment": true,
+      "canonicalLocator": "https://www.memorymarket.com/price/flash-wafer",
+      "locatorHash": "b8becbaec280db1ca181ba57866bbc96e20dcf51b5d7251f0498e0e05063c055",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"business_day_sessions\",\"canonical_locator\":\"https://www.memorymarket.com/price/flash-wafer\",\"catalog_row_id\":\"N19\",\"cfm_series_id\":100257,\"currency\":\"USD\",\"exact_row_label\":\"1Tb QLC\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100257:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":\"closing_session_at_10_00_UTC\"}",
+      "definitionHash": "83fd5acf5fafd3d6731f6685b03a3e85e101bf38c413b73b4b5a65a31ba91b2f",
+      "detailUrl": "https://www.memorymarket.com/price/in/100257",
+      "children": []
+    },
+    {
+      "id": "N20",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100242:LATEST:USD",
+      "parentSourceId": "40eb7eabf4000d09ad65eaa5ab6ecd984e15d8318a834fff67f9f76f430c2479",
+      "publisher": "CFM",
+      "weightBps": 1000,
+      "directAssessment": true,
+      "canonicalLocator": "https://www.memorymarket.com/price/flash-wafer",
+      "locatorHash": "b8becbaec280db1ca181ba57866bbc96e20dcf51b5d7251f0498e0e05063c055",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"business_day_sessions\",\"canonical_locator\":\"https://www.memorymarket.com/price/flash-wafer\",\"catalog_row_id\":\"N20\",\"cfm_series_id\":100242,\"currency\":\"USD\",\"exact_row_label\":\"1Tb TLC\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100242:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":\"closing_session_at_10_00_UTC\"}",
+      "definitionHash": "caf4321bea248d42259a7a09ccacd6006c8047ca360f585e61e7b47c96be1d27",
+      "detailUrl": "https://www.memorymarket.com/price/in/100242",
+      "children": []
+    },
+    {
+      "id": "N21",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100170:LATEST:USD",
+      "parentSourceId": "f8e18e4d7a00c392f4ccb1369e041a38814589b7c0ce8ca8a9b534acb6c0c097",
+      "publisher": "CFM",
+      "weightBps": 500,
+      "directAssessment": true,
+      "canonicalLocator": "https://www.memorymarket.com/price/flash-wafer",
+      "locatorHash": "b8becbaec280db1ca181ba57866bbc96e20dcf51b5d7251f0498e0e05063c055",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"business_day_sessions\",\"canonical_locator\":\"https://www.memorymarket.com/price/flash-wafer\",\"catalog_row_id\":\"N21\",\"cfm_series_id\":100170,\"currency\":\"USD\",\"exact_row_label\":\"512Gb TLC\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100170:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":\"closing_session_at_10_00_UTC\"}",
+      "definitionHash": "a70c76116408f584e55e450568050b18394314c46b1f9eb0b50b493fdd6cb828",
+      "detailUrl": "https://www.memorymarket.com/price/in/100170",
+      "children": []
+    },
+    {
+      "id": "N22",
+      "product": "NANDX",
+      "parentSourceKey": "CFM:NANDX:100164:LATEST:USD",
+      "parentSourceId": "79087e0526f30e7cc3f2bd3e4adce22b5adc89de1a9e09f9c78e5545d5b30264",
+      "publisher": "CFM",
+      "weightBps": 250,
+      "directAssessment": true,
+      "canonicalLocator": "https://www.memorymarket.com/price/flash-wafer",
+      "locatorHash": "b8becbaec280db1ca181ba57866bbc96e20dcf51b5d7251f0498e0e05063c055",
+      "definitionTranscript": "amoeba-cfm-parent-definition-v1\u0000{\"cadence\":\"business_day_sessions\",\"canonical_locator\":\"https://www.memorymarket.com/price/flash-wafer\",\"catalog_row_id\":\"N22\",\"cfm_series_id\":100164,\"currency\":\"USD\",\"exact_row_label\":\"256Gb TLC\",\"field\":\"Latest\",\"mapping_mode\":\"shared_parent_assessment_proxy\",\"market\":\"NANDX\",\"parent_source_key\":\"CFM:NANDX:100164:LATEST:USD\",\"publisher_cluster_id\":\"CFM\",\"publisher_id\":\"CFM\",\"raw_value_scale\":6,\"schema\":\"amoeba.cfm-parent-definition.proposed-v1\",\"unit_policy\":\"Preserve the publisher gauge unit; no per-GB, per-die or whole-wafer conversion is asserted\",\"value_semantics\":\"CFM published category assessment; not an observed price for any child MPN\",\"wafer_session_selection\":\"closing_session_at_10_00_UTC\"}",
+      "definitionHash": "3a9413eda5273d7efd61715dde303c704bcd7be821f8a028bbd713e5b489dcea",
+      "detailUrl": "https://www.memorymarket.com/price/in/100164",
+      "children": []
+    }
+  ]
+}

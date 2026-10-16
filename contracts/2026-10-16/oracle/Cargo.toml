@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["crates/oracle-interface", "programs/ameba_oracle"]
+
+[workspace.package]
+edition = "2021"
+publish = false
+
+[workspace.dependencies]
+ameba-oracle-interface = { path = "crates/oracle-interface" }
+solana-program = { version = "2.3", default-features = false }
+solana-sdk-ids = "2.2.1"
+solana-system-interface = { version = "1.0", features = ["bincode"] }
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+incremental = false
+debug = 0
+strip = "debuginfo"

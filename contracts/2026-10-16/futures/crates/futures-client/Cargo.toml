@@ -1,0 +1,21 @@
+[package]
+name = "ameba-futures-client"
+version = "0.2.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Off-chain client for the Ameba futures market: addresses, instruction builders, the market decoder, the package proposer and governance binding"
+
+[dependencies]
+ameba-governance-interface = { path = "../../../governance/crates/governance-interface" }
+borsh.workspace = true
+solana-program.workspace = true
+solana-system-interface.workspace = true
+spl-token.workspace = true
+solana-sdk-ids = "2.2.1"
+ameba-oracle-interface.workspace = true
+ameba-futures = { path = "../../programs/futures", features = ["no-entrypoint"] }
+ameba-futures-math = { path = "../futures-math" }
+
+[lints]
+workspace = true

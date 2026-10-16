@@ -1,0 +1,13 @@
+[package]
+name = "ameba-governance-interface"
+version = "0.1.0"
+edition = "2021"
+publish = false
+[features]
+localnet-governance = []
+[dependencies]
+solana-program = { version = "=2.3.0", default-features = false }
+solana-sdk-ids = "=2.2.1"
+
+[build-dependencies]
+solana-pubkey = "=2.4.0"

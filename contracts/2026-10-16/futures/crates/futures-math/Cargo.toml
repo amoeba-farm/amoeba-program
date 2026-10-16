@@ -1,0 +1,12 @@
+[package]
+name = "ameba-futures-math"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Ameba futures: range-claim payoffs, the package graph, the exact off-chain package solver and the on-chain package verifier"
+
+[dependencies]
+
+[lints]
+workspace = true
