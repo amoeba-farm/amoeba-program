@@ -1,0 +1,592 @@
+{
+  "schema": "amoeba.mainnet-verification-completion.v1",
+  "status": "COMPLETED",
+  "assembledAt": "2026-10-16T17:29:24.004Z",
+  "cluster": "mainnet-beta",
+  "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "ceremonyId": "verification-20261016-ea8dd309053d",
+  "missingEvidence": [],
+  "controllerUpgrade": {
+    "proposalId": "64",
+    "sourceCommit": "1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+    "runningRelease": 4,
+    "installedRelease": 5,
+    "artifactSha256": "ea8dd309053dd52c768d8d04e5e0dc73b48bae4a3f289b67638ed328bd767bee",
+    "artifactBytes": 238936,
+    "buildReceiptSha256": "2685683aa51034bbe7285b80a6a6346e51f4c96da66841136903e007091094d3",
+    "capacity": 247400,
+    "extension": {
+      "priorPaddedPayloadSha256": "cd132b437595e557256c157b0b1f50fed5151a8a77bd27d221b0198b80dc859f",
+      "deployedSlot": "457711442",
+      "receipt": {
+        "name": "controller-extend",
+        "signature": "4AU96yqC1yjrGpRAMSjgys3CuTKQeSV8VZJvVfjopasmTXdFBZbq7t2Zf7VDZFQAisLa4eULhDzUAxokCrDphCmM",
+        "slot": 457711442,
+        "err": null,
+        "messageSha256": "c0b9bdf144fb50d3a56315d80da793cc086a20f316263e33de1f7ef337c873ee"
+      }
+    },
+    "buffer": "GXKu5wwwwihmKk53mKvmrPAMDjZd8zwebWe34FQYVMrN",
+    "receipts": [
+      {
+        "name": "upgrade-create",
+        "signature": "2wxwsnz8LVHA3STjiY6RRfYqY8RKgtM9ZgMHVWg6y3vQV9df6KH3RqggyZQqSngyZeDJsv5k4SNAi2xNEYvrvKWt",
+        "slot": 457711968,
+        "err": null,
+        "messageSha256": "86e8de0343ffce4b576ed0f1b4d65f387ebfe3f19a9eedee87437d8a0e0c1534"
+      },
+      {
+        "name": "buffer-create",
+        "signature": "5tY7hXjm1AcudrsqktZpMiXC4SL4MkhJTtQfssj8mbtpBxG4mcP2jc11jCecaa3vVSnnerEkTH1HqRqQqF1sTwyC",
+        "slot": 457713206,
+        "err": null,
+        "messageSha256": "9f09619a5cd7965614464b61902f9b1f1e17da2c6ced19f55725ce3cfc57e434"
+      },
+      {
+        "name": "buffer-seal",
+        "signature": "27EgGpUBFco1MX3ZWRK5rC9n9aCTLXmDocjB2GLwrRQhPHXsWWLYkaffS2WK5gY7nLbq2bGBbw3YTxsermJBmEMH",
+        "slot": 457715516,
+        "err": null,
+        "messageSha256": "6c7123743dd9de79f58876e9b4f031023b47a8610a07b61973e03a58c96e3ff6"
+      },
+      {
+        "name": "verify-0",
+        "signature": "UVXPK36sGyCfHZrAqNoWZwYfFFZzCJeL8qpUvjh5r7HuTzf2rXYWYaNagqt9LE271WwYwwHGSa9ZUyBSycXSP8x",
+        "slot": 457715590,
+        "err": null,
+        "messageSha256": "d7f548d737fd6adb3f671f071f8aae6a3a041c920c6eb98426c1bcdf360eeb41"
+      },
+      {
+        "name": "verify-1",
+        "signature": "25cYNfDSYENL3wJW4kmxFbhKH4SYRrWh1B5s95WM5BhzVGrFxXYpSXyfXhum8jUJso9xQ5YE9HH8qh1rZxpNZNtS",
+        "slot": 457715606,
+        "err": null,
+        "messageSha256": "21a23fafc60fc40fc760eb9f741403beb26c3795a691ae37514a35b9b000bc23"
+      },
+      {
+        "name": "verify-2",
+        "signature": "2kE39XAPxzA5ik8nyZuvQkgMM2Un9ecv7XHCLE99QC52TfcCqBFaU1KXQzMGEowmseJJC6isA985yeALrp313XmF",
+        "slot": 457715621,
+        "err": null,
+        "messageSha256": "2ddd7529278891bd03b8213cc112c05efa27668ab1e377f64c1b5aeaa166097e"
+      },
+      {
+        "name": "verify-3",
+        "signature": "598aD8cU8JsJNbQ3p7rhqRBqxN73Mfy6m8d4YnDPBD77UrWG3pGecvkoncRbvpsaLvgHQRZKsTWCPWMQwwJaA8Ln",
+        "slot": 457715636,
+        "err": null,
+        "messageSha256": "2c6ac6c5162a71fcc87796d091f15c7da1d3d2423e8fadadb4160bb4d49d9921"
+      },
+      {
+        "name": "verify-4",
+        "signature": "2LnPLK6T6PX2mKsgHESdnP11pfSsC7tj6bKwbVUUkNYza8UPbhc9vU73JZTYCgek3NwAfLeyz3Rh3cW9oyA1Fr2S",
+        "slot": 457715652,
+        "err": null,
+        "messageSha256": "44b3e77bde3aa24196b485a4811a1864a57801f309c049fe457834c45151e265"
+      },
+      {
+        "name": "verify-5",
+        "signature": "2FrkP8VWCupo66kh65ZA3bmEjVgc6Hix2vVPAGdNWPwJSoW965wEt8NaYQX5WFCFBqBvTHaCuE759ztSN42DkybZ",
+        "slot": 457715667,
+        "err": null,
+        "messageSha256": "77e7150c629338911f780576890ccb621ce017b0df4e0f9abd6d18550ebec8b4"
+      },
+      {
+        "name": "verify-6",
+        "signature": "3ppEBtf4EF7r4qWUHbkbKMu6qs3bFXvCAmxfAxcyy3FgUsgQQC8ZCyH5iBQFn5FvKgm2KYLTaRkaVJeaLwdt4TrW",
+        "slot": 457715681,
+        "err": null,
+        "messageSha256": "71182b38e424510c795be3c5025968b405c7357c6b4823fc6a089a607f6ae3c8"
+      },
+      {
+        "name": "verify-7",
+        "signature": "wcMsJcvvYHUwKbWpKdukc5JHFAQ95JeCCYps4EuzavnQcNSFgsrVcmYRpSQEgBzUNyZ3MbVgEcWmL2r9NFN6aQH",
+        "slot": 457715697,
+        "err": null,
+        "messageSha256": "91d5aa90555f224cefe54443aff1ec0b3c4d1d5ad9158eff42abc047d16ec547"
+      },
+      {
+        "name": "verify-8",
+        "signature": "4H6gekjhwTwr5Lsc1GPvkEgjo491gK4yYG9aULDqiN3xRdyWBtfud6B3yEKWpmw3A2oapyX3bo14hWwYnABTMYf",
+        "slot": 457715713,
+        "err": null,
+        "messageSha256": "eb2e14c3abfa29db1bcebdde01dbf000dd209a0db17cf595207cff41a4951c29"
+      },
+      {
+        "name": "verify-9",
+        "signature": "4kGJayjhwz6UP9fJyw3PhHwrNvWuoANyMH2EJQXgJ1zHwrfkoNyJBMbScTTX3SRbvVYqW2NdgoXQR8usek8FyTvQ",
+        "slot": 457715728,
+        "err": null,
+        "messageSha256": "72fed03528a8c93b79b4af8e996a9e551bd44ee6720584243b78a8b4cfab5a8b"
+      },
+      {
+        "name": "verify-10",
+        "signature": "5WpbLTBMiVdNSqUBjsDd49nUvRKnj4TTmmwgS3GfSY1UykWf9fQ7dJ4gYxpXnxNBBHmuKmvdKLfLtWNkp3L3vVX4",
+        "slot": 457715743,
+        "err": null,
+        "messageSha256": "60755be0582b48424f0abcdbb08b686e034d2ec1a8ef8ee81754e0fc02a09af0"
+      },
+      {
+        "name": "verify-11",
+        "signature": "sjN5guo5kni9EW2YjhgKiYwKap78LYdtXV18WjeBquMoPdLcTi8FE449hh48dcbwEnrDk8XrXP8Lf4y1idKgZM9",
+        "slot": 457715758,
+        "err": null,
+        "messageSha256": "2633ef59e3471ef68c7e34759c014c3589003cb60477773e525ef1f4a6ef011d"
+      },
+      {
+        "name": "verify-12",
+        "signature": "2aHr5Z8zT6y8GZBAu98MbH8A31yBUffeusFKtd96byDht3AuTgefjJX5XvDrYjAn4eCyGPVTwhTChTgJ95q4GYAT",
+        "slot": 457715774,
+        "err": null,
+        "messageSha256": "a1f000507879cc41d7b13953f015392ea3d3cf2941186984bb2bfe141d865944"
+      },
+      {
+        "name": "verify-13",
+        "signature": "2rTkTYHH1oCuHe2egRDZk91ox4xRzMzdhgGFCXejEGD3HivLtZdjWhK3pyHFaYfy1ZCqVEhQVo1koCRWrMyVWAcJ",
+        "slot": 457715789,
+        "err": null,
+        "messageSha256": "a22d002213413d6308f0bf7beaa1de9f79094cee66fa5583b32d34f487c1c6d7"
+      },
+      {
+        "name": "verify-14",
+        "signature": "2r1aBFRfhuAZAna6ouVce8fwKek24kWjnXvAcFtqW1cE8yeRVyDtGVByLNz3v8srHphjuDRMsuoL2ruEwys9pt4N",
+        "slot": 457715804,
+        "err": null,
+        "messageSha256": "0d25d542a5cdfdb6c704a0c6b0a397d7c380b6db7b7be6c3cc4f36f55b2ddb43"
+      },
+      {
+        "name": "upgrade-approve",
+        "signature": "67AZK7tPs3WB5w9pyCjHWTnPMeD2dd274YHnCCxhSBTo9K4jEYUgec5wntWvttBkaGS8vFgt4NTezehAKNnuRo1i",
+        "slot": 457715893,
+        "err": null,
+        "messageSha256": "38a7250cbc4a75bee93766c8b1b3071ff356649e8dea16e8972460e7dfe398a9"
+      },
+      {
+        "name": "upgrade-execute",
+        "signature": "2ft6euZZSVfpvwxabmoAtZBv8oFbrJNSL9kPfygAn6gEeoujvNtBd2qoAGVJTazKaUHU33Zn28Ve4YzCYi9Aogv9",
+        "slot": 457716212,
+        "err": null,
+        "messageSha256": "605dca5a752dfa8846ab9cc2568c3e2b18c0565647ac267df4ce909209e5bc1d"
+      }
+    ],
+    "installedAuthority": "Frc28QFQxqUxF9HPgzcmm5VkqorqUb2LeLPE5uKU6Ycp"
+  },
+  "programs": [
+    {
+      "name": "controller",
+      "program": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+      "authority": "Frc28QFQxqUxF9HPgzcmm5VkqorqUb2LeLPE5uKU6Ycp",
+      "repository": "https://github.com/amoeba-farm/amoeba-governance",
+      "commit": "1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+      "hash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+      "expectedExecutableHash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+      "installedProgramData": {
+        "deployedSlot": "457716212",
+        "capacity": 247400,
+        "payloadSha256": "3a6e449fd2b02a757b0948a0608a203ab5cd18c2f46f0bcb22ec3df917a1ac1d"
+      },
+      "metadata": {
+        "address": "H6TGQ8KDAf7MWixKwTKRzLZetCiEhzZXAbpF3bahWDwQ",
+        "proposalId": "65",
+        "recipe": {
+          "version": "0.5.1",
+          "repository": "https://github.com/amoeba-farm/amoeba-governance",
+          "commit": "1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+          "args": [
+            "--library-name",
+            "governance_controller_v3",
+            "--base-image",
+            "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+            "--arch",
+            "v1"
+          ],
+          "deployedSlot": "457716212"
+        },
+        "recipeSha256": "c07f46eb61afbf4625c8998060d16188c49ac8703acd53b01cc50e33cb590dea",
+        "fullRecordSha256": "d00e39cd973f11f7e38661f3e945b516ae522cb7d2fb985b49082f9e7ae2ff4b",
+        "recordBytes": 384,
+        "finalizedObservationSlot": 457717930,
+        "receipts": [
+          {
+            "name": "metadata-controller-create",
+            "signature": "4pqUfDEFfhQuZchxAmzW5b363ZcioQWmTbCohFwDoG8F1XuQMfh9eNXbajmsc5sTxTPHWotQguTmuZhYYgJof3zd",
+            "slot": 457716929,
+            "err": null,
+            "messageSha256": "270b52d9b74431ee3e1d3961d376d219e0de0a46126301fbdec2ec7aa1b47090"
+          },
+          {
+            "name": "metadata-controller-approve",
+            "signature": "57F2c7ai9C2X7d7jkLskbGuN9PjuqWtTaQeVAqdeBZ2E3LGQassrqKTTT5ZZGDWTc7QDxbAWQGKUXhMVJZMU5VpW",
+            "slot": 457717016,
+            "err": null,
+            "messageSha256": "9ced4b3d5240d554b4755a2d12b95107cc6ca60af31969746e2a91de807dc4b7"
+          },
+          {
+            "name": "metadata-controller-execute",
+            "signature": "w3UxqWUm716z2tVBcHA4Mn3DZg6GoTgWxe4fnwn7oUaDu7WTZcmbySVpmDMeJc7dtNGu1BQHwgWNTyf51Eo5DWY",
+            "slot": 457717879,
+            "err": null,
+            "messageSha256": "94a86ff8f88bffa5f6b127bf0550dd294551cdf225f326ef269fe8c9e0f4ec91"
+          }
+        ]
+      },
+      "hosted": {
+        "submission": {
+          "httpStatus": 200,
+          "observedAt": "2026-10-16T17:18:49.931Z",
+          "status": "in_progress",
+          "requestId": "2add9611-9af2-4810-a009-b8096f527f64"
+        },
+        "job": {
+          "on_chain_hash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+          "executable_hash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-governance/tree/1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+          "status": "completed"
+        },
+        "jobUrl": "https://verify.osec.io/job/2add9611-9af2-4810-a009-b8096f527f64",
+        "canonical": {
+          "url": "https://verify.osec.io/status/8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+          "observedAt": "2026-10-16T17:20:32.487Z",
+          "is_verified": true,
+          "on_chain_hash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+          "executable_hash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+          "commit": "1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-governance/tree/1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+          "is_closed": false
+        },
+        "authority": {
+          "url": "https://verify.osec.io/status-all/8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+          "observedAt": "2026-10-16T17:20:32.715Z",
+          "is_verified": true,
+          "on_chain_hash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+          "executable_hash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+          "commit": "1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-governance/tree/1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+          "is_closed": false,
+          "signer": "Frc28QFQxqUxF9HPgzcmm5VkqorqUb2LeLPE5uKU6Ycp"
+        }
+      }
+    },
+    {
+      "name": "oracle",
+      "program": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+      "authority": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+      "repository": "https://github.com/amoeba-farm/amoeba-program",
+      "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+      "hash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+      "expectedExecutableHash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+      "installedProgramData": {
+        "deployedSlot": "457528207",
+        "capacity": 707424,
+        "payloadSha256": "4ebbb73b8c0aaac0e07f74b640325c1bae5f990dff9ce7faff36d0a56e4cabb7"
+      },
+      "metadata": {
+        "address": "FQbSSZeS3tiRweHeni4qcteqTBgtQkSz3rbsnM1rrqUn",
+        "proposalId": "66",
+        "recipe": {
+          "version": "0.5.2",
+          "repository": "https://github.com/amoeba-farm/amoeba-program",
+          "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "args": [
+            "--workspace-path",
+            "oracle",
+            "--library-name",
+            "ameba_oracle",
+            "--base-image",
+            "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/gate-final@sha256:7ad1e567f19831e658f5b892a7269d23d7f1826438e025b5d9d2e385240a4d67",
+            "--arch",
+            "v1",
+            "--cargo-build-sbf-args",
+            "--tools-version v1.53"
+          ],
+          "deployedSlot": "457528207"
+        },
+        "recipeSha256": "0941214887425642912443def389999e42e1ef0feff089c2f8807857f64c28e3",
+        "fullRecordSha256": "0d63515f945801846e563d71311b440f4fed0273cbee74270366274f6b4fee0d",
+        "recordBytes": 486,
+        "finalizedObservationSlot": 457719893,
+        "receipts": [
+          {
+            "name": "metadata-oracle-create",
+            "signature": "4u2ZqBbf2Vr2zZ1wcBsFjMFUxBih8bPzwf2QQo92bqv1Vk5HKN73g8mxa3iJREYSqLtqmwgVVTjva121JJbuVKHz",
+            "slot": 457717094,
+            "err": null,
+            "messageSha256": "0d48ab7db4d40b14c803177ffa1a9a963618f9ff33c9455c6bf03f1307cfd930"
+          },
+          {
+            "name": "metadata-oracle-approve",
+            "signature": "47gDzixQrvZfYkki8FUJJYongBxitFXhjXcfV87xkJLUF3fZEZuhS3auEiHLDM5H4ismY1ypnsxP9DVRxqUbt7We",
+            "slot": 457717156,
+            "err": null,
+            "messageSha256": "11363db85fa986d7891731ab2275ef1f5471947d46578631460eae60298fd13a"
+          },
+          {
+            "name": "metadata-oracle-execute",
+            "signature": "3Zvei4vu1UrNJ38faDnRatCkniE1Kpbak2ZpX1E4AzbXouLzUimhYD9ESmMMSiv8pbKDUgr4oMJokANdJyef5pfr",
+            "slot": 457719848,
+            "err": null,
+            "messageSha256": "9bfd1f20d808bafa519cc3db1a6a4e41c8e3dad104c510a62d1641b5bb5c5d66",
+            "recoveredFrom": "58jQMApi1wbB21VTtTge43uyAu4XHZ6fcZaZ7sPhGfPdjSRQ4VXVQKaf9znGr1CiasBTAhgk6j1HH9p4nYEa9yeV",
+            "retryJournal": "metadata-oracle-execute-retry-1",
+            "recoverySignature": "3Zvei4vu1UrNJ38faDnRatCkniE1Kpbak2ZpX1E4AzbXouLzUimhYD9ESmMMSiv8pbKDUgr4oMJokANdJyef5pfr"
+          }
+        ]
+      },
+      "hosted": {
+        "submission": {
+          "httpStatus": 200,
+          "observedAt": "2026-10-16T17:25:43.472Z",
+          "status": "in_progress",
+          "requestId": "ed6aed39-770f-4013-acd8-a260acd1dd8b"
+        },
+        "job": {
+          "on_chain_hash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+          "executable_hash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "status": "completed"
+        },
+        "jobUrl": "https://verify.osec.io/job/ed6aed39-770f-4013-acd8-a260acd1dd8b",
+        "canonical": {
+          "url": "https://verify.osec.io/status/45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+          "observedAt": "2026-10-16T17:27:44.059Z",
+          "is_verified": true,
+          "on_chain_hash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+          "executable_hash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+          "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "is_closed": false
+        },
+        "authority": {
+          "url": "https://verify.osec.io/status-all/45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+          "observedAt": "2026-10-16T17:27:44.232Z",
+          "is_verified": true,
+          "on_chain_hash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+          "executable_hash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+          "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "is_closed": false,
+          "signer": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7"
+        }
+      }
+    },
+    {
+      "name": "futures",
+      "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+      "authority": "Gi964re8sQK2Z1fNszd2c7RVUxLeK6nbc6jok6dBkpLx",
+      "repository": "https://github.com/amoeba-farm/amoeba-program",
+      "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+      "hash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+      "expectedExecutableHash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+      "installedProgramData": {
+        "deployedSlot": "457530127",
+        "capacity": 420984,
+        "payloadSha256": "2f1fc1077b8b77ef28b29994084537fcfd093741bd01944a41fa2ff99ab56f4f"
+      },
+      "metadata": {
+        "address": "4y2644qGMYJtqeSkJVPLiqBruscYd4LqCioFTmWNMMWg",
+        "proposalId": "67",
+        "recipe": {
+          "version": "0.5.2",
+          "repository": "https://github.com/amoeba-farm/amoeba-program",
+          "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "args": [
+            "--workspace-path",
+            "futures",
+            "--library-name",
+            "ameba_futures",
+            "--base-image",
+            "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/gate-final@sha256:7ad1e567f19831e658f5b892a7269d23d7f1826438e025b5d9d2e385240a4d67",
+            "--arch",
+            "v1",
+            "--cargo-build-sbf-args",
+            "--tools-version v1.53"
+          ],
+          "deployedSlot": "457530127"
+        },
+        "recipeSha256": "76a56654d2adca9874d300ba54a0922ab48eb81712f1d90d500a12706514a2cb",
+        "fullRecordSha256": "e3ade7e934fd19af22ffc2992a04571ad271ef1d16ab901c82eee28d3402a423",
+        "recordBytes": 488,
+        "finalizedObservationSlot": 457720328,
+        "receipts": [
+          {
+            "name": "metadata-futures-create",
+            "signature": "3C4gNSHCHNpC2PTfDJRiKjjv2LunwvZ3raqNuqGVvQrPbU2yHFgCwCEmReXVFJ9nTmrHWkfktSFiehe921UHZ8xu",
+            "slot": 457717227,
+            "err": null,
+            "messageSha256": "91c503e79d0f86cca9fc315ccf3679dc04fd4c911128484ddb1cc43a8f7b5ff9"
+          },
+          {
+            "name": "metadata-futures-approve",
+            "signature": "5DnsmotYV8xVSPy2nhJd9SpfroLZf7Xd7SwYFbws8t4gkq6QkKymGkPMEKnZn49ru1ZRJg6kJYpWKXgBxKDwmfDw",
+            "slot": 457717290,
+            "err": null,
+            "messageSha256": "0b2eb1c26313d5b29fe6dfc6ac41e3d38d3fff4404aa28b110d01b5573fe9946"
+          },
+          {
+            "name": "metadata-futures-execute",
+            "signature": "3FofQg9tAdcWMaR8VgiztpiWp5o5D7yhvZbcrxjXFPSB1mm5sqUT2dH1bRJFdTn6ui8LTar1S14r7y7Zo2ASGzYo",
+            "slot": 457720283,
+            "err": null,
+            "messageSha256": "da085a87092325e885276b4ecec3d14a3247d172f8d0b26f301401bfdf059a72"
+          }
+        ]
+      },
+      "hosted": {
+        "submission": {
+          "httpStatus": 200,
+          "observedAt": "2026-10-16T17:27:14.993Z",
+          "status": "in_progress",
+          "requestId": "fc90b07f-5ab4-4ca1-aa43-d274bd081d8b"
+        },
+        "job": {
+          "on_chain_hash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+          "executable_hash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "status": "completed"
+        },
+        "jobUrl": "https://verify.osec.io/job/fc90b07f-5ab4-4ca1-aa43-d274bd081d8b",
+        "canonical": {
+          "url": "https://verify.osec.io/status/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+          "observedAt": "2026-10-16T17:29:13.295Z",
+          "is_verified": true,
+          "on_chain_hash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+          "executable_hash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+          "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "is_closed": false
+        },
+        "authority": {
+          "url": "https://verify.osec.io/status-all/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+          "observedAt": "2026-10-16T17:29:13.465Z",
+          "is_verified": true,
+          "on_chain_hash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+          "executable_hash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+          "commit": "624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7",
+          "is_closed": false,
+          "signer": "Gi964re8sQK2Z1fNszd2c7RVUxLeK6nbc6jok6dBkpLx"
+        }
+      }
+    }
+  ],
+  "qualification": {
+    "sourceCommit": "1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe",
+    "checks": {
+      "typescriptFocusedTests": "3 passed: fixed wire/rejection, both new target recipes and authority accounts, unchanged legacy recipe hashes",
+      "typescriptTypecheck": "passed final recipe source",
+      "rustFocusedUnitTests": "3 passed final recipe source: new recipes, unknown/zero rejection, old controller/Spread exact digests",
+      "controllerReleaseBindingTest": "1 passed; candidate release5 expectation",
+      "actualSbfIntegration": {
+        "result": "1 passed; 0 failed; executes four target cases sequentially",
+        "targets": [
+          "controller self",
+          "Spread 2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw",
+          "Oracle 45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+          "Futures Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu"
+        ],
+        "logSha256": "16a1fa397c45b0db56b93ce3da46e5ce41a1be67471eff27f0b9888ac899019b"
+      }
+    },
+    "limitations": [
+      "Offline assembly validates saved evidence consistency; it does not refresh chain or hosted state.",
+      "No network, chain submission, signing or publication is performed by this assembler.",
+      "Fresh finalized postflight evidence supplies installed state, exact metadata, authority balances, closed buffer and its transaction-derived treasury refund; this assembler does not independently refresh those observations."
+    ]
+  },
+  "finalizedObservationSlot": 457720434,
+  "postflight": {
+    "observedAt": "2026-10-16T17:27:31.594Z",
+    "finalizedObservationSlot": 457720434,
+    "bufferClosed": true,
+    "bufferRefundLamports": 1214633080,
+    "upgradeFeeLamports": 6400,
+    "upgradeTransaction": "2ft6euZZSVfpvwxabmoAtZBv8oFbrJNSL9kPfygAn6gEeoujvNtBd2qoAGVJTazKaUHU33Zn28Ve4YzCYi9Aogv9",
+    "council": {
+      "bump": 254,
+      "controller": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+      "programdata": "7eW9UXcCDrpEAQ93fP7o2zgGMKhAKi3zJLihELjR8xYd",
+      "authority": "Frc28QFQxqUxF9HPgzcmm5VkqorqUb2LeLPE5uKU6Ycp",
+      "treasury": "8XUjnzVzR71DaVuqbSHaNev5H4vrxofyFP4iZt2FXa1j",
+      "seats": [
+        "pSutXCyMTkwvzG1kpiHXULkVKyzz8NPSNgnjLgwNcTu",
+        "4vrxWeSfCoJA8KvzCcWGgG4C5S4gPYrLaRWysycJeVpz",
+        "DgMGtSjUg1wXPZuPBT6HqGN3qRLVBJCqYrv31XtcwcBR",
+        "4SJyALW3CinnBrFUzHeJL6v5KM12hw2FGLL1wbVTVfn8",
+        "Cmd42MrYC7CVyQNGq7GRkTqR3jQ8cBPKzjzDpsc5eNW4"
+      ],
+      "councilEpoch": "1",
+      "timingVersion": "2",
+      "timing": {
+        "reviewSlots": "1512000",
+        "delaySlots": "150",
+        "expirySlots": "2592000"
+      },
+      "nextId": "68"
+    },
+    "programs": [
+      {
+        "name": "controller",
+        "program": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+        "deployedSlot": "457716212",
+        "capacity": 247400,
+        "payloadSha256": "3a6e449fd2b02a757b0948a0608a203ab5cd18c2f46f0bcb22ec3df917a1ac1d",
+        "executableHash": "b01c4c564a4fce983b060cfb38cfcd5b0f1b96a65e0b480670699ff3b1d780e1",
+        "authority": "Frc28QFQxqUxF9HPgzcmm5VkqorqUb2LeLPE5uKU6Ycp",
+        "authorityLamports": 0,
+        "metadata": "H6TGQ8KDAf7MWixKwTKRzLZetCiEhzZXAbpF3bahWDwQ",
+        "metadataRecordSha256": "d00e39cd973f11f7e38661f3e945b516ae522cb7d2fb985b49082f9e7ae2ff4b",
+        "metadataLamports": 2600960
+      },
+      {
+        "name": "oracle",
+        "program": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+        "deployedSlot": "457528207",
+        "capacity": 707424,
+        "payloadSha256": "4ebbb73b8c0aaac0e07f74b640325c1bae5f990dff9ce7faff36d0a56e4cabb7",
+        "executableHash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+        "authority": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+        "authorityLamports": 0,
+        "metadata": "FQbSSZeS3tiRweHeni4qcteqTBgtQkSz3rbsnM1rrqUn",
+        "metadataRecordSha256": "0d63515f945801846e563d71311b440f4fed0273cbee74270366274f6b4fee0d",
+        "metadataLamports": 3119120
+      },
+      {
+        "name": "futures",
+        "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+        "deployedSlot": "457530127",
+        "capacity": 420984,
+        "payloadSha256": "2f1fc1077b8b77ef28b29994084537fcfd093741bd01944a41fa2ff99ab56f4f",
+        "executableHash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+        "authority": "Gi964re8sQK2Z1fNszd2c7RVUxLeK6nbc6jok6dBkpLx",
+        "authorityLamports": 0,
+        "metadata": "4y2644qGMYJtqeSkJVPLiqBruscYd4LqCioFTmWNMMWg",
+        "metadataRecordSha256": "e3ade7e934fd19af22ffc2992a04571ad271ef1d16ab901c82eee28d3402a423",
+        "metadataLamports": 3129280
+      }
+    ]
+  },
+  "oracleRecovery": {
+    "originalSignature": "58jQMApi1wbB21VTtTge43uyAu4XHZ6fcZaZ7sPhGfPdjSRQ4VXVQKaf9znGr1CiasBTAhgk6j1HH9p4nYEa9yeV",
+    "lastValidBlockHeight": 435753895,
+    "finalizedExpiryObservation": {
+      "observedAt": "2026-10-16T17:25:15.545Z",
+      "slot": 457719800,
+      "finalizedBlockHeight": 435755577,
+      "signatureStatus": null,
+      "blockhashValid": false,
+      "proposalId": "66",
+      "recordSha256": "0d63515f945801846e563d71311b440f4fed0273cbee74270366274f6b4fee0d"
+    },
+    "retryJournal": "metadata-oracle-execute-retry-1",
+    "serverRetries": 3,
+    "replacementSignature": "3Zvei4vu1UrNJ38faDnRatCkniE1Kpbak2ZpX1E4AzbXouLzUimhYD9ESmMMSiv8pbKDUgr4oMJokANdJyef5pfr",
+    "replacementMessageSha256": "9bfd1f20d808bafa519cc3db1a6a4e41c8e3dad104c510a62d1641b5bb5c5d66",
+    "finalizedReceipt": {
+      "name": "metadata-oracle-execute-retry-1",
+      "signature": "3Zvei4vu1UrNJ38faDnRatCkniE1Kpbak2ZpX1E4AzbXouLzUimhYD9ESmMMSiv8pbKDUgr4oMJokANdJyef5pfr",
+      "slot": 457719848,
+      "err": null,
+      "messageSha256": "9bfd1f20d808bafa519cc3db1a6a4e41c8e3dad104c510a62d1641b5bb5c5d66"
+    }
+  }
+}

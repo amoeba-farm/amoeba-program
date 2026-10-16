@@ -19,11 +19,16 @@ The earlier index-options / Spread program remains in
 | Range futures | `Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu` | [Solana Verified Builds status](https://verify.osec.io/status/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu) |
 | Governance controller | `8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx` | [Solana Verified Builds status](https://verify.osec.io/status/8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx) |
 
-Public verification of these current deployments is pending. The links report
-the verifier's current result; source publication alone is not verification.
-Oracle and futures source and installation records are in
-[contracts/2026-10-16](contracts/2026-10-16). The controller source is in
-[amoeba-governance](https://github.com/amoeba-farm/amoeba-governance).
+All three current Mainnet programs have passed hosted source verification.
+[Finalized metadata and hosted-verification evidence](deployment-evidence/mainnet-verification-20261016-completed.json)
+records the selected source commits, deployed hashes, authority-signed records
+and verifier jobs. Oracle and futures match their
+[published source](https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7)
+and their existing installed binaries; neither program required an upgrade.
+The controller matches
+[release-5 source](https://github.com/amoeba-farm/amoeba-governance/tree/1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe).
+Original source and installation records remain in
+[contracts/2026-10-16](contracts/2026-10-16).
 
 The earlier Mainnet Spread program
 `2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw` is closed. Its

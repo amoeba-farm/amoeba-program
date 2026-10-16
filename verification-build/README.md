@@ -20,5 +20,7 @@ installation record before publishing verification metadata. A matching local
 build and a successful hosted verification are distinct results; this recipe
 alone claims neither. [REPRODUCTION.json](REPRODUCTION.json) records the local
 container builds that exactly match the installed oracle and futures binaries.
-Hosted verification remains pending. Historical Spread recipes and records
+Hosted verification is recorded in
+[the completion receipt](../deployment-evidence/mainnet-verification-20261016-completed.json).
+Historical Spread recipes and records
 remain unchanged.

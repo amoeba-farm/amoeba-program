@@ -54,8 +54,9 @@ original environment. Cargo source-path metadata affects their bytes: rebuilding
 the checkout must use the original absolute build path to reproduce them.
 [The container recipe](../../verification-build/README.md) preserves that path;
 [the reproduction receipt](../../verification-build/REPRODUCTION.json) records
-matching oracle and futures builds using the published immutable image. Public
-verifier registration and on-chain source-verification metadata remain pending.
+matching oracle and futures builds using the published immutable image.
+Finalized authority-signed metadata and hosted-verifier results are recorded in
+[the completion receipt](../../deployment-evidence/mainnet-verification-20261016-completed.json).
 
 The later monorepo launch-tool corrections through
 `37af722bb47ffa44a5f14dea9cba6bf25212cb49` change host operations, not these
