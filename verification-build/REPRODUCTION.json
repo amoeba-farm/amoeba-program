@@ -1,0 +1,48 @@
+{
+  "schema": "amoeba.original-path-reproduction.v1",
+  "date": "2026-10-16",
+  "sourceCommit": "4caf83f080f7541b1f741e63871c8d701b398e9b",
+  "sourceInventorySha256": "5f6c9d0c39e2d096583aecff868270168f009f46eb51e135e033fa7c96c6eec9",
+  "sourceRoot": "repository root",
+  "image": "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/gate-final@sha256:7ad1e567f19831e658f5b892a7269d23d7f1826438e025b5d9d2e385240a4d67",
+  "parentImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+  "imageWorkdir": "/opt/ameba-dev/worktrees/gate-final",
+  "verifierVersion": "0.5.2",
+  "verifierLinuxBinarySha256": "b9d5ccce9634dc14269cab3e7a58649bc141b3306e7735a94478c936341f211f",
+  "arch": "v1",
+  "platformToolsVersion": "v1.53",
+  "features": "default production features",
+  "programs": [
+    {
+      "name": "oracle",
+      "address": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+      "workspace": "oracle",
+      "library": "ameba_oracle",
+      "bytes": 707424,
+      "artifactSha256": "4ebbb73b8c0aaac0e07f74b640325c1bae5f990dff9ce7faff36d0a56e4cabb7",
+      "verifierExecutableHash": "f1ccd350b2f10f0dfea335898ca2259d54b9d29388f7323f358cd42f05b4a315",
+      "matchesInstalledProgram": true
+    },
+    {
+      "name": "futures",
+      "address": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+      "workspace": "futures",
+      "library": "ameba_futures",
+      "bytes": 420984,
+      "artifactSha256": "2f1fc1077b8b77ef28b29994084537fcfd093741bd01944a41fa2ff99ab56f4f",
+      "verifierExecutableHash": "53eb6129f86e0bec381595404bd723005c074f323a0599b35ef61ccbfcd2a667",
+      "matchesInstalledProgram": true
+    }
+  ],
+  "chainComparison": {
+    "cluster": "mainnet-beta",
+    "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+    "provider": "Helius",
+    "commitment": "finalized",
+    "slot": 457698625,
+    "executableHashMethod": "SHA-256 of ProgramData payload after its 45-byte header, with trailing zero bytes removed"
+  },
+  "scope": "Local container reproduction and finalized chain-byte comparison",
+  "hostedVerificationComplete": false,
+  "programUpgradePerformed": false
+}

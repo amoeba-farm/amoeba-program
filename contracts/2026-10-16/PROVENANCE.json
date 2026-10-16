@@ -22,7 +22,7 @@
   "laterHostOpsCommit": "37af722bb47ffa44a5f14dea9cba6bf25212cb49",
   "laterHostOpsIncluded": false,
   "binaryIncludedInGit": false,
-  "independentDeployedByteReproductionClaimed": false,
+  "independentDeployedByteReproductionClaimed": true,
   "publicVerifierRegistrationClaimed": false,
   "validation": {
     "sourceInventoryAndGitBlobs": "passed",
@@ -33,6 +33,15 @@
       "governance"
     ],
     "highConfidenceCredentialPatternsFound": 0,
-    "sbfBuildRerun": false
-  }
+    "sbfBuildRerun": true
+  },
+  "publicSourceRoot": ".",
+  "publicWorkspacePaths": [
+    "oracle",
+    "futures",
+    "governance"
+  ],
+  "verificationBuildRecipe": "verification-build/Dockerfile",
+  "verificationReproductionReceipt": "verification-build/REPRODUCTION.json",
+  "sourceLayoutNote": "Original inventory paths now resolve from the repository root; source bytes, Git blob hashes and historical installation receipts are unchanged."
 }

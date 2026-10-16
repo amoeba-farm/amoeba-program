@@ -1,19 +1,43 @@
 # Amoeba Program
 
-Solana smart contracts for Amoeba's index options protocol. The program implements
-collateral custody, oracle source selection, contract issuance, settlement, and
-an integrated discrete liquidity market maker (DLMM).
+Solana smart contracts for Amoeba's oracle and range-futures markets, together
+with the preserved source of its earlier index-options / Spread program.
 
 [Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
-The newer Mainnet oracle and range-futures programs are distributed separately
-under [contracts/2026-10-16](contracts/2026-10-16), with their exact source
-inventory, installed-artifact hashes and build qualification boundaries. The
-existing root below preserves the historical index-options / Spread program.
+The Mainnet oracle and range-futures source is in [oracle](oracle) and
+[futures](futures). [contracts/2026-10-16](contracts/2026-10-16) records their exact
+source inventory, installed-artifact hashes and build qualification boundaries.
+The earlier index-options / Spread program remains in
+[programs/light_token_minter](programs/light_token_minter).
+
+## Mainnet programs
+
+| Program | Address | Verification |
+| --- | --- | --- |
+| Oracle | `45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS` | [Solana Verified Builds status](https://verify.osec.io/status/45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS) |
+| Range futures | `Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu` | [Solana Verified Builds status](https://verify.osec.io/status/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu) |
+| Governance controller | `8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx` | [Solana Verified Builds status](https://verify.osec.io/status/8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx) |
+
+Public verification of these current deployments is pending. The links report
+the verifier's current result; source publication alone is not verification.
+Oracle and futures source and installation records are in
+[contracts/2026-10-16](contracts/2026-10-16). The controller source is in
+[amoeba-governance](https://github.com/amoeba-farm/amoeba-governance).
+
+The earlier Mainnet Spread program
+`2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw` is closed. Its
+[historical verification status](https://verify.osec.io/status/2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw)
+and source remain available. Mainnet status links do not attest historical
+Devnet deployments at the same addresses.
 
 ## Source
 
-The Rust program is in [`programs/light_token_minter`](programs/light_token_minter).
+The current programs are in [`oracle/programs/ameba_oracle`](oracle/programs/ameba_oracle)
+and [`futures/programs/futures`](futures/programs/futures). Their reproducible
+build recipe is in [verification-build](verification-build).
+
+The historical Spread program is in [`programs/light_token_minter`](programs/light_token_minter).
 
 | Path | Contents |
 | --- | --- |
@@ -36,12 +60,13 @@ cargo check --manifest-path programs/light_token_minter/Cargo.toml \
 
 ## Deployment and verification
 
-This source tree supports Devnet and Mainnet profiles. The latest attested Mainnet
-artifact, deployment slot, build inputs, and gate snapshot are recorded in
-[`MAINNET_BUILD.json`](MAINNET_BUILD.json); historical Devnet configuration remains
-in [Devnet configuration](deployments/devnet-v3.json).
+The historical Spread source tree supports Devnet and Mainnet profiles.
+[`MAINNET_BUILD.json`](MAINNET_BUILD.json) describes an earlier prepared release
+with a pending deployment status; it is not the current futures installation.
+Historical Devnet configuration remains in
+[Devnet configuration](deployments/devnet-v3.json).
 
-This is a source preview. The private current release selection and its
+The historical Spread tree is a source preview. Its private release selection and
 qualification bundle are omitted: they include operator evidence and generated
 artifacts outside this source export. The preview does not assert that this
 source revision is the installed Mainnet program or authorize deployment.

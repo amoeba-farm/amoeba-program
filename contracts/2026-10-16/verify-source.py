@@ -5,15 +5,18 @@ from pathlib import Path
 import re
 import tomllib
 
-root = Path(__file__).resolve().parent
-inventory = json.loads((root / 'SOURCE_FILES.json').read_text(encoding='utf8'))
+bundle = Path(__file__).resolve().parent
+root = bundle.parents[1]
+inventory = json.loads((bundle / 'SOURCE_FILES.json').read_text(encoding='utf8'))
 assert inventory['sourceCommit'] == '4caf83f080f7541b1f741e63871c8d701b398e9b'
 records = inventory['files']
 assert len(records) == inventory['exportedFileCount']
 paths = {entry['path'] for entry in records}
 for entry in records:
     file = root / entry['path']
-    assert file.is_relative_to(root) and not file.is_symlink(), entry['path']
+    assert not file.is_symlink(), entry['path']
+    file = file.resolve()
+    assert file.is_relative_to(root), entry['path']
     data = file.read_bytes()
     assert len(data) == entry['bytes'], entry['path']
     assert hashlib.sha256(data).hexdigest() == entry['sha256'], entry['path']

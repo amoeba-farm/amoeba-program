@@ -1,9 +1,10 @@
 # Mainnet oracle and futures contracts
 
-This directory contains the exact contract source closure from monorepo commit
+This directory records the exact contract source closure from monorepo commit
 `4caf83f080f7541b1f741e63871c8d701b398e9b`, the source recorded for the
-2026-10-16 Mainnet installation. The repository's existing root remains the
-historical index-options / Spread source distribution.
+2026-10-16 Mainnet installation. The source workspaces are now repository-root
+siblings: `oracle/`, `futures/` and `governance/`. Historical index-options /
+Spread source remains at `programs/light_token_minter/`; its records are preserved.
 
 | Program | Mainnet address | Installed ELF bytes | Installed ELF SHA-256 |
 | --- | --- | ---: | --- |
@@ -32,7 +33,7 @@ files are unmodified. [SOURCE_FILES.json](SOURCE_FILES.json) lists each exported
 file's original path, size, mode and SHA-256. No operator keys, environment files,
 runtime state, API, web or private launch evidence are included.
 
-Build from this directory on Linux with Agave 4.0.0 and SBF platform tools v1.53:
+Build from the repository root on Linux with Agave 4.0.0 and SBF platform tools v1.53:
 
 ```sh
 (cd oracle && cargo-build-sbf --manifest-path programs/ameba_oracle/Cargo.toml --arch v1 --tools-version v1.53 -- --locked -j 3)
@@ -43,17 +44,18 @@ Use the default production feature sets; do not enable test, dev, localnet,
 synthetic-controller or tracing features for a production artifact. These
 commands build only; they do not deploy, initialize or sign anything.
 
-`python3 verify-source.py` checks the exported file hashes and local Cargo path
+`python3 contracts/2026-10-16/verify-source.py` (from the repository root) checks the exported file hashes and local Cargo path
 closure without building programs or contacting a chain.
 
 ## Qualification boundary
 
 The installed ELF hashes above belong to the supplied artifacts built in the
 original environment. Cargo source-path metadata affects their bytes: rebuilding
-this relocated export is not a claim to reproduce those exact hashes. A pinned
-container image and canonical build path for independent byte-for-byte source
-verification remain separate work. No successful public verifier registration or
-on-chain source-verification metadata is claimed here.
+the checkout must use the original absolute build path to reproduce them.
+[The container recipe](../../verification-build/README.md) preserves that path;
+[the reproduction receipt](../../verification-build/REPRODUCTION.json) records
+matching oracle and futures builds using the published immutable image. Public
+verifier registration and on-chain source-verification metadata remain pending.
 
 The later monorepo launch-tool corrections through
 `37af722bb47ffa44a5f14dea9cba6bf25212cb49` change host operations, not these
