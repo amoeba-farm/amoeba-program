@@ -36,16 +36,17 @@ FUTURES_IMAGE='us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds
 solana-verify build . --base-image "$FUTURES_IMAGE" --workspace-path "$PWD/futures" --library-name ameba_futures --arch v1 --cargo-build-sbf-args '--tools-version v1.53'
 ```
 
-[Current source and reproduction evidence](../contracts/2026-10-16-amba-earn)
+[Previous source and reproduction evidence](../contracts/2026-10-16-amba-earn)
 records the exact installed-byte match. A bounded standard compiler path-remap
-experiment under the old image still produced a different hash. Updated hosted
-verification remains separate and pending.
+experiment under the old image still produced a different hash. That historical reproduction did not itself establish hosted verification.
 
-## Current inventory-netting candidate
+## Installed inventory-netting release
 
 The [inventory-netting source and reproduction record](../contracts/2026-10-17-inventory-netting)
 uses the same immutable `amba-release` image and Futures command above.
 Its two independent builds match exactly at 482,000 bytes. This preserves the
 fixed controller recipe while advancing the selected source commit.
 The Oracle recipe remains unchanged. The older AMBA Earn reproduction remains
-historical; deployment and hosted verification of this candidate are pending.
+historical. The fixed-path artifact is installed at slot 457976295 and passed
+hosted verification on 2026-10-17. See the
+[installation receipt](../deployment-evidence/mainnet-inventory-netting-20261017.json).

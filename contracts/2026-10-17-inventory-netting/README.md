@@ -1,6 +1,6 @@
 # Inventory-backed quotes and overlap netting
 
-This source candidate exports the exact Futures workspace from release
+This source export contains the exact Futures workspace from release
 `release/2026-10-17-inventory-netting`, commit
 `b306e314d60bfc1145f88ee54a158cc6694a94da`.
 [SOURCE_FILES.json](SOURCE_FILES.json) records all 22 workspace files.
@@ -34,5 +34,11 @@ artifact passed in LiteSVM: inventory-backed bids/asks, shifted and partial
 overlap netting, claim-slot exhaustion and all three wide-book/compute cases.
 [QUALIFICATION.json](QUALIFICATION.json) records the exact artifact and results.
 
-Deployment and updated hosted verification are pending. Publishing this source
-or matching two local builds does not claim either has completed.
+The fixed-path artifact was installed at finalized slot **457976295** and activated
+at gate epoch **8**. API, maker and keeper runtime confirmation passed for this
+release. Hosted verification passed on 2026-10-17 for public source
+`045090bfade3707f48ba7d1d2d5176300751aa36`, with matching canonical and
+authority-specific hashes.
+[Installation and runtime evidence](../../deployment-evidence/mainnet-inventory-netting-20261017.json)
+records the finalized transactions; matching local builds alone does not establish
+hosted verification.
