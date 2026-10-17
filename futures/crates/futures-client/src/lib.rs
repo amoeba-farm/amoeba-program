@@ -986,6 +986,41 @@ impl Book {
         self.quote_proposal_core(owner, l, l.full(), knots)
     }
 
+    /// The escrow `Quote` reserves for `owner`'s ladder `l` now: what each
+    /// step needs beyond what its inventory backs (`Maker::step_escrow`).
+    /// `None` on overflow.
+    pub fn ladder_escrow(
+        &self,
+        owner: &Pubkey,
+        l: &Ladder,
+        core: Core,
+        knots: &[Knot],
+    ) -> Option<u64> {
+        let h = self.header;
+        let mut data = self.data.clone();
+        let m = match self.trader_of(owner) {
+            Some((_, t)) if t.maker > 0 => t.maker - 1,
+            _ => (0..h.maker_cap).find(|&m| !Maker::read(&data, h.maker_off(m)).used)?,
+        };
+        state::write_ladder(&mut data, &h, m, l, core, knots)
+    }
+
+    /// Cash a fresh claim of `lots` on `[lo, hi)` (`side`) of trader `t`
+    /// releases at once by netting against `t`'s opposite claims, as the
+    /// program nets it (`state::plan_net`; ignoring the rare match left out
+    /// for want of claim slots).
+    pub fn net_release(&self, t: u16, side: Side, lo: u16, hi: u16, lots: u64) -> u128 {
+        let opposite: Vec<(u32, Claim)> = self
+            .claims_of(t)
+            .into_iter()
+            .filter(|(_, c)| c.side != side as u8)
+            .collect();
+        state::plan_net(lo, hi, lots, &opposite)
+            .iter()
+            .map(|m| u128::from(m.lots) * u128::from(payoff::set_value(m.lo, m.hi, self.header.k)))
+            .sum()
+    }
+
     /// As [`Book::quote_proposal`], for [`Market::quote_core`].
     pub fn quote_proposal_core(
         &self,

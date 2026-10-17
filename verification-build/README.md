@@ -24,7 +24,7 @@ Hosted verification is recorded in
 Historical Spread recipes and records
 remain unchanged.
 
-## Current Futures AMBA Earn build
+## Previous Futures AMBA Earn build
 
 The Futures upgrade from source `315cae4d` used the checkout root
 `/opt/ameba-dev/worktrees/amba-release`. The preceding gate-final image and
@@ -40,3 +40,12 @@ solana-verify build . --base-image "$FUTURES_IMAGE" --workspace-path "$PWD/futur
 records the exact installed-byte match. A bounded standard compiler path-remap
 experiment under the old image still produced a different hash. Updated hosted
 verification remains separate and pending.
+
+## Current inventory-netting candidate
+
+The [inventory-netting source and reproduction record](../contracts/2026-10-17-inventory-netting)
+uses the same immutable `amba-release` image and Futures command above.
+Its two independent builds match exactly at 482,000 bytes. This preserves the
+fixed controller recipe while advancing the selected source commit.
+The Oracle recipe remains unchanged. The older AMBA Earn reproduction remains
+historical; deployment and hosted verification of this candidate are pending.

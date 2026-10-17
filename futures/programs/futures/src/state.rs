@@ -697,18 +697,32 @@ impl Maker {
     }
 
     /// Cash a step's remaining lots need: `bid` per bid lot, `k - ask` per
-    /// ask lot, tier by tier.
+    /// ask lot, tier by tier, except the lots its inventory backs. A step's
+    /// first ask lots to fill (best tier first), as many as it holds long,
+    /// sell that inventory: the fill redeems the set and pays the ask's
+    /// share from it, as a close order pays from the claim it reserves.
+    /// Likewise its first bid lots, as many as it holds short. `Quote`
+    /// reserves this, summed over the ladder's steps; a fill pays its
+    /// escrowed lots' share from it, and what else it frees (inventory now
+    /// backing the step's other side) stays reserved until the next quote,
+    /// so the escrow never falls short of what the steps need.
     pub fn step_escrow(&self, sizes: &(TierLots, TierLots), st: &Step, k: u64) -> Option<u64> {
         let (bids, asks) = self.step_lots(sizes, st);
+        let mut long = u64::try_from(st.inv.max(0)).ok()?;
+        let mut short = if st.inv < 0 { st.inv.unsigned_abs() } else { 0 };
         let mut total = 0u64;
         for i in 0..self.tiers.n() {
-            if bids[i] > 0 {
+            let backed = bids[i].min(short);
+            short -= backed;
+            if bids[i] > backed {
                 let per = self.tiers.price(st.bid, Side::Long, i, k);
-                total = total.checked_add(bids[i].checked_mul(per)?)?;
+                total = total.checked_add((bids[i] - backed).checked_mul(per)?)?;
             }
-            if asks[i] > 0 {
+            let backed = asks[i].min(long);
+            long -= backed;
+            if asks[i] > backed {
                 let per = k.checked_sub(self.tiers.price(st.ask, Side::Short, i, k))?;
-                total = total.checked_add(asks[i].checked_mul(per)?)?;
+                total = total.checked_add((asks[i] - backed).checked_mul(per)?)?;
             }
         }
         Some(total)
@@ -752,6 +766,65 @@ impl Step {
         let bid = self.bid_lots.checked_mul(u64::from(self.bid))?;
         ask.checked_add(bid)
     }
+}
+
+/// One redemption a fresh claim's netting plans ([`plan_net`]): `lots` of
+/// the fresh claim's piece `[piece.0, piece.1)` against the owner's claim in
+/// slot `claim`, over their overlap `[lo, hi)`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NetMatch {
+    pub claim: u32,
+    pub piece: (u16, u16),
+    pub lo: u16,
+    pub hi: u16,
+    pub lots: u64,
+}
+
+/// How a fresh claim of `lots` on `[lo, hi)` nets against its owner's
+/// opposite claims `opposite` (slot and claim; their unreserved lots): every
+/// overlap is redeemed for its sets and the parts outside it kept, `Split`
+/// and `Redeem` in one, so the owner's payoff is unchanged at every
+/// settlement. Exact complements come first, then the other overlapping
+/// claims in slot order, each once; what is left of the fresh claim (its
+/// unmatched lots, and the parts outside a match) goes on to the next.
+pub fn plan_net(lo: u16, hi: u16, lots: u64, opposite: &[(u32, Claim)]) -> Vec<NetMatch> {
+    let mut order: Vec<&(u32, Claim)> = opposite
+        .iter()
+        .filter(|(_, c)| c.lo < hi && lo < c.hi && c.lots > c.reserved)
+        .collect();
+    order.sort_by_key(|(i, c)| (c.lo != lo || c.hi != hi, *i));
+    let mut pieces: Vec<(u16, u16, u64)> = vec![(lo, hi, lots)];
+    let mut out = Vec::new();
+    for (i, c) in order {
+        let mut usable = c.lots - c.reserved;
+        let mut k = 0;
+        while k < pieces.len() && usable > 0 {
+            let (pl, ph, pn) = pieces[k];
+            let (a, z) = (pl.max(c.lo), ph.min(c.hi));
+            k += 1;
+            if pn == 0 || a >= z {
+                continue;
+            }
+            let m = pn.min(usable);
+            out.push(NetMatch {
+                claim: *i,
+                piece: (pl, ph),
+                lo: a,
+                hi: z,
+                lots: m,
+            });
+            usable -= m;
+            pieces[k - 1].2 -= m;
+            // The parts outside `c` (they never overlap it again).
+            if pl < a {
+                pieces.push((pl, a, m));
+            }
+            if z < ph {
+                pieces.push((z, ph, m));
+            }
+        }
+    }
+    out
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1561,6 +1634,120 @@ mod tests {
                 ..back
             },
             p
+        );
+    }
+
+    #[test]
+    fn inventory_backs_the_first_lots_to_fill() {
+        let k = 10_000;
+        // Three tiers 100 atoms apart, 50/40/30 lots... (ratio 80%).
+        let mk = Maker {
+            tiers: Tiers {
+                count: 3,
+                ratio: 80,
+                spread: 100,
+            },
+            bid_total: 100,
+            ask_total: 100,
+            ..Maker::default()
+        };
+        let sizes = mk.sizes();
+        let st = Step {
+            ask: 6_000,
+            bid: 4_000,
+            ask_lots: 100,
+            bid_lots: 100,
+            inv: 0,
+        };
+        let full = mk.step_escrow(&sizes, &st, k).unwrap();
+        let (bids, asks) = mk.step_lots(&sizes, &st);
+        let price = |side, i| {
+            mk.tiers
+                .price(if side == Side::Long { st.bid } else { st.ask }, side, i, k)
+        };
+        let need = |side, i: usize, lots: u64| {
+            lots * if side == Side::Long {
+                price(side, i)
+            } else {
+                k - price(side, i)
+            }
+        };
+        // Long inventory of the first tier's lots plus 1: the asks' first
+        // tier and one lot of the second need nothing.
+        let long = Step {
+            inv: asks[0] as i64 + 1,
+            ..st
+        };
+        assert_eq!(
+            mk.step_escrow(&sizes, &long, k).unwrap(),
+            full - need(Side::Short, 0, asks[0]) - need(Side::Short, 1, 1)
+        );
+        // Short inventory backs the bids the same way; inventory beyond
+        // every lot backs them all.
+        let short = Step {
+            inv: -(bids[0] as i64),
+            ..st
+        };
+        assert_eq!(
+            mk.step_escrow(&sizes, &short, k).unwrap(),
+            full - need(Side::Long, 0, bids[0])
+        );
+        let lots: i64 = asks.iter().sum::<u64>() as i64;
+        let all = Step {
+            inv: lots + 5,
+            ..st
+        };
+        let bids_only: u64 = (0..3).map(|i| need(Side::Long, i, bids[i])).sum();
+        assert_eq!(mk.step_escrow(&sizes, &all, k).unwrap(), bids_only);
+    }
+
+    #[test]
+    fn netting_plans_every_overlap() {
+        let claim = |side, lo, hi, lots, reserved| Claim {
+            lots,
+            side,
+            lo,
+            hi,
+            reserved,
+            ..Claim::default()
+        };
+        // A long 95-105 x 10 against shorts: 98-108 x 4, the exact 95-105 x 3
+        // (first, though later in slot order), and 50-60 (no overlap).
+        let opposite = [
+            (7, claim(1, 98, 108, 4, 0)),
+            (9, claim(1, 95, 105, 5, 2)),
+            (3, claim(1, 50, 60, 9, 0)),
+        ];
+        let plan = plan_net(95, 105, 10, &opposite);
+        let m = |claim, piece, lo, hi, lots| NetMatch {
+            claim,
+            piece,
+            lo,
+            hi,
+            lots,
+        };
+        assert_eq!(
+            plan,
+            [m(9, (95, 105), 95, 105, 3), m(7, (95, 105), 98, 105, 4)]
+        );
+        // A short inside the fresh long: the parts outside it go on.
+        let plan = plan_net(
+            90,
+            110,
+            2,
+            &[(1, claim(1, 95, 100, 5, 0)), (2, claim(1, 92, 108, 5, 0))],
+        );
+        assert_eq!(
+            plan,
+            [
+                m(1, (90, 110), 95, 100, 2),
+                m(2, (90, 95), 92, 95, 2),
+                m(2, (100, 110), 100, 108, 2)
+            ]
+        );
+        assert!(
+            plan_net(90, 110, 2, &[(1, claim(1, 95, 100, 5, 5))]).is_empty(),
+            "reserved lots stay"
         );
     }
 }

@@ -1,0 +1,26 @@
+{
+  "schema": "amoeba.inventory-netting-fixed-build.v1",
+  "sourceCommit": "b306e314d60bfc1145f88ee54a158cc6694a94da",
+  "image": "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/amba-release@sha256:36bdcd0005a5a41f9eba76add58f16fccdc7a2b7b2fbace1be3aaba8cda7b40e",
+  "workdir": "/opt/ameba-dev/worktrees/amba-release",
+  "workspace": "futures",
+  "library": "ameba_futures",
+  "arch": "v1",
+  "toolsVersion": "v1.53",
+  "defaultProductionFeatures": true,
+  "artifactBytes": 482000,
+  "artifactSha256": "0215dc5bb67cec367e2386bc8478658e9c65d2ddde20fd20ca2362adc69c3fd0",
+  "normalizedSha256": "cfd004d73708961817667ba185af75bbc439b4dfbc3ffd7aa14a26eb4ed7efe6",
+  "independentBuildsMatch": true,
+  "buildTags": [
+    "a",
+    "b"
+  ],
+  "devMarkersFound": [],
+  "buildStackErrorLines": [],
+  "focusedArtifactQualification": "pending; maintained separately",
+  "chainTransactionsSubmitted": false,
+  "sourceInventorySha256": "0182c7d98921b230f301fcf0f410eb4b027cf732c2320dbb268268661ee8af79",
+  "dependencyInputsSha256": "006eb3251cee0ed483aba07a0176b5509e87e108bd21bd9d1c96ffc95508411d",
+  "publicBaseCommit": "8153c2d78938580eb3603c6690e4117908d84cdf"
+}

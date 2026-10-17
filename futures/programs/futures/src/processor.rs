@@ -1054,8 +1054,13 @@ fn redeem_pair(
     Ok(cash)
 }
 
-/// Nets a fresh claim against the owner's exact complements: `first` (a
-/// close order's claim, using its reserved lots) and then any other.
+/// Nets a fresh claim against its owner's opposite claims: `first` (a close
+/// order's claim, its exact complement, using its reserved lots), then every
+/// claim that overlaps it ([`plan_net`]: exact complements first). Each
+/// overlap's matched lots are redeemed for their sets and the parts outside
+/// it kept, so the owner's payoff is the same at every settlement and the
+/// overlap's backing is free cash at once. Best effort: a match whose parts
+/// find no claim slot, and every match after it, is left as it is.
 fn net(b: &mut [u8], h: &mut Header, fresh: u32, first: Option<(u32, bool)>) -> R<()> {
     if let Some((c, reserved)) = first {
         let left = Claim::read(b, h.claim_off(fresh)).lots;
@@ -1071,33 +1076,123 @@ fn net(b: &mut [u8], h: &mut Header, fresh: u32, first: Option<(u32, bool)>) -> 
         }
     }
     let n = Claim::read(b, h.claim_off(fresh));
-    if n.lots == 0 {
+    if n.lots == 0 || trader(b, h, n.trader).claims < 2 {
         return Ok(());
     }
-    if trader(b, h, n.trader).claims < 2 {
-        return Ok(());
-    }
+    let mut opposite = Vec::new();
     for i in 0..h.claim_cap {
         let at = h.claim_off(i);
         if i == fresh || u64_at(b, at) == 0 || u16_at(b, at + 16) != n.trader {
             continue;
         }
         let c = Claim::read(b, at);
-        if c.lots > c.reserved
-            && c.trader == n.trader
-            && c.side != n.side
-            && c.lo == n.lo
-            && c.hi == n.hi
-        {
-            let left = Claim::read(b, h.claim_off(fresh)).lots;
-            let lots = left.min(c.lots - c.reserved);
-            redeem_pair(b, h, fresh, i, lots, [false, false])?;
-            if lots == left {
-                return Ok(());
-            }
+        if c.side != n.side {
+            opposite.push((i, c));
+        }
+    }
+    // The fresh claim's pieces (slots), as the matches split it.
+    let mut pieces = vec![fresh];
+    for m in plan_net(n.lo, n.hi, n.lots, &opposite) {
+        let piece = pieces.iter().copied().find(|&s| {
+            let c = Claim::read(b, h.claim_off(s));
+            c.trader == n.trader && c.side == n.side && (c.lo, c.hi) == m.piece && c.lots >= m.lots
+        });
+        let Some(f) = piece else { break };
+        match net_overlap(b, h, f, m.claim, (m.lo, m.hi), m.lots)? {
+            Some(parts) => pieces.extend(parts),
+            None => break,
         }
     }
     Ok(())
+}
+
+/// Redeems `lots` of the overlap `[a, z)` of one owner's opposite claims `f`
+/// and `c`: each gives up `lots` of its unreserved lots, whose parts outside
+/// `[a, z)` stay as claims of `lots` lots (the cost basis split by width, as
+/// `Split`; a claim left empty keeps one of its parts in its slot), and the
+/// overlap's sets pay into free cash. Returns the slots now holding new
+/// parts of `f`, or `None`, changing nothing, when the market has no slots
+/// for the parts.
+fn net_overlap(
+    b: &mut [u8],
+    h: &mut Header,
+    f: u32,
+    c: u32,
+    (a, z): (u16, u16),
+    lots: u64,
+) -> R<Option<Vec<u32>>> {
+    let claims = [
+        Claim::read(b, h.claim_off(f)),
+        Claim::read(b, h.claim_off(c)),
+    ];
+    let parts = |x: &Claim| {
+        [
+            (x.lo < a).then_some((x.lo, a)),
+            (z < x.hi).then_some((z, x.hi)),
+        ]
+    };
+    let mut need = 0u64;
+    for x in &claims {
+        if lots > x.lots - x.reserved || a < x.lo || x.hi < z {
+            return Err(FuturesError::NotComplement.into());
+        }
+        let n = parts(x).iter().flatten().count() as u64;
+        need += if x.lots == lots {
+            n.saturating_sub(1)
+        } else {
+            n
+        };
+    }
+    if need > u64::from(h.claim_cap).saturating_sub(h.claims_open) {
+        return Ok(None);
+    }
+    let mut fresh_parts = Vec::new();
+    for (slot, mut x) in [f, c].into_iter().zip(claims) {
+        let part = shrink(&mut x, lots);
+        let (template, width) = (x, u128::from(x.hi - x.lo));
+        let piece = |(lo, hi): (u16, u16)| Claim {
+            lots,
+            trader: template.trader,
+            side: template.side,
+            lo,
+            hi,
+            cost: (u128::from(part) * u128::from(hi - lo) / width) as u64,
+            opened_ts: template.opened_ts,
+            ..Claim::default()
+        };
+        let mut outside = parts(&template).into_iter().flatten();
+        if x.lots > 0 {
+            x.seq = next_seq(h)?;
+            put_claim(b, h, slot, &x);
+        } else if let Some(p) = outside.next() {
+            // The emptied slot keeps the first part (for `f`, a piece
+            // already).
+            let mut p = piece(p);
+            p.seq = next_seq(h)?;
+            put_claim(b, h, slot, &p);
+        } else {
+            drop_claim(b, h, slot);
+        }
+        for p in outside {
+            let s = new_claim(b, h, piece(p))?;
+            if slot == f {
+                fresh_parts.push(s);
+            }
+        }
+    }
+    let cash = mul(lots, set_value(a, z, h.k))?;
+    let t = claims[0].trader;
+    backing_to_free(b, h, t, cash)?;
+    let owner = trader(b, h, t).owner;
+    sol_log_data(&[
+        b"ARREDM01",
+        owner.as_ref(),
+        &a.to_le_bytes(),
+        &z.to_le_bytes(),
+        &lots.to_le_bytes(),
+        &cash.to_le_bytes(),
+    ]);
+    Ok(Some(fresh_parts))
 }
 
 // ---------------------------------------------------------------- the book
@@ -1198,8 +1293,9 @@ fn submit(
     let mut net_cost = 0i128;
     let mut short_sets = 0i128;
     let mut ladders: Vec<(u8, Side, u16, u16, u64, u64)> = Vec::new();
-    // Per maker: contribution out of its escrow and lots netted per step.
-    let mut makers: Vec<(u8, u64, u64)> = Vec::new();
+    // Per maker: the contribution of its escrowed lots, of the lots its
+    // inventory backs, and the lots netted per step.
+    let mut makers: Vec<(u8, [u64; 3])> = Vec::new();
     // Per maker: its head and tier sizes (the same for every step).
     let mut heads: Vec<(u8, Maker, (TierLots, TierLots))> = Vec::new();
     for (arc, &m) in arcs.iter().zip(&fills) {
@@ -1230,12 +1326,16 @@ fn submit(
                 };
                 let (_, mk, sz) = &heads[at];
                 let netted = fill_step(&mut b, &h, mk, maker, step, side, tier, m, sz)?;
+                // A step's netted lots are the ones its inventory backs.
+                let backed = mul(netted, c / m)?;
+                let fill = [sub(c, backed)?, backed, netted];
                 match makers.iter_mut().find(|x| x.0 == maker) {
                     Some(x) => {
-                        x.1 = add(x.1, c)?;
-                        x.2 = add(x.2, netted)?;
+                        for (a, v) in x.1.iter_mut().zip(fill) {
+                            *a = add(*a, v)?;
+                        }
                     }
-                    None => makers.push((maker, c, netted)),
+                    None => makers.push((maker, fill)),
                 }
                 let premium = arc.price.saturating_mul(m);
                 match ladders.iter_mut().find(|l| l.0 == maker && l.1 == side) {
@@ -1250,16 +1350,26 @@ fn submit(
             }
         }
     }
-    for (maker, c, netted) in makers {
+    for (maker, [escrowed, backed, netted]) in makers {
         let at = h.maker_off(maker);
         let mut mk = Maker::read(&b, at);
-        mk.escrow = mk.escrow.checked_sub(c).ok_or(FuturesError::Insolvent)?;
+        // The escrowed lots pay from the escrow. It never falls short of
+        // what the steps need: a fill takes exactly its escrowed lots' share,
+        // and what it frees on the other side of a step stays reserved until
+        // the next `Quote` reserves anew.
+        mk.escrow = mk
+            .escrow
+            .checked_sub(escrowed)
+            .ok_or(FuturesError::Insolvent)?;
         mk.write(&mut b, at);
-        reserved_to_backing(&mut b, &mut h, mk.trader, c)?;
+        reserved_to_backing(&mut b, &mut h, mk.trader, escrowed)?;
+        // The lots inventory backs pay from the sets their netting redeems.
+        h.backing = add(h.backing, backed)?;
         if netted > 0 {
             let cash = mul(netted, h.k)?;
             backing_to_free(&mut b, &mut h, mk.trader, cash)?;
         }
+        debit_free(&mut b, &mut h, mk.trader, backed)?;
     }
     // One line per ladder side: steps spanned, lot-steps filled, premium.
     for (maker, side, lo, hi, lot_steps, premium) in ladders {
@@ -1476,7 +1586,9 @@ fn fill_order(
 }
 
 /// A ladder step's tier fills `m` lots; the maker's inventory nets per step.
-/// Returns the lots netted against opposite inventory (redeemed sets).
+/// Returns the lots netted against opposite inventory (redeemed sets): the
+/// lots that inventory backs (`Maker::step_escrow`), which pay from the sets
+/// they redeem; the others pay from the ladder's escrow.
 #[allow(clippy::too_many_arguments)]
 fn fill_step(
     b: &mut [u8],

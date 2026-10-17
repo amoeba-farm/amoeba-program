@@ -6,8 +6,9 @@ with the preserved source of its earlier index-options / Spread program.
 [Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
 The Mainnet oracle and range-futures source is in [oracle](oracle) and
-[futures](futures). [The AMBA Earn source record](contracts/2026-10-16-amba-earn)
-tracks the later Futures deployment; [contracts/2026-10-16](contracts/2026-10-16)
+[futures](futures). [The inventory-netting source candidate](contracts/2026-10-17-inventory-netting)
+tracks the prepared next Futures release; [the AMBA Earn record](contracts/2026-10-16-amba-earn)
+records its predecessor; [contracts/2026-10-16](contracts/2026-10-16)
 preserves the original source inventory and installation records.
 The earlier index-options / Spread program remains in
 [programs/light_token_minter](programs/light_token_minter).
@@ -21,7 +22,8 @@ The earlier index-options / Spread program remains in
 | Governance controller | `8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx` | [Solana Verified Builds status](https://verify.osec.io/status/8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx) |
 
 All three programs passed hosted source verification on 2026-10-16. A later
-Futures AMBA Earn upgrade changed its installed binary; updated Futures hosted
+Futures AMBA Earn upgrade changed its installed binary; the inventory-netting
+source candidate is prepared next. Deployment and updated Futures hosted
 verification is pending. Oracle and controller verification records are unchanged.
 [Finalized metadata and hosted-verification evidence](deployment-evidence/mainnet-verification-20261016-completed.json)
 records the selected source commits, deployed hashes, authority-signed records
