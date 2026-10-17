@@ -18,7 +18,7 @@
   ],
   "devMarkersFound": [],
   "buildStackErrorLines": [],
-  "focusedArtifactQualification": "pending; maintained separately",
+  "focusedArtifactQualification": "passed; see QUALIFICATION.json",
   "chainTransactionsSubmitted": false,
   "sourceInventorySha256": "0182c7d98921b230f301fcf0f410eb4b027cf732c2320dbb268268661ee8af79",
   "dependencyInputsSha256": "006eb3251cee0ed483aba07a0176b5509e87e108bd21bd9d1c96ffc95508411d",

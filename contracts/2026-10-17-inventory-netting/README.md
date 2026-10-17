@@ -28,9 +28,11 @@ Both builds passed stack-diagnostic and dev-marker scans.
 [REPRODUCTION.json](REPRODUCTION.json) records the build inputs and outputs.
 
 The release's earlier native `inn-release` build has a different path-dependent
-hash (`c96354b4…`); this candidate selects the fixed-path artifact above instead.
-Source-bound passing release tests are reused. Focused tests against this exact
-artifact are qualified separately before deployment.
+hash (`c96354b48b0989aba22869b4948e6b79169fbb1daaa6d8a49e8157f8d26b1a27`); this candidate selects the fixed-path artifact above instead.
+Source-bound passing release tests are reused. Eight focused tests against this exact
+artifact passed in LiteSVM: inventory-backed bids/asks, shifted and partial
+overlap netting, claim-slot exhaustion and all three wide-book/compute cases.
+[QUALIFICATION.json](QUALIFICATION.json) records the exact artifact and results.
 
 Deployment and updated hosted verification are pending. Publishing this source
 or matching two local builds does not claim either has completed.

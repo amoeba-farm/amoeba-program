@@ -24,7 +24,9 @@ The earlier index-options / Spread program remains in
 All three programs passed hosted source verification on 2026-10-16. A later
 Futures AMBA Earn upgrade changed its installed binary; the inventory-netting
 source candidate is prepared next. Deployment and updated Futures hosted
-verification is pending. Oracle and controller verification records are unchanged.
+verification are pending. The Oracle record remains unchanged; controller R6
+and inventory-netting Futures hosted verification will be refreshed as part of
+this release. Deployment and hosted status remain pending until receipts exist.
 [Finalized metadata and hosted-verification evidence](deployment-evidence/mainnet-verification-20261016-completed.json)
 records the selected source commits, deployed hashes, authority-signed records
 and verifier jobs. Oracle and futures matched their

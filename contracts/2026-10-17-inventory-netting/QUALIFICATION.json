@@ -1,0 +1,51 @@
+{
+  "schema": "amoeba.inventory-netting-artifact-qualification.v1",
+  "sourceCommit": "b306e314d60bfc1145f88ee54a158cc6694a94da",
+  "artifactBytes": 482000,
+  "artifactSha256": "0215dc5bb67cec367e2386bc8478658e9c65d2ddde20fd20ca2362adc69c3fd0",
+  "normalizedSha256": "cfd004d73708961817667ba185af75bbc439b4dfbc3ffd7aa14a26eb4ed7efe6",
+  "execution": "in-process LiteSVM against the exact selected production Futures ELF",
+  "passed": true,
+  "testsPassed": [
+    "b4_inventory_backs_the_bids",
+    "b5_inventory_backs_the_asks",
+    "c10_netting_waits_for_claim_slots",
+    "c6_shifted_intervals_net_their_overlap",
+    "c9_a_fill_inside_a_larger_claim",
+    "low_leverage_opens_and_closes_against_the_wings",
+    "outer_steps_quote_only_the_last_tier",
+    "the_heaviest_admitted_book_verifies_in_one_transaction"
+  ],
+  "testCount": 8,
+  "supportArtifacts": [
+    {
+      "name": "governance_controller_v3.so",
+      "bytes": 334600,
+      "sha256": "f316e26081083d6bc6b15d7565d739bd1394718b0e55d17a0213cc5293ee4f6c",
+      "origin": "existing gate SBF cache, copied to isolated harness; never deployed by this qualification"
+    },
+    {
+      "name": "ameba_oracle.so",
+      "bytes": 947072,
+      "sha256": "054b964bd6616e01e5380c8a4e1f6569b99a5025f763055beaf9559237a9aa23",
+      "origin": "existing gate SBF cache, copied to isolated harness; never deployed by this qualification"
+    }
+  ],
+  "logs": [
+    {
+      "name": "artifact-integration.log",
+      "sha256": "b16bee3f332bc13a9b7ed82e96ed82db6bd0bf3e5bf22ac56f15817c22a9a5c3"
+    },
+    {
+      "name": "artifact-c6.log",
+      "sha256": "3c93642daa779fcb57bc0dfec9429e0da8007d80dd7e12a597fa91dfbed0e13c"
+    }
+  ],
+  "scope": "five inventory/netting regressions plus all three wide-book/compute cases; unchanged full source-bound release gate reused",
+  "sourceBoundGateReceipts": {
+    "futures": "682972380b3c8d75",
+    "api": "159cfba362053e1c"
+  },
+  "productionSigning": false,
+  "chainSubmission": false
+}
