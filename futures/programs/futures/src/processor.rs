@@ -11,6 +11,7 @@ use solana_program::{
     account_info::AccountInfo,
     clock::Clock,
     entrypoint::ProgramResult,
+    instruction::{AccountMeta, Instruction},
     log::sol_log_data,
     program::{invoke, invoke_signed, set_return_data},
     program_error::ProgramError,
@@ -247,6 +248,16 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         }
         FuturesInstruction::VaultFund { amount } => vault_fund(program_id, accounts, amount),
         FuturesInstruction::VaultDefund { amount } => vault_defund(program_id, accounts, amount),
+        FuturesInstruction::VaultRewards {
+            start_ts,
+            end_ts,
+            amount,
+            house,
+        } => vault_rewards(program_id, accounts, (start_ts, end_ts, amount), &house),
+        FuturesInstruction::VaultRewardsClaim => vault_rewards_claim(program_id, accounts),
+        FuturesInstruction::VaultRewardsWithdraw { amount } => {
+            vault_rewards_withdraw(program_id, accounts, amount)
+        }
     }
 }
 
@@ -372,7 +383,8 @@ fn authorize(
     if owner.owner != program_id {
         return Err(FuturesError::Unauthorized.into());
     }
-    let vault = owner.data_len() == VAULT_LEN && owner.try_borrow_data()?[..8] == VAULT_MAGIC;
+    let vault = (owner.data_len() == VAULT_LEN || owner.data_len() == VAULT_REWARDS_LEN)
+        && owner.try_borrow_data()?[..8] == VAULT_MAGIC;
     let operator = if vault {
         let v = load_vault(program_id, owner)?;
         if !v.markets.contains(market) {
@@ -2401,6 +2413,8 @@ fn vault_deposit(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> Program
     }
     let mut lp = vault_position(program_id, vault_info, owner.key, lp_info, payer, system)?;
     transfer_from(token_program, owner_token, cash, owner, amount)?;
+    reward_touch(&mut v, &mut lp, now_ts()?)?;
+    house_moves(&mut v, &lp, shares, 0)?;
     v.cash = add(v.cash, amount)?;
     v.shares = add(v.shares, shares)?;
     v.deposited = add(v.deposited, amount)?;
@@ -2569,6 +2583,8 @@ fn vault_withdraw(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> Progra
         transfer_signed(token_program, cash, owner_token, vault_info, amount, seeds)?;
         v.cash -= amount;
     }
+    reward_touch(&mut v, &mut lp, now_ts()?)?;
+    house_moves(&mut v, &lp, 0, shares)?;
     v.shares -= shares;
     v.withdrawn = add(v.withdrawn, amount)?;
     lp.shares -= shares;
@@ -2683,6 +2699,327 @@ fn vault_defund(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramR
     Ok(())
 }
 
+// ---------------------------------------------------------------- Earn rewards
+
+/// SPL Token-2022, the other token program a reward mint may be of (AMBA is
+/// a Token-2022 mint with a transfer fee).
+const TOKEN_2022: Pubkey = solana_program::pubkey!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+/// Token-2022's account-type byte after the base layout of an extended
+/// account (`AccountType::Mint`, `AccountType::Account`).
+const TYPE_MINT: u8 = 1;
+const TYPE_ACCOUNT: u8 = 2;
+
+fn is_token_program(key: &Pubkey) -> bool {
+    *key == spl_token::id() || *key == TOKEN_2022
+}
+
+/// A token account of either token program, by its base layout (a
+/// Token-2022 account's extensions follow it).
+fn reward_token_account(info: &AccountInfo) -> R<spl_token::state::Account> {
+    let base = spl_token::state::Account::LEN;
+    let d = info.try_borrow_data()?;
+    if !is_token_program(info.owner)
+        || d.len() < base
+        || (d.len() > base && d[base] != TYPE_ACCOUNT)
+    {
+        return Err(FuturesError::Custody.into());
+    }
+    let a = spl_token::state::Account::unpack_from_slice(&d[..base])
+        .map_err(|_| FuturesError::Custody)?;
+    if a.state != spl_token::state::AccountState::Initialized {
+        return Err(FuturesError::Custody.into());
+    }
+    Ok(a)
+}
+
+/// A mint's decimals, either token program.
+fn reward_mint_decimals(info: &AccountInfo) -> R<u8> {
+    let (base, account) = (spl_token::state::Mint::LEN, spl_token::state::Account::LEN);
+    let d = info.try_borrow_data()?;
+    if !is_token_program(info.owner)
+        || d.len() < base
+        || (d.len() > base && (d.len() <= account || d[account] != TYPE_MINT))
+    {
+        return Err(FuturesError::Custody.into());
+    }
+    let m =
+        spl_token::state::Mint::unpack_from_slice(&d[..base]).map_err(|_| FuturesError::Custody)?;
+    if !m.is_initialized {
+        return Err(FuturesError::Custody.into());
+    }
+    Ok(m.decimals)
+}
+
+/// Brings the vault's reward stream up to `now` and settles `lp`'s part of
+/// it: before their shares change, and before a payment.
+fn reward_touch(v: &mut Vault, lp: &mut VaultPosition, now: u64) -> R<()> {
+    let shares = v.shares;
+    if let Some(r) = v.rewards.as_mut() {
+        r.accrue(shares, now).ok_or(FuturesError::Overflow)?;
+        r.settle(lp).ok_or(FuturesError::Overflow)?;
+    }
+    Ok(())
+}
+
+/// Keeps the house's shares in step when its position gains `plus` or loses
+/// `minus` shares.
+fn house_moves(v: &mut Vault, lp: &VaultPosition, plus: u64, minus: u64) -> R<()> {
+    if let Some(r) = v.rewards.as_mut().filter(|r| r.house == lp.owner) {
+        r.house_shares = sub(add(r.house_shares, plus)?, minus)?;
+    }
+    Ok(())
+}
+
+/// The vault's reward stream and its accounts, checked: the reward account,
+/// its mint and the mint's token program.
+fn reward_accounts<'v>(
+    v: &'v mut Vault,
+    account: &AccountInfo,
+    mint: &AccountInfo,
+    token_program: &AccountInfo,
+) -> R<&'v mut Rewards> {
+    let r = v.rewards.as_mut().ok_or(FuturesError::InvalidAccount)?;
+    if *account.key != r.account
+        || *mint.key != r.mint
+        || mint.owner != token_program.key
+        || !is_token_program(token_program.key)
+    {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    Ok(r)
+}
+
+/// A checked transfer of `amount` from the vault's reward account, signed by
+/// the vault (`seeds`).
+#[allow(clippy::too_many_arguments)]
+fn reward_transfer<'a>(
+    token_program: &AccountInfo<'a>,
+    from: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
+    to: &AccountInfo<'a>,
+    vault: &AccountInfo<'a>,
+    amount: u64,
+    decimals: u8,
+    seeds: &[&[u8]],
+) -> ProgramResult {
+    // TransferChecked (12): the same instruction in both token programs.
+    let mut data = Vec::with_capacity(10);
+    data.push(12);
+    data.extend_from_slice(&amount.to_le_bytes());
+    data.push(decimals);
+    invoke_signed(
+        &Instruction {
+            program_id: *token_program.key,
+            accounts: vec![
+                AccountMeta::new(*from.key, false),
+                AccountMeta::new_readonly(*mint.key, false),
+                AccountMeta::new(*to.key, false),
+                AccountMeta::new_readonly(*vault.key, true),
+            ],
+            data,
+        },
+        &[
+            from.clone(),
+            mint.clone(),
+            to.clone(),
+            vault.clone(),
+            token_program.clone(),
+        ],
+        &[seeds],
+    )
+}
+
+#[inline(never)]
+fn vault_rewards(
+    program_id: &Pubkey,
+    a: &[AccountInfo],
+    (start_ts, end_ts, amount): (u64, u64, u64),
+    house: &Pubkey,
+) -> ProgramResult {
+    let [vault_info, operator, payer, mint, account, house_lp, system, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_signer(operator)?;
+    need_writable(vault_info)?;
+    if end_ts <= start_ts {
+        return Err(FuturesError::InvalidInstruction.into());
+    }
+    let mut v = load_vault(program_id, vault_info)?;
+    if *operator.key != v.operator {
+        return Err(FuturesError::Unauthorized.into());
+    }
+    let now = now_ts()?;
+    let shares = v.shares;
+    match v.rewards.as_mut() {
+        Some(r) => {
+            if *mint.key != r.mint || *account.key != r.account || *house != r.house {
+                return Err(FuturesError::InvalidAccount.into());
+            }
+            r.accrue(shares, now).ok_or(FuturesError::Overflow)?;
+        }
+        None => {
+            let decimals = reward_mint_decimals(mint)?;
+            let t = reward_token_account(account)?;
+            if account.owner != mint.owner
+                || t.mint != *mint.key
+                || t.owner != *vault_info.key
+                || t.delegate.is_some()
+                || t.close_authority.is_some()
+            {
+                return Err(FuturesError::Custody.into());
+            }
+            // The house's shares so far: its position, if it has one.
+            if *house_lp.key != vault_lp_address(program_id, vault_info.key, house).0 {
+                return Err(FuturesError::InvalidAccount.into());
+            }
+            let house_shares = if house_lp.owner == program_id {
+                VaultPosition::read(&house_lp.try_borrow_data()?)?.shares
+            } else {
+                0
+            };
+            if *system.key != solana_system_interface::program::ID {
+                return Err(FuturesError::InvalidAccount.into());
+            }
+            need_signer(payer)?;
+            let need = Rent::get()?.minimum_balance(VAULT_REWARDS_LEN);
+            let have = vault_info.lamports();
+            if have < need {
+                invoke(
+                    &system_instruction::transfer(payer.key, vault_info.key, need - have),
+                    &[payer.clone(), vault_info.clone(), system.clone()],
+                )?;
+            }
+            vault_info.resize(VAULT_REWARDS_LEN)?;
+            v.rewards = Some(Rewards {
+                mint: *mint.key,
+                account: *account.key,
+                house: *house,
+                decimals,
+                last_ts: now,
+                house_shares,
+                ..Rewards::default()
+            });
+        }
+    }
+    let r = v.rewards.as_mut().ok_or(FuturesError::InvalidAccount)?;
+    r.start_ts = start_ts;
+    r.end_ts = end_ts;
+    r.amount = amount;
+    v.write(&mut vault_info.try_borrow_mut_data()?);
+    sol_log_data(&[
+        b"ARVRWD01",
+        vault_info.key.as_ref(),
+        mint.key.as_ref(),
+        &start_ts.to_le_bytes(),
+        &end_ts.to_le_bytes(),
+        &amount.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn vault_rewards_claim(program_id: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
+    let [vault_info, lp_info, account, mint, owner_token, token_program, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_writable(vault_info)?;
+    need_writable(lp_info)?;
+    let mut v = load_vault(program_id, vault_info)?;
+    if lp_info.owner != program_id {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let mut lp = VaultPosition::read(&lp_info.try_borrow_data()?)?;
+    if lp.vault != *vault_info.key {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    reward_touch(&mut v, &mut lp, now_ts()?)?;
+    let bump = [v.bump];
+    let operator = v.operator;
+    let r = reward_accounts(&mut v, account, mint, token_program)?;
+    let pay = lp.reward_pending;
+    if pay > 0 {
+        // Only into the position owner's own account of the mint.
+        let dest = reward_token_account(owner_token)?;
+        if owner_token.owner != token_program.key
+            || owner_token.key == account.key
+            || dest.owner != lp.owner
+            || dest.mint != r.mint
+        {
+            return Err(FuturesError::Custody.into());
+        }
+        let seeds: &[&[u8]] = &[NAMESPACE, VAULT_SEED, operator.as_ref(), &bump];
+        reward_transfer(
+            token_program,
+            account,
+            mint,
+            owner_token,
+            vault_info,
+            pay,
+            r.decimals,
+            seeds,
+        )?;
+        r.paid = add(r.paid, pay)?;
+        lp.reward_pending = 0;
+        lp.reward_paid = lp.reward_paid.saturating_add(pay);
+    }
+    lp.write(&mut lp_info.try_borrow_mut_data()?);
+    v.write(&mut vault_info.try_borrow_mut_data()?);
+    sol_log_data(&[
+        b"ARVRCL01",
+        vault_info.key.as_ref(),
+        lp.owner.as_ref(),
+        &pay.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn vault_rewards_withdraw(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
+    let [vault_info, operator, account, mint, dest, token_program, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_signer(operator)?;
+    need_writable(vault_info)?;
+    let mut v = load_vault(program_id, vault_info)?;
+    if *operator.key != v.operator {
+        return Err(FuturesError::Unauthorized.into());
+    }
+    let (bump, shares, now) = ([v.bump], v.shares, now_ts()?);
+    let r = reward_accounts(&mut v, account, mint, token_program)?;
+    r.accrue(shares, now).ok_or(FuturesError::Overflow)?;
+    // Depositors' accrued rewards and the stream's rest stay.
+    let held = reward_token_account(account)?.amount;
+    let surplus = held.saturating_sub(r.owed().saturating_add(r.left(now)));
+    let amount = if amount == u64::MAX { surplus } else { amount };
+    if amount == 0 || amount > surplus {
+        return Err(FuturesError::InsufficientFunds.into());
+    }
+    let to = reward_token_account(dest)?;
+    if dest.owner != token_program.key || dest.key == account.key || to.mint != r.mint {
+        return Err(FuturesError::Custody.into());
+    }
+    let decimals = r.decimals;
+    let seeds: &[&[u8]] = &[NAMESPACE, VAULT_SEED, operator.key.as_ref(), &bump];
+    reward_transfer(
+        token_program,
+        account,
+        mint,
+        dest,
+        vault_info,
+        amount,
+        decimals,
+        seeds,
+    )?;
+    v.write(&mut vault_info.try_borrow_mut_data()?);
+    sol_log_data(&[
+        b"ARVRWX01",
+        vault_info.key.as_ref(),
+        dest.key.as_ref(),
+        &amount.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
 // ---------------------------------------------------------------- legacy pools (dev)
 
 /// The owner's position in a legacy pool, checked against its address.
@@ -2755,6 +3092,8 @@ fn pool_migrate(program_id: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     store(&mut b, &h)?;
     drop(b);
     let mut vlp = vault_position(program_id, vault_info, holder.key, vlp_info, payer, system)?;
+    reward_touch(&mut v, &mut vlp, now_ts()?)?;
+    house_moves(&mut v, &vlp, shares, 0)?;
     pool.shares = 0;
     pool.withdrawn = add(pool.withdrawn, value)?;
     lp.shares = 0;

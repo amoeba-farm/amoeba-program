@@ -330,6 +330,41 @@ pub enum FuturesInstruction {
     /// 5 holder (s); 6 operator (s); 7 payer (s, w); 8 system program; then
     /// every market of the vault, in its order.
     PoolMigrate,
+    /// The operator sets the vault's reward stream (`state::Rewards`):
+    /// `amount` atoms of the reward mint released linearly from `start_ts`
+    /// to `end_ts` (unix seconds) to depositors by their shares, except
+    /// `house`'s (the protocol's own deposit; `Pubkey::default()`: none).
+    /// What the previous stream released up to now stays accrued; the rest
+    /// of it, and any part of the new one before now, is not released. The
+    /// first stream fixes the mint, the reward account (a token account of
+    /// the mint, either token program, owned by the vault's address) and
+    /// the house, and grows the vault account by `REWARDS_LEN` (rent from
+    /// `payer`). The reward account is funded by plain transfers; the
+    /// stream doesn't check its balance.
+    ///
+    /// Accounts: 0 vault (w); 1 operator (s); 2 payer (s, w); 3 reward mint;
+    /// 4 reward account; 5 the house's vault position (its address, whether
+    /// or not it exists); 6 system program.
+    VaultRewards {
+        start_ts: u64,
+        end_ts: u64,
+        amount: u64,
+        house: Pubkey,
+    },
+    /// Permissionless: pays a position's rewards accrued so far into its
+    /// owner's token account of the reward mint (checked transfer: the
+    /// mint's transfer fee, if any, comes out of what arrives).
+    ///
+    /// Accounts: 0 vault (w); 1 position (w); 2 reward account (w); 3 reward
+    /// mint; 4 owner's token account (w); 5 the mint's token program.
+    VaultRewardsClaim,
+    /// The operator takes back `amount` (`u64::MAX`: all) of the reward
+    /// account's surplus: what it holds beyond what depositors are owed and
+    /// what the stream has still to release.
+    ///
+    /// Accounts: 0 vault (w); 1 operator (s); 2 reward account (w); 3 reward
+    /// mint; 4 destination token account (w); 5 the mint's token program.
+    VaultRewardsWithdraw { amount: u64 },
 }
 
 #[cfg(not(feature = "no-entrypoint"))]

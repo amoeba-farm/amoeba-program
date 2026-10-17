@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/futures-client",
     "crates/futures-math",
+    "crates/signer",
     "programs/futures",
 ]
 

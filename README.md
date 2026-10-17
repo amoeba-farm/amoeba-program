@@ -6,8 +6,9 @@ with the preserved source of its earlier index-options / Spread program.
 [Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
 The Mainnet oracle and range-futures source is in [oracle](oracle) and
-[futures](futures). [contracts/2026-10-16](contracts/2026-10-16) records their exact
-source inventory, installed-artifact hashes and build qualification boundaries.
+[futures](futures). [The AMBA Earn source record](contracts/2026-10-16-amba-earn)
+tracks the later Futures deployment; [contracts/2026-10-16](contracts/2026-10-16)
+preserves the original source inventory and installation records.
 The earlier index-options / Spread program remains in
 [programs/light_token_minter](programs/light_token_minter).
 
@@ -19,12 +20,16 @@ The earlier index-options / Spread program remains in
 | Range futures | `Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu` | [Solana Verified Builds status](https://verify.osec.io/status/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu) |
 | Governance controller | `8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx` | [Solana Verified Builds status](https://verify.osec.io/status/8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx) |
 
-All three current Mainnet programs have passed hosted source verification.
+All three programs passed hosted source verification on 2026-10-16. A later
+Futures AMBA Earn upgrade changed its installed binary; updated Futures hosted
+verification is pending. Oracle and controller verification records are unchanged.
 [Finalized metadata and hosted-verification evidence](deployment-evidence/mainnet-verification-20261016-completed.json)
 records the selected source commits, deployed hashes, authority-signed records
-and verifier jobs. Oracle and futures match their
+and verifier jobs. Oracle and futures matched their
 [published source](https://github.com/amoeba-farm/amoeba-program/tree/624728f222d719a5011e2d92dff0eb50a4c7d6f7)
-and their existing installed binaries; neither program required an upgrade.
+and the binaries installed at that verification event; neither program required
+an upgrade for that event. This historical evidence does not attest the later
+Futures AMBA Earn binary.
 The controller matches
 [release-5 source](https://github.com/amoeba-farm/amoeba-governance/tree/1a8f9e3fa3c80e3d0d1a20651742a0b5e17640fe).
 Original source and installation records remain in

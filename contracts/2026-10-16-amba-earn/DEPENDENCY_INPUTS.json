@@ -1,0 +1,47 @@
+{
+  "sourceCommit": "315cae4d2ab23d0a54dd7a6717503349bb3fd9c4",
+  "files": [
+    {
+      "path": "governance/Cargo.toml",
+      "bytes": 815,
+      "sha256": "5dbe98ea78a7e0a71153275995ce302241a3eff0215d0afdfbdb8a39172b0b69",
+      "gitBlobSha1": "1d6c0bc6dbb952b82d019b23e17dca295c935366"
+    },
+    {
+      "path": "governance/crates/governance-interface/Cargo.toml",
+      "bytes": 287,
+      "sha256": "1e03dee1d70daabb27199fff1651758dc0fbad3e4bc5f105b50f70bb17c0b82c",
+      "gitBlobSha1": "1c68f30a7a3964bb734d238f8558d90cbcb073d1"
+    },
+    {
+      "path": "governance/crates/governance-interface/build.rs",
+      "bytes": 1259,
+      "sha256": "3288dbd22349766a1db8cf9f74d86a0088cff1bd234d78af0f8a4346fcf145f2",
+      "gitBlobSha1": "fb16b6d75ea77ef431ac46b8938a6093048becb8"
+    },
+    {
+      "path": "governance/crates/governance-interface/src/lib.rs",
+      "bytes": 35264,
+      "sha256": "38edc5dc063411797fbfe1ed1d27a1973b82e0ba0139bb4dbe95b13dc5086656",
+      "gitBlobSha1": "a8bb283d035215e9b0ac1cf9790ffa05af60a098"
+    },
+    {
+      "path": "oracle/Cargo.toml",
+      "bytes": 521,
+      "sha256": "a463c15da704b3bbc30ab9dc50b9ba22972ab7a44650d1f053a2d4a69d82df7e",
+      "gitBlobSha1": "c69ed77c32ef21061c23aa13b8d8c2b77833f33c"
+    },
+    {
+      "path": "oracle/crates/oracle-interface/Cargo.toml",
+      "bytes": 254,
+      "sha256": "3ec50a92a4e9fd82e3dcdb0d669b90898abb707b572d250e95ed22a64eeaef0f",
+      "gitBlobSha1": "aa194132306c51fbdb1d65dca2db90ec3ca0abd5"
+    },
+    {
+      "path": "oracle/crates/oracle-interface/src/lib.rs",
+      "bytes": 16649,
+      "sha256": "a8c990aa959990427cfe9f3327a6212587d23edb535aaa0e510d361ea6230332",
+      "gitBlobSha1": "080b91b80daf649b167e4f6a5450b2f1249bd4f2"
+    }
+  ]
+}

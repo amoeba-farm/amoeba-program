@@ -53,6 +53,15 @@ pub const VAULT_MARKETS: usize = 13;
 const VAULT_HEAD: usize = 192;
 pub const VAULT_LEN: usize = VAULT_HEAD + 32 * VAULT_MARKETS;
 pub const VAULT_LP_LEN: usize = 128;
+/// The reward stream's section ([`Rewards`]), appended to the vault account
+/// after its markets the first time the operator sets a stream
+/// (`VaultRewards`): the vault is `VAULT_LEN` bytes before, `VAULT_REWARDS_LEN`
+/// after.
+pub const REWARDS_LEN: usize = 192;
+pub const VAULT_REWARDS_LEN: usize = VAULT_LEN + REWARDS_LEN;
+pub const REWARDS_MAGIC: [u8; 8] = *b"AFRVRWD1";
+/// Fixed point of [`Rewards::acc`]: reward atoms per share, times this.
+pub const REWARD_SCALE: u128 = 1_000_000_000_000;
 
 pub const STATUS_OPEN: u8 = 0;
 pub const STATUS_SETTLED: u8 = 1;
@@ -867,13 +876,22 @@ pub struct Vault {
     pub created_ts: u64,
     /// Every market where the vault may hold a trader slot, in order.
     pub markets: Vec<Pubkey>,
+    /// The reward stream, once the operator has set one.
+    pub rewards: Option<Rewards>,
 }
 
 impl Vault {
     pub fn read(b: &[u8]) -> Result<Self, ProgramError> {
-        if b.len() != VAULT_LEN || b[..8] != VAULT_MAGIC || usize::from(b[9]) > VAULT_MARKETS {
+        if (b.len() != VAULT_LEN && b.len() != VAULT_REWARDS_LEN)
+            || b[..8] != VAULT_MAGIC
+            || usize::from(b[9]) > VAULT_MARKETS
+        {
             return Err(FuturesError::InvalidAccount.into());
         }
+        let rewards = match b.get(VAULT_LEN..) {
+            Some(r) if !r.is_empty() => Some(Rewards::read(r)?),
+            _ => None,
+        };
         Ok(Vault {
             bump: b[8],
             operator: key_at(b, 16),
@@ -887,6 +905,7 @@ impl Vault {
             markets: (0..usize::from(b[9]))
                 .map(|i| key_at(b, VAULT_HEAD + 32 * i))
                 .collect(),
+            rewards,
         })
     }
     pub fn write(&self, b: &mut [u8]) {
@@ -901,10 +920,136 @@ impl Vault {
         put64(b, 128, self.deposited);
         put64(b, 136, self.withdrawn);
         put64(b, 144, self.created_ts);
-        b[VAULT_HEAD..].fill(0);
+        b[VAULT_HEAD..VAULT_LEN].fill(0);
         for (i, m) in self.markets.iter().enumerate() {
             put_key(b, VAULT_HEAD + 32 * i, m);
         }
+        if let (Some(r), Some(at)) = (&self.rewards, b.get_mut(VAULT_LEN..VAULT_REWARDS_LEN)) {
+            r.write(at);
+        }
+    }
+}
+
+/// The Earn vault's reward stream (`REWARDS_LEN` bytes after the vault's
+/// markets): `amount` atoms of `mint`, held in `account` (a token account of
+/// the mint owned by the vault's address), released linearly from `start_ts`
+/// to `end_ts` to the depositors by their shares, except `house`'s (the
+/// protocol's own deposit). A share's part accumulates in `acc` (atoms per
+/// share, times `REWARD_SCALE`), which only grows; each position settles its
+/// part when its shares change or it is paid (`VaultRewardsClaim`).
+/// What is released while only the house holds shares goes to nobody and
+/// stays with the operator's surplus (`VaultRewardsWithdraw`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Rewards {
+    pub mint: Pubkey,
+    pub account: Pubkey,
+    /// The owner whose shares earn nothing (`Pubkey::default()`: none).
+    pub house: Pubkey,
+    /// The mint's decimals (its transfers are checked).
+    pub decimals: u8,
+    pub start_ts: u64,
+    pub end_ts: u64,
+    pub amount: u64,
+    /// Accrued up to here.
+    pub last_ts: u64,
+    pub acc: u128,
+    /// The house's shares, left out of every share's part.
+    pub house_shares: u64,
+    /// Atoms ever accrued to depositors, and ever paid to them.
+    pub distributed: u64,
+    pub paid: u64,
+}
+
+impl Rewards {
+    /// `b`: the `REWARDS_LEN` bytes after the vault's markets.
+    pub fn read(b: &[u8]) -> Result<Self, ProgramError> {
+        if b.len() != REWARDS_LEN || b[..8] != REWARDS_MAGIC {
+            return Err(FuturesError::InvalidAccount.into());
+        }
+        Ok(Rewards {
+            decimals: b[8],
+            mint: key_at(b, 16),
+            account: key_at(b, 48),
+            house: key_at(b, 80),
+            start_ts: u64_at(b, 112),
+            end_ts: u64_at(b, 120),
+            amount: u64_at(b, 128),
+            last_ts: u64_at(b, 136),
+            acc: u128_at(b, 144),
+            house_shares: u64_at(b, 160),
+            distributed: u64_at(b, 168),
+            paid: u64_at(b, 176),
+        })
+    }
+    pub fn write(&self, b: &mut [u8]) {
+        b.fill(0);
+        b[..8].copy_from_slice(&REWARDS_MAGIC);
+        b[8] = self.decimals;
+        put_key(b, 16, &self.mint);
+        put_key(b, 48, &self.account);
+        put_key(b, 80, &self.house);
+        put64(b, 112, self.start_ts);
+        put64(b, 120, self.end_ts);
+        put64(b, 128, self.amount);
+        put64(b, 136, self.last_ts);
+        put128(b, 144, self.acc);
+        put64(b, 160, self.house_shares);
+        put64(b, 168, self.distributed);
+        put64(b, 176, self.paid);
+    }
+
+    /// What the stream has released by `t`: nothing before `start_ts`,
+    /// `amount` from `end_ts`, linear between (rounded down).
+    pub fn released_at(&self, t: u64) -> u64 {
+        if t <= self.start_ts || self.end_ts <= self.start_ts {
+            0
+        } else if t >= self.end_ts {
+            self.amount
+        } else {
+            let part = u128::from(self.amount) * u128::from(t - self.start_ts)
+                / u128::from(self.end_ts - self.start_ts);
+            part as u64
+        }
+    }
+
+    /// Accrues what the stream released since `last_ts` up to `now` to a
+    /// vault of `shares` shares (before they change). `None` on overflow.
+    pub fn accrue(&mut self, shares: u64, now: u64) -> Option<()> {
+        let from = self.last_ts.max(self.start_ts);
+        let to = now.min(self.end_ts);
+        if to > from {
+            let released = self.released_at(to) - self.released_at(from);
+            let earning = shares.saturating_sub(self.house_shares);
+            if earning > 0 && released > 0 {
+                let per = u128::from(released).checked_mul(REWARD_SCALE)? / u128::from(earning);
+                self.acc = self.acc.checked_add(per)?;
+                self.distributed = self.distributed.checked_add(released)?;
+            }
+        }
+        self.last_ts = self.last_ts.max(now);
+        Some(())
+    }
+
+    /// Settles what `p` earned since its last settlement into its pending
+    /// rewards (the house earns nothing). `None` on overflow.
+    pub fn settle(&self, p: &mut VaultPosition) -> Option<()> {
+        if p.owner != self.house {
+            let per = self.acc.checked_sub(p.reward_snapshot)?;
+            let earned = u128::from(p.shares).checked_mul(per)? / REWARD_SCALE;
+            p.reward_pending = p.reward_pending.checked_add(u64::try_from(earned).ok()?)?;
+        }
+        p.reward_snapshot = self.acc;
+        Some(())
+    }
+
+    /// Accrued to depositors and not paid yet.
+    pub fn owed(&self) -> u64 {
+        self.distributed.saturating_sub(self.paid)
+    }
+
+    /// What the stream still releases after `now` (accrued to `now`).
+    pub fn left(&self, now: u64) -> u64 {
+        self.amount - self.released_at(now.max(self.last_ts))
     }
 }
 
@@ -918,7 +1063,17 @@ pub struct VaultPosition {
     /// Cash this owner ever deposited and withdrawn (informational).
     pub deposited: u64,
     pub withdrawn: u64,
+    /// The vault's `Rewards::acc` at this position's last settlement.
+    pub reward_snapshot: u128,
+    /// Reward atoms settled and not paid yet.
+    pub reward_pending: u64,
+    /// Reward atoms ever paid (informational): stored in seven bytes, so it
+    /// stops at `REWARD_PAID_MAX`.
+    pub reward_paid: u64,
 }
+
+/// The most `VaultPosition::reward_paid` holds (2^56 - 1 atoms).
+pub const REWARD_PAID_MAX: u64 = (1 << 56) - 1;
 
 impl VaultPosition {
     pub fn read(b: &[u8]) -> Result<Self, ProgramError> {
@@ -932,16 +1087,22 @@ impl VaultPosition {
             shares: u64_at(b, 80),
             deposited: u64_at(b, 88),
             withdrawn: u64_at(b, 96),
+            reward_snapshot: u128_at(b, 104),
+            reward_pending: u64_at(b, 120),
+            reward_paid: u64_at(b, 8) >> 8,
         })
     }
     pub fn write(&self, b: &mut [u8]) {
         b[..8].copy_from_slice(&VAULT_LP_MAGIC);
+        put64(b, 8, self.reward_paid.min(REWARD_PAID_MAX) << 8);
         b[8] = self.bump;
         put_key(b, 16, &self.vault);
         put_key(b, 48, &self.owner);
         put64(b, 80, self.shares);
         put64(b, 88, self.deposited);
         put64(b, 96, self.withdrawn);
+        put128(b, 104, self.reward_snapshot);
+        put64(b, 120, self.reward_pending);
     }
 }
 
@@ -1332,5 +1493,74 @@ mod tests {
         for x in 0..20 {
             assert_eq!(mids.at(x), 42);
         }
+    }
+
+    #[test]
+    fn rewards_round_trip_and_split_by_shares() {
+        let mut r = Rewards {
+            mint: Pubkey::new_unique(),
+            account: Pubkey::new_unique(),
+            house: Pubkey::new_unique(),
+            decimals: 9,
+            start_ts: 1_000,
+            end_ts: 4_000,
+            amount: 3_000_000,
+            last_ts: 1_000,
+            house_shares: 600,
+            ..Rewards::default()
+        };
+        // 1,000 of 3,000 seconds: a third, to the 400 shares outside the house.
+        r.accrue(1_000, 2_000).unwrap();
+        assert_eq!((r.distributed, r.last_ts), (1_000_000, 2_000));
+        let mut p = VaultPosition {
+            owner: Pubkey::new_unique(),
+            shares: 100,
+            ..VaultPosition::default()
+        };
+        r.settle(&mut p).unwrap();
+        assert_eq!((p.reward_pending, p.reward_snapshot), (250_000, r.acc));
+        let mut house = VaultPosition {
+            owner: r.house,
+            shares: 600,
+            ..VaultPosition::default()
+        };
+        r.settle(&mut house).unwrap();
+        assert_eq!(house.reward_pending, 0, "the house earns nothing");
+        assert_eq!(r.left(2_000), 2_000_000);
+        // Past the end nothing more is released; only the house: nobody's.
+        r.house_shares = 1_000;
+        r.accrue(1_000, 9_000).unwrap();
+        assert_eq!((r.distributed, r.left(9_000)), (1_000_000, 0));
+        // The vault account grows by the section; the position keeps its bytes.
+        let v = Vault {
+            markets: vec![Pubkey::new_unique()],
+            rewards: Some(r),
+            ..Vault::default()
+        };
+        let mut b = vec![0u8; VAULT_REWARDS_LEN];
+        v.write(&mut b);
+        assert_eq!(Vault::read(&b).unwrap(), v);
+        let plain = Vault {
+            rewards: None,
+            ..v.clone()
+        };
+        assert_eq!(Vault::read(&b[..VAULT_LEN]).unwrap(), plain);
+        p.bump = 254;
+        p.reward_paid = u64::MAX;
+        let mut b = vec![0u8; VAULT_LP_LEN];
+        p.write(&mut b);
+        let back = VaultPosition::read(&b).unwrap();
+        assert_eq!(
+            (back.bump, back.reward_paid),
+            (254, REWARD_PAID_MAX),
+            "paid stops at 2^56 - 1"
+        );
+        assert_eq!(
+            VaultPosition {
+                reward_paid: u64::MAX,
+                ..back
+            },
+            p
+        );
     }
 }

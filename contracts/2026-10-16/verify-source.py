@@ -7,6 +7,18 @@ import tomllib
 
 bundle = Path(__file__).resolve().parent
 root = bundle.parents[1]
+# The old installation inventory is immutable; verify its pinned historical tree.
+import subprocess, tempfile, tarfile, io
+snapshot = tempfile.TemporaryDirectory(prefix='amoeba-historical-source-')
+archive = subprocess.check_output(['git', '-C', str(root), 'archive', '--format=tar', '624728f222d719a5011e2d92dff0eb50a4c7d6f7', '--', 'oracle', 'futures', 'governance'])
+root = Path(snapshot.name).resolve()
+with tarfile.open(fileobj=io.BytesIO(archive)) as members:
+    for member in members:
+        target = (root / member.name).resolve()
+        assert target.is_relative_to(root) and not member.issym() and not member.islnk()
+        if member.isfile():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(members.extractfile(member).read())
 inventory = json.loads((bundle / 'SOURCE_FILES.json').read_text(encoding='utf8'))
 assert inventory['sourceCommit'] == '4caf83f080f7541b1f741e63871c8d701b398e9b'
 records = inventory['files']

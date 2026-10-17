@@ -1,0 +1,41 @@
+[package]
+name = "ameba-signer"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "The keys Amoeba's services and ops tools sign with: Solana keypair files (dev) or Google Cloud KMS Ed25519 key versions (production), per role, every signature verified against the role's address"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+# Cloud KMS's REST API and Google's token endpoints (the futures API's build).
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# RS256 for a service account key's token request (Application Default
+# Credentials). Already in every dependent's tree through rustls.
+ring = "0.17"
+serde_json = "1"
+solana-keypair = "2"
+solana-pubkey = "2"
+solana-signature = { version = "2", features = ["verify"] }
+solana-signer = "2"
+solana-transaction = { version = "2", features = ["bincode"] }
+# `blocking::BlockingSigner` runs KMS requests on a small runtime of its own.
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
+
+[dev-dependencies]
+# A local stub of the metadata server, Google's token endpoint and Cloud KMS.
+axum = "0.8"
+form_urlencoded = "1"
+rand = "0.8"
+# A throwaway RSA service account key for the credential tests; generated at
+# test time, never stored.
+rsa = "0.9"
+# The canonical mainnet-beta genesis hash, to check MAINNET_GENESIS against.
+solana-cluster-type = "2"
+solana-message = "2"
+solana-program.workspace = true
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
+
+[lints]
+workspace = true

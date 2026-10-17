@@ -17,8 +17,8 @@ pub use ameba_oracle_interface as oracle;
 pub use ameba_futures::{
     self as program,
     state::{
-        self, Claim, Core, Header, Ladder, LpPosition, Maker, Order, Pool, Step, Tiers, Trader,
-        Vault, VaultPosition, ORDER_CLOSE, STATUS_FAILED, STATUS_OPEN, STATUS_SETTLED,
+        self, Claim, Core, Header, Ladder, LpPosition, Maker, Order, Pool, Rewards, Step, Tiers,
+        Trader, Vault, VaultPosition, ORDER_CLOSE, STATUS_FAILED, STATUS_OPEN, STATUS_SETTLED,
         VAULT_MARKETS,
     },
     FuturesError, FuturesInstruction, Knot, ERROR_BASE, MODE_GTC, MODE_IOC, MODE_POST, NO_CLAIM,
@@ -32,6 +32,9 @@ use solana_program::{
 };
 
 pub const SYSTEM: Pubkey = solana_system_interface::program::ID;
+/// SPL Token-2022 (reward mints such as AMBA may be of it).
+pub const TOKEN_2022: Pubkey =
+    solana_program::pubkey!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 pub const COMPUTE_BUDGET: Pubkey =
     solana_program::pubkey!("ComputeBudget111111111111111111111111111111");
 /// The heap frame `Submit` and `Quote` need (the program's own allocator).
@@ -734,6 +737,107 @@ impl EarnVault {
             ],
         )
     }
+}
+
+impl EarnVault {
+    /// `VaultRewards`: the operator sets the reward stream, `amount` atoms
+    /// of `mint` from `start_ts` to `end_ts` out of `account` (the vault's
+    /// token account of the mint), `house`'s shares left out; `payer` funds
+    /// the vault's growth the first time.
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_rewards(
+        &self,
+        payer: &Pubkey,
+        mint: &Pubkey,
+        account: &Pubkey,
+        start_ts: u64,
+        end_ts: u64,
+        amount: u64,
+        house: &Pubkey,
+    ) -> Instruction {
+        ix(
+            self.program,
+            FuturesInstruction::VaultRewards {
+                start_ts,
+                end_ts,
+                amount,
+                house: *house,
+            },
+            vec![
+                AccountMeta::new(self.vault, false),
+                AccountMeta::new_readonly(self.operator, true),
+                AccountMeta::new(*payer, true),
+                AccountMeta::new_readonly(*mint, false),
+                AccountMeta::new_readonly(*account, false),
+                AccountMeta::new_readonly(self.position(house), false),
+                AccountMeta::new_readonly(SYSTEM, false),
+            ],
+        )
+    }
+
+    /// `VaultRewardsClaim` (anyone may send it): pays `owner`'s rewards of
+    /// stream `r` into `owner_token`, their token account of the reward mint
+    /// under `token_program`.
+    pub fn claim_rewards(
+        &self,
+        r: &Rewards,
+        token_program: &Pubkey,
+        owner: &Pubkey,
+        owner_token: &Pubkey,
+    ) -> Instruction {
+        ix(
+            self.program,
+            FuturesInstruction::VaultRewardsClaim,
+            vec![
+                AccountMeta::new(self.vault, false),
+                AccountMeta::new(self.position(owner), false),
+                AccountMeta::new(r.account, false),
+                AccountMeta::new_readonly(r.mint, false),
+                AccountMeta::new(*owner_token, false),
+                AccountMeta::new_readonly(*token_program, false),
+            ],
+        )
+    }
+
+    /// `VaultRewardsWithdraw`: the operator takes `amount` (`u64::MAX`: all)
+    /// of the reward account's surplus into `dest`.
+    pub fn withdraw_rewards(
+        &self,
+        r: &Rewards,
+        token_program: &Pubkey,
+        dest: &Pubkey,
+        amount: u64,
+    ) -> Instruction {
+        ix(
+            self.program,
+            FuturesInstruction::VaultRewardsWithdraw { amount },
+            vec![
+                AccountMeta::new(self.vault, false),
+                AccountMeta::new_readonly(self.operator, true),
+                AccountMeta::new(r.account, false),
+                AccountMeta::new_readonly(r.mint, false),
+                AccountMeta::new(*dest, false),
+                AccountMeta::new_readonly(*token_program, false),
+            ],
+        )
+    }
+}
+
+/// The vault's reward stream accrued to `now`, and what `p` would be paid
+/// then (its pending rewards, settled to `now`), as the program counts them;
+/// `None` without a stream.
+pub fn rewards_at(v: &Vault, p: Option<&VaultPosition>, now: u64) -> Option<(Rewards, u64)> {
+    let mut r = v.rewards?;
+    r.accrue(v.shares, now)?;
+    let pending = match p {
+        Some(p) => {
+            let mut p = *p;
+            r.settle(&mut p)?;
+            p.reward_pending
+        }
+        None => 0,
+    };
+    Some((r, pending))
 }
 
 /// The vault account.

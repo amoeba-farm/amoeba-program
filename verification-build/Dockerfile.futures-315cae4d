@@ -1,0 +1,2 @@
+FROM solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68
+WORKDIR /opt/ameba-dev/worktrees/amba-release

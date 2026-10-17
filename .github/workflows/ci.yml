@@ -20,8 +20,11 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Verify oracle and futures source inventory
         run: python3 contracts/2026-10-16/verify-source.py
+      - name: Verify current Futures source inventory
+        run: python3 contracts/2026-10-16-amba-earn/verify-source.py
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
         with:
           toolchain: 1.90.0

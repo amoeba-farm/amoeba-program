@@ -1,0 +1,42 @@
+{
+  "schema": "amoeba.futures-reproduction-experiments.v1",
+  "sourceCommit": "315cae4d2ab23d0a54dd7a6717503349bb3fd9c4",
+  "parentImage": "solanafoundation/solana-verifiable-build@sha256:0b4e3716fad9ca4b4aac3e3f977f43aad93a18c22296c0c0f44fc22e644bdd68",
+  "workspace": "futures",
+  "library": "ameba_futures",
+  "arch": "v1",
+  "toolsVersion": "v1.53",
+  "features": "default production features",
+  "builder": "cargo-build-sbf in isolated container, --locked -j1",
+  "baseline": {
+    "workdir": "/opt/ameba-dev/worktrees/gate-final",
+    "bytes": 444816,
+    "rawSha256": "ea5b07b1d9d98dbc522516a96fc8b679d834ee863b79fa874ebbcf44813549d5",
+    "normalizedSha256": "4b73c96341363bae279664c3fceb9c3a73abb4a9eb401f83f79c5ac06d9fd3cb",
+    "matchesInstalled": false
+  },
+  "matchingPath": {
+    "workdir": "/opt/ameba-dev/worktrees/amba-release",
+    "bytes": 444816,
+    "rawSha256": "b0480f9adc17c4d58a3f78bc84cb235c6b7ad92782ce6b00bbbf7c55fc666873",
+    "normalizedSha256": "bb068e2a37216b8ba0aced762a69d51424bd35253629dfac5c7379cf42c1a075",
+    "matchesInstalled": true,
+    "image": "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/amba-release@sha256:36bdcd0005a5a41f9eba76add58f16fccdc7a2b7b2fbace1be3aaba8cda7b40e"
+  },
+  "standardPathRemap": {
+    "status": "completed",
+    "configuration": "[target.sbpfv1-solana-solana] rustflags=[\"--remap-path-prefix=/opt/ameba-dev/worktrees/gate-final=/opt/ameba-dev/worktrees/amba-release\"]",
+    "bytes": 444816,
+    "rawSha256": "ea5b07b1d9d98dbc522516a96fc8b679d834ee863b79fa874ebbcf44813549d5",
+    "normalizedSha256": "4b73c96341363bae279664c3fceb9c3a73abb4a9eb401f83f79c5ac06d9fd3cb",
+    "matchesInstalled": false,
+    "wrapperOrPrebuiltUsed": false,
+    "effectiveRustflags": [
+      "--remap-path-prefix=/opt/ameba-dev/worktrees/gate-final=/opt/ameba-dev/worktrees/amba-release",
+      "-Zremap-cwd-prefix="
+    ],
+    "compilerFingerprint": "sbpfv1-solana-solana/release/.fingerprint/ameba-futures-1c00d5e48b1ca305/lib-ameba_futures.json",
+    "flagsAppliedEvidence": "Cargo compiler fingerprint rustflags field includes the exact remap flag for ameba_futures and ameba_futures_math; target triple is sbpfv1-solana-solana."
+  },
+  "hostedVerificationComplete": false
+}
