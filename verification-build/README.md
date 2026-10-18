@@ -51,10 +51,12 @@ historical. The fixed-path artifact is installed at slot 457976295 and passed
 hosted verification on 2026-10-17. See the
 [installation receipt](../deployment-evidence/mainnet-inventory-netting-20261017.json).
 
-## Prepared staking release
+## Installed staking release
 
 The [staking source and reproduction record](../contracts/2026-10-18-staking-mainnet)
 uses the same immutable `amba-release` image and Futures build command above.
-The build reproduces the 706,416-byte prepared release artifact exactly. Oracle
-source and its build recipe are unchanged. Installation and updated hosted
-verification remain pending for this new artifact.
+The build reproduces the installed 706,416-byte artifact exactly. Oracle source
+and its build recipe are unchanged. Futures was installed at slot 458402515,
+activated at epoch 11, and passed updated hosted verification for public source
+`8536d411b2af0bd77b37740edc315db2f06db601`.
+See the [installation receipt](../deployment-evidence/mainnet-staking-20261018.json).

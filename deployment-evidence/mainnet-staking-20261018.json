@@ -1,0 +1,312 @@
+{
+  "schema": "amoeba.staking-mainnet-installation.v1",
+  "status": "COMPLETED",
+  "assembledAt": "2026-10-18T10:45:04.318Z",
+  "cluster": "mainnet-beta",
+  "releaseTag": "release/2026-10-18-staking-mainnet",
+  "privateSourceCommit": "c723db776e9d0c639565d89ac761703731b37fb4",
+  "publicSourceCommit": "8536d411b2af0bd77b37740edc315db2f06db601",
+  "controller": {
+    "program": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+    "installedRelease": 6,
+    "unchanged": true,
+    "normalizedSha256": "534d7456bd65c0849345a130050882b45bd82b072d7dca0d71059b89ed8ce1f7"
+  },
+  "futures": {
+    "observedAt": "2026-10-18T10:33:48.918Z",
+    "slot": 458403065,
+    "target": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+    "sourceCommit": "c723db776e9d0c639565d89ac761703731b37fb4",
+    "artifactSha256": "6c38326084c53f560bbdbcc54f2f2441191bcee0a2f915850496d8329a4452cf",
+    "deployedSlot": "458402515",
+    "capacity": 706416,
+    "authority": "Gi964re8sQK2Z1fNszd2c7RVUxLeK6nbc6jok6dBkpLx",
+    "gate": {
+      "bump": 254,
+      "status": 0,
+      "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+      "targetProgram": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+      "programdata": "RqYipon2KYuhBCUSg9GSdyYfH5B7bdQ9ThoeAJyhZeJ",
+      "epoch": "11",
+      "activeProposal": "11111111111111111111111111111111",
+      "freezeSlot": "0",
+      "reason": 0,
+      "lastCompletedProposal": "EQDq1bKF1UEtoah11Wq81156928L4JYQh7RAnzP548Ur"
+    },
+    "bufferClosed": true,
+    "bufferRefundLamports": 3589431480,
+    "upgradeSignature": "5nL43iWRzC3nCPNLoMEYSLJ9W9kwhwQFumetu2qX2dCCB4Dyt8omeYWkTqskiAazizoU23D2BBwpwz7pmDdWNWdq",
+    "activationSignature": "4Saha2BoizeB9kBx3a1QVuGfeHtZ7w2TfQzEVxURV2yEZad3PY8RyVJgwvW7mSSYDffwNgKwJAoMUocH8JjCZ77V",
+    "extensionSignature": "5U5XfnD9CgRLgakH6RmJqpNH3CWTLdVqVNJjL74Xj38CvBPZQb8SR65Bph31KHhqwJGGwsY1uH3EfzCSFAuUr5ns",
+    "extensionLamports": 1140033280,
+    "artifactBytes": 706416,
+    "extensionBytes": 224416,
+    "normalizedSha256": "d37452966b76f2bbaefbd77daf1a48e30c7e21bdaeecdcf6c35d0dbebe92209d",
+    "upgradeProposalId": "77",
+    "freezeProposalId": "78",
+    "activationProposalId": "79",
+    "councilApprovals": 3,
+    "verifiedArtifactChunks": 44,
+    "extension": {
+      "name": "futures-extend",
+      "signature": "5U5XfnD9CgRLgakH6RmJqpNH3CWTLdVqVNJjL74Xj38CvBPZQb8SR65Bph31KHhqwJGGwsY1uH3EfzCSFAuUr5ns",
+      "slot": 458394593,
+      "err": null,
+      "messageSha256": "44292fd225055b2136baecac6192ed2ed8c6ce6d4cd8f5cb6cfb4acfdaa2cf9e"
+    },
+    "freeze": {
+      "name": "freeze-execute",
+      "signature": "TH5S1S6SVu1PgMMzhzWgr1jq3cUfXUPCaDmLV8LrLb7vdkHAyaEkxXCdocTtCnbZNzpskTfpUZsQoHLWqf5bpRe",
+      "slot": 458401864,
+      "err": null,
+      "messageSha256": "4c0c671f3dad64d816c8a3664392a1b4f7055d2e88c64904ef2b2bb8f14402cd"
+    },
+    "upgrade": {
+      "name": "upgrade-execute",
+      "signature": "5nL43iWRzC3nCPNLoMEYSLJ9W9kwhwQFumetu2qX2dCCB4Dyt8omeYWkTqskiAazizoU23D2BBwpwz7pmDdWNWdq",
+      "slot": 458402515,
+      "err": null,
+      "messageSha256": "d136b78201174e01bae751b16d396a25ada9d294dbe1dc955cfb885a5fcda2ce"
+    },
+    "activation": {
+      "name": "activate-execute",
+      "signature": "4Saha2BoizeB9kBx3a1QVuGfeHtZ7w2TfQzEVxURV2yEZad3PY8RyVJgwvW7mSSYDffwNgKwJAoMUocH8JjCZ77V",
+      "slot": 458402776,
+      "err": null,
+      "messageSha256": "72383b55ff055552d173668c11691f7549f9021b69d8fb9f674e0a6524c59aca"
+    }
+  },
+  "preservation": {
+    "frozenAccountCount": 14,
+    "frozenAccountsSha256": "be4d763e427e46e4d41560af1fe4646499ec5ae43d99305805cb8539934400d9",
+    "frozenStateAndTokenCustodyUnchanged": true,
+    "controllerAfterActivation": {
+      "ownProposalIds": [
+        "77",
+        "78",
+        "79"
+      ],
+      "proposalAddresses": [
+        "4A1d1FurokhZqqLLxsZUMRT6RZx2bGEMqxQjkHwQT9Yv",
+        "7QtRR7BsBjz7TywwB45Lbd42KXyAdYc5vyjnQAQqnF9M",
+        "EQDq1bKF1UEtoah11Wq81156928L4JYQh7RAnzP548Ur"
+      ],
+      "configComparedExceptNextId": true,
+      "futuresGate": {
+        "status": 0,
+        "epoch": "11"
+      },
+      "preservedUnrelatedAccounts": 25
+    },
+    "controllerAfterMetadata": {
+      "ownProposalIds": [
+        "77",
+        "78",
+        "79",
+        "80"
+      ],
+      "proposalAddresses": [
+        "4A1d1FurokhZqqLLxsZUMRT6RZx2bGEMqxQjkHwQT9Yv",
+        "7QtRR7BsBjz7TywwB45Lbd42KXyAdYc5vyjnQAQqnF9M",
+        "EQDq1bKF1UEtoah11Wq81156928L4JYQh7RAnzP548Ur",
+        "41jYPBpCaZD1Lyich2AgR6Kf5zHWbjx865rHuoeuKG5z"
+      ],
+      "configComparedExceptNextId": true,
+      "futuresGate": {
+        "status": 0,
+        "epoch": "11"
+      },
+      "preservedUnrelatedAccounts": 25
+    }
+  },
+  "runtime": {
+    "existingRelease": "95143eb396c802faf51b83a0144af9b2c5db6113",
+    "selection": {
+      "schema": "amoeba.staking-mainnet-runtime-selection.v1",
+      "sourceCommit": "c723db776e9d0c639565d89ac761703731b37fb4",
+      "programBytes": 706416,
+      "programSha256": "6c38326084c53f560bbdbcc54f2f2441191bcee0a2f915850496d8329a4452cf",
+      "expectedActiveEpoch": 11,
+      "opsRevision": "95143eb396c802faf51b83a0144af9b2c5db6113",
+      "apiRevision": "95143eb396c802faf51b83a0144af9b2c5db6113",
+      "binaryHashes": {
+        "api": "841f676e5a3c9589f08fcf2e38393fa0db5c33eeefaeba6f1388a3cd24c97f12",
+        "maker": "44782dc1cc2c1a908546d53cb9ff6844495de351e770b91755885ade6a850c1d",
+        "keeper": "08207185c73627ad82681fc22c8b0bfa95cf670fd7060fbba44fe7c5dfec0b46"
+      }
+    },
+    "selectionSha256": "854006e39fe07fe8eec023329df247377f7f9a7bb06f4598af5b7045a2a8c09f",
+    "services": {
+      "api": {
+        "unit": "ameba-futures-api.service",
+        "MainPID": "1102825",
+        "ActiveState": "active",
+        "SubState": "running",
+        "UnitFileState": "enabled",
+        "current": "/opt/ameba-futures/releases/95143eb396c802faf51b83a0144af9b2c5db6113",
+        "binarySha256": "841f676e5a3c9589f08fcf2e38393fa0db5c33eeefaeba6f1388a3cd24c97f12"
+      },
+      "maker": {
+        "unit": "ameba-futures-maker.service",
+        "MainPID": "1104469",
+        "ActiveState": "active",
+        "SubState": "running",
+        "UnitFileState": "enabled",
+        "current": "/opt/ameba-futures-ops/releases/95143eb396c802faf51b83a0144af9b2c5db6113",
+        "binarySha256": "44782dc1cc2c1a908546d53cb9ff6844495de351e770b91755885ade6a850c1d"
+      },
+      "keeper": {
+        "unit": "ameba-futures-keeper.service",
+        "MainPID": "1104470",
+        "ActiveState": "active",
+        "SubState": "running",
+        "UnitFileState": "enabled",
+        "current": "/opt/ameba-futures-ops/releases/95143eb396c802faf51b83a0144af9b2c5db6113",
+        "binarySha256": "08207185c73627ad82681fc22c8b0bfa95cf670fd7060fbba44fe7c5dfec0b46"
+      }
+    },
+    "apiPidUnchanged": true,
+    "unsignedSimulation": {
+      "schema": "amoeba.staking-mainnet-bot-simulation.v1",
+      "status": "PASSED",
+      "sourceCommit": "c723db776e9d0c639565d89ac761703731b37fb4",
+      "releaseSha256": "854006e39fe07fe8eec023329df247377f7f9a7bb06f4598af5b7045a2a8c09f",
+      "programSha256": "6c38326084c53f560bbdbcc54f2f2441191bcee0a2f915850496d8329a4452cf",
+      "provider": "Helius",
+      "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+      "programNormalizedSha256": "d37452966b76f2bbaefbd77daf1a48e30c7e21bdaeecdcf6c35d0dbebe92209d",
+      "deployedSlot": "458402515",
+      "gate": "4WiuZP4CpHjRNa37Y5kLmSrgct2PzvHN8Q2DRhUrSjTP",
+      "gateStatus": "Active",
+      "gateEpoch": 11,
+      "observedSlot": 458403312,
+      "roles": {
+        "maker": {
+          "binarySha256": "44782dc1cc2c1a908546d53cb9ff6844495de351e770b91755885ade6a850c1d",
+          "outputSha256": "ef676c7020792eb2393934ee9538397a2446877f1d0079f524a165a02b777d53",
+          "exit": 0,
+          "passErrorDetected": false,
+          "messageHeaders": 2,
+          "messages": 2
+        },
+        "keeper": {
+          "binarySha256": "08207185c73627ad82681fc22c8b0bfa95cf670fd7060fbba44fe7c5dfec0b46",
+          "outputSha256": "6ec2c36a05195b5a53e023a71f3381f989838bf8652dc45c79477cc969f64eed",
+          "exit": 0,
+          "passErrorDetected": false,
+          "messageHeaders": 0,
+          "messages": 0
+        }
+      },
+      "simulations": [
+        {
+          "role": "maker",
+          "index": 1,
+          "messageSha256": "54dd6808d5951ad1c6ead1584d18f64547712cf7e4287242c02ff5bc3d91f967",
+          "slot": 458403315,
+          "err": null,
+          "unitsConsumed": 735232
+        },
+        {
+          "role": "maker",
+          "index": 2,
+          "messageSha256": "f5ba77685a043418fe383464075279f7b113b51f7e2175028a51b2d3f0a82e27",
+          "slot": 458403321,
+          "err": null,
+          "unitsConsumed": 721882
+        }
+      ],
+      "signaturesProduced": 0,
+      "transactionsSubmitted": 0,
+      "observedAt": "2026-10-18T10:34:46.726Z"
+    },
+    "liveTradeOrFillQualified": false
+  },
+  "stakePool": {
+    "schema": "amoeba.mainnet-stake-pool-created.v1",
+    "status": "CREATED_FINALIZED",
+    "state": {
+      "haircutBps": 5000,
+      "profitBps": 5000,
+      "bufferBps": 1000,
+      "vault": "C8mS8bs2yvqSgfPXTjdkbHSvQ991veWMYyPCi5DyEJUd",
+      "operator": "JDwoz1W3QiLhKxsssvA7AMbVowUJzfUjRejkgZzjtK7R",
+      "ambaMint": "BxKJN4PKAT2CFhVbsyKzVyCznu5a2n2oVh8Pb2wdDjam",
+      "ambaTokenAccount": "CWaR7SrH9demFnxAd2YLgv6Bb3z5oJedx5zUL8jBuXqt",
+      "usdcTokenAccount": "5Tqiv2z9B9dHJyEcNazeFgp1dJLnvHW679q3NbxqvZQ5",
+      "usdcMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "twapWindowSeconds": "3600",
+      "expiryWindowSeconds": "86400",
+      "staked": "0",
+      "shares": "0",
+      "allocated": "0"
+    },
+    "observedAt": "2026-10-18T10:44:59.566Z",
+    "finalizedObservationSlot": 458406161,
+    "signature": "5AvjdBBRmSxRciJRSBn9ZNb9wf5W5koSk8aDhaFuDGt7zB1Nc3UoR6jPN849Vpor7iLfGYr3NaXwMzgYGLQFTWBe",
+    "transactionSlot": 458406056,
+    "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+    "sourceCommit": "c723db776e9d0c639565d89ac761703731b37fb4",
+    "pool": "52ofKvwLebGsPLG5wgMaNB65cRgGxhUDYzYQVRmN1fY3",
+    "vault": "C8mS8bs2yvqSgfPXTjdkbHSvQ991veWMYyPCi5DyEJUd",
+    "operator": "JDwoz1W3QiLhKxsssvA7AMbVowUJzfUjRejkgZzjtK7R",
+    "params": {
+      "haircutBps": 5000,
+      "profitBps": 5000,
+      "bufferBps": 1000,
+      "twapWindowSeconds": 3600,
+      "expiryWindowSeconds": 86400
+    },
+    "ambaMint": "BxKJN4PKAT2CFhVbsyKzVyCznu5a2n2oVh8Pb2wdDjam",
+    "ambaTokenAccount": "CWaR7SrH9demFnxAd2YLgv6Bb3z5oJedx5zUL8jBuXqt",
+    "usdcTokenAccount": "5Tqiv2z9B9dHJyEcNazeFgp1dJLnvHW679q3NbxqvZQ5",
+    "poolDataBytes": 800,
+    "poolDataSha256": "b45409a0c73675e1275c4dce68602a25bd5c08a8ecf2e139fdec5c4480fae247",
+    "poolLamports": 4714240,
+    "reviewedDryMessageSha256": "8385378db02f04cd9069c1565a546575b12f2c3fcf1281c0a79a0da2aa4a6db8",
+    "creation": {
+      "name": "stake-pool-create",
+      "signature": "5AvjdBBRmSxRciJRSBn9ZNb9wf5W5koSk8aDhaFuDGt7zB1Nc3UoR6jPN849Vpor7iLfGYr3NaXwMzgYGLQFTWBe",
+      "slot": 458406056,
+      "err": null,
+      "messageSha256": "34a506aa18f0997979c22eb5047ec3ce4ddc75347ea482e8c65ebd8c773e2e1d"
+    }
+  },
+  "verification": {
+    "metadataProposalId": "80",
+    "metadata": "4y2644qGMYJtqeSkJVPLiqBruscYd4LqCioFTmWNMMWg",
+    "recordSha256": "63340d430e32e5d616fb480a1b576064b7e7d754abb8e86d316615e918c8913f",
+    "publication": {
+      "name": "metadata-futures-execute",
+      "signature": "2LvLvLiugfxoD9hDub34CAy9ZpRonutSHF4bAuhdCoWBALWmFtTMfYr7cHrp4HTussBvWSgx3Pw6fcnRn8imPhBH",
+      "slot": 458404484,
+      "err": null,
+      "messageSha256": "709c10ad20dd826e82e38ea093d30841db7e01f4381bc5b6a2e9369c5c1e6106"
+    },
+    "hosted": {
+      "target": "futures",
+      "observedAt": "2026-10-18T10:41:36.291Z",
+      "jobStatus": "completed",
+      "canonicalVerified": true,
+      "authorityVerified": true,
+      "exactExpectedCommit": "8536d411b2af0bd77b37740edc315db2f06db601",
+      "exactExpectedHash": "d37452966b76f2bbaefbd77daf1a48e30c7e21bdaeecdcf6c35d0dbebe92209d",
+      "status": "verified"
+    },
+    "job": {
+      "requestId": "cf4cb18a-5568-4369-91d1-f5656bb56de8",
+      "responseStatus": "in_progress",
+      "recordSha256": "63340d430e32e5d616fb480a1b576064b7e7d754abb8e86d316615e918c8913f"
+    },
+    "canonicalUrl": "https://verify.osec.io/status/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+    "authorityRecordsUrl": "https://verify.osec.io/status-all/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+    "authority": "Gi964re8sQK2Z1fNszd2c7RVUxLeK6nbc6jok6dBkpLx"
+  },
+  "scope": {
+    "programUpgraded": true,
+    "gateActivated": true,
+    "stakePoolCreated": true,
+    "stakeOrLendingFundingPerformed": false,
+    "apiOrWebDeploymentPerformed": false
+  }
+}

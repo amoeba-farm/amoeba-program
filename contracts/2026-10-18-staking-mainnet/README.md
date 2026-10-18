@@ -38,5 +38,23 @@ version 1, using former spare fields for credit state. New stake pools are
 separate governed operations; publishing or installing this artifact does not
 create, fund or enable lending from one.
 
-Mainnet installation and updated hosted verification are pending. Prior
-verification receipts attest their own historical artifacts.
+Installed at finalized slot **458402515**, activated at slot
+**458402776** and gate epoch **11**, with 3 council approvals.
+The exact deployed bytes match the reproduced artifact. All captured market,
+vault and token custody state was preserved, and **3.589431480 SOL** of buffer
+rent returned to the treasury. Existing maker and keeper binaries resumed after
+unsigned runtime checks passed (2 maker messages simulated successfully; 0 keeper messages emitted).
+
+The Mainnet stake pool `52ofKvwLebGsPLG5wgMaNB65cRgGxhUDYzYQVRmN1fY3` was then created at finalized slot
+**458406056** for Earn vault `C8mS8bs2yvqSgfPXTjdkbHSvQ991veWMYyPCi5DyEJUd`, with its
+AMBA Token-2022 and USDC associated token accounts. Parameters: haircut
+5000 bps, profit share 5000 bps,
+buffer 1000 bps, average window
+3600 seconds and no new credit within
+86400 seconds before expiry. No stake or lending
+funding was performed.
+
+Hosted verification passed for public source `8536d411b2af0bd77b37740edc315db2f06db601`, matching
+both canonical and authority-specific hashes.
+[Installation and verification evidence](../../deployment-evidence/mainnet-staking-20261018.json) records the result.
+Prior verification receipts attest their own historical artifacts.

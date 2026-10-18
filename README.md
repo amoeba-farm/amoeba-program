@@ -6,18 +6,13 @@ with the preserved source of its earlier index-options / Spread program.
 [Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
 
 The Mainnet oracle and range-futures source is in [oracle](oracle) and
-[futures](futures). [The deployed inventory-netting source](contracts/2026-10-17-inventory-netting)
-records the installed Futures release; [the AMBA Earn record](contracts/2026-10-16-amba-earn)
-records its predecessor; [contracts/2026-10-16](contracts/2026-10-16)
-preserves the original source inventory and installation records.
+[futures](futures). The [staking release](contracts/2026-10-18-staking-mainnet)
+records the installed Futures source `c723db776e9d0c639565d89ac761703731b37fb4` and its exact
+reproduced artifact. The [inventory-netting](contracts/2026-10-17-inventory-netting),
+[AMBA Earn](contracts/2026-10-16-amba-earn) and
+[original](contracts/2026-10-16) records preserve earlier releases.
 The earlier index-options / Spread program remains in
 [programs/light_token_minter](programs/light_token_minter).
-
-The [staking release source](contracts/2026-10-18-staking-mainnet) advances the
-Futures workspace to source `c723db776e9d0c639565d89ac761703731b37fb4`.
-Its fixed-image build matches the prepared release artifact. Mainnet installation
-and updated hosted verification of this new artifact are pending; the records
-below describe the preceding inventory-netting deployment.
 
 ## Mainnet programs
 
@@ -27,13 +22,18 @@ below describe the preceding inventory-netting deployment.
 | Range futures | `Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu` | [Solana Verified Builds status](https://verify.osec.io/status/Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu) |
 | Governance controller | `8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx` | [Solana Verified Builds status](https://verify.osec.io/status/8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx) |
 
-Controller release 6 and inventory-netting Futures are installed on Mainnet.
-Futures was deployed at slot **457976295** and is Active at gate epoch **8**.
-The API, maker and keeper from release `b306e314` passed runtime confirmation.
-Controller and Futures passed updated hosted verification on 2026-10-17, with
-matching canonical and authority-specific results. Oracle remains verified.
-[Installation and runtime evidence](deployment-evidence/mainnet-inventory-netting-20261017.json)
-records finalized transactions, exact deployed artifacts and hosted results.
+The staking Futures artifact is installed at finalized slot **458402515**
+and Active at gate epoch **11**. The exact **706,416-byte** program matches its
+reproduced source. Existing market and token custody state was preserved; the
+maker and keeper resumed after unsigned runtime checks passed (2 maker messages simulated successfully; 0 keeper messages emitted). The API
+remained online. The Mainnet stake pool was then created at finalized slot
+**458406056**; no stake or lending funding was performed.
+
+Futures passed updated hosted verification on 2026-10-18 for public source
+`8536d411b2af0bd77b37740edc315db2f06db601`, with matching canonical and authority-specific hashes.
+The controller remains at release 6; its and the Oracle's verification records
+are unchanged. [Installation and verification evidence](deployment-evidence/mainnet-staking-20261018.json) records
+the finalized council transactions, artifact hashes, buffer refund and runtime checks.
 
 All three programs passed hosted source verification on 2026-10-16.
 [Finalized metadata and hosted-verification evidence](deployment-evidence/mainnet-verification-20261016-completed.json)
