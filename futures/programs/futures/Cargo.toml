@@ -12,10 +12,14 @@ crate-type = ["cdylib", "lib"]
 [features]
 # The dev chain's build: governance on the localnet controller, and the
 # legacy per-market Earn pools' exit (their shares on the dev chain).
-localnet-governance = ["ameba-governance-interface/localnet-governance", "legacy-pools"]
+localnet-governance = ["ameba-governance-interface/localnet-governance", "legacy-pools", "operator-price"]
 # Dev only: `PoolWithdraw`, `PoolMigrate` and the operator's cancels for the
 # per-market Earn pools the dev chain still holds. Never in production.
 legacy-pools = []
+# Dev only: the operator posts the AMBA price (`StakePrice`), since the dev
+# chain has no Meteora pool or Pyth feed. The production build refuses it and
+# takes the price from mainnet's accounts (`PoolPrice`; the user, 2026-10-18).
+operator-price = []
 default = ["custom-heap"]
 no-entrypoint = []
 # The program brings its own upward bump allocator (src/heap.rs), so the

@@ -258,6 +258,64 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         FuturesInstruction::VaultRewardsWithdraw { amount } => {
             vault_rewards_withdraw(program_id, accounts, amount)
         }
+        FuturesInstruction::CreateStakePool {
+            haircut_bps,
+            profit_bps,
+            buffer_bps,
+            twap_window,
+            expiry_window,
+        } => create_stake_pool(
+            program_id,
+            accounts,
+            StakeParams {
+                haircut_bps,
+                profit_bps,
+                buffer_bps,
+                twap_window,
+                expiry_window,
+            },
+        ),
+        FuturesInstruction::StakeConfig {
+            haircut_bps,
+            profit_bps,
+            buffer_bps,
+            twap_window,
+            expiry_window,
+        } => stake_config(
+            program_id,
+            accounts,
+            StakeParams {
+                haircut_bps,
+                profit_bps,
+                buffer_bps,
+                twap_window,
+                expiry_window,
+            },
+        ),
+        #[cfg(feature = "operator-price")]
+        FuturesInstruction::StakePrice { price } => stake_price(program_id, accounts, price),
+        #[cfg(not(feature = "operator-price"))]
+        FuturesInstruction::StakePrice { .. } => Err(FuturesError::Unauthorized.into()),
+        FuturesInstruction::Stake { amount } => stake(program_id, accounts, amount),
+        FuturesInstruction::Unstake { shares } => unstake(program_id, accounts, shares),
+        FuturesInstruction::StakeClaim => stake_claim(program_id, accounts),
+        FuturesInstruction::StakeRewards {
+            start_ts,
+            end_ts,
+            amount,
+        } => stake_rewards(program_id, accounts, (start_ts, end_ts, amount)),
+        FuturesInstruction::StakeRewardsWithdraw { amount } => {
+            stake_rewards_withdraw(program_id, accounts, amount)
+        }
+        FuturesInstruction::CreditFund { amount } => credit_fund(program_id, accounts, amount),
+        FuturesInstruction::CreditDefund { amount } => credit_defund(program_id, accounts, amount),
+        FuturesInstruction::CreditSettle => credit_settle(program_id, accounts),
+        FuturesInstruction::SettleRecovery { claims, maker } => {
+            settle_recovery(program_id, accounts, &claims, maker)
+        }
+        FuturesInstruction::PoolPrice => pool_price(program_id, accounts),
+        FuturesInstruction::StartUnstake { shares } => start_unstake(program_id, accounts, shares),
+        FuturesInstruction::CancelUnstake => cancel_unstake(program_id, accounts),
     }
 }
 
@@ -276,10 +334,101 @@ fn load<'a, 'b>(
     Ok((data, h))
 }
 
-/// Writes the header after checking the market's invariants.
+/// Writes the header after checking the market's invariants. The credit
+/// owner's free cash repays its debt first.
 fn store(b: &mut [u8], h: &Header) -> R<()> {
-    audit(b, h)?;
+    let mut h = *h;
+    repay(b, &mut h)?;
+    audit(b, &h)?;
     h.write(b);
+    Ok(())
+}
+
+/// The credit owner's free cash goes to its debt before anything else, until
+/// the market's credit settles (then `debt` is what the winners give up).
+/// Then the debt must stay carried by open sets: debt <= backing plus the
+/// credit owner's own cash here. So everyone else's free and reserved cash is
+/// always in custody: a loss the credit owner realizes beyond its cash can
+/// only come out of settlement payouts (where the stakers' buffer and AMBA
+/// make winners whole), never out of someone's withdrawable cash (the review
+/// of 2026-10-18, finding 2). While the market is open this can't fail for
+/// anyone's instruction: the credit owner's own instructions keep its debt
+/// within its own cash and the backing its claims and inventory hold
+/// ([`check_credit`], `state::credit_risk`), which is never more than the
+/// backing, at worst over every fill of its resting liquidity; nobody
+/// else's instruction moves either (the re-review of 2026-10-18). It stays
+/// as a check.
+fn repay(b: &mut [u8], h: &mut Header) -> R<()> {
+    if h.debt == 0 || !h.has_credit() {
+        return Ok(());
+    }
+    let owner = h.credit_owner;
+    let slot = find_trader(b, h, &owner);
+    if let (Some(t), false) = (slot, h.credit_settled()) {
+        let r = trader(b, h, t).free.min(h.debt);
+        if r > 0 {
+            debit_free(b, h, t, r)?;
+            h.debt -= r;
+        }
+    }
+    let own = slot.map_or(0, |t| {
+        let tr = trader(b, h, t);
+        u128::from(tr.free) + u128::from(tr.reserved)
+    });
+    let own = if h.credit_settled() { 0 } else { own };
+    if u128::from(h.debt) > u128::from(h.backing) + own {
+        return Err(FuturesError::CreditLimit.into());
+    }
+    Ok(())
+}
+
+/// Cash `need` in trader `t`'s free balance: the credit owner borrows what
+/// its free cash lacks (`debt`) while its market lends (open, before
+/// `credit_until`). Returns what it borrowed; the caller then checks the
+/// credit ([`check_credit`]). Anyone else must have it.
+fn fund(b: &mut [u8], h: &mut Header, t: u16, need: u64, now: u64) -> R<u64> {
+    let tr = trader(b, h, t);
+    if tr.free >= need
+        || !h.has_credit()
+        || tr.owner != h.credit_owner
+        || h.status != STATUS_OPEN
+        || h.credit_settled()
+        || now >= h.credit_until
+    {
+        return Ok(0);
+    }
+    let lend = need - tr.free;
+    credit_free(b, h, t, lend)?;
+    h.debt = add(h.debt, lend)?;
+    Ok(lend)
+}
+
+/// After the credit owner's own `Quote` or `Submit` while it owes anything
+/// (it borrowed now, or before): at worst over every later fill of its
+/// resting orders, close orders and ladder (`state::credit_admits`), its
+/// exposure stays within the market's credit limit and its own cash and the
+/// backing its claims and inventory hold carry its debt. So no fill of its
+/// liquidity can break either rule, and no taker's package through it is
+/// refused for its sake (the re-review of 2026-10-18). A no-op for anyone
+/// else.
+fn check_credit(b: &[u8], h: &Header, t: u16) -> R<()> {
+    if !credit_admits(b, h, t).ok_or(FuturesError::Overflow)? {
+        return Err(FuturesError::CreditLimit.into());
+    }
+    Ok(())
+}
+
+/// After a `Submit` that fills the credit owner's resting liquidity: both
+/// rules hold now. [`check_credit`] admitted that liquidity at its worst
+/// fill, so this can't fail; it stays as a check.
+fn assert_credit(b: &[u8], h: &Header, t: u16) -> R<()> {
+    if h.debt == 0 || !h.has_credit() || trader(b, h, t).owner != h.credit_owner {
+        return Ok(());
+    }
+    let r = credit_risk(b, h, t, false).ok_or(FuturesError::Overflow)?;
+    if r.exposure > h.credit_limit || h.debt > r.carry {
+        return Err(FuturesError::CreditLimit.into());
+    }
     Ok(())
 }
 
@@ -295,7 +444,10 @@ fn trader_slot(b: &mut [u8], h: &Header, owner: &Pubkey) -> R<u16> {
     let i = (0..h.trader_cap)
         .find(|&i| {
             let t = Trader::read(b, h.trader_off(i));
-            t.owner == Pubkey::default() || t.idle()
+            (t.owner == Pubkey::default() || t.idle())
+                // The credit owner's slot holds its debt until its credit
+                // settles (the review of 2026-10-18, finding 5).
+                && !(h.has_credit() && !h.credit_settled() && t.owner == h.credit_owner)
         })
         .ok_or(FuturesError::TraderCapacity)?;
     Trader {
@@ -539,7 +691,8 @@ fn check_shape(h: &Header, lo: u16, hi: u16) -> R<()> {
 ///
 /// * trader buckets sum to the totals; reserves are exactly the escrow of
 ///   resting orders and maker ladders;
-/// * custody (deposits minus withdrawals) = free + reserved + backing;
+/// * custody (deposits minus withdrawals) plus the credit owner's debt =
+///   free + reserved + backing;
 /// * while open, backing = `k` × (short coverage) = `k` × (long coverage):
 ///   every promised payoff is backed by exactly one complete set;
 /// * once final, backing = what the remaining claims and inventories pay.
@@ -557,10 +710,25 @@ fn audit(b: &[u8], h: &Header) -> R<()> {
     }
     let open = h.status == STATUS_OPEN;
     let mut escrow = 0u128;
+    // Each held claim slot is held by one resting opening order of its
+    // owner, side and range.
+    let mut holds = 0u32;
     for i in 0..h.order_cap {
         let at = h.order_off(i);
-        if u64_at(b, at) != 0 {
-            escrow += u128::from(u64_at(b, at + 16)) * u128::from(u64_at(b, at + 32));
+        if u64_at(b, at) == 0 {
+            continue;
+        }
+        escrow += u128::from(u64_at(b, at + 16)) * u128::from(u64_at(b, at + 32));
+        let o = Order::read(b, at);
+        if o.flags & ORDER_CLOSE == 0 && o.claim != NO_CLAIM {
+            if o.claim >= h.claim_cap {
+                return Err(fail());
+            }
+            let c = Claim::read(b, h.claim_off(o.claim));
+            if !c.held || (c.trader, c.side, c.lo, c.hi) != (o.trader, o.side, o.lo, o.hi) {
+                return Err(fail());
+            }
+            holds += 1;
         }
     }
     let k = u128::from(h.k);
@@ -596,8 +764,10 @@ fn audit(b: &[u8], h: &Header) -> R<()> {
     if escrow != reserved {
         return Err(fail());
     }
+    let mut held = 0u32;
     for i in 0..h.claim_cap {
         let at = h.claim_off(i);
+        held += u32::from(b[at + 19] != 0);
         let lots = u64_at(b, at);
         if lots == 0 {
             continue;
@@ -617,13 +787,16 @@ fn audit(b: &[u8], h: &Header) -> R<()> {
             }
         }
     }
+    if held != holds {
+        return Err(fail());
+    }
     let backing = u128::from(h.backing);
     let balanced = if open {
         long == backing && short == backing
     } else {
         owed == backing
     };
-    if !balanced || u128::from(h.custody) != free + reserved + backing {
+    if !balanced || u128::from(h.custody) + u128::from(h.debt) != free + reserved + backing {
         return Err(fail());
     }
     Ok(())
@@ -962,14 +1135,23 @@ fn put_claim(b: &mut [u8], h: &Header, i: u32, c: &Claim) {
     c.write(b, h.claim_off(i));
 }
 
-/// Opens a claim slot for trader `t`.
-fn new_claim(b: &mut [u8], h: &mut Header, mut c: Claim) -> R<u32> {
+/// A free claim slot: no lots and not held by a resting order.
+fn free_slot(b: &[u8], h: &mut Header) -> R<u32> {
     let cap = h.claim_cap;
     let i = (0..cap)
         .map(|j| (h.claim_hint + j) % cap)
-        .find(|&i| u64_at(b, h.claim_off(i)) == 0)
+        .find(|&i| {
+            let at = h.claim_off(i);
+            u64_at(b, at) == 0 && b[at + 19] == 0
+        })
         .ok_or(FuturesError::ClaimCapacity)?;
     h.claim_hint = (i + 1) % cap;
+    Ok(i)
+}
+
+/// Opens a claim slot for trader `t`.
+fn new_claim(b: &mut [u8], h: &mut Header, mut c: Claim) -> R<u32> {
+    let i = free_slot(b, h)?;
     c.seq = next_seq(h)?;
     put_claim(b, h, i, &c);
     let mut t = trader(b, h, c.trader);
@@ -979,13 +1161,97 @@ fn new_claim(b: &mut [u8], h: &mut Header, mut c: Claim) -> R<u32> {
     Ok(i)
 }
 
+/// Empties claim slot `i`. A held slot stays its order's, as a placeholder.
 fn drop_claim(b: &mut [u8], h: &mut Header, i: u32) {
     let c = Claim::read(b, h.claim_off(i));
     let mut t = trader(b, h, c.trader);
     t.claims = t.claims.saturating_sub(1);
     put_trader(b, h, c.trader, &t);
     h.claims_open = h.claims_open.saturating_sub(1);
-    put_claim(b, h, i, &Claim::default());
+    let empty = if c.held {
+        Claim {
+            seq: c.seq,
+            trader: c.trader,
+            side: c.side,
+            lo: c.lo,
+            hi: c.hi,
+            held: true,
+            ..Claim::default()
+        }
+    } else {
+        Claim::default()
+    };
+    put_claim(b, h, i, &empty);
+}
+
+/// Empty slots that resting orders hold (placeholders).
+fn placeholders(b: &[u8], h: &Header) -> u64 {
+    (0..h.order_cap)
+        .map(|i| h.order_off(i))
+        .filter(|&at| {
+            let claim = u32_at(b, at + 40);
+            u64_at(b, at) != 0
+                && b[at + 11] & ORDER_CLOSE == 0
+                && claim < h.claim_cap
+                && u64_at(b, h.claim_off(claim)) == 0
+        })
+        .count() as u64
+}
+
+/// Claim slots neither in use nor held.
+fn free_slots(b: &[u8], h: &Header) -> u64 {
+    u64::from(h.claim_cap)
+        .saturating_sub(h.claims_open)
+        .saturating_sub(placeholders(b, h))
+}
+
+/// The slot resting opening order `o` of trader `t` holds for its fills:
+/// `prefer` (where the order's own taker fill went) or another claim of the
+/// owner with its side and range that no order holds yet, or else a
+/// placeholder in a free slot (`ClaimCapacity` when there is none).
+fn take_hold(b: &mut [u8], h: &mut Header, o: &Order, prefer: Option<u32>) -> R<u32> {
+    let fits = |b: &[u8], i: u32| {
+        let at = h.claim_off(i);
+        u64_at(b, at) > 0 && u16_at(b, at + 16) == o.trader && {
+            let c = Claim::read(b, at);
+            !c.held && c.side == o.side && (c.lo, c.hi) == (o.lo, o.hi)
+        }
+    };
+    let found = prefer.filter(|&i| fits(b, i)).or_else(|| {
+        (trader(b, h, o.trader).claims > 0)
+            .then(|| (0..h.claim_cap).find(|&i| fits(b, i)))
+            .flatten()
+    });
+    let i = match found {
+        Some(i) => {
+            let mut c = Claim::read(b, h.claim_off(i));
+            c.held = true;
+            put_claim(b, h, i, &c);
+            i
+        }
+        None => {
+            let i = free_slot(b, h)?;
+            let c = Claim {
+                seq: next_seq(h)?,
+                trader: o.trader,
+                side: o.side,
+                lo: o.lo,
+                hi: o.hi,
+                held: true,
+                ..Claim::default()
+            };
+            put_claim(b, h, i, &c);
+            i
+        }
+    };
+    Ok(i)
+}
+
+/// A resting order gives up the slot it held: an empty one is free again.
+fn release_hold(b: &mut [u8], h: &Header, i: u32) {
+    let mut c = Claim::read(b, h.claim_off(i));
+    c.held = false;
+    put_claim(b, h, i, &if c.lots == 0 { Claim::default() } else { c });
 }
 
 /// Removes `lots` from a claim with its share of the cost basis.
@@ -995,6 +1261,62 @@ fn shrink(c: &mut Claim, lots: u64) -> u64 {
     c.cost -= part;
     c.lots -= lots;
     part
+}
+
+/// `c` gives up `lots` to a redemption, from its reserved lots (a resting
+/// close order's) or from the others.
+fn give_up(c: &mut Claim, lots: u64, from_reserved: bool) -> R<()> {
+    let usable = if from_reserved {
+        c.lots
+    } else {
+        c.lots - c.reserved
+    };
+    if lots > usable {
+        return Err(FuturesError::ClaimReserved.into());
+    }
+    if from_reserved {
+        c.reserved = c
+            .reserved
+            .checked_sub(lots)
+            .ok_or(FuturesError::ClaimReserved)?;
+    }
+    shrink(c, lots);
+    Ok(())
+}
+
+/// Writes back claim `i` after a redemption took some of its lots.
+fn put_shrunk(b: &mut [u8], h: &mut Header, i: u32, mut c: Claim) -> R<()> {
+    if c.lots == 0 {
+        drop_claim(b, h, i);
+    } else {
+        c.seq = next_seq(h)?;
+        put_claim(b, h, i, &c);
+    }
+    Ok(())
+}
+
+/// Pays trader `t` the backing of `lots` redeemed sets on `[lo, hi)`.
+fn pay_redeemed(b: &mut [u8], h: &mut Header, t: u16, lo: u16, hi: u16, lots: u64) -> R<u64> {
+    let cash = mul(lots, set_value(lo, hi, h.k))?;
+    backing_to_free(b, h, t, cash)?;
+    let owner = trader(b, h, t).owner;
+    sol_log_data(&[
+        b"ARREDM01",
+        owner.as_ref(),
+        &lo.to_le_bytes(),
+        &hi.to_le_bytes(),
+        &lots.to_le_bytes(),
+        &cash.to_le_bytes(),
+    ]);
+    Ok(cash)
+}
+
+fn complements(x: &Claim, y: &Claim) -> bool {
+    x.trader == y.trader
+        && (x.lo, x.hi) == (y.lo, y.hi)
+        && x.side != y.side
+        && x.lots > 0
+        && y.lots > 0
 }
 
 /// Redeems `lots` of an exact complement pair held by one trader.
@@ -1008,77 +1330,134 @@ fn redeem_pair(
 ) -> R<u64> {
     let mut cx = Claim::read(b, h.claim_off(x));
     let mut cy = Claim::read(b, h.claim_off(y));
-    if cx.trader != cy.trader
-        || cx.lo != cy.lo
-        || cx.hi != cy.hi
-        || cx.side == cy.side
-        || cx.lots == 0
-        || cy.lots == 0
-    {
+    if !complements(&cx, &cy) {
         return Err(FuturesError::NotComplement.into());
     }
-    for (c, r) in [(&mut cx, from_reserved[0]), (&mut cy, from_reserved[1])] {
-        let usable = if r { c.lots } else { c.lots - c.reserved };
-        if lots > usable {
-            return Err(FuturesError::ClaimReserved.into());
-        }
-        if r {
-            c.reserved = c
-                .reserved
-                .checked_sub(lots)
-                .ok_or(FuturesError::ClaimReserved)?;
-        }
-        shrink(c, lots);
-    }
-    let cash = mul(lots, set_value(cx.lo, cx.hi, h.k))?;
-    let t = cx.trader;
-    for (i, c) in [(x, cx), (y, cy)] {
-        if c.lots == 0 {
-            drop_claim(b, h, i);
-        } else {
-            let mut c = c;
-            c.seq = next_seq(h)?;
-            put_claim(b, h, i, &c);
-        }
-    }
-    backing_to_free(b, h, t, cash)?;
-    let owner = trader(b, h, t).owner;
-    sol_log_data(&[
-        b"ARREDM01",
-        owner.as_ref(),
-        &cx.lo.to_le_bytes(),
-        &cx.hi.to_le_bytes(),
-        &lots.to_le_bytes(),
-        &cash.to_le_bytes(),
-    ]);
-    Ok(cash)
+    give_up(&mut cx, lots, from_reserved[0])?;
+    give_up(&mut cy, lots, from_reserved[1])?;
+    put_shrunk(b, h, x, cx)?;
+    put_shrunk(b, h, y, cy)?;
+    pay_redeemed(b, h, cx.trader, cx.lo, cx.hi, lots)
 }
 
-/// Nets a fresh claim against its owner's opposite claims: `first` (a close
-/// order's claim, its exact complement, using its reserved lots), then every
-/// claim that overlaps it ([`plan_net`]: exact complements first). Each
-/// overlap's matched lots are redeemed for their sets and the parts outside
-/// it kept, so the owner's payoff is the same at every settlement and the
-/// overlap's backing is free cash at once. Best effort: a match whose parts
-/// find no claim slot, and every match after it, is left as it is.
-fn net(b: &mut [u8], h: &mut Header, fresh: u32, first: Option<(u32, bool)>) -> R<()> {
+/// Redeems `lots` of a fresh claim, not yet in a slot, against its owner's
+/// exact complement in slot `y` (from its reserved lots: a resting close
+/// order's).
+fn redeem_fresh(
+    b: &mut [u8],
+    h: &mut Header,
+    fresh: &mut Claim,
+    y: u32,
+    lots: u64,
+    from_reserved: bool,
+) -> R<()> {
+    let mut cy = Claim::read(b, h.claim_off(y));
+    if !complements(fresh, &cy) {
+        return Err(FuturesError::NotComplement.into());
+    }
+    give_up(fresh, lots, false)?;
+    give_up(&mut cy, lots, from_reserved)?;
+    put_shrunk(b, h, y, cy)?;
+    pay_redeemed(b, h, fresh.trader, fresh.lo, fresh.hi, lots)?;
+    Ok(())
+}
+
+/// Puts a fill's (or a transfer's) fresh claim in the table, taking a slot
+/// only for what is left (`docs/futures.md`, "Claim slots"): it first
+/// redeems against `first` (a close's claim, its exact complement; `true`:
+/// its reserved lots) and the owner's other exact complements, in slot
+/// order, without a slot of its own. What is left joins `hold` (the slot a
+/// resting order holds) or the owner's claim of the same side and range, or
+/// else takes a free slot, and nets against the owner's overlapping opposite
+/// claims ([`net_overlaps`]). So a fill that closes a position never needs
+/// a free slot. Returns the slot holding what is left (`None`: all of it
+/// redeemed).
+fn place(
+    b: &mut [u8],
+    h: &mut Header,
+    mut fresh: Claim,
+    first: Option<(u32, bool)>,
+    hold: Option<u32>,
+) -> R<Option<u32>> {
     if let Some((c, reserved)) = first {
-        let left = Claim::read(b, h.claim_off(fresh)).lots;
         let other = Claim::read(b, h.claim_off(c));
         let usable = if reserved {
             other.reserved
         } else {
             other.lots - other.reserved
         };
-        let lots = left.min(usable);
+        let lots = fresh.lots.min(usable);
         if lots > 0 {
-            redeem_pair(b, h, fresh, c, lots, [false, reserved])?;
+            redeem_fresh(b, h, &mut fresh, c, lots, reserved)?;
         }
     }
-    let n = Claim::read(b, h.claim_off(fresh));
-    if n.lots == 0 || trader(b, h, n.trader).claims < 2 {
-        return Ok(());
+    let t = fresh.trader;
+    let mut join = hold;
+    let mut overlaps = false;
+    if fresh.lots > 0 && trader(b, h, t).claims > 0 {
+        for i in 0..h.claim_cap {
+            let at = h.claim_off(i);
+            if u64_at(b, at) == 0 || u16_at(b, at + 16) != t {
+                continue;
+            }
+            let c = Claim::read(b, at);
+            let exact = (c.lo, c.hi) == (fresh.lo, fresh.hi);
+            if c.side == fresh.side {
+                if exact && join.is_none() {
+                    join = Some(i);
+                }
+            } else if exact {
+                let lots = fresh.lots.min(c.lots - c.reserved);
+                if lots > 0 {
+                    redeem_fresh(b, h, &mut fresh, i, lots, false)?;
+                    if fresh.lots == 0 {
+                        return Ok(None);
+                    }
+                }
+            } else if c.lo < fresh.hi && fresh.lo < c.hi && c.lots > c.reserved {
+                overlaps = true;
+            }
+        }
     }
+    if fresh.lots == 0 {
+        return Ok(None);
+    }
+    let lots = fresh.lots;
+    let f = match join {
+        Some(i) => {
+            let mut c = Claim::read(b, h.claim_off(i));
+            if c.lots == 0 {
+                // A placeholder: the order's first fill since it held it.
+                c.opened_ts = fresh.opened_ts;
+                let mut tr = trader(b, h, t);
+                tr.claims += 1;
+                put_trader(b, h, t, &tr);
+                h.claims_open += 1;
+            }
+            c.lots = add(c.lots, fresh.lots)?;
+            c.cost = add(c.cost, fresh.cost)?;
+            c.opened_ts = c.opened_ts.min(fresh.opened_ts);
+            c.seq = next_seq(h)?;
+            put_claim(b, h, i, &c);
+            i
+        }
+        None => new_claim(b, h, fresh)?,
+    };
+    if overlaps {
+        net_overlaps(b, h, f, lots)?;
+    }
+    Ok(Some(f))
+}
+
+/// Nets `lots` of claim `fresh` (what a fill just put there) against its
+/// owner's overlapping opposite claims ([`plan_net`]; the exact complements
+/// [`place`] redeemed already). Each overlap's matched lots are redeemed for
+/// their sets and the parts outside it kept, so the owner's payoff is the
+/// same at every settlement and the overlap's backing is free cash at once.
+/// Best effort: a match whose parts find no claim slot, and every match
+/// after it, is left as it is.
+fn net_overlaps(b: &mut [u8], h: &mut Header, fresh: u32, lots: u64) -> R<()> {
+    let n = Claim::read(b, h.claim_off(fresh));
     let mut opposite = Vec::new();
     for i in 0..h.claim_cap {
         let at = h.claim_off(i);
@@ -1092,7 +1471,7 @@ fn net(b: &mut [u8], h: &mut Header, fresh: u32, first: Option<(u32, bool)>) -> 
     }
     // The fresh claim's pieces (slots), as the matches split it.
     let mut pieces = vec![fresh];
-    for m in plan_net(n.lo, n.hi, n.lots, &opposite) {
+    for m in plan_net(n.lo, n.hi, lots, &opposite) {
         let piece = pieces.iter().copied().find(|&s| {
             let c = Claim::read(b, h.claim_off(s));
             c.trader == n.trader && c.side == n.side && (c.lo, c.hi) == m.piece && c.lots >= m.lots
@@ -1109,10 +1488,10 @@ fn net(b: &mut [u8], h: &mut Header, fresh: u32, first: Option<(u32, bool)>) -> 
 /// Redeems `lots` of the overlap `[a, z)` of one owner's opposite claims `f`
 /// and `c`: each gives up `lots` of its unreserved lots, whose parts outside
 /// `[a, z)` stay as claims of `lots` lots (the cost basis split by width, as
-/// `Split`; a claim left empty keeps one of its parts in its slot), and the
-/// overlap's sets pay into free cash. Returns the slots now holding new
-/// parts of `f`, or `None`, changing nothing, when the market has no slots
-/// for the parts.
+/// `Split`; a claim left empty keeps one of its parts in its slot unless a
+/// resting order holds the slot), and the overlap's sets pay into free cash.
+/// Returns the slots now holding new parts of `f`, or `None`, changing
+/// nothing, when the market has no slots for the parts.
 fn net_overlap(
     b: &mut [u8],
     h: &mut Header,
@@ -1137,13 +1516,13 @@ fn net_overlap(
             return Err(FuturesError::NotComplement.into());
         }
         let n = parts(x).iter().flatten().count() as u64;
-        need += if x.lots == lots {
+        need += if x.lots == lots && !x.held {
             n.saturating_sub(1)
         } else {
             n
         };
     }
-    if need > u64::from(h.claim_cap).saturating_sub(h.claims_open) {
+    if need > free_slots(b, h) {
         return Ok(None);
     }
     let mut fresh_parts = Vec::new();
@@ -1164,6 +1543,9 @@ fn net_overlap(
         if x.lots > 0 {
             x.seq = next_seq(h)?;
             put_claim(b, h, slot, &x);
+        } else if x.held {
+            // The slot stays its order's; every part moves out.
+            drop_claim(b, h, slot);
         } else if let Some(p) = outside.next() {
             // The emptied slot keeps the first part (for `f`, a piece
             // already).
@@ -1180,18 +1562,7 @@ fn net_overlap(
             }
         }
     }
-    let cash = mul(lots, set_value(a, z, h.k))?;
-    let t = claims[0].trader;
-    backing_to_free(b, h, t, cash)?;
-    let owner = trader(b, h, t).owner;
-    sol_log_data(&[
-        b"ARREDM01",
-        owner.as_ref(),
-        &a.to_le_bytes(),
-        &z.to_le_bytes(),
-        &lots.to_le_bytes(),
-        &cash.to_le_bytes(),
-    ]);
+    pay_redeemed(b, h, claims[0].trader, a, z, lots)?;
     Ok(Some(fresh_parts))
 }
 
@@ -1298,10 +1669,25 @@ fn submit(
     let mut makers: Vec<(u8, [u64; 3])> = Vec::new();
     // Per maker: its head and tier sizes (the same for every step).
     let mut heads: Vec<(u8, Maker, (TierLots, TierLots))> = Vec::new();
+    // Whether this package fills the credit owner's orders or ladder: its
+    // admission bounded every such fill (`check_credit`), so the rules are
+    // only asserted again (the review of 2026-10-18, finding 4, and its
+    // re-review).
+    let credit_slot = if h.has_credit() && !h.credit_settled() {
+        let owner = h.credit_owner;
+        find_trader(&b, &h, &owner)
+    } else {
+        None
+    };
+    let mut credit_filled = false;
     for (arc, &m) in arcs.iter().zip(&fills) {
         if m == 0 {
             continue;
         }
+        credit_filled |= credit_slot.is_some_and(|c| match arc.id {
+            ArcId::Order(slot) => u16_at(&b, h.order_off(slot) + 8) == c,
+            ArcId::Maker { maker, .. } => u16_at(&b, h.maker_off(maker) + 8) == c,
+        });
         let c = mul(m, contribution(arc.side, arc.lo, arc.hi, arc.price, h.k))?;
         resting += i128::from(c);
         net_cost += i128::from(arc.cost()) * i128::from(m);
@@ -1393,6 +1779,8 @@ fn submit(
         Side::Short => -net_cost,
     };
     let mut paid = 0i128;
+    // Where the taker's fresh claim went (`None`: none, or all of it netted).
+    let mut taken = None;
     if filled > 0 {
         let sets: i128 = short_sets
             + if side == Side::Short {
@@ -1409,29 +1797,27 @@ fn submit(
             return Err(FuturesError::LimitExceeded.into());
         }
         let cost = u64::try_from(paid.max(0)).map_err(|_| FuturesError::Overflow)?;
-        let fresh = new_claim(
-            &mut b,
-            &mut h,
-            Claim {
-                lots: filled,
-                trader: t,
-                side: side as u8,
-                lo: p.lo,
-                hi: p.hi,
-                cost,
-                opened_ts: now,
-                ..Claim::default()
-            },
-        )?;
         // Backing comes in first (any refund of a negative premium goes out
-        // of it), then a close nets against its claim, then the taker pays.
+        // of it), then the fresh claim nets (a close against its claim, with
+        // no slot of its own) and takes its slot, then the taker pays.
         if paid >= 0 {
             h.backing = add(h.backing, to_u64(paid)?)?;
         } else {
             backing_to_free(&mut b, &mut h, t, to_u64(-paid)?)?;
         }
-        net(&mut b, &mut h, fresh, close.map(|c| (c, false)))?;
+        let fresh = Claim {
+            lots: filled,
+            trader: t,
+            side: side as u8,
+            lo: p.lo,
+            hi: p.hi,
+            cost,
+            opened_ts: now,
+            ..Claim::default()
+        };
+        taken = place(&mut b, &mut h, fresh, close.map(|c| (c, false)), None)?;
         if paid > 0 {
+            fund(&mut b, &mut h, t, to_u64(paid)?, now)?;
             debit_free(&mut b, &mut h, t, to_u64(paid)?)?;
         }
         h.trades += 1;
@@ -1448,7 +1834,21 @@ fn submit(
         let slot = (0..h.order_cap)
             .find(|&i| u64_at(&b, h.order_off(i)) == 0)
             .ok_or(FuturesError::OrderCapacity)?;
-        let (escrow_per_lot, flags, claim_ref) = match close {
+        let mut o = Order {
+            seq,
+            trader: t,
+            side: p.side,
+            flags: 0,
+            lo: p.lo,
+            hi: p.hi,
+            lots: left,
+            price: p.limit,
+            escrow_per_lot: contribution(side, p.lo, p.hi, p.limit, h.k),
+            claim: NO_CLAIM,
+            placed_lots: left,
+            placed_ts: now,
+        };
+        match close {
             Some(c) => {
                 let mut cl = Claim::read(&b, h.claim_off(c));
                 if cl.lots == 0 || left > cl.lots - cl.reserved {
@@ -1456,27 +1856,18 @@ fn submit(
                 }
                 cl.reserved += left;
                 put_claim(&mut b, &h, c, &cl);
-                (0, ORDER_CLOSE, c)
+                (o.escrow_per_lot, o.flags, o.claim) = (0, ORDER_CLOSE, c);
             }
-            None => (contribution(side, p.lo, p.hi, p.limit, h.k), 0, NO_CLAIM),
-        };
-        let escrow = mul(left, escrow_per_lot)?;
-        reserve(&mut b, &mut h, t, escrow)?;
-        Order {
-            seq,
-            trader: t,
-            side: p.side,
-            flags,
-            lo: p.lo,
-            hi: p.hi,
-            lots: left,
-            price: p.limit,
-            escrow_per_lot,
-            claim: claim_ref,
-            placed_lots: left,
-            placed_ts: now,
+            // An opening order holds the claim slot its fills go to, so a
+            // fill never waits for a free one (on a full table it can't
+            // rest: `ClaimCapacity`).
+            None => o.claim = take_hold(&mut b, &mut h, &o, taken)?,
         }
-        .write(&mut b, h.order_off(slot));
+        let escrow = mul(left, o.escrow_per_lot)?;
+        fund(&mut b, &mut h, t, escrow, now)?;
+        reserve(&mut b, &mut h, t, escrow)?;
+        o.write(&mut b, h.order_off(slot));
+        let flags = o.flags;
         let mut tr = trader(&b, &h, t);
         tr.orders += 1;
         put_trader(&mut b, &h, t, &tr);
@@ -1507,6 +1898,10 @@ fn submit(
         &seq.to_le_bytes(),
         &rested.to_le_bytes(),
     ]);
+    check_credit(&b, &h, t)?;
+    if let (Some(c), true) = (credit_slot, credit_filled) {
+        assert_credit(&b, &h, c)?;
+    }
     let mut ret = Vec::with_capacity(42);
     ret.extend_from_slice(&filled.to_le_bytes());
     ret.extend_from_slice(&premium.to_le_bytes());
@@ -1543,23 +1938,36 @@ fn fill_order(
         }
         reserved_to_backing(b, h, t, c)?;
     }
-    let fresh = new_claim(
-        b,
-        h,
-        Claim {
-            lots: m,
-            trader: t,
-            side: o.side,
-            lo: o.lo,
-            hi: o.hi,
-            cost: c,
-            opened_ts: now,
-            ..Claim::default()
-        },
-    )?;
-    net(b, h, fresh, close.then_some((o.claim, true)))?;
+    let fresh = Claim {
+        lots: m,
+        trader: t,
+        side: o.side,
+        lo: o.lo,
+        hi: o.hi,
+        cost: c,
+        opened_ts: now,
+        ..Claim::default()
+    };
+    // A close nets against the claim it reserves; an opening order's fill
+    // joins the slot it holds.
+    let hold = (!close && o.claim != NO_CLAIM).then_some(o.claim);
+    let placed = place(b, h, fresh, close.then_some((o.claim, true)), hold)?;
     if close {
         debit_free(b, h, t, c)?;
+    } else if hold.is_none() {
+        // An order placed before slots were held takes hold of where its
+        // fill went, if netting left a claim of its range there.
+        if let Some(i) = placed {
+            let mut cl = Claim::read(b, h.claim_off(i));
+            if cl.lots > 0
+                && !cl.held
+                && (cl.trader, cl.side, cl.lo, cl.hi) == (t, o.side, o.lo, o.hi)
+            {
+                cl.held = true;
+                put_claim(b, h, i, &cl);
+                o.claim = i;
+            }
+        }
     }
     let owner = trader(b, h, t).owner;
     sol_log_data(&[
@@ -1575,6 +1983,9 @@ fn fill_order(
         &o.seq.to_le_bytes(),
     ]);
     if o.lots == 0 {
+        if !close && o.claim != NO_CLAIM {
+            release_hold(b, h, o.claim);
+        }
         Order::default().write(b, at);
         let mut tr = trader(b, h, t);
         tr.orders = tr.orders.saturating_sub(1);
@@ -1686,6 +2097,8 @@ fn remove_order(b: &mut [u8], h: &mut Header, slot: u16) -> R<u64> {
             c.reserved = c.reserved.saturating_sub(o.lots);
             put_claim(b, h, o.claim, &c);
         }
+    } else if o.claim != NO_CLAIM {
+        release_hold(b, h, o.claim);
     }
     Order::default().write(b, at);
     let mut tr = trader(b, h, o.trader);
@@ -1756,7 +2169,10 @@ fn quote(
     trace("start");
     let escrow = write_ladder(&mut b, &h, m, &p, core, knots).ok_or(FuturesError::Overflow)?;
     trace("write");
-    // Admission is balance-based: the ladder must be fully funded now.
+    // Admission is balance-based: the ladder must be fully funded now, the
+    // credit owner's partly by what its stake pool lends it.
+    let now = now_ts()?;
+    fund(&mut b, &mut h, t, escrow, now)?;
     reserve(&mut b, &mut h, t, escrow)?;
     // The head as `write_ladder` left it (tiers and per-step lots).
     let mut mk = Maker::read(&b, h.maker_off(m));
@@ -1766,8 +2182,10 @@ fn quote(
     mk.escrow = escrow;
     mk.bid_spread = p.bid_spread;
     mk.ask_spread = p.ask_spread;
-    mk.quoted_ts = now_ts()?;
+    mk.quoted_ts = now;
     mk.write(&mut b, h.maker_off(m));
+    check_credit(&b, &h, t)?;
+    trace("credit");
 
     if ladder_arcs(&b, &h) > MAX_BOOK_LADDER_ARCS {
         return Err(FuturesError::MakerCapacity.into());
@@ -1891,8 +2309,15 @@ fn split(program_id: &Pubkey, a: &[AccountInfo], i: u32, seq: u64, at: u16) -> P
     };
     c.hi = at;
     c.cost -= right_cost;
-    c.seq = next_seq(&mut h)?;
-    put_claim(&mut b, &h, i, &c);
+    if c.held {
+        // The slot stays its resting order's: both parts move out.
+        drop_claim(&mut b, &mut h, i);
+        c.held = false;
+        new_claim(&mut b, &mut h, c)?;
+    } else {
+        c.seq = next_seq(&mut h)?;
+        put_claim(&mut b, &h, i, &c);
+    }
     new_claim(&mut b, &mut h, right)?;
     store(&mut b, &h)
 }
@@ -1935,9 +2360,18 @@ fn merge(
     }
     k.cost = add(k.cost, x.cost)?;
     k.opened_ts = k.opened_ts.min(x.opened_ts);
-    k.seq = next_seq(&mut h)?;
-    put_claim(&mut b, &h, keep.0, &k);
-    drop_claim(&mut b, &mut h, absorb.0);
+    if k.held && (k.lo, k.hi) != (x.lo, x.hi) {
+        // The kept slot stays its resting order's range: the wider claim
+        // moves out.
+        drop_claim(&mut b, &mut h, keep.0);
+        drop_claim(&mut b, &mut h, absorb.0);
+        k.held = false;
+        new_claim(&mut b, &mut h, k)?;
+    } else {
+        k.seq = next_seq(&mut h)?;
+        put_claim(&mut b, &h, keep.0, &k);
+        drop_claim(&mut b, &mut h, absorb.0);
+    }
     store(&mut b, &h)
 }
 
@@ -1962,6 +2396,7 @@ fn redeem(
         &a[2..],
         Operated::Trade,
     )?;
+    no_redemption_past_final(&b, &h, t)?;
     let l = owned_claim(&b, &h, long.0, long.1, t)?;
     let s = owned_claim(&b, &h, short.0, short.1, t)?;
     // Exact complements only: same absolute interval, opposite sides.
@@ -1991,6 +2426,7 @@ fn transfer(
     };
     let (mut b, mut h) = load(program_id, market)?;
     let t = owned_trader(&b, &h, owner)?;
+    no_redemption_past_final(&b, &h, t)?;
     let mut c = owned_claim(&b, &h, i, seq, t)?;
     if lots == 0 || lots > c.lots - c.reserved || *to == Pubkey::default() {
         return Err(FuturesError::ClaimReserved.into());
@@ -2021,8 +2457,7 @@ fn transfer(
         c.seq = next_seq(&mut h)?;
         put_claim(&mut b, &h, i, &c);
     }
-    let fresh = new_claim(&mut b, &mut h, moved)?;
-    net(&mut b, &mut h, fresh, None)?;
+    place(&mut b, &mut h, moved, None, None)?;
     sol_log_data(&[
         b"ARXFER01",
         owner.key.as_ref(),
@@ -2124,11 +2559,64 @@ fn council_settle(program_id: &Pubkey, a: &[AccountInfo], value: u64) -> Program
     store(&mut b, &h)
 }
 
+/// After finalization, in a market whose credit hasn't settled or settled
+/// short, claims leave only through settlement (`Settle`, `SettleRecovery`):
+/// a redemption or a transfer's netting would pay a set in full past the
+/// shortfall's cut (the review of 2026-10-18, finding 3). The credit owner's
+/// own redemptions repay its debt and stay open to it.
+fn no_redemption_past_final(b: &[u8], h: &Header, t: u16) -> R<()> {
+    let unsettled = !h.credit_settled() || h.credit_flags & CREDIT_SHORTFALL != 0;
+    if h.status != STATUS_OPEN
+        && h.has_credit()
+        && unsettled
+        && trader(b, h, t).owner != h.credit_owner
+    {
+        return Err(FuturesError::NeedsRecovery.into());
+    }
+    Ok(())
+}
+
 fn need_final(h: &Header) -> R<()> {
     if h.status == STATUS_OPEN {
         return Err(FuturesError::NotSettled.into());
     }
     Ok(())
+}
+
+/// Whether trader `t`'s settlement of `payout` may go through `Settle` or
+/// `SettleMaker`: in a market with credit, the credit owner's first (its
+/// payouts repay its debt), everyone else's once the credit is settled, and
+/// a shortfall's winners only through `SettleRecovery`.
+fn may_settle(b: &[u8], h: &Header, t: u16, payout: u64) -> R<()> {
+    if !h.has_credit() || trader(b, h, t).owner == h.credit_owner {
+        return Ok(());
+    }
+    if !h.credit_settled() {
+        return Err(FuturesError::NotSettled.into());
+    }
+    if h.credit_flags & CREDIT_SHORTFALL != 0 && payout > 0 {
+        return Err(FuturesError::NeedsRecovery.into());
+    }
+    Ok(())
+}
+
+/// What maker `m`'s ladder inventory pays at the settlement, zeroing it.
+fn inventory_payout(b: &mut [u8], h: &Header, m: u8) -> R<u64> {
+    let mut payout = 0u64;
+    for x in 0..h.grid {
+        let at = h.step_off(m, x);
+        let mut st = Step::read(b, at);
+        let lots = st.inv.unsigned_abs();
+        let per = if st.inv > 0 {
+            long_per_lot(x, x + 1, h.settlement_fine, h.k)
+        } else {
+            short_per_lot(x, x + 1, h.settlement_fine, h.k)
+        };
+        payout = add(payout, mul(lots, per)?)?;
+        st.inv = 0;
+        st.write(b, at);
+    }
+    Ok(payout)
 }
 
 #[inline(never)]
@@ -2149,6 +2637,7 @@ fn settle(program_id: &Pubkey, a: &[AccountInfo], claims: &[u32]) -> ProgramResu
             short_per_lot(c.lo, c.hi, h.settlement_fine, h.k)
         };
         let payout = mul(c.lots, per)?;
+        may_settle(&b, &h, c.trader, payout)?;
         drop_claim(&mut b, &mut h, i);
         backing_to_free(&mut b, &mut h, c.trader, payout)?;
         h.total_paid_out = add(h.total_paid_out, payout)?;
@@ -2184,20 +2673,8 @@ fn settle_maker(program_id: &Pubkey, a: &[AccountInfo], m: u8) -> ProgramResult 
     if !mk.used {
         return Err(FuturesError::OrderNotFound.into());
     }
-    let mut payout = 0u64;
-    for x in 0..h.grid {
-        let at = h.step_off(m, x);
-        let mut st = Step::read(&b, at);
-        let lots = st.inv.unsigned_abs();
-        let per = if st.inv > 0 {
-            long_per_lot(x, x + 1, h.settlement_fine, h.k)
-        } else {
-            short_per_lot(x, x + 1, h.settlement_fine, h.k)
-        };
-        payout = add(payout, mul(lots, per)?)?;
-        st.inv = 0;
-        st.write(&mut b, at);
-    }
+    let payout = inventory_payout(&mut b, &h, m)?;
+    may_settle(&b, &h, mk.trader, payout)?;
     backing_to_free(&mut b, &mut h, mk.trader, payout)?;
     h.total_paid_out = add(h.total_paid_out, payout)?;
     retire_ladder(&mut b, &mut h, m)?;
@@ -2380,12 +2857,17 @@ fn store_vault(info: &AccountInfo, v: &Vault, cash: &AccountInfo) -> R<()> {
 /// The vault's (lowest, highest) value over every settlement outcome: its
 /// idle cash plus its trader's value in each of its markets, which `markets`
 /// must name exactly, in the vault's order. Markets settle independently, so
-/// the extremes of the sum are the sums of the extremes.
+/// the extremes of the sum are the sums of the extremes. Where its stake pool
+/// lent it credit, a market's value is its equity there at `now`
+/// (`state::credit_equity`: less the debt, never below zero, less the
+/// stakers' share of the profit), which only grows with the raw value, so
+/// the extremes map.
 fn vault_value(
     program_id: &Pubkey,
     vault: &Pubkey,
     v: &Vault,
     markets: &[AccountInfo],
+    now: u64,
 ) -> R<(u64, u64)> {
     if markets.len() < v.markets.len() {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -2399,7 +2881,12 @@ fn vault_value(
         let b = info.try_borrow_data()?;
         let h = Header::read(&b)?;
         if let Some(t) = find_trader(&b, &h, vault) {
-            let (l, hi) = trader_value_with(&b, &h, t, &mut work).ok_or(FuturesError::Overflow)?;
+            let (mut l, mut hi) =
+                trader_value_with(&b, &h, t, &mut work).ok_or(FuturesError::Overflow)?;
+            if h.credit_owner == *vault {
+                l = credit_equity(&h, l, now);
+                hi = credit_equity(&h, hi, now);
+            }
             low += u128::from(l);
             high += u128::from(hi);
         }
@@ -2514,7 +3001,8 @@ fn vault_deposit(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> Program
         return Err(FuturesError::InvalidAccount.into());
     }
     // Shares at the vault's highest value: a deposit never dilutes the others.
-    let (_, high) = vault_value(program_id, vault_info.key, &v, markets)?;
+    let now = now_ts()?;
+    let (_, high) = vault_value(program_id, vault_info.key, &v, markets, now)?;
     let shares = if v.shares == 0 {
         amount
     } else {
@@ -2525,7 +3013,7 @@ fn vault_deposit(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> Program
     }
     let mut lp = vault_position(program_id, vault_info, owner.key, lp_info, payer, system)?;
     transfer_from(token_program, owner_token, cash, owner, amount)?;
-    reward_touch(&mut v, &mut lp, now_ts()?)?;
+    reward_touch(&mut v, &mut lp, now)?;
     house_moves(&mut v, &lp, shares, 0)?;
     v.cash = add(v.cash, amount)?;
     v.shares = add(v.shares, shares)?;
@@ -2561,6 +3049,7 @@ fn draw<'a>(
     token_program: &AccountInfo<'a>,
     want: u64,
     retire: bool,
+    work: &mut Vec<i128>,
 ) -> R<u64> {
     let (mut b, mut h) = load(program_id, market)?;
     if *market_vault.key != h.vault || h.quote_mint != v.quote_mint {
@@ -2569,6 +3058,11 @@ fn draw<'a>(
     let Some(t) = find_trader(&b, &h, vault) else {
         return Ok(0);
     };
+    // After expiry the vault's cash there waits for its credit to settle
+    // (its stakers' share, or its shortfall).
+    if h.credit_owner == *vault && h.status != STATUS_OPEN && !h.credit_settled() {
+        return Err(FuturesError::NotSettled.into());
+    }
     let tr = trader(&b, &h, t);
     if retire
         && tr.free < want
@@ -2584,8 +3078,37 @@ fn draw<'a>(
             &released.to_le_bytes(),
         ]);
     }
-    let amount = want.min(trader(&b, &h, t).free);
+    let credit = h.credit_owner == *vault && h.has_credit() && !h.credit_settled();
+    // The most the stakers' share of what the vault has earned here can
+    // become stays in the market for `CreditSettle`: its best case at full
+    // credit weight, since a withdrawal leaves credit a larger part of the
+    // capacity from then on (the review of 2026-10-18, finding 7, and its
+    // re-review).
+    let keep = if credit {
+        let (_, high) = trader_value_with(&b, &h, t, work).ok_or(FuturesError::Overflow)?;
+        h.staker_share_max(high.saturating_sub(h.debt))
+    } else {
+        0
+    };
+    // While it owes, what it takes out raises its exposure and lowers what
+    // carries its debt one for one: no more than both rules leave, at worst
+    // over every fill of what still rests (`state::credit_risk`).
+    let room = if credit && h.debt > 0 {
+        let r = credit_risk_with(&b, &h, t, true, work).ok_or(FuturesError::Overflow)?;
+        r.carry
+            .saturating_sub(h.debt)
+            .min(h.credit_limit.saturating_sub(r.exposure))
+    } else {
+        u64::MAX
+    };
+    let amount = want
+        .min(trader(&b, &h, t).free.saturating_sub(keep))
+        .min(room);
     if amount > 0 {
+        if h.credit_owner == *vault {
+            h.credit_clock(now_ts()?).ok_or(FuturesError::Overflow)?;
+            h.funded_out = add(h.funded_out, amount)?;
+        }
         debit_free(&mut b, &mut h, t, amount)?;
         h.custody = sub(h.custody, amount)?;
         let bump = [h.authority_bump];
@@ -2637,7 +3160,8 @@ fn vault_withdraw(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> Progra
     }
     let (markets, draws) = rest.split_at(v.markets.len());
     // Paid at the vault's lowest value: a withdrawal never takes from the rest.
-    let (low, high) = vault_value(program_id, vault_info.key, &v, markets)?;
+    let now = now_ts()?;
+    let (low, high) = vault_value(program_id, vault_info.key, &v, markets, now)?;
     let amount = mul_div(shares, low, v.shares)?;
     // The last shares can't leave while the vault may still pay more than
     // they're paid: nobody would own the rest, and the next deposit would get
@@ -2647,6 +3171,7 @@ fn vault_withdraw(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> Progra
         return Err(FuturesError::NotSettled.into());
     }
     // Idle cash first, then the vault's free cash in the markets named.
+    let mut work = Vec::new();
     for pair in draws.chunks(2) {
         let short = amount.saturating_sub(v.cash);
         if short == 0 {
@@ -2675,6 +3200,7 @@ fn vault_withdraw(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> Progra
             token_program,
             short,
             true,
+            &mut work,
         )?;
         v.cash = add(v.cash, got)?;
     }
@@ -2695,7 +3221,7 @@ fn vault_withdraw(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> Progra
         transfer_signed(token_program, cash, owner_token, vault_info, amount, seeds)?;
         v.cash -= amount;
     }
-    reward_touch(&mut v, &mut lp, now_ts()?)?;
+    reward_touch(&mut v, &mut lp, now)?;
     house_moves(&mut v, &lp, 0, shares)?;
     v.shares -= shares;
     v.withdrawn = add(v.withdrawn, amount)?;
@@ -2748,6 +3274,12 @@ fn vault_fund(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramRes
     }
     credit_free(&mut b, &mut h, t, amount)?;
     h.custody = add(h.custody, amount)?;
+    // Only the credit owner's funding weighs its stakers' share (the review
+    // of 2026-10-18, finding 6).
+    if h.credit_owner == *vault_info.key {
+        h.credit_clock(now_ts()?).ok_or(FuturesError::Overflow)?;
+        h.funded_in = add(h.funded_in, amount)?;
+    }
     check_vault(&h, market_vault)?;
     store(&mut b, &h)?;
     drop(b);
@@ -2790,6 +3322,7 @@ fn vault_defund(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramR
         token_program,
         amount,
         false,
+        &mut Vec::new(),
     )?;
     v.cash = add(v.cash, moved)?;
     // A market where the vault now holds nothing leaves its markets.
@@ -3132,6 +3665,1133 @@ fn vault_rewards_withdraw(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -
     Ok(())
 }
 
+// ---------------------------------------------------------------- staked AMBA
+
+/// The pool's parameters, as `CreateStakePool` and `StakeConfig` take them.
+struct StakeParams {
+    haircut_bps: u16,
+    profit_bps: u16,
+    buffer_bps: u16,
+    twap_window: u64,
+    expiry_window: u64,
+}
+
+impl StakeParams {
+    fn check(&self) -> R<()> {
+        let bps = BPS as u16;
+        if self.haircut_bps > bps || self.profit_bps > bps || self.buffer_bps > bps {
+            return Err(FuturesError::InvalidInstruction.into());
+        }
+        Ok(())
+    }
+
+    fn apply(&self, p: &mut StakePool) {
+        p.haircut_bps = self.haircut_bps;
+        p.profit_bps = self.profit_bps;
+        p.buffer_bps = self.buffer_bps;
+        p.twap_window = self.twap_window;
+        p.expiry_window = self.expiry_window;
+    }
+}
+
+fn load_stake(program_id: &Pubkey, info: &AccountInfo) -> R<StakePool> {
+    if info.owner != program_id {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let p = StakePool::read(&info.try_borrow_data()?)?;
+    let at = Pubkey::create_program_address(
+        &[NAMESPACE, STAKE_SEED, p.vault.as_ref(), &[p.bump]],
+        program_id,
+    )
+    .map_err(|_| FuturesError::InvalidAccount)?;
+    if at != *info.key {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    Ok(p)
+}
+
+fn store_stake(info: &AccountInfo, p: &StakePool) -> R<()> {
+    need_writable(info)?;
+    p.write(&mut info.try_borrow_mut_data()?);
+    Ok(())
+}
+
+/// A pool from before (`STAKE_V1_LEN`, `STAKE_V2_LEN`, `STAKE_V3_LEN`)
+/// grown to `STAKE_LEN` (its rent topped up from `payer`), so a rollover's
+/// conversion rate, the unstaking shares and the credit markets are kept.
+fn grow_stake<'a>(
+    info: &AccountInfo<'a>,
+    payer: &AccountInfo<'a>,
+    system: &AccountInfo<'a>,
+) -> R<()> {
+    grow_to(info, payer, system, STAKE_LEN)
+}
+
+/// A program account shorter than `len` (a pool or position from before)
+/// grown to it, its rent topped up from `payer`.
+fn grow_to<'a>(
+    info: &AccountInfo<'a>,
+    payer: &AccountInfo<'a>,
+    system: &AccountInfo<'a>,
+    len: usize,
+) -> R<()> {
+    if info.data_len() >= len {
+        return Ok(());
+    }
+    if *system.key != solana_system_interface::program::ID {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    need_signer(payer)?;
+    need_writable(info)?;
+    let need = Rent::get()?.minimum_balance(len);
+    let have = info.lamports();
+    if have < need {
+        invoke(
+            &system_instruction::transfer(payer.key, info.key, need - have),
+            &[payer.clone(), info.clone(), system.clone()],
+        )?;
+    }
+    info.resize(len)?;
+    Ok(())
+}
+
+fn need_operator(p: &StakePool, operator: &AccountInfo) -> R<()> {
+    need_signer(operator)?;
+    if *operator.key != p.operator {
+        return Err(FuturesError::Unauthorized.into());
+    }
+    Ok(())
+}
+
+/// The pool's staked AMBA account, its mint and the mint's token program.
+fn stake_amba(
+    p: &StakePool,
+    account: &AccountInfo,
+    mint: &AccountInfo,
+    program: &AccountInfo,
+) -> R<()> {
+    if *account.key != p.amba_account
+        || *mint.key != p.amba_mint
+        || mint.owner != program.key
+        || !is_token_program(program.key)
+    {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    Ok(())
+}
+
+/// `info` is `owner`'s own token account of `mint` under `program`, not
+/// `not`.
+fn owners_account(
+    info: &AccountInfo,
+    owner: &Pubkey,
+    mint: &Pubkey,
+    program: &Pubkey,
+    not: &Pubkey,
+) -> R<()> {
+    let t = reward_token_account(info)?;
+    if info.owner != program || info.key == not || t.owner != *owner || t.mint != *mint {
+        return Err(FuturesError::Custody.into());
+    }
+    Ok(())
+}
+
+/// A checked transfer of `amount` from the signing `owner`'s account.
+#[allow(clippy::too_many_arguments)]
+fn checked_transfer_from<'a>(
+    token_program: &AccountInfo<'a>,
+    from: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
+    to: &AccountInfo<'a>,
+    owner: &AccountInfo<'a>,
+    amount: u64,
+    decimals: u8,
+) -> ProgramResult {
+    // TransferChecked (12): the same instruction in both token programs.
+    let mut data = Vec::with_capacity(10);
+    data.push(12);
+    data.extend_from_slice(&amount.to_le_bytes());
+    data.push(decimals);
+    invoke(
+        &Instruction {
+            program_id: *token_program.key,
+            accounts: vec![
+                AccountMeta::new(*from.key, false),
+                AccountMeta::new_readonly(*mint.key, false),
+                AccountMeta::new(*to.key, false),
+                AccountMeta::new_readonly(*owner.key, true),
+            ],
+            data,
+        },
+        &[
+            from.clone(),
+            mint.clone(),
+            to.clone(),
+            owner.clone(),
+            token_program.clone(),
+        ],
+    )
+}
+
+/// The owner's stake position: loaded, or created (rent from `payer`).
+fn stake_position<'a>(
+    program_id: &Pubkey,
+    pool: &AccountInfo<'a>,
+    owner: &Pubkey,
+    info: &AccountInfo<'a>,
+    payer: &AccountInfo<'a>,
+    system: &AccountInfo<'a>,
+) -> R<StakePosition> {
+    if *info.owner == *program_id {
+        return load_stake_position(program_id, pool.key, info, Some(owner));
+    }
+    let (at, bump) = stake_position_address(program_id, pool.key, owner);
+    if at != *info.key {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let seeds: &[&[u8]] = &[
+        NAMESPACE,
+        STAKE_POS_SEED,
+        pool.key.as_ref(),
+        owner.as_ref(),
+        &[bump],
+    ];
+    create_pda(program_id, payer, info, system, STAKE_POS_LEN, seeds)?;
+    let p = StakePool::read(&pool.try_borrow_data()?)?;
+    Ok(StakePosition {
+        bump,
+        pool: *pool.key,
+        owner: *owner,
+        epoch: p.epoch,
+        index: p.share_index,
+        ..StakePosition::default()
+    })
+}
+
+fn load_stake_position(
+    program_id: &Pubkey,
+    pool: &Pubkey,
+    info: &AccountInfo,
+    owner: Option<&Pubkey>,
+) -> R<StakePosition> {
+    if info.owner != program_id {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let p = StakePosition::read(&info.try_borrow_data()?)?;
+    if p.pool != *pool || owner.is_some_and(|o| *o != p.owner) {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    Ok(p)
+}
+
+#[inline(never)]
+fn create_stake_pool(program_id: &Pubkey, a: &[AccountInfo], params: StakeParams) -> ProgramResult {
+    let [pool_info, vault_info, operator, payer, mint, amba, usdc, system, this_program, program_data, council @ ..] =
+        a
+    else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_signer(operator)?;
+    params.check()?;
+    // A pool lends credit against its collateral in any market: only the
+    // program's upgrade authority (the council, once governed) creates one,
+    // so nobody can lend themselves credit against a token they made (the
+    // review of 2026-10-18, finding 1). An immutable program has no pools.
+    need_signer(payer)?;
+    check_upgrade_authority(
+        program_id,
+        this_program,
+        program_data,
+        payer.key,
+        council,
+        false,
+    )?;
+    let v = load_vault(program_id, vault_info)?;
+    if *operator.key != v.operator {
+        return Err(FuturesError::Unauthorized.into());
+    }
+    let (at, bump) = stake_address(program_id, vault_info.key);
+    if at != *pool_info.key {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    // The pool's own AMBA and USDC accounts: only their owner (the pool's
+    // address) can give them a delegate or close authority.
+    let decimals = reward_mint_decimals(mint)?;
+    let t = reward_token_account(amba)?;
+    let u = token_account(usdc)?;
+    if amba.owner != mint.owner
+        || t.mint != *mint.key
+        || t.owner != at
+        || t.delegate.is_some()
+        || t.close_authority.is_some()
+        || u.mint != v.quote_mint
+        || u.owner != at
+        || u.delegate.is_some()
+        || u.close_authority.is_some()
+    {
+        return Err(FuturesError::Custody.into());
+    }
+    let seeds: &[&[u8]] = &[NAMESPACE, STAKE_SEED, vault_info.key.as_ref(), &[bump]];
+    create_pda(program_id, payer, pool_info, system, STAKE_LEN, seeds)?;
+    let mut p = StakePool {
+        bump,
+        amba_decimals: decimals,
+        vault: *vault_info.key,
+        operator: v.operator,
+        amba_mint: *mint.key,
+        amba_account: *amba.key,
+        usdc_account: *usdc.key,
+        usdc_mint: v.quote_mint,
+        created_ts: now_ts()?,
+        // It counts every market it lends to from the start.
+        credit_counted: true,
+        ..StakePool::default()
+    };
+    params.apply(&mut p);
+    p.write(&mut pool_info.try_borrow_mut_data()?);
+    sol_log_data(&[
+        b"ARSCRT01",
+        pool_info.key.as_ref(),
+        vault_info.key.as_ref(),
+        mint.key.as_ref(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn stake_config(program_id: &Pubkey, a: &[AccountInfo], params: StakeParams) -> ProgramResult {
+    let [pool_info, operator, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    need_operator(&p, operator)?;
+    params.check()?;
+    params.apply(&mut p);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSCFG01",
+        pool_info.key.as_ref(),
+        &p.haircut_bps.to_le_bytes(),
+        &p.profit_bps.to_le_bytes(),
+        &p.buffer_bps.to_le_bytes(),
+        &p.twap_window.to_le_bytes(),
+        &p.expiry_window.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+#[cfg(feature = "operator-price")]
+fn stake_price(program_id: &Pubkey, a: &[AccountInfo], price: u64) -> ProgramResult {
+    let [pool_info, operator, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    need_operator(&p, operator)?;
+    if price == 0 {
+        return Err(FuturesError::InvalidPrice.into());
+    }
+    let now = now_ts()?;
+    p.post(price, now);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSPRC01",
+        pool_info.key.as_ref(),
+        &price.to_le_bytes(),
+        &p.twap.to_le_bytes(),
+        &now.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn stake(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
+    let [pool_info, pos_info, owner, owner_amba, pool_amba, mint, token_program, system, payer, ..] =
+        a
+    else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_signer(owner)?;
+    need_writable(pool_info)?;
+    if amount == 0 {
+        return Err(FuturesError::InvalidInstruction.into());
+    }
+    let mut p = load_stake(program_id, pool_info)?;
+    stake_amba(&p, pool_amba, mint, token_program)?;
+    if owner_amba.key == pool_amba.key {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let mut pos = stake_position(program_id, pool_info, owner.key, pos_info, payer, system)?;
+    let now = now_ts()?;
+    // Shares for what arrives (the mint's transfer fee comes out of it).
+    let before = reward_token_account(pool_amba)?.amount;
+    checked_transfer_from(
+        token_program,
+        owner_amba,
+        mint,
+        pool_amba,
+        owner,
+        amount,
+        p.amba_decimals,
+    )?;
+    let received = sub(reward_token_account(pool_amba)?.amount, before)?;
+    // Every staked atom gone to a shortfall, or too few left for the shares
+    // this needs to fit: a new share epoch, the old shares converted (a
+    // pool from before the rates grows to hold them first).
+    if p.rolls_over(received) {
+        grow_stake(pool_info, payer, system)?;
+        p.begin_epoch(now).ok_or(FuturesError::Overflow)?;
+    }
+    p.touch(&mut pos, now).ok_or(FuturesError::Overflow)?;
+    let shares = p.shares_for(received).ok_or(FuturesError::Overflow)?;
+    if shares == 0 {
+        return Err(FuturesError::InsufficientFunds.into());
+    }
+    p.staked = add(p.staked, received)?;
+    p.shares = add(p.shares, shares)?;
+    p.staked_in = add(p.staked_in, received)?;
+    pos.shares = add(pos.shares, shares)?;
+    pos.staked_in = add(pos.staked_in, received)?;
+    pos.write(&mut pos_info.try_borrow_mut_data()?);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSSTK01",
+        pool_info.key.as_ref(),
+        owner.key.as_ref(),
+        &received.to_le_bytes(),
+        &shares.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+/// `StartUnstake`: the position's `shares` (`u64::MAX`: all not unstaking
+/// yet) start their `UNBOND_SECS` timer, restarting it for any already
+/// unstaking.
+#[inline(never)]
+fn start_unstake(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> ProgramResult {
+    let [pool_info, pos_info, owner, payer, system, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_signer(owner)?;
+    need_writable(pool_info)?;
+    need_writable(pos_info)?;
+    let mut p = load_stake(program_id, pool_info)?;
+    let mut pos = load_stake_position(program_id, pool_info.key, pos_info, Some(owner.key))?;
+    // Settled first: earnings to now, an earlier epoch's shares converted.
+    let now = now_ts()?;
+    p.touch(&mut pos, now).ok_or(FuturesError::Overflow)?;
+    let active = pos.shares.saturating_sub(pos.unbonding);
+    let added = shares.min(active);
+    if added == 0 {
+        return Err(FuturesError::InsufficientFunds.into());
+    }
+    // Accounts from before the timer grow to hold it.
+    grow_to(pool_info, payer, system, STAKE_LEN)?;
+    grow_to(pos_info, payer, system, STAKE_POS_LEN)?;
+    pos.unbonding = add(pos.unbonding, added)?;
+    pos.unbond_ts = now;
+    p.unbonding = add(p.unbonding, added)?.min(p.shares);
+    pos.write(&mut pos_info.try_borrow_mut_data()?);
+    store_stake(pool_info, &p)?;
+    let ends = now.saturating_add(UNBOND_SECS);
+    sol_log_data(&[
+        b"ARSUBD01",
+        pool_info.key.as_ref(),
+        owner.key.as_ref(),
+        &added.to_le_bytes(),
+        &pos.unbonding.to_le_bytes(),
+        &ends.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+/// `CancelUnstake`: the position's unstaking shares are active again.
+#[inline(never)]
+fn cancel_unstake(program_id: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
+    let [pool_info, pos_info, owner, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_signer(owner)?;
+    need_writable(pos_info)?;
+    let mut p = load_stake(program_id, pool_info)?;
+    let mut pos = load_stake_position(program_id, pool_info.key, pos_info, Some(owner.key))?;
+    p.touch(&mut pos, now_ts()?).ok_or(FuturesError::Overflow)?;
+    let shares = pos.unbonding;
+    if shares == 0 {
+        return Err(FuturesError::InsufficientFunds.into());
+    }
+    p.unbonding = p.unbonding.saturating_sub(shares);
+    pos.unbonding = 0;
+    pos.unbond_ts = 0;
+    pos.write(&mut pos_info.try_borrow_mut_data()?);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSUBC01",
+        pool_info.key.as_ref(),
+        owner.key.as_ref(),
+        &shares.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+/// `Unstake`: pays unstaking shares whose timer is done. Anyone may send it
+/// (the keeper completes finished timers); the AMBA goes only into the
+/// owner's own account.
+#[inline(never)]
+fn unstake(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> ProgramResult {
+    let [pool_info, pos_info, sender, owner_amba, pool_amba, mint, token_program, markets @ ..] = a
+    else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_signer(sender)?;
+    need_writable(pos_info)?;
+    let mut p = load_stake(program_id, pool_info)?;
+    stake_amba(&p, pool_amba, mint, token_program)?;
+    let mut pos = load_stake_position(program_id, pool_info.key, pos_info, None)?;
+    // Settled first: a position of an earlier epoch holds no shares now.
+    let now = now_ts()?;
+    p.touch(&mut pos, now).ok_or(FuturesError::Overflow)?;
+    let shares = if shares == u64::MAX {
+        pos.unbonding
+    } else {
+        shares
+    };
+    if shares == 0 || shares > pos.unbonding {
+        return Err(FuturesError::InsufficientFunds.into());
+    }
+    // Anyone but the owner completes all of it, never a part (Codex's
+    // review of the timer, 2026-10-18).
+    if *sender.key != pos.owner && shares != pos.unbonding {
+        return Err(FuturesError::Unauthorized.into());
+    }
+    // Only once their timer is done (the user, 2026-10-18: 7 days).
+    match p.unbond_ends(&pos) {
+        Some(ends) if now >= ends => {}
+        _ => return Err(FuturesError::NotSettled.into()),
+    }
+    // Nor while a market it lends to is near expiry or past it unsettled.
+    lending_markets(program_id, &p, markets, now)?;
+    let amba = p.amba_of(shares);
+    // Nobody burns shares for nothing.
+    if amba == 0 {
+        return Err(FuturesError::InsufficientFunds.into());
+    }
+    // What stays (unstaking AMBA included) must still back the credit lent;
+    // the rest comes out later, as markets settle and the credit returns.
+    let left = p.staked - amba;
+    if p.allocated > 0 && p.capacity_of(left, now).ok_or(FuturesError::Overflow)? < p.allocated {
+        return Err(FuturesError::CreditLimit.into());
+    }
+    if amba > 0 {
+        owners_account(
+            owner_amba,
+            &pos.owner,
+            mint.key,
+            token_program.key,
+            pool_amba.key,
+        )?;
+        let seeds: &[&[u8]] = &[NAMESPACE, STAKE_SEED, p.vault.as_ref(), &[p.bump]];
+        reward_transfer(
+            token_program,
+            pool_amba,
+            mint,
+            owner_amba,
+            pool_info,
+            amba,
+            p.amba_decimals,
+            seeds,
+        )?;
+    }
+    p.staked = left;
+    p.shares -= shares;
+    p.unbonding = p.unbonding.saturating_sub(shares);
+    p.unstaked = add(p.unstaked, amba)?;
+    pos.shares -= shares;
+    pos.unbonding -= shares;
+    if pos.unbonding == 0 {
+        pos.unbond_ts = 0;
+    }
+    pos.unstaked = add(pos.unstaked, amba)?;
+    pos.write(&mut pos_info.try_borrow_mut_data()?);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSUNS01",
+        pool_info.key.as_ref(),
+        pos.owner.as_ref(),
+        &shares.to_le_bytes(),
+        &amba.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+/// `Unstake`'s check of the markets the pool lends to (Codex's review of the
+/// unstake timer, 2026-10-18): once a market is in its last `expiry_window`
+/// (the user's rule of no new credit near expiry), its shortfall may be
+/// certain, and an unstake then would leave it all to the stakers who stay.
+/// So `markets` must be exactly the pool's `credit_markets`, distinct,
+/// each holding its credit unsettled (`Header::counts_credit_of`;
+/// `InvalidAccount` otherwise), and none may be in that window or past
+/// expiry (`NotSettled`: unstaking waits for its `CreditSettle`). A pool
+/// from before the count waits while it lends anything.
+fn lending_markets(program_id: &Pubkey, p: &StakePool, markets: &[AccountInfo], now: u64) -> R<()> {
+    if !p.counted() {
+        return Err(FuturesError::NotSettled.into());
+    }
+    if markets.len() != p.credit_markets as usize {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    for (i, m) in markets.iter().enumerate() {
+        if m.owner != program_id || markets[..i].iter().any(|o| o.key == m.key) {
+            return Err(FuturesError::InvalidAccount.into());
+        }
+        let h = Header::read(&m.try_borrow_data()?)?;
+        if !h.counts_credit_of(&p.vault) {
+            return Err(FuturesError::InvalidAccount.into());
+        }
+        if h.holds_unstaking(p.expiry_window, now) {
+            return Err(FuturesError::NotSettled.into());
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn stake_claim(program_id: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
+    let [pool_info, pos_info, reward_account, mint, owner_amba, amba_program, pool_usdc, owner_usdc, token_program, ..] =
+        a
+    else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_writable(pos_info)?;
+    let mut p = load_stake(program_id, pool_info)?;
+    let mut pos = load_stake_position(program_id, pool_info.key, pos_info, None)?;
+    p.touch(&mut pos, now_ts()?).ok_or(FuturesError::Overflow)?;
+    let (vault, bump) = (p.vault, [p.bump]);
+    let seeds: &[&[u8]] = &[NAMESPACE, STAKE_SEED, vault.as_ref(), &bump];
+    let amba = pos.reward_pending;
+    if amba > 0 {
+        let r = p.rewards.as_mut().ok_or(FuturesError::InvalidAccount)?;
+        if *reward_account.key != r.account
+            || *mint.key != r.mint
+            || mint.owner != amba_program.key
+            || !is_token_program(amba_program.key)
+        {
+            return Err(FuturesError::InvalidAccount.into());
+        }
+        owners_account(
+            owner_amba,
+            &pos.owner,
+            mint.key,
+            amba_program.key,
+            reward_account.key,
+        )?;
+        reward_transfer(
+            amba_program,
+            reward_account,
+            mint,
+            owner_amba,
+            pool_info,
+            amba,
+            r.decimals,
+            seeds,
+        )?;
+        r.paid = add(r.paid, amba)?;
+        pos.reward_pending = 0;
+        pos.reward_paid = add(pos.reward_paid, amba)?;
+    }
+    let usdc = pos.usdc_pending;
+    if usdc > 0 {
+        if *pool_usdc.key != p.usdc_account || *token_program.key != spl_token::id() {
+            return Err(FuturesError::InvalidAccount.into());
+        }
+        let dest = token_account(owner_usdc)?;
+        if owner_usdc.key == pool_usdc.key || dest.owner != pos.owner || dest.mint != p.usdc_mint {
+            return Err(FuturesError::Custody.into());
+        }
+        transfer_signed(token_program, pool_usdc, owner_usdc, pool_info, usdc, seeds)?;
+        p.usdc_paid = add(p.usdc_paid, usdc)?;
+        pos.usdc_pending = 0;
+        pos.usdc_paid = add(pos.usdc_paid, usdc)?;
+    }
+    pos.write(&mut pos_info.try_borrow_mut_data()?);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSCLM01",
+        pool_info.key.as_ref(),
+        pos.owner.as_ref(),
+        &amba.to_le_bytes(),
+        &usdc.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn stake_rewards(
+    program_id: &Pubkey,
+    a: &[AccountInfo],
+    (start_ts, end_ts, amount): (u64, u64, u64),
+) -> ProgramResult {
+    let [pool_info, operator, mint, account, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    need_operator(&p, operator)?;
+    if end_ts <= start_ts {
+        return Err(FuturesError::InvalidInstruction.into());
+    }
+    let now = now_ts()?;
+    let shares = p.shares;
+    match p.rewards.as_mut() {
+        Some(r) => {
+            if *mint.key != r.mint || *account.key != r.account {
+                return Err(FuturesError::InvalidAccount.into());
+            }
+            r.accrue(shares, now).ok_or(FuturesError::Overflow)?;
+        }
+        None => {
+            // AMBA, in an account of the pool's other than its staked one.
+            if *mint.key != p.amba_mint || *account.key == p.amba_account {
+                return Err(FuturesError::InvalidAccount.into());
+            }
+            let decimals = reward_mint_decimals(mint)?;
+            let t = reward_token_account(account)?;
+            if account.owner != mint.owner
+                || t.mint != *mint.key
+                || t.owner != *pool_info.key
+                || t.delegate.is_some()
+                || t.close_authority.is_some()
+            {
+                return Err(FuturesError::Custody.into());
+            }
+            p.rewards = Some(Rewards {
+                mint: *mint.key,
+                account: *account.key,
+                decimals,
+                last_ts: now,
+                ..Rewards::default()
+            });
+        }
+    }
+    let r = p.rewards.as_mut().ok_or(FuturesError::InvalidAccount)?;
+    r.start_ts = start_ts;
+    r.end_ts = end_ts;
+    r.amount = amount;
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSRWD01",
+        pool_info.key.as_ref(),
+        &start_ts.to_le_bytes(),
+        &end_ts.to_le_bytes(),
+        &amount.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn stake_rewards_withdraw(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
+    let [pool_info, operator, account, mint, dest, token_program, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    need_operator(&p, operator)?;
+    let (vault, bump, shares, now) = (p.vault, [p.bump], p.shares, now_ts()?);
+    let r = p.rewards.as_mut().ok_or(FuturesError::InvalidAccount)?;
+    if *account.key != r.account
+        || *mint.key != r.mint
+        || mint.owner != token_program.key
+        || !is_token_program(token_program.key)
+    {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    r.accrue(shares, now).ok_or(FuturesError::Overflow)?;
+    // Stakers' accrued rewards and the stream's rest stay.
+    let held = reward_token_account(account)?.amount;
+    let surplus = held.saturating_sub(r.owed().saturating_add(r.left(now)));
+    let amount = if amount == u64::MAX { surplus } else { amount };
+    if amount == 0 || amount > surplus {
+        return Err(FuturesError::InsufficientFunds.into());
+    }
+    let to = reward_token_account(dest)?;
+    if dest.owner != token_program.key || dest.key == account.key || to.mint != r.mint {
+        return Err(FuturesError::Custody.into());
+    }
+    let decimals = r.decimals;
+    let seeds: &[&[u8]] = &[NAMESPACE, STAKE_SEED, vault.as_ref(), &bump];
+    reward_transfer(
+        token_program,
+        account,
+        mint,
+        dest,
+        pool_info,
+        amount,
+        decimals,
+        seeds,
+    )?;
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSRWX01",
+        pool_info.key.as_ref(),
+        dest.key.as_ref(),
+        &amount.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+// ---------------------------------------------------------------- credit
+
+#[inline(never)]
+fn credit_fund(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
+    let [market, pool_info, operator, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    need_operator(&p, operator)?;
+    if amount == 0 {
+        return Err(FuturesError::InvalidInstruction.into());
+    }
+    let (mut b, mut h) = load(program_id, market)?;
+    if h.status != STATUS_OPEN {
+        return Err(FuturesError::NotTradable.into());
+    }
+    if h.quote_mint != p.usdc_mint || (h.has_credit() && h.credit_owner != p.vault) {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let now = now_ts()?;
+    let capacity = p.capacity(now).ok_or(FuturesError::Overflow)?;
+    if add(p.allocated, amount)? > capacity {
+        return Err(FuturesError::CreditLimit.into());
+    }
+    if !h.has_credit() {
+        // The stakers' share counts from here: what the vault holds here now
+        // is its funding, at its best case (they share only what it earns
+        // beyond that), and the weight's clock starts.
+        h.credit_owner = p.vault;
+        h.funded_in = match find_trader(&b, &h, &p.vault) {
+            Some(t) => trader_value(&b, &h, t).ok_or(FuturesError::Overflow)?.1,
+            None => 0,
+        };
+        h.funded_out = 0;
+        h.tw_credit = 0;
+        h.tw_cash = 0;
+        h.tw_ts = 0;
+    }
+    // The pool counts the markets holding its credit unsettled, for
+    // `Unstake`: this one from its first `CreditFund` (in a pool from before
+    // the count, from the first one since it grew to hold it). A count that
+    // was complete with nothing lent stays complete.
+    if pool_info.data_len() == STAKE_LEN {
+        p.credit_counted = p.counted();
+        if h.credit_flags & CREDIT_COUNTED == 0 {
+            h.credit_flags |= CREDIT_COUNTED;
+            p.credit_markets = p
+                .credit_markets
+                .checked_add(1)
+                .ok_or(FuturesError::Overflow)?;
+        }
+    }
+    h.credit_clock(now).ok_or(FuturesError::Overflow)?;
+    h.credit_limit = add(h.credit_limit, amount)?;
+    h.credit_until = h.expiry_ts.saturating_sub(p.expiry_window);
+    h.profit_bps = p.profit_bps;
+    p.allocated = add(p.allocated, amount)?;
+    let limit = h.credit_limit;
+    store(&mut b, &h)?;
+    drop(b);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARCFND01",
+        market.key.as_ref(),
+        pool_info.key.as_ref(),
+        &amount.to_le_bytes(),
+        &limit.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn credit_defund(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {
+    let [market, pool_info, operator, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    need_operator(&p, operator)?;
+    let (mut b, mut h) = load(program_id, market)?;
+    if !h.has_credit() || h.credit_owner != p.vault || h.credit_settled() {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    // Once final the credit stays for `CreditSettle` (the review of
+    // 2026-10-18, finding 5).
+    if h.status != STATUS_OPEN {
+        return Err(FuturesError::NotTradable.into());
+    }
+    // Never below what the vault's position there could still cost at worst
+    // over every fill of its resting liquidity (`state::credit_exposure`;
+    // all of its debt, without a slot), so no fill can exceed the limit.
+    let floor = match find_trader(&b, &h, &p.vault) {
+        Some(t) => credit_exposure(&b, &h, t).ok_or(FuturesError::Overflow)?,
+        None => h.debt,
+    };
+    let most = h.credit_limit.saturating_sub(floor);
+    let amount = if amount == u64::MAX { most } else { amount };
+    if amount == 0 || amount > most {
+        return Err(FuturesError::CreditLimit.into());
+    }
+    h.credit_clock(now_ts()?).ok_or(FuturesError::Overflow)?;
+    h.credit_limit -= amount;
+    p.allocated = p.allocated.saturating_sub(amount);
+    p.release_buffer().ok_or(FuturesError::Overflow)?;
+    let limit = h.credit_limit;
+    store(&mut b, &h)?;
+    drop(b);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARCDFD01",
+        market.key.as_ref(),
+        pool_info.key.as_ref(),
+        &amount.to_le_bytes(),
+        &limit.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+/// The automatic, published tail rule (the user's notes, 2026-10-17): the
+/// vault's own payouts repay its debt (`repay`, as they settle); a profit
+/// pays the stakers their credit-weighted share; a shortfall drains their
+/// USDC buffer, then their AMBA is set aside for the market's winners at the
+/// average price. No vote.
+#[inline(never)]
+fn credit_settle(program_id: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
+    let [market, pool_info, market_vault, authority, pool_usdc, token_program, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    let (mut b, mut h) = load(program_id, market)?;
+    need_final(&h)?;
+    if !h.has_credit() || h.credit_owner != p.vault {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    if h.credit_settled() {
+        return Err(FuturesError::AlreadyFinal.into());
+    }
+    if *market_vault.key != h.vault
+        || *pool_usdc.key != p.usdc_account
+        || *token_program.key != spl_token::id()
+    {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let now = now_ts()?;
+    h.credit_clock(now).ok_or(FuturesError::Overflow)?;
+    // The vault's own claims, inventory and orders settle first.
+    let vt = find_trader(&b, &h, &p.vault);
+    let free = match vt {
+        Some(t) => {
+            let tr = trader(&b, &h, t);
+            if tr.claims > 0 || tr.orders > 0 || tr.reserved > 0 || tr.maker > 0 {
+                return Err(FuturesError::NotSettled.into());
+            }
+            tr.free
+        }
+        None => 0,
+    };
+    let bump = [h.authority_bump];
+    let market_seeds: &[&[u8]] = &[NAMESPACE, AUTHORITY_SEED, market.key.as_ref(), &bump];
+    let at = Pubkey::create_program_address(market_seeds, program_id)
+        .map_err(|_| FuturesError::InvalidAccount)?;
+    if *authority.key != at {
+        return Err(FuturesError::InvalidAccount.into());
+    }
+    let (vault, pool_bump) = (p.vault, [p.bump]);
+    let pool_seeds: &[&[u8]] = &[NAMESPACE, STAKE_SEED, vault.as_ref(), &pool_bump];
+    let (mut share, mut cover, mut amba) = (0u64, 0u64, 0u64);
+    if h.debt == 0 {
+        share = h.staker_share(free);
+        if let (Some(t), true) = (vt, share > 0) {
+            debit_free(&mut b, &mut h, t, share)?;
+            h.custody = sub(h.custody, share)?;
+            transfer_signed(
+                token_program,
+                market_vault,
+                pool_usdc,
+                authority,
+                share,
+                market_seeds,
+            )?;
+            p.profit_in = add(p.profit_in, share)?;
+            p.take_profit(share).ok_or(FuturesError::Overflow)?;
+        }
+    } else {
+        cover = p.buffer.min(h.debt);
+        if cover > 0 {
+            transfer_signed(
+                token_program,
+                pool_usdc,
+                market_vault,
+                pool_info,
+                cover,
+                pool_seeds,
+            )?;
+            h.custody = add(h.custody, cover)?;
+            h.debt -= cover;
+            p.buffer -= cover;
+            p.covered = add(p.covered, cover)?;
+        }
+        // `repay` keeps the debt within the open sets' backing (and the
+        // vault's cash, all repaid by now), so the winners' payouts carry
+        // what the buffer didn't.
+        if h.debt > h.backing {
+            return Err(FuturesError::Insolvent.into());
+        }
+        if h.debt > 0 {
+            // Never at a stale price: a fresh `PoolPrice` first.
+            if !p.price_fresh(now) {
+                return Err(FuturesError::NotSettled.into());
+            }
+            amba = p.amba_for_at_most(h.debt, p.twap_at(now), p.staked);
+            p.staked -= amba;
+            p.recovery_owed = add(p.recovery_owed, amba)?;
+            p.slashed = add(p.slashed, amba)?;
+            h.shortfall = h.debt;
+            h.recovery_amba = amba;
+            h.winners = h.backing;
+            h.credit_flags |= CREDIT_SHORTFALL;
+        }
+    }
+    p.allocated = p.allocated.saturating_sub(h.credit_limit);
+    h.credit_limit = 0;
+    if h.credit_flags & CREDIT_COUNTED != 0 {
+        p.credit_markets = p.credit_markets.saturating_sub(1);
+    }
+    h.credit_flags = (h.credit_flags & !CREDIT_COUNTED) | CREDIT_SETTLED;
+    p.release_buffer().ok_or(FuturesError::Overflow)?;
+    check_vault(&h, market_vault)?;
+    let shortfall = h.shortfall;
+    store(&mut b, &h)?;
+    drop(b);
+    // The pool's USDC account holds its buffer and what stakers are owed.
+    if token_amount(pool_usdc)? < add(p.buffer, p.usdc_owed())? {
+        return Err(FuturesError::Custody.into());
+    }
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARCSET01",
+        market.key.as_ref(),
+        pool_info.key.as_ref(),
+        &share.to_le_bytes(),
+        &cover.to_le_bytes(),
+        &shortfall.to_le_bytes(),
+        &amba.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
+#[inline(never)]
+fn settle_recovery(
+    program_id: &Pubkey,
+    a: &[AccountInfo],
+    claims: &[u32],
+    with_maker: bool,
+) -> ProgramResult {
+    let [market, pool_info, pool_amba, mint, owner_amba, token_program, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    let mut p = load_stake(program_id, pool_info)?;
+    stake_amba(&p, pool_amba, mint, token_program)?;
+    let (mut b, mut h) = load(program_id, market)?;
+    need_final(&h)?;
+    if h.credit_flags & CREDIT_SHORTFALL == 0 || h.credit_owner != p.vault || h.winners == 0 {
+        return Err(FuturesError::InvalidInstruction.into());
+    }
+    // The owner is whoever owns the AMBA account paid.
+    let owner = reward_token_account(owner_amba)?.owner;
+    owners_account(
+        owner_amba,
+        &owner,
+        mint.key,
+        token_program.key,
+        pool_amba.key,
+    )?;
+    let t = find_trader(&b, &h, &owner).ok_or(FuturesError::InvalidAccount)?;
+    let mut gross = 0u64;
+    for &i in claims {
+        let c = claim(&b, &h, i)?;
+        if c.lots == 0 {
+            continue;
+        }
+        if c.trader != t {
+            return Err(FuturesError::Unauthorized.into());
+        }
+        let per = if c.side == Side::Long as u8 {
+            long_per_lot(c.lo, c.hi, h.settlement_fine, h.k)
+        } else {
+            short_per_lot(c.lo, c.hi, h.settlement_fine, h.k)
+        };
+        let payout = mul(c.lots, per)?;
+        drop_claim(&mut b, &mut h, i);
+        gross = add(gross, payout)?;
+        sol_log_data(&[
+            b"ARSETL01",
+            owner.as_ref(),
+            &i.to_le_bytes(),
+            &[c.side],
+            &c.lo.to_le_bytes(),
+            &c.hi.to_le_bytes(),
+            &c.lots.to_le_bytes(),
+            &payout.to_le_bytes(),
+        ]);
+    }
+    let tr = trader(&b, &h, t);
+    if with_maker && tr.maker > 0 {
+        let m = tr.maker - 1;
+        gross = add(gross, inventory_payout(&mut b, &h, m)?)?;
+        retire_ladder(&mut b, &mut h, m)?;
+    }
+    // The payout less its part of the shortfall (rounded up, so the
+    // shortfall is spread in full), and its part of the AMBA set aside
+    // (rounded down, so it never runs out).
+    let winners = u128::from(h.winners);
+    let part = (u128::from(gross) * u128::from(h.shortfall)).div_ceil(winners);
+    let cut = u64::try_from(part)
+        .unwrap_or(u64::MAX)
+        .min(h.debt)
+        .min(gross);
+    let amba =
+        ((u128::from(gross) * u128::from(h.recovery_amba) / winners) as u64).min(p.recovery_owed);
+    let usdc = gross - cut;
+    h.backing = sub(h.backing, gross).map_err(|_| FuturesError::Insolvent)?;
+    h.debt -= cut;
+    credit_free(&mut b, &mut h, t, usdc)?;
+    h.total_paid_out = add(h.total_paid_out, usdc)?;
+    let mut tr = trader(&b, &h, t);
+    tr.paid_out = add(tr.paid_out, usdc)?;
+    put_trader(&mut b, &h, t, &tr);
+    if amba > 0 {
+        let seeds: &[&[u8]] = &[NAMESPACE, STAKE_SEED, p.vault.as_ref(), &[p.bump]];
+        reward_transfer(
+            token_program,
+            pool_amba,
+            mint,
+            owner_amba,
+            pool_info,
+            amba,
+            p.amba_decimals,
+            seeds,
+        )?;
+        p.recovery_owed -= amba;
+    }
+    store(&mut b, &h)?;
+    drop(b);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARRCVR01",
+        market.key.as_ref(),
+        owner.as_ref(),
+        &gross.to_le_bytes(),
+        &usdc.to_le_bytes(),
+        &amba.to_le_bytes(),
+    ]);
+    Ok(())
+}
+
 // ---------------------------------------------------------------- legacy pools (dev)
 
 /// The owner's position in a legacy pool, checked against its address.
@@ -3182,7 +4842,7 @@ fn pool_migrate(program_id: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
     if pool.shares == 0 || lp.shares != pool.shares {
         return Err(FuturesError::Unauthorized.into());
     }
-    let (_, high) = vault_value(program_id, vault_info.key, &v, markets)?;
+    let (_, high) = vault_value(program_id, vault_info.key, &v, markets, now_ts()?)?;
     let (mut b, h) = load(program_id, market)?;
     if h.quote_mint != v.quote_mint || find_trader(&b, &h, vault_info.key).is_some() {
         return Err(FuturesError::InvalidAccount.into());
@@ -3314,4 +4974,28 @@ fn pool_withdraw(program_id: &Pubkey, a: &[AccountInfo], shares: u64) -> Program
         &amount.to_le_bytes(),
     ]);
     store(&mut b, &h)
+}
+
+/// `PoolPrice`: the AMBA price from mainnet's pool and Pyth
+/// (`crate::price_source`), posted as `StakePrice` posts it.
+#[inline(never)]
+fn pool_price(program_id: &Pubkey, a: &[AccountInfo]) -> ProgramResult {
+    let [pool_info, amm, feed, ixs, ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    crate::price_source::need_alone(program_id, ixs)?;
+    let mut p = load_stake(program_id, pool_info)?;
+    let clock = Clock::get()?;
+    let now = u64::try_from(clock.unix_timestamp).unwrap_or(0);
+    let price = crate::price_source::sample(&p, amm, feed, now, clock.slot)?;
+    p.post(price, now);
+    store_stake(pool_info, &p)?;
+    sol_log_data(&[
+        b"ARSPRC01",
+        pool_info.key.as_ref(),
+        &price.to_le_bytes(),
+        &p.twap.to_le_bytes(),
+        &now.to_le_bytes(),
+    ]);
+    Ok(())
 }

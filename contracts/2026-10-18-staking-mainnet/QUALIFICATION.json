@@ -1,0 +1,73 @@
+{
+  "schema": "amoeba.staking-artifact-qualification.v1",
+  "sourceCommit": "c723db776e9d0c639565d89ac761703731b37fb4",
+  "artifactBytes": 706416,
+  "artifactSha256": "6c38326084c53f560bbdbcc54f2f2441191bcee0a2f915850496d8329a4452cf",
+  "normalizedSha256": "d37452966b76f2bbaefbd77daf1a48e30c7e21bdaeecdcf6c35d0dbebe92209d",
+  "passed": true,
+  "execution": "in-process LiteSVM against exact selected production ELF",
+  "testsPassed": [
+    "c1_an_indebted_vaults_whole_grid_quote_fits_the_compute",
+    "f6_others_sets_redeem_while_the_vault_owes",
+    "p1_the_pool_and_pyth_price_amba",
+    "p2_only_the_mainnet_accounts_are_read",
+    "p3_stale_unverified_or_idle_sources_are_refused",
+    "p4_a_sample_takes_a_transaction_of_its_own",
+    "s2_a_shortfall_drains_the_buffer_then_pays_winners_in_amba",
+    "w1_unstaking_waits_for_a_lending_markets_last_day_and_settlement"
+  ],
+  "testCount": 8,
+  "computeEvidence": [
+    "quote, no debt: 4069 lots/step, 733349 CU",
+    "taker submit, no debt: 555747 CU",
+    "quote, indebted: 9061 lots/step, 875058 CU",
+    "taker submit, indebted: 619804 CU"
+  ],
+  "supportArtifacts": [
+    {
+      "name": "governance_controller_v3.so",
+      "bytes": 334600,
+      "sha256": "f316e26081083d6bc6b15d7565d739bd1394718b0e55d17a0213cc5293ee4f6c",
+      "origin": "copied from prior owned inventory qualification harness; real supporting SBF programs, not deployed by this qualification"
+    },
+    {
+      "name": "ameba_oracle.so",
+      "bytes": 947072,
+      "sha256": "054b964bd6616e01e5380c8a4e1f6569b99a5025f763055beaf9559237a9aa23",
+      "origin": "copied from prior owned inventory qualification harness; real supporting SBF programs, not deployed by this qualification"
+    }
+  ],
+  "logs": [
+    {
+      "name": "artifact-price-production.log",
+      "sha256": "3d012e066cc3a8ef3b9311669172eaf232f9f408102c5a3c8ad8c236c3796dde"
+    },
+    {
+      "name": "artifact-credit-cu.log",
+      "sha256": "459254b0e9958c8c27e0d4bbbdc9d0ed8e94e1ee6100c466d0198c2ac9550a89"
+    },
+    {
+      "name": "artifact-shortfall.log",
+      "sha256": "5475d135874c9c0d42d50742e382928ef6df41c28a710be28d8f06b032539953"
+    },
+    {
+      "name": "artifact-redemption.log",
+      "sha256": "f9e5494858688dc4daa3ebbdc0e18cba82dd35c5c95fe6103307b11e75e418cd"
+    },
+    {
+      "name": "artifact-unstake.log",
+      "sha256": "ef8a5e15e0749216609a0f9a22f82e22ff46ab748d2d6976a1cc7c0c42784a53"
+    }
+  ],
+  "sourceBoundGate": {
+    "inputKey": "a5d1d84ae5b393a1",
+    "passedAt": "2026-10-18T09:42:23Z"
+  },
+  "limitations": [
+    "Full unchanged source-bound gate reused, not repeated.",
+    "Combined production/dev p5 test reached its absent dev-only ELF after production rejection checks passed; final focused run excludes this test and relies on source-bound gate for its dev half.",
+    "Test setup uses real copied supporting oracle/controller ELFs and source-pinned oracle ID; supporting artifacts were not rebuilt."
+  ],
+  "productionSigning": false,
+  "chainSubmission": false
+}

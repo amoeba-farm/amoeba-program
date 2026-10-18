@@ -13,6 +13,12 @@ preserves the original source inventory and installation records.
 The earlier index-options / Spread program remains in
 [programs/light_token_minter](programs/light_token_minter).
 
+The [staking release source](contracts/2026-10-18-staking-mainnet) advances the
+Futures workspace to source `c723db776e9d0c639565d89ac761703731b37fb4`.
+Its fixed-image build matches the prepared release artifact. Mainnet installation
+and updated hosted verification of this new artifact are pending; the records
+below describe the preceding inventory-netting deployment.
+
 ## Mainnet programs
 
 | Program | Address | Verification |

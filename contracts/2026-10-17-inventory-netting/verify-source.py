@@ -7,6 +7,18 @@ import tomllib
 
 bundle = Path(__file__).resolve().parent
 root = bundle.parents[1]
+# Preserve the inventory-netting snapshot while the current Futures source advances.
+import subprocess, tempfile, tarfile, io
+snapshot = tempfile.TemporaryDirectory(prefix='amoeba-inventory-historical-source-')
+archive = subprocess.check_output(['git', '-C', str(root), 'archive', '--format=tar', '045090bfade3707f48ba7d1d2d5176300751aa36', '--', 'oracle', 'futures', 'governance'])
+root = Path(snapshot.name).resolve()
+with tarfile.open(fileobj=io.BytesIO(archive)) as members:
+    for member in members:
+        target = (root / member.name).resolve()
+        assert target.is_relative_to(root) and not member.issym() and not member.islnk()
+        if member.isfile():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(members.extractfile(member).read())
 inventory = json.loads((bundle / 'SOURCE_FILES.json').read_text(encoding='utf8'))
 assert inventory['sourceCommit'] == 'b306e314d60bfc1145f88ee54a158cc6694a94da'
 dependencies = json.loads((bundle / 'DEPENDENCY_INPUTS.json').read_text())

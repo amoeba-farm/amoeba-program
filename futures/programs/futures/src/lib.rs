@@ -12,10 +12,14 @@
 //! Every package is fully funded: a complete set's backing is paid in by its
 //! long's premium and its short's contribution when it is created, and is
 //! released only by settlement or by the redemption of an exact complement.
-//! There are no protocol fees and no funding payments.
+//! There are no protocol fees and no funding payments. The one exception
+//! (2026-10-17, the user's call): an Earn vault's maker may borrow what its
+//! stake pool lends it in a market, the stakers' AMBA carrying the borrowed
+//! part (`docs/futures.md`, "Staked AMBA backs the maker").
 //!
 //! Not audited; dev chain only. See `docs/futures.md`.
 pub mod heap;
+pub mod price_source;
 pub mod processor;
 pub mod state;
 
@@ -30,7 +34,8 @@ pub enum FuturesError {
     Unauthorized,
     /// `Submit` or `Quote` on a market that is not open, or whose oracle
     /// period is not Live inside its trading window (before its listing,
-    /// Forming, at or after expiry, Settled or Failed).
+    /// Forming, at or after expiry, Settled or Failed); `CreditDefund` on a
+    /// market that is not open.
     NotTradable,
     InvalidShape,
     InvalidPrice,
@@ -59,6 +64,10 @@ pub enum FuturesError {
     NotComplement,
     ClaimNotFound,
     OrderNotFound,
+    /// Not yet: it waits for a settlement (the oracle's, the market's, its
+    /// credit's), a fresh price, or the positions a pool's last shares hold;
+    /// or `Unstake` before the position's unstake timer is done
+    /// (`state::UNBOND_SECS` after its last `StartUnstake`).
     NotSettled,
     AlreadyFinal,
     Overflow,
@@ -71,6 +80,16 @@ pub enum FuturesError {
     /// The Earn vault is in as many markets as one transaction can name
     /// (`state::VAULT_MARKETS`).
     VaultCapacity,
+    /// The stake-backed credit can't carry it: the credit owner's exposure
+    /// over its market's limit (after its own orders, or a fill of them),
+    /// its debt over what carries it there (backing plus its own cash: any
+    /// instruction that would leave more), credit over the pool's capacity,
+    /// or unstaking AMBA that backs lent credit.
+    CreditLimit,
+    /// The market's winners are paid part in AMBA: `SettleRecovery`. Also
+    /// `Transfer` and `Redeem` after finalization while the market's credit
+    /// isn't settled or settled short: claims leave only through settlement.
+    NeedsRecovery,
 }
 
 pub const ERROR_BASE: u32 = 0x4652_0000;
@@ -151,7 +170,10 @@ pub enum FuturesInstruction {
     /// Trades one claim shape against the book with a verified package, then
     /// (GTC/post-only) rests the remainder. Only while the market's period
     /// is Live and before expiry (`NotTradable` otherwise; the user,
-    /// 2026-10-15, preflight Decisions 5).
+    /// 2026-10-15, preflight Decisions 5). The fill's claim nets before it
+    /// takes a claim slot, so a close never needs a free one; a resting
+    /// opening order holds a slot for its fills (`ClaimCapacity` when none
+    /// is free; `docs/futures.md`, "Claim slots").
     ///
     /// Accounts: 0 market (w); 1 owner (s); 2 period.
     Submit {
@@ -205,11 +227,15 @@ pub enum FuturesInstruction {
     },
     /// Accounts: 0 market (w); 1 owner (s).
     CancelQuote,
-    /// Splits a claim at `at` into `[lo, at)` and `[at, hi)`, same lots.
+    /// Splits a claim at `at` into `[lo, at)` and `[at, hi)`, same lots. A
+    /// claim a resting order holds moves out whole: both parts take free
+    /// slots and the order keeps its slot.
     /// Accounts: 0 market (w); 1 owner (s).
     Split { claim: u32, seq: u64, at: u16 },
     /// Merges two of the owner's claims on one side: identical intervals, or
-    /// adjacent ones with equal lots. Accounts as `Split`.
+    /// adjacent ones with equal lots. When a resting order holds `keep` and
+    /// the intervals differ, the merged claim takes a free slot and the order
+    /// keeps its slot. Accounts as `Split`.
     Merge {
         keep: u32,
         keep_seq: u64,
@@ -225,7 +251,8 @@ pub enum FuturesInstruction {
         short_seq: u64,
         lots: u64,
     },
-    /// Gives `lots` of a claim to `to` unchanged. `to` must be a wallet key
+    /// Gives `lots` of a claim to `to` unchanged (they net against and join
+    /// `to`'s claims as a fill would). `to` must be a wallet key
     /// (on the ed25519 curve), never a program address such as an Earn pool.
     /// Accounts as `Split`.
     Transfer {
@@ -365,6 +392,162 @@ pub enum FuturesInstruction {
     /// Accounts: 0 vault (w); 1 operator (s); 2 reward account (w); 3 reward
     /// mint; 4 destination token account (w); 5 the mint's token program.
     VaultRewardsWithdraw { amount: u64 },
+    /// Creates the stake pool behind the Earn vault's maker
+    /// (`state::StakePool`): stakers' AMBA in `amba account`, their USDC in
+    /// `usdc account`, both token accounts owned by the pool's address, empty.
+    /// The vault's operator signs and runs it.
+    ///
+    /// Only the program's upgrade authority creates a pool (`payer`; a
+    /// governed program needs three council seats, as `CreateMarket`): a
+    /// pool lends credit in any market.
+    ///
+    /// Accounts: 0 pool (w, PDA `["ameba-range-v1", "stake", vault]`);
+    /// 1 vault; 2 operator (s); 3 payer (s, w; the upgrade authority);
+    /// 4 AMBA mint; 5 AMBA account; 6 USDC account; 7 system program; 8 this
+    /// program; 9 its ProgramData; then, when governed, the council config
+    /// and three seats (s).
+    CreateStakePool {
+        haircut_bps: u16,
+        profit_bps: u16,
+        buffer_bps: u16,
+        twap_window: u64,
+        expiry_window: u64,
+    },
+    /// The operator changes the pool's parameters (as `CreateStakePool`).
+    /// Accounts: 0 pool (w); 1 operator (s).
+    StakeConfig {
+        haircut_bps: u16,
+        profit_bps: u16,
+        buffer_bps: u16,
+        twap_window: u64,
+        expiry_window: u64,
+    },
+    /// The operator posts the AMBA price: USDC atoms per whole AMBA, times
+    /// `state::PRICE_SCALE`. The pool's credit and shortfalls use the
+    /// time-weighted average of the posts (the user, 2026-10-17). Dev
+    /// builds only (`operator-price`, as the dev chain's has it): the
+    /// production build refuses it (`Unauthorized`) and takes the price from
+    /// mainnet's pool through `PoolPrice` (the user, 2026-10-18).
+    /// Accounts: 0 pool (w); 1 operator (s).
+    StakePrice { price: u64 },
+    /// Stakes `amount` AMBA atoms (a checked transfer: the mint's transfer
+    /// fee comes out of what arrives, and shares are for what arrives).
+    /// It starts a new share epoch when a shortfall took every staked atom
+    /// or the shares wouldn't fit a `u64` (`StakePool::rolls_over`).
+    ///
+    /// Accounts: 0 pool (w); 1 position (w, PDA `["ameba-range-v1",
+    /// "stake-pos", pool, owner]`, created on first use); 2 owner (s);
+    /// 3 owner's AMBA account (w); 4 pool's AMBA account (w); 5 AMBA mint;
+    /// 6 its token program; 7 system program; 8 payer (s, w: the position's
+    /// rent, and an older pool's growth to `STAKE_LEN` at a rollover).
+    Stake { amount: u64 },
+    /// Pays `shares` (`u64::MAX`: all) of the position's unstaking shares
+    /// for their AMBA once their timer is done: `UNBOND_SECS` (7 days) after
+    /// the last `StartUnstake` (`NotSettled` before), as long as the AMBA
+    /// left, unstaking AMBA included, still backs the credit lent
+    /// (`CreditLimit`: the rest comes out as markets settle and credit
+    /// returns). It also waits (`NotSettled`) while any market the pool
+    /// lends to is in its last `expiry_window` before expiry (from its
+    /// `credit_until`, if earlier) or past expiry with its credit unsettled,
+    /// and while a pool from before the count (`StakePool::credit_counted`)
+    /// lends anything. Permissionless: any signer may send it (the keeper
+    /// completes finished timers), and it pays only into the owner's own
+    /// AMBA account; anyone but the owner pays all of the position's
+    /// unstaking shares (`Unauthorized` for a part). Nothing to pay:
+    /// `InsufficientFunds`.
+    ///
+    /// Accounts: 0 pool (w); 1 position (w); 2 the owner or anyone (s);
+    /// 3 owner's AMBA account (w); 4 pool's AMBA account (w); 5 AMBA mint;
+    /// 6 its token program; then every market holding the pool's credit
+    /// unsettled (`StakePool::credit_markets` of them, distinct, each with
+    /// `Header::counts_credit_of` the pool's vault: `InvalidAccount`
+    /// otherwise).
+    Unstake { shares: u64 },
+    /// Permissionless: pays a position's AMBA stream rewards and USDC into
+    /// its owner's own accounts (either part may be nothing).
+    ///
+    /// Accounts: 0 pool (w); 1 position (w); 2 the stream's reward account
+    /// (w); 3 AMBA mint; 4 owner's AMBA account (w); 5 AMBA token program;
+    /// 6 pool's USDC account (w); 7 owner's USDC account (w); 8 SPL token
+    /// program.
+    StakeClaim,
+    /// The operator sets the pool's AMBA subsidy stream: `amount` atoms
+    /// released linearly from `start_ts` to `end_ts` to stakers by their
+    /// shares (as `VaultRewards`, no house). The first fixes the reward
+    /// account: an AMBA account owned by the pool, not its staked one.
+    ///
+    /// Accounts: 0 pool (w); 1 operator (s); 2 AMBA mint; 3 reward account.
+    StakeRewards {
+        start_ts: u64,
+        end_ts: u64,
+        amount: u64,
+    },
+    /// The operator takes back `amount` (`u64::MAX`: all) of the reward
+    /// account's surplus (as `VaultRewardsWithdraw`).
+    ///
+    /// Accounts: 0 pool (w); 1 operator (s); 2 reward account (w); 3 AMBA
+    /// mint; 4 destination (w); 5 AMBA token program.
+    StakeRewardsWithdraw { amount: u64 },
+    /// The operator lends `amount` more of the pool's credit to the vault's
+    /// trader in an open market, within the pool's capacity (the staked AMBA
+    /// at its average price, haircut, less what is lent already). The first
+    /// counts the market in the pool's `credit_markets` (a pool of
+    /// `STAKE_LEN`), marking its header `CREDIT_COUNTED`.
+    ///
+    /// Accounts: 0 market (w); 1 pool (w); 2 operator (s).
+    CreditFund { amount: u64 },
+    /// The operator takes back `amount` (`u64::MAX`: all it can) of a
+    /// market's credit, down to the vault trader's exposure there (its whole
+    /// debt if it holds no trader slot). Open markets only (`NotTradable`).
+    /// Accounts as `CreditFund`.
+    CreditDefund { amount: u64 },
+    /// Permissionless, after finalization and once the vault's own claims,
+    /// inventory and orders there are settled (their payouts repay its debt
+    /// first): pays the stakers their share of its profit there, or covers
+    /// its shortfall from their USDC buffer and then sets their AMBA aside
+    /// for the winners at the average price; returns the credit to the pool
+    /// and uncounts the market from its `credit_markets`. Everyone else's
+    /// settlement waits for it.
+    ///
+    /// Accounts: 0 market (w); 1 pool (w); 2 market token vault (w);
+    /// 3 market authority; 4 pool's USDC account (w); 5 SPL token program.
+    CreditSettle,
+    /// Permissionless, in a market with a shortfall: settles one owner's
+    /// `claims` (and with `maker`, its ladder inventory) paying the USDC
+    /// part of each payout into free cash and its share of the AMBA set
+    /// aside into the owner's AMBA account.
+    ///
+    /// Accounts: 0 market (w); 1 pool (w); 2 pool's AMBA account (w); 3 AMBA
+    /// mint; 4 owner's AMBA account (w); 5 AMBA token program.
+    SettleRecovery { claims: Vec<u32>, maker: bool },
+    /// Permissionless: posts the AMBA price from mainnet's own accounts
+    /// (`price_source`): the Meteora DAMM v2 AMBA/SOL pool's price times
+    /// Pyth's fully verified SOL/USD EMA, at most `PYTH_MAX_AGE` old, into
+    /// the pool's average as `StakePrice` would. The pool's AMBA mint must
+    /// be mainnet's, and the transaction must hold nothing but this and
+    /// compute-budget instructions (`InvalidInstruction`), so a swap in the
+    /// same transaction can't move the sample.
+    ///
+    /// Accounts: 0 pool (w); 1 the Meteora pool (`AMBA_SOL_POOL`); 2 Pyth's
+    /// SOL/USD feed (`SOL_USD_FEED`); 3 the instructions sysvar.
+    PoolPrice,
+    /// Starts unstaking `shares` (`u64::MAX`: all the position's shares not
+    /// unstaking yet; more is capped at them; none left:
+    /// `InsufficientFunds`): `Unstake` pays them `UNBOND_SECS` (7 days, the
+    /// user, 2026-10-18) from now. Adding more restarts the timer for all of
+    /// them. They keep earning and bearing shortfalls like every share, but
+    /// back no new credit (`StakePool::capacity`), so the maker hands back
+    /// what they backed. A pool or position from before the timer grows to
+    /// `STAKE_LEN` / `STAKE_POS_LEN` first, the rent from `payer`.
+    ///
+    /// Accounts: 0 pool (w); 1 position (w); 2 owner (s); 3 payer (s, w);
+    /// 4 system program.
+    StartUnstake { shares: u64 },
+    /// Returns the position's unstaking shares to active (none:
+    /// `InsufficientFunds`).
+    ///
+    /// Accounts: 0 pool (w); 1 position (w); 2 owner (s).
+    CancelUnstake,
 }
 
 #[cfg(not(feature = "no-entrypoint"))]

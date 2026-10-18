@@ -40,7 +40,7 @@ solana-verify build . --base-image "$FUTURES_IMAGE" --workspace-path "$PWD/futur
 records the exact installed-byte match. A bounded standard compiler path-remap
 experiment under the old image still produced a different hash. That historical reproduction did not itself establish hosted verification.
 
-## Installed inventory-netting release
+## Previous inventory-netting release
 
 The [inventory-netting source and reproduction record](../contracts/2026-10-17-inventory-netting)
 uses the same immutable `amba-release` image and Futures command above.
@@ -50,3 +50,11 @@ The Oracle recipe remains unchanged. The older AMBA Earn reproduction remains
 historical. The fixed-path artifact is installed at slot 457976295 and passed
 hosted verification on 2026-10-17. See the
 [installation receipt](../deployment-evidence/mainnet-inventory-netting-20261017.json).
+
+## Prepared staking release
+
+The [staking source and reproduction record](../contracts/2026-10-18-staking-mainnet)
+uses the same immutable `amba-release` image and Futures build command above.
+The build reproduces the 706,416-byte prepared release artifact exactly. Oracle
+source and its build recipe are unchanged. Installation and updated hosted
+verification remain pending for this new artifact.
