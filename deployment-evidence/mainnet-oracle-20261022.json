@@ -1,0 +1,247 @@
+{
+  "schema": "amoeba.oracle-mainnet-installation.v1",
+  "status": "COMPLETED",
+  "assembledAt": "2026-10-22T07:16:21.487Z",
+  "cluster": "mainnet-beta",
+  "releaseTag": "release/2026-10-22-oracle-upgrade",
+  "privateSourceCommit": "da0e9143f44635dcbce7288ea6510ddf042de215",
+  "packageSourceCommit": "6dc23b87f54419f595fcd51fa69732180a1d6632",
+  "publicSourceCommit": "482f01f7774205595b13c83608c2693465420706",
+  "oracle": {
+    "observedAt": "2026-10-22T07:11:51.051Z",
+    "slot": 459945800,
+    "target": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+    "sourceCommit": "da0e9143f44635dcbce7288ea6510ddf042de215",
+    "artifactSha256": "cb0a5687b452edbb5fcc7c1474b71b15382c747c0fea30e2f225da0c8251d14f",
+    "payloadSha256": "24ac960a14eb1913199ae51e4f309d8b3bb089bef0ed6695ffdcb138b659a14b",
+    "mandatoryZeroPaddingBytes": 7304,
+    "deployedSlot": "459945306",
+    "capacity": 717664,
+    "authority": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+    "gate": {
+      "bump": 255,
+      "status": 0,
+      "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+      "targetProgram": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+      "programdata": "DyDtjYRs7sZbJyLEsq1sT4ynzS2ob3zrZMS3dLBuiGq1",
+      "epoch": "5",
+      "activeProposal": "11111111111111111111111111111111",
+      "freezeSlot": "0",
+      "reason": 0,
+      "lastCompletedProposal": "14sjCwEzKL1XeC8WtnDcCN31aXjYrwUTSiZVzx5b2DVo"
+    },
+    "bufferClosed": true,
+    "bufferRefundLamports": 3609467000,
+    "upgradeSignature": "32uufCGMXDRpYpq2EAmTCDrNaWRTwuV1cXzAfcvthotLw726tZoFep4Q2mDcrg2k9xcHUUNnXJBvTtvsiVQrdx8Z",
+    "activationSignature": "4jveCsjxUHuzevuo9FXRUqK5aRw9r9frzupePNZY4NBf6Tpy9szPrthkfjV4NKQ2oz52TQoEhvpfWm7mM6K8Q7jg",
+    "extensionSignature": "5fbTof1qmGppW9G9WD3EyAJgJfGpXsAKa9etwMFq1NbV1DzG3Xxim31a9UTXJthQ9vr999CbHiymBzxiD7Qx2YQ5",
+    "extensionLamports": 52019200,
+    "artifactBytes": 710360,
+    "normalizedSha256": "7c3da6d17741916d47e3c6158c8123f630733faa4b084a6f7ec6b2d366c7f94e",
+    "extensionBytes": 10240,
+    "allocationReason": "Mainnet SIMD-0431 enforces a 10240-byte minimum ExtendProgram; 2936-byte instruction rejected in unsigned simulation.",
+    "upgradeProposalId": "81",
+    "freezeProposalId": "82",
+    "activationProposalId": "83",
+    "councilApprovals": 3,
+    "verifiedArtifactChunks": 44,
+    "transactions": {
+      "extension": {
+        "name": "oracle-extend",
+        "signature": "5fbTof1qmGppW9G9WD3EyAJgJfGpXsAKa9etwMFq1NbV1DzG3Xxim31a9UTXJthQ9vr999CbHiymBzxiD7Qx2YQ5",
+        "slot": 459938604,
+        "err": null,
+        "messageSha256": "4fbc6982245c06328a47c1c86ec010f15954a9794a81592978ebdeaf75d42007"
+      },
+      "freeze": {
+        "name": "freeze-execute",
+        "signature": "2hZo7nuunex7p49bHX4GvYAzDzK9w37Q6f6oe5aXkc92WxmPGo1MidRM9Hw4oQnmg3EvGjEm5Gpt6CuVhPkvjRwq",
+        "slot": 459945027,
+        "err": null,
+        "messageSha256": "7004a912f2920ff4069a8cacca6c64a27592deb16e026a6f1e25851212c8e9e5"
+      },
+      "upgrade": {
+        "name": "upgrade-execute",
+        "signature": "32uufCGMXDRpYpq2EAmTCDrNaWRTwuV1cXzAfcvthotLw726tZoFep4Q2mDcrg2k9xcHUUNnXJBvTtvsiVQrdx8Z",
+        "slot": 459945306,
+        "err": null,
+        "messageSha256": "c13004149764d02d55a68ef4d756389b4e9470e7a9d8054f03d74bfb4833faaa"
+      },
+      "activation": {
+        "name": "activate-execute",
+        "signature": "4jveCsjxUHuzevuo9FXRUqK5aRw9r9frzupePNZY4NBf6Tpy9szPrthkfjV4NKQ2oz52TQoEhvpfWm7mM6K8Q7jg",
+        "slot": 459945541,
+        "err": null,
+        "messageSha256": "f03d83479fd129958a16c35403603792f4129ef983fd3cec0bd94e3696be28f0"
+      },
+      "verificationMetadata": {
+        "name": "metadata-oracle-execute",
+        "signature": "emJAW518neUnkCMGcXnXHkaCAVmroAXQDXTSzTYsBwrADGHBZrRHDrYZ4Y2NxTKDmPFVFCRz96zAceofAivAzBm",
+        "slot": 459946296,
+        "err": null,
+        "messageSha256": "29c5d40138790d87ae9f523d126717b51e87cd01ffebae7719f7f610b63718aa"
+      }
+    }
+  },
+  "controller": {
+    "program": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+    "installedRelease": 6,
+    "unchanged": true,
+    "normalizedSha256": "534d7456bd65c0849345a130050882b45bd82b072d7dca0d71059b89ed8ce1f7"
+  },
+  "futures": {
+    "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+    "programAndGateUnchanged": true,
+    "baselineProgramAccounts": [
+      {
+        "address": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+        "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "executable": true,
+        "lamports": 833120,
+        "dataSha256": "b0bbe91a0eaabf617cd2949c662ce54b586336ebde4ac1bf66752fd24f9446da"
+      },
+      {
+        "address": "RqYipon2KYuhBCUSg9GSdyYfH5B7bdQ9ThoeAJyhZeJ",
+        "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+        "executable": false,
+        "lamports": 3589472120,
+        "dataSha256": "801202e4cc0993de2df8c93d28aa9cf7fa92397cbcb293418d7213e36e374e80"
+      },
+      {
+        "address": "4WiuZP4CpHjRNa37Y5kLmSrgct2PzvHN8Q2DRhUrSjTP",
+        "owner": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+        "executable": false,
+        "lamports": 1625600,
+        "dataSha256": "6c635ea5c107d8624722a0f21b8d9d11ff45130d3e621defe7c6995bfbfac767"
+      }
+    ]
+  },
+  "preservation": {
+    "frozenOracleAccountCount": 417,
+    "frozenCensusSha256": "db69ff345e9fa16d810bf763d48fc21893d2045397464c6e7087cb17bec9cb5b",
+    "frozenOracleStateUnchanged": true,
+    "controllerAfterActivation": {
+      "ownProposalIds": [
+        "81",
+        "82",
+        "83"
+      ],
+      "proposalAddresses": [
+        "GscvEYBxRcbRoeJiG2zG6HmG3R77JPbZPfsQgtNpRqrn",
+        "H8Q32dhptk7t7BPEifsiDQixKByaRwHTWYkiKAzoUm1W",
+        "14sjCwEzKL1XeC8WtnDcCN31aXjYrwUTSiZVzx5b2DVo"
+      ],
+      "configComparedExceptNextId": true,
+      "oracleGate": {
+        "status": 0,
+        "epoch": "5"
+      },
+      "preservedUnrelatedAccounts": 29
+    },
+    "controllerAfterMetadata": {
+      "ownProposalIds": [
+        "81",
+        "82",
+        "83",
+        "84"
+      ],
+      "proposalAddresses": [
+        "GscvEYBxRcbRoeJiG2zG6HmG3R77JPbZPfsQgtNpRqrn",
+        "H8Q32dhptk7t7BPEifsiDQixKByaRwHTWYkiKAzoUm1W",
+        "14sjCwEzKL1XeC8WtnDcCN31aXjYrwUTSiZVzx5b2DVo",
+        "2CdJ8HNMUinhAMrMBbUfXkfu54TbGzhVvCK1sMAJWZND"
+      ],
+      "configComparedExceptNextId": true,
+      "oracleGate": {
+        "status": 0,
+        "epoch": "5"
+      },
+      "preservedUnrelatedAccounts": 29
+    }
+  },
+  "verification": {
+    "metadata": "FQbSSZeS3tiRweHeni4qcteqTBgtQkSz3rbsnM1rrqUn",
+    "authority": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+    "proposalId": "84",
+    "recordSha256": "0878e8be734aa03b4659882e25f13aa83d7b6d358b7004521b923d61eecde763",
+    "recipe": {
+      "version": "0.5.2",
+      "repository": "https://github.com/amoeba-farm/amoeba-program",
+      "commit": "482f01f7774205595b13c83608c2693465420706",
+      "args": [
+        "--workspace-path",
+        "oracle",
+        "--library-name",
+        "ameba_oracle",
+        "--base-image",
+        "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/gate-final@sha256:7ad1e567f19831e658f5b892a7269d23d7f1826438e025b5d9d2e385240a4d67",
+        "--arch",
+        "v1",
+        "--cargo-build-sbf-args",
+        "--tools-version v1.53"
+      ],
+      "deployedSlot": "459945306"
+    },
+    "finalizedObservationSlot": 459946493,
+    "hosted": {
+      "target": "oracle",
+      "observedAt": "2026-10-22T07:16:09.302Z",
+      "jobStatus": "completed",
+      "canonicalVerified": true,
+      "authorityVerified": true,
+      "exactExpectedCommit": "482f01f7774205595b13c83608c2693465420706",
+      "exactExpectedHash": "7c3da6d17741916d47e3c6158c8123f630733faa4b084a6f7ec6b2d366c7f94e",
+      "status": "verified",
+      "requestId": "542da666-ba69-4ae5-8745-4f0208664a49",
+      "canonical": {
+        "is_verified": true,
+        "message": "On chain program verified",
+        "on_chain_hash": "7c3da6d17741916d47e3c6158c8123f630733faa4b084a6f7ec6b2d366c7f94e",
+        "executable_hash": "7c3da6d17741916d47e3c6158c8123f630733faa4b084a6f7ec6b2d366c7f94e",
+        "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/482f01f7774205595b13c83608c2693465420706",
+        "commit": "482f01f7774205595b13c83608c2693465420706",
+        "last_verified_at": "2026-10-22T07:15:28.332341",
+        "is_frozen": false,
+        "is_closed": false
+      },
+      "authoritySpecific": {
+        "signer": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+        "is_verified": true,
+        "on_chain_hash": "7c3da6d17741916d47e3c6158c8123f630733faa4b084a6f7ec6b2d366c7f94e",
+        "executable_hash": "7c3da6d17741916d47e3c6158c8123f630733faa4b084a6f7ec6b2d366c7f94e",
+        "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/482f01f7774205595b13c83608c2693465420706",
+        "commit": "482f01f7774205595b13c83608c2693465420706",
+        "last_verified_at": "2026-10-22T07:15:28.332341",
+        "is_frozen": false,
+        "is_closed": false
+      }
+    }
+  },
+  "qualification": {
+    "schema": "amoeba.oracle-input-qualification.v1",
+    "qualifiedSource": "6dc23b87f54419f595fcd51fa69732180a1d6632",
+    "releaseSource": "da0e9143f44635dcbce7288ea6510ddf042de215",
+    "sourceBoundGate": {
+      "inputKey": "oracle-1080d70800e2fea7",
+      "passedAt": "2026-10-22T03:01:52Z",
+      "record": "2026-10-22-oracle-upgrade"
+    },
+    "compiledInputsIdentical": true,
+    "comparedPaths": [
+      "oracle/programs/ameba_oracle",
+      "oracle/crates/oracle-interface",
+      "oracle/Cargo.toml",
+      "oracle/Cargo.lock",
+      "oracle/rust-toolchain.toml",
+      "governance/crates/governance-interface"
+    ],
+    "checksReused": "Full oracle release gate, including production-arch SBF tests; no compiled source changes. Fixed-path build checked separately.",
+    "artifactSha256": "cb0a5687b452edbb5fcc7c1474b71b15382c747c0fea30e2f225da0c8251d14f"
+  },
+  "build": {
+    "receiptSha256": "e81f994cdaefe65b2a2b93c65b5b2f8a7088eaa6690c3fc9d5b843053a6b495c",
+    "sourceInventorySha256": "255c6f3aba2cfddcc9afad42a8bf3e48d8894801749cecc284e604410aa79e98",
+    "publicSourceReproducesExactElf": true
+  },
+  "apiHandoff": "Oracle activation communicated to the user. API 80/20 configuration and end-to-end sponsorship checks are outside this contract-only ceremony."
+}

@@ -14,9 +14,13 @@ reproduced artifact. The [inventory-netting](contracts/2026-10-17-inventory-nett
 The earlier index-options / Spread program remains in
 [programs/light_token_minter](programs/light_token_minter).
 
-The [2026-10-22 oracle upgrade](contracts/2026-10-22-oracle-upgrade) is prepared
-for authenticated evidence and 80/20 sponsorships. Installation and updated
-hosted verification are pending; the installed Futures program is unchanged.
+The [2026-10-22 oracle upgrade](contracts/2026-10-22-oracle-upgrade) is installed
+for authenticated evidence and 80/20 sponsorships at finalized slot **459945306**
+and Active at gate epoch **5**. Hosted Solana verification passed for source
+`482f01f7774205595b13c83608c2693465420706`. The installed Futures program
+is unchanged. [Installation and verification evidence](deployment-evidence/mainnet-oracle-20261022.json)
+records the exact binary, loader-required zero padding, finalized council transactions,
+state preservation and refunded buffer deposit. API configuration is a separate handoff.
 
 ## Mainnet programs
 
@@ -35,8 +39,8 @@ remained online. The Mainnet stake pool was then created at finalized slot
 
 Futures passed updated hosted verification on 2026-10-18 for public source
 `8536d411b2af0bd77b37740edc315db2f06db601`, with matching canonical and authority-specific hashes.
-The controller remains at release 6; its and the Oracle's verification records
-are unchanged. [Installation and verification evidence](deployment-evidence/mainnet-staking-20261018.json) records
+The controller remains at release 6 and its verification record is unchanged.
+The Oracle's later update is recorded above. [Installation and verification evidence](deployment-evidence/mainnet-staking-20261018.json) records
 the finalized council transactions, artifact hashes, buffer refund and runtime checks.
 
 All three programs passed hosted source verification on 2026-10-16.
