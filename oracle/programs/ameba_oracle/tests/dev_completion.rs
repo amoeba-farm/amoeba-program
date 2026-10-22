@@ -685,3 +685,331 @@ async fn completion_refuses_ordinary_months_wrong_counts_and_out_of_order_bucket
         OracleError::InvalidOraclePhase,
     );
 }
+
+/// Every account a completed dev month has that tag 245 closes: what the ops rebuild finds on
+/// the dev chain by scanning for the accounts that name the month or its sources.
+async fn month_accounts(
+    h: &mut Harness,
+    cohort: &Cohort,
+    sources: &[[u8; 32]],
+    buckets: &[[u8; 32]],
+) -> Vec<Pubkey> {
+    use ameba_oracle::state::{
+        derive_oracle_active_weight_manifest_pda, derive_oracle_bucket_source_index_pda,
+        derive_oracle_recipe_source_index_pda, derive_oracle_recipe_weight_manifest_pda,
+        derive_oracle_settlement_source_manifest_pda, derive_oracle_sku_coverage_manifest_pda,
+        derive_oracle_sku_coverage_record_pda, derive_oracle_usdc_sku_pool_pda,
+    };
+    let p = program();
+    let month = cohort.month;
+    let schedule = derive_oracle_usdc_reward_schedule_pda(&p, &month).0;
+    let mut keys = vec![
+        month,
+        derive_oracle_sku_coverage_manifest_pda(&p, &month).0,
+        schedule,
+        derive_oracle_recipe_weight_manifest_pda(&p, &month).0,
+        derive_oracle_settlement_source_manifest_pda(&p, &month).0,
+        derive_oracle_active_weight_manifest_pda(&p, &month).0,
+        derive_oracle_recipe_source_index_pda(&p, &month).0,
+    ];
+    for bucket in buckets {
+        let index = derive_oracle_bucket_source_index_pda(&p, &month, bucket).0;
+        keys.extend([
+            derive_oracle_usdc_sku_pool_pda(&p, &schedule, bucket).0,
+            derive_oracle_bucket_median_pda(&p, &month, bucket).0,
+            derive_oracle_sku_coverage_record_pda(&p, &month, bucket).0,
+            index,
+            instruction::find_member_page_address(&p, &index, 0),
+        ]);
+    }
+    for id in sources {
+        let source = cohort.source(id);
+        keys.extend([
+            source,
+            instruction::find_oracle_source_observations_address(&p, &source),
+            instruction::find_evidence_link_address(&p, &source, 0, &locator_hash(&locator(id))),
+            instruction::find_source_journal_address(&p, &source),
+            instruction::find_checkpoint_address(&p, &source, &source),
+        ]);
+    }
+    let mut existing = Vec::new();
+    for key in keys {
+        if h.account(key)
+            .await
+            .is_some_and(|account| account.owner == p)
+        {
+            existing.push(key);
+        }
+    }
+    existing
+}
+
+/// The user's 2026-10-20 "rebuild in place": a completed dev month (240, 241, 244, 200, 121-124,
+/// as the live dev months are) is cleared by tag 245 and bootstrapped again for the same period
+/// on another bucket set, and its period goes Live again at the same expiry.
+#[tokio::test]
+async fn a_completed_dev_month_is_cleared_and_rebuilt_on_another_bucket_set() {
+    let mut h = start().await;
+    let cohort = h.bootstrapped_month().await;
+    h.activate().await;
+    h.complete_recipe(&cohort).await;
+    h.index_and_weigh(&cohort).await;
+    let oracle = h.oracle_authority.insecure_clone();
+    let payer = h.payer();
+    let p = program();
+    let old_sources: Vec<[u8; 32]> = (0..SOURCES.len()).map(source_id).collect();
+    let old_buckets: Vec<[u8; 32]> = (0..SOURCES.len()).map(bucket_id).collect();
+    let targets = month_accounts(&mut h, &cohort, &old_sources, &old_buckets).await;
+    assert!(targets.len() > 20, "{} accounts", targets.len());
+    let before = h.period(cohort.product, DEV_EXPIRY).await;
+    assert_eq!(before.status, PeriodStatus::Live);
+
+    let close = |targets: &[Pubkey]| {
+        instruction::dev_reset_close_accounts(&p, &oracle.pubkey(), &payer.pubkey(), targets)
+    };
+    let reform =
+        instruction::dev_reset_reform_period(&p, &oracle.pubkey(), &cohort.product, DEV_EXPIRY);
+
+    // The period, the config and anyone but the oracle authority are refused.
+    assert_oracle_error(
+        h.send(close(&[cohort.period]), &[&oracle]).await,
+        OracleError::InvalidAccountList,
+    );
+    let config = ameba_oracle::state::find_config_address(&p).0;
+    assert_oracle_error(
+        h.send(close(&[config]), &[&oracle]).await,
+        OracleError::InvalidAccountList,
+    );
+    let stranger = Keypair::new();
+    h.fund(&stranger.pubkey(), 1_000_000_000).await;
+    let mut foreign = close(&targets[..1]);
+    foreign.accounts[0].pubkey = stranger.pubkey();
+    assert!(h.send(foreign, &[&stranger]).await.is_err());
+    // The period can't go back to Forming while its month exists.
+    assert_oracle_error(
+        h.send(reform.clone(), &[&oracle]).await,
+        OracleError::AlreadyInitialized,
+    );
+
+    for chunk in targets.chunks(12) {
+        h.send(close(chunk), &[&oracle]).await.unwrap();
+        h.advance_slot().await;
+    }
+    for key in &targets {
+        assert!(
+            h.account(*key)
+                .await
+                .is_none_or(|account| account.owner != p),
+            "{key} still open"
+        );
+    }
+    h.send(reform.clone(), &[&oracle]).await.unwrap();
+    let forming = h.period(cohort.product, DEV_EXPIRY).await;
+    assert_eq!(forming.status, PeriodStatus::Forming);
+    assert_eq!(forming.effective_listing_ts, 0);
+    assert_eq!(forming.expiry_ts, before.expiry_ts);
+    assert_eq!(forming.planned_listing_ts, before.planned_listing_ts);
+
+    // Bootstrapped again on three chip buckets, one source each, and completed.
+    let chips: Vec<[u8; 32]> = ["DDR4_16GBIT", "DDR5_16GBIT", "DDR5_24GBIT"]
+        .iter()
+        .map(|label| {
+            let mut id = [0u8; 32];
+            id[..label.len()].copy_from_slice(label.as_bytes());
+            id
+        })
+        .collect();
+    let weights = [5_000u16, 3_000, 2_000];
+    let root = sku_merkle_root(&chips);
+    h.send(
+        instruction::dev_bootstrap_month(
+            &p,
+            &oracle.pubkey(),
+            &payer.pubkey(),
+            &cohort.product,
+            DEV_EXPIRY,
+            DevBootstrapMonthParams {
+                settlement_base_oracle_atomic: DEV_BASE,
+                required_sku_root: root,
+                required_sku_count: chips.len() as u16,
+            },
+        ),
+        &[&oracle],
+    )
+    .await
+    .unwrap();
+    let live = h.period(cohort.product, DEV_EXPIRY).await;
+    assert_eq!(live.status, PeriodStatus::Live);
+    assert_eq!(
+        h.period(cohort.product, DEV_EXPIRY).await.expiry_ts,
+        DEV_EXPIRY
+    );
+    let new_sources: Vec<[u8; 32]> = (0..chips.len())
+        .map(|index| [0xc1 + index as u8; 32])
+        .collect();
+    for (index, id) in new_sources.iter().enumerate() {
+        h.upload_evidence(&payer, 1, &locator(id)).await;
+        h.advance_slot().await;
+        h.send(
+            instruction::dev_bootstrap_source(
+                &p,
+                &oracle.pubkey(),
+                &payer.pubkey(),
+                &payer.pubkey(),
+                &cohort.period,
+                &cohort.month,
+                DevBootstrapSourceParams {
+                    source_id: *id,
+                    bucket_id: chips[index],
+                    source_type_hash: SOURCE_TYPE_HASH,
+                    canonical_locator_hash: locator_hash(&locator(id)),
+                    source_definition_hash: definition_hash(&definition(id)),
+                    bucket_weight_bps: weights[index],
+                    opening_state: 50_000_000,
+                    sku_index: index as u16,
+                    sku_proof: sku_merkle_proof(&chips, index as u16),
+                },
+            ),
+            &[&oracle],
+        )
+        .await
+        .unwrap();
+    }
+    h.send(
+        instruction::dev_begin_formation(
+            &p,
+            &oracle.pubkey(),
+            &payer.pubkey(),
+            &cohort.period,
+            &cohort.month,
+            3,
+            3,
+        ),
+        &[&oracle],
+    )
+    .await
+    .unwrap();
+    for (index, id) in new_sources.iter().enumerate() {
+        h.send(
+            instruction::dev_formation_bucket(
+                &p,
+                &oracle.pubkey(),
+                &payer.pubkey(),
+                &cohort.period,
+                &cohort.month,
+                DevFormationBucketParams {
+                    bucket_weight_bps: weights[index],
+                    ..bonds(chips[index])
+                },
+                &[cohort.source(id)],
+            ),
+            &[&oracle],
+        )
+        .await
+        .unwrap();
+    }
+    h.send(
+        instruction::dev_finalize_formation(&p, &oracle.pubkey(), &cohort.period, &cohort.month),
+        &[&oracle],
+    )
+    .await
+    .unwrap();
+    // The ordinary indexing (200) and active weights (121, 122, 124) run again: nothing of the
+    // old month is left under the month's address to collide with.
+    let state = |id: &[u8; 32]| OracleSourceState {
+        source_id: *id,
+        source_type_hash: SOURCE_TYPE_HASH,
+        canonical_locator_hash: locator_hash(&locator(id)),
+        source_definition_hash: definition_hash(&definition(id)),
+        ..OracleSourceState::default()
+    };
+    let mut chain = vec![initial_oracle_weight_manifest_hash(&cohort.month, 3, 3)];
+    for (index, id) in new_sources.iter().enumerate() {
+        let next = advance_oracle_weight_manifest_hash(
+            chain.last().unwrap(),
+            &chips[index],
+            &state(id),
+            weights[index],
+        );
+        chain.push(next);
+    }
+    for index in (0..new_sources.len()).rev() {
+        let source = state(&new_sources[index]);
+        h.send(
+            instruction::index_oracle_recipe_source_v1(
+                &p,
+                &payer.pubkey(),
+                &cohort.period,
+                &cohort.month,
+                IndexOracleRecipeSourceV1Params {
+                    previous_hash: chain[index],
+                    bucket_id: chips[index],
+                    source_id: source.source_id,
+                    source_type_hash: source.source_type_hash,
+                    canonical_locator_hash: source.canonical_locator_hash,
+                    source_definition_hash: source.source_definition_hash,
+                    bucket_weight_bps: weights[index],
+                },
+                0,
+            ),
+            &[],
+        )
+        .await
+        .unwrap();
+    }
+    h.send(
+        instruction::begin_oracle_active_weights(
+            &p,
+            &oracle.pubkey(),
+            &cohort.period,
+            &cohort.month,
+            3,
+            3,
+        ),
+        &[&oracle],
+    )
+    .await
+    .unwrap();
+    for (index, id) in new_sources.iter().enumerate() {
+        h.send(
+            instruction::accumulate_oracle_active_weight_group(
+                &p,
+                &payer.pubkey(),
+                &cohort.period,
+                &cohort.month,
+                AccumulateOracleActiveWeightGroupParams {
+                    group_id: chips[index],
+                    finalize_collection: true,
+                },
+                &cohort.source(id),
+                0,
+                &solana_sdk::system_program::id(),
+            ),
+            &[],
+        )
+        .await
+        .unwrap();
+    }
+    h.send(
+        instruction::finalize_oracle_active_weights(
+            &p,
+            &payer.pubkey(),
+            &cohort.period,
+            &cohort.month,
+        ),
+        &[],
+    )
+    .await
+    .unwrap();
+    let month: OracleMonthState = h.read_state(cohort.month).await;
+    assert_eq!(month.phase, OraclePhase::Game);
+    assert_eq!(month.source_count, 3);
+    assert_eq!(month.weight_manifest_hash, chain[3]);
+    let coverage: ameba_oracle::state::OracleSkuCoverageManifest = h
+        .read_state(
+            ameba_oracle::state::derive_oracle_sku_coverage_manifest_pda(&p, &cohort.month).0,
+        )
+        .await;
+    assert_eq!(coverage.required_sku_root, root);
+    assert_eq!(coverage.required_sku_count, 3);
+}

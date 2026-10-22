@@ -28,12 +28,13 @@ pub const UPGRADE_TARGET: u8 = 3;
 pub const SET_TARGET_GATE: u8 = 4;
 pub const INITIALIZE_SPREAD_LIGHT_CONFIG: u8 = 5;
 pub const PUBLISH_VERIFICATION: u8 = 6;
+pub const RETIRE_TARGET: u8 = 7;
 /// Release number of this controller binary. Every controller release must
 /// change it: a self-upgrade proposal binds the release it was created under
 /// and can only install while that release is running, so installing
 /// any newer controller retires all older self-upgrade proposals. Binaries
 /// before this field had release 0 (the eight action bytes were zero).
-pub const CONTROLLER_RELEASE: u64 = 2;
+pub const CONTROLLER_RELEASE: u64 = 6;
 pub const DEVNET_SPREAD: Pubkey =
     solana_program::pubkey!("2jVQSPny9eFoaG1ZWoJVAezQ5VgqJtF8rQCQXMktuBVw");
 
@@ -224,6 +225,29 @@ pub struct TargetGatePolicy {
     pub expected_epoch: u64,
     pub active: bool,
 }
+/// Permanent closure, only after the council approves the exact recovery
+/// receipt and the final installed program bytes. No arbitrary Loader action.
+#[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
+pub struct RetireTargetPolicy {
+    pub target: Pubkey,
+    pub expected_epoch: u64,
+    pub deployed_slot: u64,
+    pub payload_sha256: [u8; 32],
+    pub recovery_commitment: [u8; 32],
+}
+impl RetireTargetPolicy {
+    pub const LEN: usize = 112;
+    pub fn validate(&self) -> Result<()> {
+        require(
+            self.target != Pubkey::default()
+                && self.expected_epoch > 0
+                && self.deployed_slot > 0
+                && self.payload_sha256 != [0; 32]
+                && self.recovery_commitment != [0; 32],
+            Error::InvalidAccount,
+        )
+    }
+}
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize)]
 pub struct LightRentPolicy {
     pub base_rent: u16,
@@ -265,6 +289,27 @@ pub struct Artifact {
     pub build_commitment: [u8; 32],
 }
 impl Action {
+    pub fn retirement_policy(&self) -> Result<RetireTargetPolicy> {
+        require(
+            self.kind == RETIRE_TARGET
+                && self.data[RetireTargetPolicy::LEN..].iter().all(|b| *b == 0),
+            Error::InvalidAccount,
+        )?;
+        let value = RetireTargetPolicy::try_from_slice(&self.data[..RetireTargetPolicy::LEN])
+            .map_err(|_| Error::InvalidAccount)?;
+        value.validate()?;
+        Ok(value)
+    }
+    pub fn explicit_target(&self) -> Result<Pubkey> {
+        match self.kind {
+            UPGRADE_TARGET => Ok(self.target_upgrade()?.target),
+            SET_TARGET_GATE => Ok(self.gate_policy()?.target),
+            INITIALIZE_SPREAD_LIGHT_CONFIG => Ok(self.light_config_policy()?.target),
+            PUBLISH_VERIFICATION => Ok(self.verification_policy()?.target),
+            RETIRE_TARGET => Ok(self.retirement_policy()?.target),
+            _ => Err(Error::InvalidAccount.into()),
+        }
+    }
     pub fn verification_policy(&self) -> Result<crate::verification::VerificationPolicy> {
         use crate::verification::VerificationPolicy;
         require(
@@ -379,6 +424,7 @@ impl Action {
             }
             INITIALIZE_SPREAD_LIGHT_CONFIG => self.light_config_policy()?.validate(),
             PUBLISH_VERIFICATION => self.verification_policy()?.validate(),
+            RETIRE_TARGET => self.retirement_policy()?.validate(),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }

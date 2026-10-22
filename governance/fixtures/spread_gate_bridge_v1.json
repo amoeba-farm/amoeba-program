@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "warning": "SYNTHETIC NON-PRODUCTION BRIDGE VECTOR. The controller program is not assigned or deployed, and this file is not live governance state.",
+  "fixtureHashContract": "SHA-256 of this exact UTF-8, two-space-indented, LF-terminated JSON with fixtureSha256 replaced by 64 ASCII zeroes.",
+  "controllerProgram": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+  "targetProgram": "9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH",
+  "targetProgramdata": {
+    "address": "2DBN762WGdNc85xiVdvQX7Lo4TXAq3WhVz9mBQcaU3a3",
+    "bump": 254,
+    "derivation": "Upgradeable Loader PDA with the target program public key as its sole seed"
+  },
+  "pdas": {
+    "controllerConfig": {
+      "address": "DeXoJJjvjQ8zbw9Dv6YeAiYJfx6UvQzFnZ4k8b6ZkYQK",
+      "bump": 254
+    },
+    "protocolGate": {
+      "address": "DKhD62NUwnURpbvxnrqvvfqTG7zix9nWn1j72r4k1jw1",
+      "bump": 254
+    }
+  },
+  "gateAccount": {
+    "length": 192,
+    "hex": "414756474154303101fe0100bbe98e86a3220ee814e5baa04c26d0dc7cfd29a2e63694f691a92707ec92ce7c81944b19c12423d188991aeca0658d4908d5318b064791955f7bcc580860ef5011fa60073288bc22065977ab098a7625b29ccc20cbf71b16dfc5468c9429c0ac290000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "decoded": {
+      "discriminatorAscii": "AGVGAT01",
+      "accountVersion": 1,
+      "bump": 254,
+      "initialized": true,
+      "status": 0,
+      "statusName": "Active",
+      "controllerConfig": "DeXoJJjvjQ8zbw9Dv6YeAiYJfx6UvQzFnZ4k8b6ZkYQK",
+      "targetProgram": "9ipkBCjEfeJDMF6AFrezRmDDHmbnmeyv45cfXNqAnWsH",
+      "targetProgramdata": "2DBN762WGdNc85xiVdvQX7Lo4TXAq3WhVz9mBQcaU3a3",
+      "epoch": "41",
+      "activeProposal": "11111111111111111111111111111111",
+      "freezeSlot": "0",
+      "freezeReasonCode": 0,
+      "lastCompletedProposal": "11111111111111111111111111111111",
+      "reservedHex": "0000"
+    }
+  },
+  "governanceTail": {
+    "length": 16,
+    "hex": "41475631010000002900000000000000",
+    "decoded": {
+      "magicAscii": "AGV1",
+      "version": 1,
+      "reservedHex": "000000",
+      "expectedEpoch": "41"
+    }
+  },
+  "instructionBridge": {
+    "sampleOnly": true,
+    "sampleMeaning": "Byte-preservation vector only; ameba_gov does not classify the leading tag or claim this payload is executable by Spread.",
+    "legacyInstruction": {
+      "length": 9,
+      "hex": "cb0102030405060708"
+    },
+    "envelopedInstruction": {
+      "length": 25,
+      "hex": "cb010203040506070841475631010000002900000000000000"
+    },
+    "strippedLegacyInstruction": {
+      "length": 9,
+      "hex": "cb0102030405060708"
+    },
+    "strippedMatchesLegacy": true
+  },
+  "fixtureSha256": "33838ce2c6d8b734fe22ff62f656bd9874e584cf7836ae746e862a47d6ea85f9"
+}

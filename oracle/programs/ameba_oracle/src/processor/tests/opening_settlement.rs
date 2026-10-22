@@ -214,6 +214,220 @@ fn oracle_opening_evidence_time_never_exceeds_period_expiry() {
     }
 }
 
+const RECORD_DIGEST: &str = "abababababababababababababababababababababababababababababababab";
+
+fn evidence_record(time: u64, locator: &str) -> String {
+    format!("{ORACLE_EVIDENCE_RECORD_PREFIX}m=web;t={time};d={RECORD_DIGEST};u={locator}")
+}
+
+/// Cross-check with the off-chain reference parser, `amoeba_evidence::parse_onchain_record`
+/// (`evidence/crates/evidence/src/lib.rs`): its own test vectors (`onchain_record_round_trip`)
+/// first, then hard-coded strings with the result both sides give. The program adds the
+/// oracle's locator rules on `u`, the archive URL's byte rules and a 512-byte bound, and refuses
+/// `t=0`, whose form the reference accepts (no claim's source time is zero).
+#[test]
+fn evidence_record_parser_matches_the_off_chain_reference_vectors() {
+    let text =
+        format!("amoeba-evidence-v1;m=web;t=1760900000;d={RECORD_DIGEST};u=https://a.com/x?y=1");
+    assert_eq!(
+        parse_oracle_evidence_record(&text),
+        Ok((1_760_900_000, "https://a.com/x?y=1"))
+    );
+    assert!(parse_oracle_evidence_record(&text.replace("t=1", "t=01")).is_err());
+    assert!(parse_oracle_evidence_record(&text.replace("m=web", "m=wayback")).is_err());
+
+    let d = RECORD_DIGEST;
+    let p = ORACLE_EVIDENCE_RECORD_PREFIX;
+    let accepted: [(String, u64, &str); 6] = [
+        (
+            format!("{p}m=email;t=1760900000;d={d};u=https://a.com/x"),
+            1_760_900_000,
+            "https://a.com/x",
+        ),
+        (
+            format!("{p}m=web;t=1;d={d};u=http://a.com/x"),
+            1,
+            "http://a.com/x",
+        ),
+        (
+            format!("{p}m=web;t=18446744073709551615;d={d};u=https://a.com/x"),
+            u64::MAX,
+            "https://a.com/x",
+        ),
+        // `u` is the rest of the text, delimiters included.
+        (
+            format!("{p}m=web;t=5;d={d};u=https://a.com/x;u=https://b.com/y"),
+            5,
+            "https://a.com/x;u=https://b.com/y",
+        ),
+        (
+            format!(
+                "{p}m=web;t=5;d={};u=https://a.com/x",
+                "0123456789abcdef".repeat(4)
+            ),
+            5,
+            "https://a.com/x",
+        ),
+        (
+            format!("{p}m=web;t=5;d={d};u=https://a.com/caf\u{e9}"),
+            5,
+            "https://a.com/caf\u{e9}",
+        ),
+    ];
+    for (text, time, locator) in &accepted {
+        assert_eq!(
+            parse_oracle_evidence_record(text),
+            Ok((*time, *locator)),
+            "{text}"
+        );
+    }
+    let invalid = Err(ProgramError::Custom(
+        OracleError::InvalidOracleOpeningEvidence as u32,
+    ));
+    for text in [
+        // The one addition to the reference: t=0.
+        format!("{p}m=web;t=0;d={d};u=https://a.com/x"),
+        format!("{p}m=web;t=00;d={d};u=https://a.com/x"),
+        format!("{p}m=web;t=;d={d};u=https://a.com/x"),
+        format!("{p}m=web;t=18446744073709551616;d={d};u=https://a.com/x"),
+        format!("{p}m=web;t=100000000000000000000;d={d};u=https://a.com/x"),
+        format!("{p}m=web;t=+1;d={d};u=https://a.com/x"),
+        format!("{p}m=web;t=1;d={};u=https://a.com/x", d.to_uppercase()),
+        format!("{p}m=web;t=1;d={};u=https://a.com/x", &d[1..]),
+        format!("{p}m=web;t=1;d={d}a;u=https://a.com/x"),
+        format!(
+            "{p}m=web;t=1;d={};u=https://a.com/x",
+            d.replacen('a', "g", 1)
+        ),
+        format!("{p}m=web;t=1;d={d}"),
+        format!("{p}m=;t=1;d={d};u=https://a.com/x"),
+        format!("{p}m=WEB;t=1;d={d};u=https://a.com/x"),
+        format!("{p}t=1;d={d};u=https://a.com/x"),
+        format!("amoeba-evidence-v2;m=web;t=1;d={d};u=https://a.com/x"),
+        format!("{p}m=web;t=1;d={d};u="),
+        format!("{p}m=web;t=1;d={d};u=ftp://a.com/x"),
+        format!("{p}m=web;t=1;d={d};u=https://a.com/x?token=1"),
+        format!("{p}m=web;t=1;d={d};u=https://a.com/x?Api_Key=1"),
+        format!("{p}m=web;t=1;d={d};u=https://u@a.com/x"),
+        format!("{p}m=web;t=1;d={d};u=https://a.com/a b"),
+        format!("{p}m=web;t=1;d={d};u=https://a.com/\t"),
+        format!("{p}m=web;t=1;d={d};u=https://a.com/\u{7f}"),
+        format!("{p}m=web;t=1;d={d};u=https://a.com/{}", "a".repeat(400)),
+        format!("{p}m=web;t=1;d={d};u=https://a.com/{}", "a".repeat(500)),
+        "https://web.archive.org/web/20260701000000/https://a.com/x".to_string(),
+    ] {
+        assert_eq!(parse_oracle_evidence_record(&text), invalid, "{text}");
+    }
+}
+
+#[test]
+fn evidence_record_binds_time_and_locator_like_a_wayback_capture() {
+    let expiry_ts = 1_788_220_800;
+    let capture_start = expiry_ts - ORACLE_OPENING_WINDOW_SECONDS;
+    let anchor = sample_anchor(expiry_ts);
+    let original_url = "https://example.com/source/3";
+    let canonical_locator_hash = hashv(&[b"locator", original_url.as_bytes()]).to_bytes();
+    let source = OracleSourceState {
+        canonical_locator_hash,
+        source_definition_hash: [2; 32],
+        ..OracleSourceState::default()
+    };
+    let check = |source_time: u64, evidence: &str| {
+        validate_oracle_opening_evidence_fields_at_time(
+            &anchor,
+            capture_start,
+            &source,
+            100_000_000,
+            source_time,
+            &canonical_locator_hash,
+            &[2; 32],
+            evidence,
+            expiry_ts + 100,
+        )
+    };
+    let invalid = Err(ProgramError::Custom(
+        OracleError::InvalidOracleOpeningEvidence as u32,
+    ));
+    // A record and a Wayback capture of the same page at the same second bind alike.
+    let record = evidence_record(expiry_ts, original_url);
+    check(expiry_ts, &record).expect("a record at the source time on the registered locator");
+    check(
+        expiry_ts,
+        "https://web.archive.org/web/20260901000000/https://example.com/source/3",
+    )
+    .expect("the Wayback form keeps binding");
+    assert_eq!(
+        parse_oracle_archive_evidence(&record),
+        Ok((expiry_ts, original_url))
+    );
+    // The record's time must be the claim's source time.
+    assert_eq!(check(expiry_ts - 1, &record), invalid);
+    assert_eq!(
+        check(expiry_ts, &evidence_record(expiry_ts - 1, original_url)),
+        invalid
+    );
+    // The record's locator must be the source's registered one, byte for byte.
+    for other in [
+        "https://example.com/source/4",
+        "https://example.com/source/3/",
+        "http://example.com/source/3",
+        "https://EXAMPLE.com/source/3",
+    ] {
+        assert_eq!(
+            check(expiry_ts, &evidence_record(expiry_ts, other)),
+            invalid
+        );
+    }
+    // A credential-looking locator is refused even when it is the registered one.
+    let secret = "https://example.com/source/3?token=1";
+    assert_eq!(
+        validate_oracle_opening_archive_binding(
+            &evidence_record(expiry_ts, secret),
+            expiry_ts,
+            &hashv(&[b"locator", secret.as_bytes()]).to_bytes(),
+        ),
+        invalid
+    );
+    // Malformed records never bind.
+    for malformed in [
+        record.replace(RECORD_DIGEST, &RECORD_DIGEST.to_uppercase()),
+        record.replace("m=web", "m=wayback"),
+        record.replace(";t=", ";t=0"),
+    ] {
+        assert_eq!(check(expiry_ts, &malformed), invalid, "{malformed}");
+    }
+}
+
+#[test]
+fn oracle_opening_challenge_with_a_record_for_the_same_capture_is_not_a_noop() {
+    let wayback = "https://web.archive.org/web/20260701000000/https://example.com/source/3";
+    let record = evidence_record(1_782_864_000, "https://example.com/source/3");
+    let claim = OracleOpeningClaim {
+        opening_state: 100_000_000,
+        source_time: 1_782_864_000,
+        canonical_locator_hash: [1; 32],
+        source_definition_hash: [2; 32],
+        evidence_hash: [3; 32],
+        archive_url_hash: derive_oracle_opening_archive_url_hash(wayback),
+        ..OracleOpeningClaim::default()
+    };
+    let params = ChallengeOracleOpeningClaimParams {
+        challenge_id: [4; 32],
+        alternative_opening_state: claim.opening_state,
+        alternative_source_time: claim.source_time,
+        bond: 100,
+        canonical_locator_hash: claim.canonical_locator_hash,
+        source_definition_hash: claim.source_definition_hash,
+        archive_url: record.clone(),
+    };
+    assert!(!oracle_opening_challenge_is_true_noop(&claim, &params));
+    let recorded = OracleOpeningClaim {
+        archive_url_hash: derive_oracle_opening_archive_url_hash(&record),
+        ..claim
+    };
+    assert!(oracle_opening_challenge_is_true_noop(&recorded, &params));
+}
+
 #[test]
 fn oracle_opening_challenge_pda_validation_rejects_noncanonical_accounts() {
     let program_id = Pubkey::new_unique();

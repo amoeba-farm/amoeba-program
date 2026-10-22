@@ -165,7 +165,7 @@ fn fixed_accounts_and_digest_reject_timing_action_padding_and_trailing_drift() {
 fn closed_dispatch_rejects_every_unknown_tag_before_accounts() {
     let program = ameba_governance_interface::PINNED_CONTROLLER_PROGRAM_ID;
     // Tags 10 and 13 (retired checked extension) fail exactly like unknown tags.
-    for tag in [10u8, 13].into_iter().chain(17..=255u8) {
+    for tag in [10u8, 13].into_iter().chain(20..=255u8) {
         assert_eq!(
             governance_controller_v3::process_instruction(&program, &[], &[tag]),
             Err(solana_program::program_error::ProgramError::InvalidInstructionData)
@@ -326,4 +326,71 @@ fn spread_light_policy_has_fixed_bytes_and_rejects_reserved_or_foreign_targets()
     assert_eq!(encoded, [vec![15], vec![23; 32]].concat());
     Instruction::unpack(&encoded).unwrap();
     assert!(Instruction::unpack(&[encoded, vec![0]].concat()).is_err());
+}
+
+#[test]
+fn retirement_policy_is_fixed_and_preserves_quorum_and_timing() {
+    let (program, config, mut p) = sample();
+    let policy = RetireTargetPolicy {
+        target: Pubkey::new_from_array([42; 32]),
+        expected_epoch: 44,
+        deployed_slot: 400,
+        payload_sha256: [43; 32],
+        recovery_commitment: [44; 32],
+    };
+    let bytes = policy.try_to_vec().unwrap();
+    assert_eq!(bytes.len(), 112);
+    assert_eq!(
+        bytes,
+        [
+            vec![42; 32],
+            44u64.to_le_bytes().to_vec(),
+            400u64.to_le_bytes().to_vec(),
+            vec![43; 32],
+            vec![44; 32]
+        ]
+        .concat()
+    );
+    p.action = Action {
+        kind: RETIRE_TARGET,
+        data: [0; 192],
+    };
+    p.action.data[..112].copy_from_slice(&bytes);
+    p.digest = p.compute_digest(&program).unwrap();
+    p.validate(&program, &proposal_pda(&program, p.id).0)
+        .unwrap();
+    for mask in 0..32u8 {
+        let mut candidate = p.clone();
+        candidate.approvals = mask;
+        candidate.approval_count = mask.count_ones() as u8;
+        assert_eq!(
+            candidate.executable(&config, candidate.not_before).is_ok(),
+            mask.count_ones() >= 3
+        );
+        assert!(candidate
+            .executable(&config, candidate.not_before - 1)
+            .is_err());
+        assert!(candidate.executable(&config, candidate.expires).is_err());
+    }
+    for offset in [0, 32, 40, 48, 80] {
+        let mut changed = p.clone();
+        changed.action.data[offset] ^= 1;
+        assert_ne!(changed.compute_digest(&program).unwrap(), p.digest);
+    }
+    let mut bad = p.action.clone();
+    bad.data[112] = 1;
+    assert!(bad.validate().is_err());
+    for ix in [
+        Instruction::RetireTarget { digest: [42; 32] },
+        Instruction::ReclaimRetiredTargetRecords {
+            target: policy.target,
+        },
+    ] {
+        let encoded = ix.try_to_vec().unwrap();
+        assert_eq!(encoded.len(), 33);
+        assert!(matches!(encoded[0], 17..=19));
+        assert!(Instruction::unpack(&encoded).is_ok());
+        assert!(Instruction::unpack(&encoded[..32]).is_err());
+        assert!(Instruction::unpack(&[encoded, vec![0]].concat()).is_err());
+    }
 }

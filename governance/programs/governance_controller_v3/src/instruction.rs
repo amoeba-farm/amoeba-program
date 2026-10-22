@@ -60,10 +60,19 @@ pub enum Instruction {
     PublishVerification {
         digest: [u8; 32],
     },
+    RetireTarget {
+        digest: [u8; 32],
+    },
+    ReclaimRetiredTargetRecords {
+        target: Pubkey,
+    },
+    ReclaimRetiredTargetVerification {
+        target: Pubkey,
+    },
 }
 impl Instruction {
     pub fn unpack(data: &[u8]) -> Result<Self> {
-        if data.len() > MAX_DATA || !matches!(data.first(), Some(0..=9 | 11..=12 | 14..=16)) {
+        if data.len() > MAX_DATA || !matches!(data.first(), Some(0..=9 | 11..=12 | 14..=19)) {
             return Err(ProgramError::InvalidInstructionData);
         }
         Self::try_from_slice(data).map_err(|_| ProgramError::InvalidInstructionData)

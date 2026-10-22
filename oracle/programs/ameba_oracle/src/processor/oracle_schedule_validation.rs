@@ -375,12 +375,16 @@ pub(super) fn validate_oracle_opening_evidence_fields_at_time(
     validate_oracle_opening_archive_binding(archive_url, source_time, canonical_locator_hash)
 }
 
+/// Binds sealed archive evidence to its claim: the capture time is the claim's source time and the
+/// captured locator is the source's registered one. Both forms bind alike: a Wayback capture URL
+/// (kind 3: capture timestamp, original URL) and an authenticated evidence record (kind 4: `t`,
+/// `u`).
 pub(super) fn validate_oracle_opening_archive_binding(
     archive_url: &str,
     source_time: u64,
     canonical_locator_hash: &[u8; 32],
 ) -> ProgramResult {
-    let (capture_time, original_url) = parse_oracle_opening_archive_url(archive_url)?;
+    let (capture_time, original_url) = parse_oracle_archive_evidence(archive_url)?;
     let archived_locator_hash = hashv(&[b"locator", original_url.as_bytes()]).to_bytes();
     if capture_time != source_time || archived_locator_hash != *canonical_locator_hash {
         return Err(OracleError::InvalidOracleOpeningEvidence.into());
@@ -388,6 +392,83 @@ pub(super) fn validate_oracle_opening_archive_binding(
     Ok(())
 }
 
+/// The capture time and captured locator of sealed archive evidence, by form. The two prefixes
+/// are disjoint, and each object kind seals only its own form (`oracle_evidence::committed_hash`),
+/// so the prefix names the kind the text was sealed as.
+pub(super) fn parse_oracle_archive_evidence(text: &str) -> Result<(u64, &str), ProgramError> {
+    if text
+        .as_bytes()
+        .starts_with(ORACLE_EVIDENCE_RECORD_PREFIX.as_bytes())
+    {
+        parse_oracle_evidence_record(text)
+    } else {
+        parse_oracle_opening_archive_url(text)
+    }
+}
+
+/// A kind-4 authenticated evidence record, `amoeba-evidence-v1;m=<method>;t=<unix seconds>;
+/// d=<bundle digest>;u=<locator>`: returns (`t`, `u`). The program checks only its form; the proof
+/// is verified off chain by whoever fetches the bundle by its digest.
+///
+/// The same accept/reject as the off-chain reference `amoeba_evidence::parse_onchain_record`
+/// followed by the oracle's locator rules, with one addition: `t=0` is refused, since no claim's
+/// source time can be zero.
+/// - At most `ORACLE_EVIDENCE_RECORD_MAX_BYTES`, with no byte at or below space and no DEL
+///   (the archive URL's byte rules).
+/// - `m` is `web` (a TLSNotary web proof) or `email` (reserved for DKIM proofs: accepted now so a
+///   later off-chain method needs no program change).
+/// - `t` is 1 to 20 decimal digits without a leading zero, within `u64`.
+/// - `d` is exactly 64 lowercase hex digits.
+/// - `u` is the rest of the text and passes `public_locator` (http(s), no credentials).
+pub(super) fn parse_oracle_evidence_record(record: &str) -> Result<(u64, &str), ProgramError> {
+    let bytes = record.as_bytes();
+    if bytes.len() > ORACLE_EVIDENCE_RECORD_MAX_BYTES
+        || bytes.iter().any(|byte| *byte <= b' ' || *byte == 0x7f)
+    {
+        return Err(OracleError::InvalidOracleOpeningEvidence.into());
+    }
+    let rest = bytes
+        .strip_prefix(ORACLE_EVIDENCE_RECORD_PREFIX.as_bytes())
+        .and_then(|rest| rest.strip_prefix(b"m="))
+        .and_then(|rest| {
+            rest.strip_prefix(b"web;t=")
+                .or_else(|| rest.strip_prefix(b"email;t="))
+        })
+        .ok_or(OracleError::InvalidOracleOpeningEvidence)?;
+    let digits = rest.iter().take_while(|byte| byte.is_ascii_digit()).count();
+    if digits == 0 || digits > 20 || rest[0] == b'0' {
+        return Err(OracleError::InvalidOracleOpeningEvidence.into());
+    }
+    let mut time = 0u64;
+    for byte in &rest[..digits] {
+        time = time
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(u64::from(*byte - b'0')))
+            .ok_or(OracleError::InvalidOracleOpeningEvidence)?;
+    }
+    let rest = rest[digits..]
+        .strip_prefix(b";d=")
+        .ok_or(OracleError::InvalidOracleOpeningEvidence)?;
+    if rest.len() < 64
+        || !rest[..64]
+            .iter()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err(OracleError::InvalidOracleOpeningEvidence.into());
+    }
+    let locator_len = rest[64..]
+        .strip_prefix(b";u=")
+        .ok_or(OracleError::InvalidOracleOpeningEvidence)?
+        .len();
+    // Every byte before `u` is ASCII, so `u` starts on a UTF-8 boundary.
+    let locator = record
+        .get(bytes.len() - locator_len..)
+        .ok_or(OracleError::InvalidOracleOpeningEvidence)?;
+    crate::processor::oracle_evidence::public_locator(locator)?;
+    Ok((time, locator))
+}
+
+/// A kind-3 Wayback capture URL: returns (capture time, original URL).
 pub(super) fn parse_oracle_opening_archive_url(
     archive_url: &str,
 ) -> Result<(u64, &str), ProgramError> {

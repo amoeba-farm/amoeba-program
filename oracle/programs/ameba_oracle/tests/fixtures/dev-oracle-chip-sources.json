@@ -1,0 +1,158 @@
+{
+  "note": "Dev oracle sources for the RAMX and NANDX chip-bucket months (expiry after 2026-11-01) and the BATX months (from its first, expiry 2026-12-01), for the localnet dev bootstrap and the dev oracle feed only. One source per bucket (the dev path's shape), weights the products' (RAMX 40/20/25/15, the user's of 2026-10-21; NANDX the spec's; BATX 40/30/20/10, governance/batx_basket_spec.v1.json). BATX's rows avoid TrendForce, whose terms forbid prediction-market use (governance/batx_source_manifest.v1.json). Each row names a real public page and its row label as of 2026-10-20 and that day's value as the baseline; the dev feed's later values are synthetic. These are not settlement sources and carry no claim about a page's price basis.",
+  "afterExpiry": 1793491200,
+  "products": [
+    {
+      "product": "RAMX",
+      "phase": "Game",
+      "sources": [
+        {
+          "sourceId": "302e2eccf3d9b74ed33a0587e2bacf45c7291aa41caecd6ff3c2baae5ff39138",
+          "bucketId": "444452355f313647424954000000000000000000000000000000000000000000",
+          "bucketLabel": "DDR5_16GBIT",
+          "url": "https://www.memorymarket.com/price/ews/100266",
+          "locatorHash": "723c6ba60bcc1861bebf4171670a7d2dcda0ffb1b3d039594c8fcf21d924ba5a",
+          "row": "DDR5 16Gb Major",
+          "status": "Active",
+          "bucketWeightBps": 4000,
+          "baselineStateAtomic": "46000000"
+        },
+        {
+          "sourceId": "5095187f275101ae2ad7274acabc0e3bad96e846084f753292b8c09b01ac7afb",
+          "bucketId": "444452355f323447424954000000000000000000000000000000000000000000",
+          "bucketLabel": "DDR5_24GBIT",
+          "url": "https://www.memorymarket.com/price/ews/100265",
+          "locatorHash": "dd4cb7b73faa31b841b08d2f21efafed724c81c6713c12280982985c29c1f482",
+          "row": "DDR5 24Gb Major",
+          "status": "Active",
+          "bucketWeightBps": 2000,
+          "baselineStateAtomic": "58000000"
+        },
+        {
+          "sourceId": "626192f4a94355c4ef0eee22429316714be931770383cf20a3f8480f6de1ee6a",
+          "bucketId": "444452345f313647424954000000000000000000000000000000000000000000",
+          "bucketLabel": "DDR4_16GBIT",
+          "url": "https://www.memorymarket.com/price/ews/100222",
+          "locatorHash": "81707998a47c8518e43846c1fc9ab308e01defbb5dbb3e1c8c306ad0fa911262",
+          "row": "DDR4 16Gb 3200",
+          "status": "Active",
+          "bucketWeightBps": 2500,
+          "baselineStateAtomic": "50000000"
+        },
+        {
+          "sourceId": "74a388560119103ceba41018ae4681f602fbd54b6adcce3533fc0fbbf4bbba25",
+          "bucketId": "444452345f384742495400000000000000000000000000000000000000000000",
+          "bucketLabel": "DDR4_8GBIT",
+          "url": "https://www.memorymarket.com/price/ews/100221",
+          "locatorHash": "cc8960e0e7c32678482733bf59e2f73a318768e7567103c6cc7936082e1db4b9",
+          "row": "DDR4 8Gb 3200",
+          "status": "Active",
+          "bucketWeightBps": 1500,
+          "baselineStateAtomic": "22400000"
+        }
+      ]
+    },
+    {
+      "product": "NANDX",
+      "phase": "Game",
+      "sources": [
+        {
+          "sourceId": "ffb8c6fe637b966ebbce35c79bd950e654a830ddd18ec22cf85db015f6d53874",
+          "bucketId": "746c635f31746200000000000000000000000000000000000000000000000000",
+          "bucketLabel": "tlc_1tb",
+          "url": "https://www.memorymarket.com/price/in/100242",
+          "locatorHash": "d05cec5a2ee188ec73110a5c703b5937909dbfa95f9efb0af8374f5a0f1ff283",
+          "row": "1Tb TLC",
+          "status": "Active",
+          "bucketWeightBps": 4000,
+          "baselineStateAtomic": "29000000"
+        },
+        {
+          "sourceId": "df428c81154dd15a8700346ef1fd4e1fd76257b97e15fa8f83778b8113320c6e",
+          "bucketId": "716c635f31746200000000000000000000000000000000000000000000000000",
+          "bucketLabel": "qlc_1tb",
+          "url": "https://www.memorymarket.com/price/in/100257",
+          "locatorHash": "4c2fd211f98e7994efea14202046ce12bc36b19c867506de927c80db0df5943e",
+          "row": "1Tb QLC",
+          "status": "Active",
+          "bucketWeightBps": 3000,
+          "baselineStateAtomic": "25000000"
+        },
+        {
+          "sourceId": "eba0cca4f235d62ab6ea495867629d0ca7435da76d10e2c5feb773a7fa370cf0",
+          "bucketId": "746c635f35313267620000000000000000000000000000000000000000000000",
+          "bucketLabel": "tlc_512gb",
+          "url": "https://www.memorymarket.com/price/in/100170",
+          "locatorHash": "e18670ebb2f3af2ca065701566a35584d3fad73b999bac64516cfa10d817f946",
+          "row": "512Gb TLC",
+          "status": "Active",
+          "bucketWeightBps": 2000,
+          "baselineStateAtomic": "21000000"
+        },
+        {
+          "sourceId": "c364a3c1d30d5c54dfb9e692127dc13465c180dceddb6bcf603872b6f5b9ef2e",
+          "bucketId": "746c635f32353667620000000000000000000000000000000000000000000000",
+          "bucketLabel": "tlc_256gb",
+          "url": "https://www.memorymarket.com/price/in/100164",
+          "locatorHash": "bfd312027471c05c0d7e849dbfd5a78ae6a9b61d73f0045054e5f3d8d7b71893",
+          "row": "256Gb TLC",
+          "status": "Active",
+          "bucketWeightBps": 1000,
+          "baselineStateAtomic": "11000000"
+        }
+      ]
+    },
+    {
+      "product": "BATX",
+      "phase": "Game",
+      "sources": [
+        {
+          "sourceId": "c7702973c50ff22c4ee51bbdd6e2b5cb9edfd755db1c7c87db222e059f18df67",
+          "bucketId": "4c46505f53544f52414745000000000000000000000000000000000000000000",
+          "bucketLabel": "LFP_STORAGE",
+          "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+          "locatorHash": "f946635a501a31433f666365f5d7c8bebf4e156eab872fc3c35272e5d60ee775",
+          "row": "Prismatic LFP cell- 314Ah (RMB)",
+          "status": "Active",
+          "bucketWeightBps": 4000,
+          "baselineStateAtomic": "360000"
+        },
+        {
+          "sourceId": "5251b20d323e78c45b89b975ee2d113834ed3df9b4c2ad1e7b2633744d8ec52e",
+          "bucketId": "4c46505f45560000000000000000000000000000000000000000000000000000",
+          "bucketLabel": "LFP_EV",
+          "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+          "locatorHash": "2f8439f7739b5073990f34b6d3fbf05aae39e65342bf74a3b1e8a5aeb0454bba",
+          "row": "磷酸铁锂电芯 / 动力型 / 方形",
+          "status": "Active",
+          "bucketWeightBps": 3000,
+          "baselineStateAtomic": "550000"
+        },
+        {
+          "sourceId": "05f63fe24d52af753166203d418bcef3d9c5c9fec701b3d0c7637e9e8ac93c67",
+          "bucketId": "5445524e4152595f505249534d5f455600000000000000000000000000000000",
+          "bucketLabel": "TERNARY_PRISM_EV",
+          "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+          "locatorHash": "2f8439f7739b5073990f34b6d3fbf05aae39e65342bf74a3b1e8a5aeb0454bba",
+          "row": "三元电芯：方块：动力型：市场价格：中华人民共和国（日度）",
+          "status": "Active",
+          "bucketWeightBps": 2000,
+          "baselineStateAtomic": "630000",
+          "note": "Mysteel's public summary shows 0.63 yuan/Wh for this row, undated; its category page shows 0.59. Dev baseline only."
+        },
+        {
+          "sourceId": "46ceb5ea7324f2d9e7279a5f70a16abe3ffd0e48b66d9ea8168b92a04a59960a",
+          "bucketId": "5445524e4152595f504f5543485f455600000000000000000000000000000000",
+          "bucketLabel": "TERNARY_POUCH_EV",
+          "url": "https://newenergy.smm.cn/price/14042-15013",
+          "locatorHash": "e6aa6897f764fb2b5202a751133d7700606f33b9520695c55aac06e62b461c94",
+          "row": "523软包三元电芯(周）",
+          "status": "Active",
+          "bucketWeightBps": 1000,
+          "baselineStateAtomic": "1000000",
+          "note": "SMM-LB-EV-010. Its values are behind a login on 2026-10-20, so the baseline is a placeholder (1 yuan/Wh); the dev feed's values are synthetic."
+        }
+      ]
+    }
+  ]
+}

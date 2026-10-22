@@ -3,7 +3,7 @@
 Solana smart contracts for Amoeba's oracle and range-futures markets, together
 with the preserved source of its earlier index-options / Spread program.
 
-[Website](https://amoeba.farm) · [Governance](https://github.com/amoeba-farm/amoeba-governance) · [Security](SECURITY.md)
+[Website](https://amoeba.farm) Â· [Governance](https://github.com/amoeba-farm/amoeba-governance) Â· [Security](SECURITY.md)
 
 The Mainnet oracle and range-futures source is in [oracle](oracle) and
 [futures](futures). The [staking release](contracts/2026-10-18-staking-mainnet)
@@ -13,6 +13,10 @@ reproduced artifact. The [inventory-netting](contracts/2026-10-17-inventory-nett
 [original](contracts/2026-10-16) records preserve earlier releases.
 The earlier index-options / Spread program remains in
 [programs/light_token_minter](programs/light_token_minter).
+
+The [2026-10-22 oracle upgrade](contracts/2026-10-22-oracle-upgrade) is prepared
+for authenticated evidence and 80/20 sponsorships. Installation and updated
+hosted verification are pending; the installed Futures program is unchanged.
 
 ## Mainnet programs
 

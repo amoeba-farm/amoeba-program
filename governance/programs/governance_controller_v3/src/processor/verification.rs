@@ -76,7 +76,11 @@ pub(super) fn publish(
                 &record(
                     target.key,
                     authority.key,
-                    &policy.previous_spread_params(program)?,
+                    &if policy.target == crate::verification::MAINNET_FUTURES {
+                        policy.previous_futures_params(program)?
+                    } else {
+                        policy.previous_spread_params(program)?
+                    },
                     metadata_bump,
                 ),
                 false,

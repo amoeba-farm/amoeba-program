@@ -1,0 +1,13 @@
+[package]
+name = "ameba-commodity-spec"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+description = "RAMX, NANDX and BATX commodity buckets, comparison-series and observation formats, the deterministic submission routing of governance/commodity_submission_spec.v1.json and governance/batx_basket_spec.v1.json, and BATX's fixed-base index"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+sha2 = "0.10"

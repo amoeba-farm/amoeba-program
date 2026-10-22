@@ -135,6 +135,14 @@ pub const ORACLE_OPENING_ARCHIVE_URL_MAX_BYTES: usize = 384;
 pub const ORACLE_OPENING_ARCHIVE_URL_PREFIX: &str = "https://web.archive.org/web/";
 pub const ORACLE_OPENING_EVIDENCE_HASH_DOMAIN: &[u8] = b"amoeba-oracle-opening-evidence-v1";
 pub const ORACLE_OPENING_ARCHIVE_URL_HASH_DOMAIN: &[u8] = b"amoeba-oracle-opening-archive-url-v1";
+/// Evidence object kind 4, the authenticated evidence record, accepted wherever a sealed kind-3
+/// Wayback archive URL is: `amoeba-evidence-v1;m=<web|email>;t=<unix seconds>;d=<bundle
+/// digest, 64 lowercase hex>;u=<locator>`. Its commitment is the kind-3 one
+/// (`ORACLE_OPENING_ARCHIVE_URL_HASH_DOMAIN` over the text). The off-chain reference parser is
+/// `amoeba_evidence::parse_onchain_record` (`evidence/crates/evidence/src/lib.rs`).
+pub const ORACLE_EVIDENCE_RECORD_KIND: u8 = 4;
+pub const ORACLE_EVIDENCE_RECORD_PREFIX: &str = "amoeba-evidence-v1;";
+pub const ORACLE_EVIDENCE_RECORD_MAX_BYTES: usize = 512;
 /// Evidence and dispute-resolution window after expiry before the oracle month can finalize.
 /// Tests exercise this exact production settlement timing contract instead of a shortened
 /// test-only protocol.

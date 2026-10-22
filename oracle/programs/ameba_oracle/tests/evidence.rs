@@ -1,5 +1,5 @@
 //! Evidence objects (tag 30, selectors 14-15): chunked writes, resume, sealing against the
-//! committed hash, overwrite rejection and draft refunds.
+//! committed hash, overwrite rejection and draft refunds; kind-4 evidence records in openings.
 mod common;
 
 use ameba_oracle::instruction;
@@ -163,6 +163,341 @@ async fn evidence_locator_rejects_credentials_and_binds_its_domain() {
         )
         .await
         .is_err());
+}
+
+/// Evidence kind 4, the authenticated evidence record: written in chunks and sealed under the
+/// archive-URL commitment. Each archive kind seals only its own form.
+#[tokio::test]
+async fn evidence_record_seals_as_kind_four_and_each_archive_kind_takes_only_its_form() {
+    let mut h = start().await;
+    let payer = h.payer();
+    // Long enough to take two chunks.
+    let locator = format!("https://example.com/prices/{}", "p".repeat(120));
+    let record = common::cohort::evidence_record_of(&locator, 1_760_900_000);
+    assert!(record.len() > 192 && record.len() <= 512);
+    let digest = instruction::archive_url_hash(&record);
+    assert_eq!(
+        digest,
+        hashv(&[
+            ameba_oracle::constants::ORACLE_OPENING_ARCHIVE_URL_HASH_DOMAIN,
+            record.as_bytes()
+        ])
+        .to_bytes()
+    );
+    assert_eq!(instruction::archive_evidence_kind(&record), 4);
+    let key = instruction::find_evidence_object_address(&program(), &payer.pubkey(), 4, &digest);
+    let bytes = record.as_bytes();
+    h.send(
+        write(&payer.pubkey(), 4, digest, bytes.len(), 0, &bytes[..192]),
+        &[],
+    )
+    .await
+    .unwrap();
+    assert_eq!(h.account(key).await.unwrap().data[75], 0, "draft");
+    h.send(
+        write(&payer.pubkey(), 4, digest, bytes.len(), 192, &bytes[192..]),
+        &[],
+    )
+    .await
+    .unwrap();
+    let object = h.account(key).await.unwrap();
+    assert_eq!(object.owner, program());
+    assert_eq!(object.data.len(), 76 + bytes.len());
+    assert_eq!(object.data[38], 4);
+    assert_eq!(&object.data[39..71], &digest);
+    assert_eq!(object.data[75], 1, "sealed");
+    assert_eq!(&object.data[76..], bytes);
+
+    // The record never seals as a Wayback URL (kind 3), nor a Wayback URL as a record.
+    let short = common::cohort::evidence_record_of("https://example.com/p", 1_760_900_000);
+    let short_digest = instruction::archive_url_hash(&short);
+    assert!(h
+        .send(
+            write(
+                &payer.pubkey(),
+                3,
+                short_digest,
+                short.len(),
+                0,
+                short.as_bytes()
+            ),
+            &[]
+        )
+        .await
+        .is_err());
+    let wayback = "https://web.archive.org/web/20251019190000/https://example.com/p";
+    let wayback_digest = instruction::archive_url_hash(wayback);
+    assert_eq!(instruction::archive_evidence_kind(wayback), 3);
+    assert!(h
+        .send(
+            write(
+                &payer.pubkey(),
+                4,
+                wayback_digest,
+                wayback.len(),
+                0,
+                wayback.as_bytes()
+            ),
+            &[]
+        )
+        .await
+        .is_err());
+    for (kind, digest) in [(3, short_digest), (4, wayback_digest)] {
+        let misplaced =
+            instruction::find_evidence_object_address(&program(), &payer.pubkey(), kind, &digest);
+        assert!(h.account(misplaced).await.is_none());
+    }
+    // Both seal under their own kind.
+    h.upload_evidence(&payer, 4, short.as_bytes()).await;
+    h.upload_evidence(&payer, 3, wayback.as_bytes()).await;
+
+    // A malformed record never seals.
+    for bad in [
+        short.replace(common::cohort::RECORD_DIGEST, &"AB".repeat(32)),
+        short.replace("m=web", "m=wayback"),
+        short.replace("t=1", "t=01"),
+        short.replace("https://example.com/p", "https://example.com/p?token=1"),
+    ] {
+        let digest = instruction::archive_url_hash(&bad);
+        assert!(
+            h.send(
+                write(&payer.pubkey(), 4, digest, bad.len(), 0, bad.as_bytes()),
+                &[]
+            )
+            .await
+            .is_err(),
+            "{bad}"
+        );
+    }
+    // Kind 4 is bounded at 512 bytes.
+    assert!(h
+        .send(
+            write(&payer.pubkey(), 4, [9; 32], 513, 0, &[b'a'; 192]),
+            &[]
+        )
+        .await
+        .is_err());
+    h.send(
+        write(&payer.pubkey(), 4, [9; 32], 512, 0, &[b'a'; 192]),
+        &[],
+    )
+    .await
+    .unwrap();
+}
+
+mod records {
+    use super::*;
+    use ameba_oracle::{
+        error::OracleError,
+        instruction::{ChallengeOracleOpeningClaimParams, SubmitOracleOpeningClaimParams},
+        state::{OracleOpeningClaim, OracleOpeningClaimChallenge},
+    };
+    use common::cohort::*;
+    use solana_sdk::signature::Keypair;
+
+    fn submit(
+        cohort: &Cohort,
+        claimant: &Keypair,
+        source: &Pubkey,
+        source_id: &[u8; 32],
+        source_time: u64,
+        evidence: &str,
+    ) -> solana_sdk::instruction::Instruction {
+        instruction::submit_oracle_opening_claim_v2(
+            &program(),
+            &claimant.pubkey(),
+            &claimant.pubkey(),
+            &cohort.period,
+            &cohort.month,
+            source,
+            &cohort.sku_ids[0],
+            SubmitOracleOpeningClaimParams {
+                opening_state: OPENING_STATE,
+                source_time,
+                stake: OPENING_BOND,
+                canonical_locator_hash: locator_hash(&locator(source_id)),
+                source_definition_hash: definition_hash(&definition(source_id)),
+                archive_url: String::new(),
+            },
+            evidence,
+        )
+    }
+
+    /// An opening (162) and its challenge (163) with evidence records: bound to the source's
+    /// locator and the claim's source time, committed over the text, published through links to
+    /// the kind-4 objects, and backfilled (30/17) from them.
+    #[tokio::test]
+    async fn an_opening_and_its_challenge_carry_evidence_records() {
+        let mut h = start().await;
+        let cohort = h.open_cohort(1).await;
+        h.fund_schedule(&cohort).await;
+        h.at(cohort.scramble).await;
+        let formed = h.cover_skus(&cohort).await;
+        h.at(cohort.placement_end()).await;
+        h.finalize_coverage(&cohort).await;
+        h.at(cohort.kill_end()).await;
+        h.freeze_recipe(&cohort, &formed).await;
+        h.index_recipe(&cohort, &formed).await;
+        let capture = cohort.scramble_end();
+        h.at(capture).await;
+        let (source, source_id) = formed.sources[0];
+        let claimant = h.participant(PARTICIPANT_USDC).await;
+
+        // A record of another page, or of another second, never opens the source.
+        for wrong in [
+            evidence_record_of("https://example.com/source/ffff", capture),
+            evidence_record(&source_id, capture - 1),
+        ] {
+            h.upload_evidence(&claimant, 4, wrong.as_bytes()).await;
+            assert_oracle_error(
+                h.send(
+                    submit(&cohort, &claimant, &source, &source_id, capture, &wrong),
+                    &[&claimant],
+                )
+                .await,
+                OracleError::InvalidOracleOpeningEvidence,
+            );
+        }
+
+        let record = evidence_record(&source_id, capture);
+        h.upload_evidence(&claimant, 4, record.as_bytes()).await;
+        h.send(
+            submit(&cohort, &claimant, &source, &source_id, capture, &record),
+            &[&claimant],
+        )
+        .await
+        .unwrap();
+        let claim_key =
+            instruction::find_oracle_opening_claim_address(&program(), &cohort.month, &source);
+        let claim: OracleOpeningClaim = h.read_state(claim_key).await;
+        let lh = locator_hash(&locator(&source_id));
+        let dh = definition_hash(&definition(&source_id));
+        assert_eq!(claim.source_time, capture);
+        assert_eq!(
+            claim.archive_url_hash,
+            instruction::archive_url_hash(&record)
+        );
+        assert_eq!(
+            claim.evidence_hash,
+            instruction::opening_evidence_hash(
+                &cohort.month,
+                &source,
+                OPENING_STATE,
+                capture,
+                &lh,
+                &dh,
+                &record
+            )
+        );
+        let object = instruction::find_evidence_object_address(
+            &program(),
+            &claimant.pubkey(),
+            4,
+            &claim.archive_url_hash,
+        );
+        let link_key = instruction::find_evidence_link_address(
+            &program(),
+            &claim_key,
+            2,
+            &claim.evidence_hash,
+        );
+        let link = h.account(link_key).await.expect("opening link");
+        assert_eq!(&link.data[102..134], object.as_ref());
+
+        // Backfill from the kind-4 object is an exact no-op on the published link.
+        let payer = h.payer();
+        h.send(
+            instruction::backfill_claim_evidence(
+                &program(),
+                &payer.pubkey(),
+                &cohort.period,
+                &cohort.month,
+                &source,
+                &claim_key,
+                &claim_key,
+                &object,
+                &claim.evidence_hash,
+                2,
+            ),
+            &[],
+        )
+        .await
+        .unwrap();
+        assert_eq!(h.account(link_key).await.unwrap().data, link.data);
+
+        // A challenge with a record of the same capture under another bundle digest.
+        let challenger = h.participant(PARTICIPANT_USDC).await;
+        let alternative = record.replace(RECORD_DIGEST, &"cd".repeat(32));
+        h.upload_evidence(&challenger, 4, alternative.as_bytes())
+            .await;
+        let challenge_id = [0xa4; 32];
+        h.send(
+            instruction::challenge_oracle_opening_claim_v2(
+                &program(),
+                &challenger.pubkey(),
+                &challenger.pubkey(),
+                &cohort.period,
+                &cohort.month,
+                &source,
+                &cohort.sku_ids[0],
+                ChallengeOracleOpeningClaimParams {
+                    challenge_id,
+                    alternative_opening_state: OPENING_STATE + 7,
+                    alternative_source_time: capture,
+                    bond: CHALLENGE_MIN_BOND,
+                    canonical_locator_hash: lh,
+                    source_definition_hash: dh,
+                    archive_url: String::new(),
+                },
+                &alternative,
+            ),
+            &[&challenger],
+        )
+        .await
+        .unwrap();
+        let challenge_key = instruction::find_oracle_opening_challenge_address(
+            &program(),
+            &cohort.month,
+            &claim_key,
+            &challenge_id,
+        );
+        let challenge: OracleOpeningClaimChallenge = h.read_state(challenge_key).await;
+        assert_eq!(
+            challenge.archive_url_hash,
+            instruction::archive_url_hash(&alternative)
+        );
+        assert_eq!(
+            challenge.evidence_hash,
+            instruction::opening_evidence_hash(
+                &cohort.month,
+                &source,
+                OPENING_STATE + 7,
+                capture,
+                &lh,
+                &dh,
+                &alternative
+            )
+        );
+        let link = h
+            .account(instruction::find_evidence_link_address(
+                &program(),
+                &challenge_key,
+                3,
+                &challenge.evidence_hash,
+            ))
+            .await
+            .expect("challenge link");
+        assert_eq!(
+            &link.data[102..134],
+            instruction::find_evidence_object_address(
+                &program(),
+                &challenger.pubkey(),
+                4,
+                &challenge.archive_url_hash
+            )
+            .as_ref()
+        );
+    }
 }
 
 mod canonical_month {

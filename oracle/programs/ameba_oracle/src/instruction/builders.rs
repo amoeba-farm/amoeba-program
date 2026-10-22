@@ -409,7 +409,7 @@ pub fn initialize_oracle_month_v5(
 }
 
 /// Evidence object `[ns, "g3-evidence-bytes-v1", payer, kind, hash]`: kind 1 is a public
-/// locator, 2 a source definition, 3 a Wayback archive URL.
+/// locator, 2 a source definition, 3 a Wayback archive URL, 4 an authenticated evidence record.
 pub fn find_evidence_object_address(
     program_id: &Pubkey,
     payer: &Pubkey,
@@ -1398,7 +1398,19 @@ pub fn find_bucket_rank_address(
     )
 }
 
-/// Commitment of a sealed Wayback archive URL (evidence kind 3).
+/// The evidence object kind that seals archive evidence `text`: 4 for an authenticated evidence
+/// record (`amoeba-evidence-v1;…`), otherwise 3 (a Wayback archive URL). The opening, update and
+/// challenge builders address the object by it.
+pub fn archive_evidence_kind(text: &str) -> u8 {
+    if text.starts_with(crate::constants::ORACLE_EVIDENCE_RECORD_PREFIX) {
+        crate::constants::ORACLE_EVIDENCE_RECORD_KIND
+    } else {
+        3
+    }
+}
+
+/// Commitment of sealed archive evidence: a Wayback archive URL (evidence kind 3) or an
+/// authenticated evidence record (kind 4), the same function of the text for both.
 pub fn archive_url_hash(archive_url: &str) -> [u8; 32] {
     solana_program::hash::hashv(&[
         crate::constants::ORACLE_OPENING_ARCHIVE_URL_HASH_DOMAIN,
@@ -1602,8 +1614,9 @@ pub fn accumulate_oracle_settlement_source_bucket(
     )
 }
 
-/// Submit an opening print. The archive URL travels only through the sealed kind-3 object that
-/// `object_payer` wrote; `params.archive_url` must be empty.
+/// Submit an opening print. The archive URL travels only through the sealed kind-3 object (or the
+/// evidence record through its kind-4 object) that `object_payer` wrote; `params.archive_url`
+/// must be empty.
 #[allow(clippy::too_many_arguments)]
 pub fn submit_oracle_opening_claim_v2(
     program_id: &Pubkey,
@@ -1646,7 +1659,7 @@ pub fn submit_oracle_opening_claim_v2(
                 find_evidence_object_address(
                     program_id,
                     object_payer,
-                    3,
+                    archive_evidence_kind(archive_url),
                     &archive_url_hash(archive_url),
                 ),
                 false,
@@ -1704,7 +1717,7 @@ pub fn challenge_oracle_opening_claim_v2(
                 find_evidence_object_address(
                     program_id,
                     object_payer,
-                    3,
+                    archive_evidence_kind(archive_url),
                     &archive_url_hash(archive_url),
                 ),
                 false,
@@ -2077,7 +2090,7 @@ pub fn commit_oracle_update_claim_v3(
 
 /// Accounts: 0 [signer, writable] claimant and payer; 1 period; 2 month; 3 source;
 /// 4 finalized active-weight manifest; 5 [writable] update claim; 6 system program; 7 sealed
-/// archive-URL object written by `object_payer`; 8 [writable] publication link.
+/// archive-evidence object (kind 3 or 4) written by `object_payer`; 8 [writable] publication link.
 #[allow(clippy::too_many_arguments)]
 pub fn reveal_oracle_update_claim_v3(
     program_id: &Pubkey,
@@ -2110,7 +2123,7 @@ pub fn reveal_oracle_update_claim_v3(
                 find_evidence_object_address(
                     program_id,
                     object_payer,
-                    3,
+                    archive_evidence_kind(archive_url),
                     &archive_url_hash(archive_url),
                 ),
                 false,
@@ -2125,8 +2138,8 @@ pub fn reveal_oracle_update_claim_v3(
 
 /// Accounts: 0 [signer, writable] challenger and payer; 1 period; 2 month; 3 SKU pool; 4 claim;
 /// 5 source; 6 [writable] challenger collateral; 7 [writable] challenge PDA; 8 system program;
-/// 9 [writable] update-challenge guard PDA; 10 sealed archive-URL object written by
-/// `object_payer`; 11 [writable] publication link.
+/// 9 [writable] update-challenge guard PDA; 10 sealed archive-evidence object (kind 3 or 4)
+/// written by `object_payer`; 11 [writable] publication link.
 #[allow(clippy::too_many_arguments)]
 pub fn challenge_oracle_update_claim_v2(
     program_id: &Pubkey,
@@ -2168,7 +2181,7 @@ pub fn challenge_oracle_update_claim_v2(
                 find_evidence_object_address(
                     program_id,
                     object_payer,
-                    3,
+                    archive_evidence_kind(archive_url),
                     &archive_url_hash(archive_url),
                 ),
                 false,

@@ -169,6 +169,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ameba-commodity-spec"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "ameba-governance-interface"
 version = "0.1.0"
 dependencies = [

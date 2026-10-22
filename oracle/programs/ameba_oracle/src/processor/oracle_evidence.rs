@@ -93,10 +93,14 @@ fn link_address(program: &Pubkey, event: &Pubkey, role: u8, hash: &[u8; 32]) -> 
         program,
     )
 }
+/// Object kinds: 1 a public locator, 2 a source definition, 3 a Wayback archive URL, 4 an
+/// authenticated evidence record (`ORACLE_EVIDENCE_RECORD_KIND`). Kinds 3 and 4 are the two forms
+/// of a claim's archive evidence.
 fn max_bytes(kind: u8) -> Result<usize, ProgramError> {
     match kind {
         1 | 3 => Ok(ORACLE_OPENING_ARCHIVE_URL_MAX_BYTES),
         2 => Ok(DEFINITION_MAX),
+        ORACLE_EVIDENCE_RECORD_KIND => Ok(ORACLE_EVIDENCE_RECORD_MAX_BYTES),
         _ => invalid(),
     }
 }
@@ -214,11 +218,23 @@ fn committed_hash(kind: u8, bytes: &[u8]) -> Result<[u8; 32], ProgramError> {
         // Full SHA-256 input transcript, including any structured serialization/domain.
         // This does not reinterpret an opaque definition commitment as H(display text).
         2 => Ok(hashv(&[bytes]).to_bytes()),
+        // Kind 3 seals only a Wayback URL: an evidence record never seals as kind 3.
         3 => {
             let text = std::str::from_utf8(bytes)
                 .map_err(|_| OracleError::InvalidOracleOpeningEvidence)?;
             let (_, target) = parse_oracle_opening_archive_url(text)?;
             public_locator(target)?;
+            Ok(derive_oracle_opening_archive_url_hash(text))
+        }
+        // Kind 4 seals only an evidence record (its parser applies `public_locator` to `u`), and
+        // commits to it exactly like kind 3, so every archive hash downstream (claims,
+        // challenges, observation chains, checkpoints, update commitments) is the same function
+        // of the text. The forms cannot collide (disjoint prefixes), and the object PDA seeds the
+        // kind.
+        ORACLE_EVIDENCE_RECORD_KIND => {
+            let text = std::str::from_utf8(bytes)
+                .map_err(|_| OracleError::InvalidOracleOpeningEvidence)?;
+            parse_oracle_evidence_record(text)?;
             Ok(derive_oracle_opening_archive_url_hash(text))
         }
         _ => invalid(),
@@ -257,9 +273,15 @@ pub(super) fn with_sealed_definition_preimage<T>(
     decode(&data[HEADER..])
 }
 
+/// The object kinds that carry a claim's archive evidence: a Wayback URL or an evidence record.
+fn is_archive_kind(kind: u8) -> bool {
+    kind == 3 || kind == ORACLE_EVIDENCE_RECORD_KIND
+}
+
 /// Current G3 publication transports the URL only through its sealed object.
 /// Reject inline URL bytes: there is one current payload interpretation.
-/// Opening and update claims read their archive URL through this.
+/// Opening and update claims (162, 163, 198, 168) read their archive evidence through this: a
+/// sealed Wayback URL (kind 3) or authenticated evidence record (kind 4), returned as text.
 pub(super) fn publication_url(
     program: &Pubkey,
     object: &AccountInfo,
@@ -270,7 +292,8 @@ pub(super) fn publication_url(
     }
     validate_object(program, object)?;
     let d = object.try_data()?;
-    if d[38] != 3 || d[75] != 1 || committed_hash(3, &d[HEADER..])? != d[39..71] {
+    let kind = d[38];
+    if !is_archive_kind(kind) || d[75] != 1 || committed_hash(kind, &d[HEADER..])? != d[39..71] {
         return invalid();
     }
     Ok(std::str::from_utf8(&d[HEADER..])
@@ -404,6 +427,14 @@ pub(super) fn publish<'a>(
     let kind = if role < 2 { role + 1 } else { 3 };
     {
         let d = object.try_data()?;
+        // Archive roles (2-5: claims and challenges) also take the kind-4 form of archive
+        // evidence, an authenticated evidence record. A source's locator and definition (roles 0
+        // and 1) never do: a record is claim evidence, not a source's identity.
+        let kind = if kind == 3 && d[38] == ORACLE_EVIDENCE_RECORD_KIND {
+            ORACLE_EVIDENCE_RECORD_KIND
+        } else {
+            kind
+        };
         if d[75] != 1
             || d[38] != kind
             || d[39..71] != commitment
@@ -492,7 +523,8 @@ pub(super) fn backfill_source(program: &Pubkey, a: &[AccountInfo]) -> ProgramRes
     Ok(())
 }
 /// Accounts: 0 payer signer; 1 month; 2 source; 3 claim or challenge; 4 parent claim;
-/// 5 archive-URL object; 6 writable link; 7 system program; 8 the month's period.
+/// 5 archive evidence object (a kind-3 Wayback URL or kind-4 evidence record); 6 writable link;
+/// 7 system program; 8 the month's period.
 pub(super) fn backfill_claim(program: &Pubkey, a: &[AccountInfo], role: u8) -> ProgramResult {
     if a.len() != 9 {
         return invalid();
@@ -810,5 +842,333 @@ mod tests {
         let credential = format!("{base}?{}token=", "a".repeat(fill - 7));
         assert!(public_locator(&credential).is_err());
         assert!(!reference_public_locator(&credential));
+    }
+
+    const DIGEST: &str = "abababababababababababababababababababababababababababababababab";
+
+    fn record(method: &str, time: &str, digest: &str, locator: &str) -> String {
+        format!("{ORACLE_EVIDENCE_RECORD_PREFIX}m={method};t={time};d={digest};u={locator}")
+    }
+
+    /// A sealed object of `kind` holding `body`, as `write` leaves it.
+    fn sealed_object(program: &Pubkey, payer: &Pubkey, kind: u8, body: &[u8]) -> (Pubkey, Vec<u8>) {
+        let commitment = committed_hash(kind, body).unwrap();
+        let (key, bump) = bytes_address(program, payer, kind, &commitment);
+        let mut data = vec![0; HEADER + body.len()];
+        data[..6].copy_from_slice(&[b'O', b'E', b'B', 1, 1, bump]);
+        data[6..38].copy_from_slice(payer.as_ref());
+        data[38] = kind;
+        data[39..71].copy_from_slice(&commitment);
+        data[71..73].copy_from_slice(&(body.len() as u16).to_le_bytes());
+        data[73..75].copy_from_slice(&(body.len() as u16).to_le_bytes());
+        data[75] = 1;
+        data[HEADER..].copy_from_slice(body);
+        (key, data)
+    }
+
+    #[test]
+    fn evidence_record_seals_as_kind_four_under_the_archive_url_commitment() {
+        let text = record(
+            "web",
+            "1760900000",
+            DIGEST,
+            "https://example.com/price?x=%2f",
+        );
+        let commitment = committed_hash(ORACLE_EVIDENCE_RECORD_KIND, text.as_bytes()).unwrap();
+        assert_eq!(
+            commitment,
+            hashv(&[ORACLE_OPENING_ARCHIVE_URL_HASH_DOMAIN, text.as_bytes()]).to_bytes()
+        );
+        assert_eq!(commitment, derive_oracle_opening_archive_url_hash(&text));
+        let email = record("email", "1760900000", DIGEST, "https://example.com/price");
+        assert!(committed_hash(4, email.as_bytes()).is_ok());
+        assert_eq!(max_bytes(4).unwrap(), ORACLE_EVIDENCE_RECORD_MAX_BYTES);
+        assert_eq!(ORACLE_EVIDENCE_RECORD_MAX_BYTES, 512);
+        assert!(max_bytes(5).is_err());
+
+        // Each archive kind seals only its own form.
+        let wayback = "https://web.archive.org/web/20260701000000/https://example.com/price?x=%2f";
+        assert!(committed_hash(3, text.as_bytes()).is_err());
+        assert!(committed_hash(3, wayback.as_bytes()).is_ok());
+        assert!(committed_hash(4, wayback.as_bytes()).is_err());
+        // A record is neither a locator nor a definition commitment.
+        assert!(committed_hash(1, text.as_bytes()).is_err());
+        assert_ne!(committed_hash(2, text.as_bytes()).unwrap(), commitment);
+
+        let upper = DIGEST.replacen('a', "A", 1);
+        let long = format!("https://example.com/{}", "a".repeat(500));
+        for bad in [
+            record("web", "1760900000", &upper, "https://example.com/price"),
+            record(
+                "web",
+                "1760900000",
+                &DIGEST[1..],
+                "https://example.com/price",
+            ),
+            record("wayback", "1760900000", DIGEST, "https://example.com/price"),
+            record("web", "01760900000", DIGEST, "https://example.com/price"),
+            record("web", "0", DIGEST, "https://example.com/price"),
+            record(
+                "web",
+                "1760900000",
+                DIGEST,
+                "https://example.com/price?api_key=1",
+            ),
+            record(
+                "web",
+                "1760900000",
+                DIGEST,
+                "https://name:pass@example.com/price",
+            ),
+            record("web", "1760900000", DIGEST, &long),
+            record("web", "1760900000", DIGEST, "https://example.com/a b"),
+        ] {
+            assert!(committed_hash(4, bad.as_bytes()).is_err(), "{bad}");
+        }
+        // The longest well-formed record (an `email` record, 20-digit time, 384-byte locator)
+        // fits the 512-byte bound; anything past the bound is refused before parsing.
+        let base = "https://example.com/";
+        let at_limit = format!(
+            "{base}{}",
+            "a".repeat(ORACLE_OPENING_ARCHIVE_URL_MAX_BYTES - base.len())
+        );
+        let longest = record("email", "10000000000000000000", DIGEST, &at_limit);
+        assert!(longest.len() <= ORACLE_EVIDENCE_RECORD_MAX_BYTES);
+        assert!(committed_hash(4, longest.as_bytes()).is_ok());
+        let over = format!("{longest}{}", "a".repeat(513 - longest.len()));
+        assert_eq!(over.len(), 513);
+        assert!(committed_hash(4, over.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn publication_reads_a_sealed_wayback_url_or_evidence_record() {
+        let program = Pubkey::new_unique();
+        let payer = Pubkey::new_unique();
+        let text = record("web", "1760900000", DIGEST, "https://example.com/price");
+        let wayback = "https://web.archive.org/web/20260701000000/https://example.com/price";
+        let read = |key: &Pubkey, bytes: &mut [u8], wire: &str| {
+            let mut lamports = 1;
+            let info =
+                AccountInfo::new(key, false, false, &mut lamports, bytes, &program, false, 0);
+            publication_url(&program, &info, wire)
+        };
+        for (kind, body) in [(4, text.as_str()), (3, wayback)] {
+            let (key, data) = sealed_object(&program, &payer, kind, body.as_bytes());
+            assert_eq!(read(&key, &mut data.clone(), "").unwrap(), body);
+            // Inline wire bytes, an unsealed draft and a foreign kind byte are refused.
+            assert!(read(&key, &mut data.clone(), body).is_err());
+            let mut draft = data.clone();
+            draft[75] = 0;
+            draft[73..75].copy_from_slice(&0u16.to_le_bytes());
+            draft[HEADER..].fill(0);
+            assert!(read(&key, &mut draft, "").is_err());
+            let mut relabelled = data.clone();
+            relabelled[38] = 7 - kind;
+            assert!(read(&key, &mut relabelled, "").is_err());
+        }
+        // Locator and definition objects are not archive evidence.
+        let locator = b"https://example.com/price";
+        let (key, data) = sealed_object(&program, &payer, 1, locator);
+        assert!(read(&key, &mut data.clone(), "").is_err());
+        let (key, data) = sealed_object(&program, &payer, 2, text.as_bytes());
+        assert!(read(&key, &mut data.clone(), "").is_err());
+        // A kind-4 object larger than its bound never validates.
+        let (key, mut data) = sealed_object(&program, &payer, 4, text.as_bytes());
+        data[71..73].copy_from_slice(&513u16.to_le_bytes());
+        assert!(read(&key, &mut data, "").is_err());
+    }
+
+    /// `amoeba_evidence::parse_onchain_record` (`evidence/crates/evidence/src/lib.rs`) kept
+    /// verbatim as the behavioral reference, with its `hash::parse_hex32` inlined.
+    fn reference_parse_onchain_record(text: &str) -> Option<(&str, u64, [u8; 32], &str)> {
+        fn parse_hex32(text: &str) -> Option<[u8; 32]> {
+            if text.len() != 64 || text.bytes().any(|b| b.is_ascii_uppercase()) {
+                return None;
+            }
+            let mut out = [0u8; 32];
+            for (byte, pair) in out.iter_mut().zip(text.as_bytes().chunks(2)) {
+                let high = (pair[0] as char).to_digit(16)?;
+                let low = (pair[1] as char).to_digit(16)?;
+                *byte = (high * 16 + low) as u8;
+            }
+            Some(out)
+        }
+        let rest = text.strip_prefix("amoeba-evidence-v1;")?;
+        let rest = rest.strip_prefix("m=")?;
+        let (method, rest) = rest.split_once(";t=")?;
+        let (time, rest) = rest.split_once(";d=")?;
+        let (digest, locator) = rest.split_once(";u=")?;
+        if !matches!(method, "web" | "email")
+            || time.is_empty()
+            || time.len() > 20
+            || !time.bytes().all(|c| c.is_ascii_digit())
+            || (time.len() > 1 && time.starts_with('0'))
+        {
+            return None;
+        }
+        Some((method, time.parse().ok()?, parse_hex32(digest)?, locator))
+    }
+
+    /// What the program accepts: the reference's form, `t` nonzero, the oracle's locator rules on
+    /// `u`, and the archive URL's byte rules and the record bound on the whole text.
+    fn expected_record(text: &str) -> Option<(u64, &str)> {
+        let (_, time, _, locator) = reference_parse_onchain_record(text)?;
+        (text.len() <= ORACLE_EVIDENCE_RECORD_MAX_BYTES
+            && !text.bytes().any(|b| b <= b' ' || b == 0x7f)
+            && time != 0
+            && reference_public_locator(locator))
+        .then_some((time, locator))
+    }
+
+    const RECORD_PREFIXES: &[&str] = &[
+        "amoeba-evidence-v1;",
+        "amoeba-evidence-v1",
+        "amoeba-evidence-v2;",
+        "AMOEBA-evidence-v1;",
+        "",
+    ];
+    const RECORD_METHODS: &[&str] = &[
+        "m=web",
+        "m=email",
+        "m=wayback",
+        "m=WEB",
+        "m=",
+        "web",
+        "m=web;m=web",
+        "m=em;ail",
+        "m=web ",
+    ];
+    const RECORD_TIMES: &[&str] = &[
+        ";t=1760900000",
+        ";t=1",
+        ";t=0",
+        ";t=00",
+        ";t=01",
+        ";t=",
+        ";t=18446744073709551615",
+        ";t=18446744073709551616",
+        ";t=99999999999999999999",
+        ";t=100000000000000000000",
+        ";t=1;t=2",
+        ";t=1a",
+        ";t=+1",
+        ";t=-1",
+        ";t= 1",
+        "t=1",
+    ];
+    const RECORD_LOCATORS: &[&str] = &[
+        ";u=https://example.com/price?x=1",
+        ";u=http://example.com/x",
+        ";u=https://example.com/x?token=1",
+        ";u=https://example.com/x?api%5Fkey=1",
+        ";u=",
+        ";u=ftp://example.com/x",
+        ";u=https://u@example.com/x",
+        ";u=https://example.com/x;u=https://other.example/y",
+        ";u=https://example.com/x;d=1;t=2",
+        ";u=https://example.com/\u{e9}",
+        ";u=https://example.com/ x",
+        ";u=https://example.com/\t",
+        ";u=https://example.com/\u{7f}",
+        "u=https://example.com/x",
+        ";u=https://:443/x",
+    ];
+
+    fn record_digest(choice: usize) -> String {
+        match choice {
+            0 => format!(";d={DIGEST}"),
+            1 => format!(";d={}", "0123456789abcdef".repeat(4)),
+            2 => format!(";d={}", DIGEST.replacen('b', "B", 1)),
+            3 => format!(";d={}", &DIGEST[1..]),
+            4 => format!(";d={DIGEST}0"),
+            5 => format!(";d={}", DIGEST.replacen('b', "g", 1)),
+            6 => ";d=".to_string(),
+            7 => format!(";d={DIGEST};d={DIGEST}"),
+            8 => format!("d={DIGEST}"),
+            _ => format!(";d={}", "\u{e9}".repeat(32)),
+        }
+    }
+
+    #[test]
+    fn evidence_record_parser_matches_reference_on_every_structured_combination() {
+        let (mut accepted, mut rejected) = (0, 0);
+        for prefix in RECORD_PREFIXES {
+            for method in RECORD_METHODS {
+                for time in RECORD_TIMES {
+                    for digest in 0..10 {
+                        for locator in RECORD_LOCATORS {
+                            let text =
+                                format!("{prefix}{method}{time}{}{locator}", record_digest(digest));
+                            let parsed = parse_oracle_evidence_record(&text).ok();
+                            assert_eq!(parsed, expected_record(&text), "{text:?}");
+                            if parsed.is_some() {
+                                accepted += 1;
+                            } else {
+                                rejected += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            accepted > 0 && rejected > accepted,
+            "{accepted} / {rejected}"
+        );
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(4096))]
+        #[test]
+        fn evidence_record_parser_matches_reference_on_structured_records(
+            prefix in 0..RECORD_PREFIXES.len() * 2,
+            method in 0..RECORD_METHODS.len() * 2,
+            time in 0..RECORD_TIMES.len() * 2,
+            digest in 0..20usize,
+            locator in 0..RECORD_LOCATORS.len() * 2,
+            tail in proptest::collection::vec(0..LOCATOR_ATOMS.len(), 0..12),
+            tail_len in 0..24usize,
+            pad in 0..450usize,
+        ) {
+            // An index past a list picks its first (well-formed) entry, so about half of each
+            // field is well formed and whole records are often valid.
+            let pick = |list: &[&'static str], index: usize| {
+                list.get(index).copied().unwrap_or(list[0])
+            };
+            let mut text = format!(
+                "{}{}{}{}{}",
+                pick(RECORD_PREFIXES, prefix),
+                pick(RECORD_METHODS, method),
+                pick(RECORD_TIMES, time),
+                record_digest(if digest < 10 { digest } else { digest % 2 }),
+                pick(RECORD_LOCATORS, locator),
+            );
+            for atom in tail.iter().take(tail_len.saturating_sub(12)) {
+                text.push_str(LOCATOR_ATOMS[*atom]);
+            }
+            // Sometimes long enough to cross the locator and record bounds.
+            if pad > 300 {
+                text.push_str(&"a".repeat(pad));
+            }
+            proptest::prop_assert_eq!(
+                parse_oracle_evidence_record(&text).ok(),
+                expected_record(&text)
+            );
+        }
+
+        #[test]
+        fn evidence_record_parser_matches_reference_on_arbitrary_tails(tail in ".{0,520}") {
+            for head in ["amoeba-evidence-v1;m=web;t=", "amoeba-evidence-v1;m=email;t=1760900000;d="] {
+                let text = format!("{head}{tail}");
+                proptest::prop_assert_eq!(
+                    parse_oracle_evidence_record(&text).ok(),
+                    expected_record(&text)
+                );
+            }
+            proptest::prop_assert_eq!(
+                parse_oracle_evidence_record(&tail).ok(),
+                expected_record(&tail)
+            );
+        }
     }
 }

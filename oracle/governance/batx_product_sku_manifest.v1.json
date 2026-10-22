@@ -1,0 +1,71 @@
+{
+  "schema": "amoeba.oracle-product-sku-manifest",
+  "schemaVersion": 1,
+  "manifestVersion": 1,
+  "product": {
+    "marketId": "batx",
+    "symbol": "BATX",
+    "underlyingId": "battery-cell-basket"
+  },
+  "provenance": {
+    "sourceDescription": "BATX battery-cell basket brief, draft 1.0 (2026-10-20): four market categories of manufactured lithium-ion cells, China domestic industrial pricing in CNY",
+    "sourceSha256": "9761097947cf590562184ebb59ae09c53451b01b5629e3f44df5547eb0d3317c"
+  },
+  "canonicalLabelEncoding": {
+    "name": "printable-ascii-utf8-right-zero-padded-bytes32-v1",
+    "minimumBytes": 1,
+    "maximumBytes": 32,
+    "sort": "ascending-encoded-bytes"
+  },
+  "tag190Plan": {
+    "instructionTag": 190,
+    "maximumChunkSkuIds": 16,
+    "chunkSkuCounts": [
+      4
+    ]
+  },
+  "requiredSkuCount": 4,
+  "requiredSkuRootHex": "5303c0507ecb9d42bd10367d7a5b13a32bb4f84ba3ad9dc8069fd6b8a9a341b9",
+  "groups": [
+    {
+      "name": "LFP",
+      "skuCount": 2,
+      "subgroups": [
+        {
+          "name": "Prismatic, stationary storage",
+          "skuCount": 1,
+          "skuLabels": [
+            "LFP_STORAGE"
+          ]
+        },
+        {
+          "name": "Prismatic, electric vehicles",
+          "skuCount": 1,
+          "skuLabels": [
+            "LFP_EV"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Nickel-based ternary",
+      "skuCount": 2,
+      "subgroups": [
+        {
+          "name": "Prismatic, electric vehicles",
+          "skuCount": 1,
+          "skuLabels": [
+            "TERNARY_PRISM_EV"
+          ]
+        },
+        {
+          "name": "Pouch, electric vehicles",
+          "skuCount": 1,
+          "skuLabels": [
+            "TERNARY_POUCH_EV"
+          ]
+        }
+      ]
+    }
+  ]
+}

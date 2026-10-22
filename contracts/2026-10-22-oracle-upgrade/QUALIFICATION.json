@@ -1,0 +1,21 @@
+{
+  "schema": "amoeba.oracle-input-qualification.v1",
+  "qualifiedSource": "6dc23b87f54419f595fcd51fa69732180a1d6632",
+  "releaseSource": "da0e9143f44635dcbce7288ea6510ddf042de215",
+  "sourceBoundGate": {
+    "inputKey": "oracle-1080d70800e2fea7",
+    "passedAt": "2026-10-22T03:01:52Z",
+    "record": "2026-10-22-oracle-upgrade"
+  },
+  "compiledInputsIdentical": true,
+  "comparedPaths": [
+    "oracle/programs/ameba_oracle",
+    "oracle/crates/oracle-interface",
+    "oracle/Cargo.toml",
+    "oracle/Cargo.lock",
+    "oracle/rust-toolchain.toml",
+    "governance/crates/governance-interface"
+  ],
+  "checksReused": "Full oracle release gate, including production-arch SBF tests; no compiled source changes. Fixed-path build checked separately.",
+  "artifactSha256": "cb0a5687b452edbb5fcc7c1474b71b15382c747c0fea30e2f225da0c8251d14f"
+}

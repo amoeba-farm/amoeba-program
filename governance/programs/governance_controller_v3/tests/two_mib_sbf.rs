@@ -934,7 +934,7 @@ async fn actual_sbf_release_one_installs_release_two_and_retires_old_proposals()
         sha256_hex(&deployed),
         "1442c507f6f40f666e4191d767f8a892d61ddf73c82ab80da593c611c7312780"
     );
-    assert_eq!(CONTROLLER_RELEASE, 2);
+    assert_eq!(CONTROLLER_RELEASE, 6);
     let mut current = deployed.clone();
     current.resize(ALLOCATED, 0);
     let mut h = Harness::start_with(&current, &deployed, &[&new, &new]).await;
@@ -978,7 +978,7 @@ async fn actual_sbf_release_one_installs_release_two_and_retires_old_proposals()
         .ok(
             h.execute_controller(1, first.digest),
             &[],
-            "release 1 installs release 2",
+            "release 1 installs the current release",
         )
         .await;
     assert!(units < MAX_EXECUTE_CU);
@@ -1047,17 +1047,17 @@ async fn actual_sbf_release_one_installs_release_two_and_retires_old_proposals()
             .data,
         rival_before.data
     );
-    for release in [0, 1, 3] {
+    for release in [0, 1, CONTROLLER_RELEASE + 1] {
         let action = h.controller_action(&new, release).await;
         assert!(
             h.create(3, action).await.is_err(),
             "retired or future release {release}"
         );
     }
-    let action = h.controller_action(&new, 2).await;
+    let action = h.controller_action(&new, CONTROLLER_RELEASE).await;
     h.create(3, action)
         .await
-        .expect("release-2 proposal accepted");
+        .expect("current-release proposal accepted");
     println!("AMOEBA_GOV_V3_RELEASE_ONE_TO_TWO old_bytes={} new_bytes={} allocated={} execute_cu={units}", deployed.len(), new.len(), installed.len());
 }
 

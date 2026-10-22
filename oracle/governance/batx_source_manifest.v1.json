@@ -1,0 +1,320 @@
+{
+  "document_type": "BATX source manifest (brief §8 A)",
+  "version": "batx-source-manifest-v1-candidates",
+  "date": "2026-10-20",
+  "spec": "batx_basket_spec.v1.json",
+  "status": "Candidate series only: none is approved, none has a data licence, and no internal coefficient is set. Every value, label and term below was read from the publisher's own page on 2026-10-20; anything not shown there is \"unknown\". Values are the latest public ones, recorded to identify the series, not as observations.",
+  "verification": {
+    "checked_at": "2026-10-20",
+    "method": "Each page and its terms page fetched directly; labels copied verbatim. ICCSino blocked automated access; its rows are unverified."
+  },
+  "data_use_summary": "No source may be used for BATX settlement without a written data licence. TrendForce's Terms of Use §5(h) prohibit using its prices \"in connection with any betting, wagering, prediction market, or other speculative activity\"; every other publisher limits commercial use, redistribution or benchmarking without a licence.",
+  "internal_coefficients": "unspecified; on chain each bucket settles on the median of its frozen sources (see batx_feasibility.v1.md)",
+  "publishers": {
+    "trendforce": {
+      "name": "TrendForce",
+      "terms": "https://www.trendforce.com/about/terms",
+      "data_use": "prohibited for prediction markets: §5(h) \"You are prohibited from using, referencing, incorporating, or relying upon any prices, data, forecasts, research, or other content provided through the Website in connection with any betting, wagering, prediction market, or other speculative activity based on the occurrence or outcome of future events\"; §3 limited personal non-commercial use; §6(2) no reproduction or distribution without written consent"
+    },
+    "infolink": {
+      "name": "InfoLink Consulting",
+      "terms": "https://www.infolink-group.com/term-of-use/",
+      "data_use": "restricted: \"Unauthorized screenshots, forwarding, sharing with third parties, or any commercial redistribution is strictly prohibited.\""
+    },
+    "fastmarkets": {
+      "name": "Fastmarkets",
+      "terms": "https://www.fastmarkets.com/terms-of-use",
+      "data_use": "restricted: internal business purposes only; no distribution, derivative works or benchmarking without a data licence"
+    },
+    "smm": {
+      "name": "SMM (Shanghai Metals Market, 上海有色网)",
+      "terms": "https://www.smm.cn/legal",
+      "data_use": "restricted: no commercial use, reproduction or derivative works without written authorisation"
+    },
+    "mysteel": {
+      "name": "Mysteel (我的钢铁网)",
+      "terms": "unknown",
+      "data_use": "restricted: reports marked \"非公开资料，仅供Mysteel客户自身使用\" (non-public, for Mysteel clients' own use)"
+    },
+    "benchmark": {
+      "name": "Benchmark Mineral Intelligence",
+      "terms": "unknown",
+      "data_use": "subscription only"
+    }
+  },
+  "categories": {
+    "LFP_STORAGE": [
+      {
+        "publisher": "trendforce",
+        "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+        "row": "Battery Cell-Square LFP Battery Cell: Energy Storage (RMB/Wh) (RMB)",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment",
+        "unit": "RMB/Wh",
+        "currency": "CNY",
+        "statistic": "Average",
+        "latest_public": { "value": "0.38", "as_of": "2026-09-07 (\"Last Update\")" },
+        "cadence": "monthly (\"Updated Monthly\"); no October update by 2026-10-20",
+        "access": "public table, no login",
+        "history": "latest value only on the page",
+        "commercial_basis": { "geography": "China's li-ion battery industry chain", "tax": "unknown", "delivery": "unknown", "quantity": "unknown", "price_basis": "unknown" },
+        "product_scope": { "capacity": "unknown (not stated)", "performance_class": "unknown" }
+      },
+      {
+        "publisher": "infolink",
+        "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+        "row": "Prismatic LFP cell- 314Ah (RMB)",
+        "row_zh": "方形磷酸铁锂储能电芯-314Ah (RMB)",
+        "section": "Energy-storage cell-China (including VAT.) (Wh)",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment",
+        "unit": "RMB/Wh",
+        "currency": "CNY",
+        "statistic": "High / Low / Average price (one fixed per series)",
+        "latest_public": { "high": "0.390", "low": "0.330", "average": "0.360", "as_of": "2026-10-14" },
+        "cadence": "weekly, Wednesdays (terms: \"Quotes are updated on our website every Wednesday\"); dated articles biweekly Jan-Apr 2026, weekly from 2026-05-06, none in the 2026-10-07 holiday week",
+        "access": "storage rows public",
+        "history": "the page shows the current week; dated public articles (ess-spot-price-YYYYMMDD) form a back-series",
+        "commercial_basis": { "geography": "China", "tax": "VAT-inclusive (\"含税成交价\")", "delivery": "unknown", "quantity": "unknown", "price_basis": "transaction prices from nearly 20 leading manufacturers" },
+        "product_scope": { "capacity": "314Ah", "performance_class": "unknown" },
+        "sibling_rows": [
+          "Prismatic LFP cell- 280Ah (RMB): 0.390 / 0.330 / 0.360 on 2026-10-14",
+          "Prismatic LFP cell- 100Ah (RMB): 0.450 / 0.390 / 0.420 on 2026-10-14, \"mainly based on long-cycle specifications (6,000 cycles and above)\""
+        ],
+        "note": "One publisher: its 100, 280 and 314Ah rows are separate series of one methodology, not independent publishers (brief §6)."
+      },
+      {
+        "publisher": "fastmarkets",
+        "url": "https://www.fastmarkets.com/insights/fastmarkets-to-launch-china-pv-module-bess-battery-cell-prices/",
+        "row": "LFP prismatic cell, 314Ah, ex-works domestic China basis, yuan per Wh",
+        "provider_id": "MB-LFP-0001",
+        "evidence_class": "published_assessment",
+        "unit": "yuan/Wh",
+        "currency": "CNY",
+        "statistic": "unknown (the launch print was a range)",
+        "latest_public": { "value": "0.35-0.40", "as_of": "2026-06-26 (launch print, from Fastmarkets' own articles)" },
+        "cadence": "monthly, last Friday of the month, 5-6pm Shanghai time",
+        "access": "price page shows no values (\"Inquire about this price\")",
+        "history": "from 2026-06-26; values after June not public",
+        "commercial_basis": { "geography": "domestic China", "tax": "unknown", "delivery": "EXW", "quantity": "no minimum quantity", "loading": "within 60 days", "price_basis": "assessment" },
+        "product_scope": { "capacity": "314Ah", "nominal_voltage": "3.2V", "performance_class": "cycle life >= 8,000 cycles, 0.25P-1P" }
+      },
+      {
+        "publisher": "smm",
+        "url": "https://newenergy.smm.cn/price/14042-15013",
+        "row": "方形磷酸铁锂电池(周)",
+        "provider_id": "SMM-LB-ES-005",
+        "spec": "储能型，314Ah",
+        "evidence_class": "published_assessment",
+        "unit": "unknown (values behind login)",
+        "currency": "CNY",
+        "statistic": "unknown",
+        "latest_public": { "value": "behind login", "as_of": "2026-10-16" },
+        "cadence": "weekly, Fridays 12:00 Beijing time",
+        "access": "values and history require login (free or paid tier unknown)",
+        "history": "since 2024-05-10 (locked)",
+        "commercial_basis": { "geography": "China", "tax": "13% VAT included", "delivery": "delivered (送到成交价)", "quantity": "unknown", "price_basis": "transaction" },
+        "product_scope": { "capacity": "314Ah", "performance_class": "unknown" },
+        "sibling_rows": [
+          "SMM-LB-ES-006 方形磷酸铁锂电池(周) 储能型，280Ah, since 2022-10-14",
+          "SMM-LB-ES-009 SMM方形磷酸铁锂电池314Ah指数, ex-works (出厂价), since 2025-10-10",
+          "SMM-LB-ES-003 / -004 储能型 100Ah / 50Ah (small-format home and telecom storage)"
+        ]
+      },
+      {
+        "publisher": "benchmark",
+        "url": "unknown (subscription)",
+        "row": "LFP Prismatic 314Ah EXW China",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment (model-based)",
+        "unit": "USD/kWh",
+        "currency": "USD",
+        "latest_public": { "value": "54.21", "as_of": "September 2026 (Q3 review of 2026-10-09)" },
+        "cadence": "monthly",
+        "routing": "RESEARCH_ONLY: not CNY-native (converted from RMB) and partly modelled"
+      }
+    ],
+    "LFP_EV": [
+      {
+        "publisher": "trendforce",
+        "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+        "row": "Battery Cell-Square LFP Battery Cell: for EV (RMB/Wh) (RMB)",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment",
+        "unit": "RMB/Wh",
+        "currency": "CNY",
+        "statistic": "Average",
+        "latest_public": { "value": "0.40", "as_of": "2026-09-07" },
+        "cadence": "monthly",
+        "access": "public table",
+        "history": "latest value only",
+        "commercial_basis": { "geography": "China", "tax": "unknown", "delivery": "unknown", "quantity": "unknown", "price_basis": "unknown" },
+        "product_scope": { "capacity": "unknown", "performance_class": "unknown" }
+      },
+      {
+        "publisher": "smm",
+        "url": "https://newenergy.smm.cn/price/14042-15013",
+        "row": "方形磷酸铁锂电芯(周)",
+        "provider_id": "SMM-LB-EV-005",
+        "spec": "174Ah, 动力用",
+        "evidence_class": "published_assessment",
+        "unit": "unknown (behind login)",
+        "currency": "CNY",
+        "latest_public": { "value": "behind login", "as_of": "2026-10-16" },
+        "cadence": "weekly, Fridays",
+        "access": "login",
+        "history": "since 2024-05-17 (locked)",
+        "commercial_basis": { "geography": "China", "tax": "13% VAT included", "delivery": "delivered", "price_basis": "transaction" },
+        "product_scope": { "capacity": "174Ah" },
+        "sibling_rows": ["SMM-LB-EV-004 方形磷酸铁锂电芯(周) 100Ah 动力用, since 2021-01-08"]
+      },
+      {
+        "publisher": "mysteel",
+        "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "row": "磷酸铁锂电芯 / 动力型 / 方形",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment",
+        "unit": "元/Wh",
+        "currency": "CNY",
+        "statistic": "low / high / mid (one fixed per series)",
+        "latest_public": { "low": "0.52", "high": "0.57", "mid": "0.55", "as_of": "2026-10-16" },
+        "cadence": "daily, weekdays",
+        "access": "summary table public; daily reports client-only",
+        "history": "unknown",
+        "commercial_basis": { "geography": "China", "tax": "VAT-inclusive (出厂含税价)", "delivery": "ex-works", "price_basis": "unknown" },
+        "product_scope": { "capacity": "unknown" },
+        "note": "Level differs a lot from TrendForce's 0.40 (September); not reconciled."
+      },
+      {
+        "publisher": "benchmark",
+        "row": "Standard LFP prismatic cells in China",
+        "currency": "USD",
+        "latest_public": { "value": "57.37 USD/kWh", "as_of": "September 2026" },
+        "routing": "RESEARCH_ONLY: not CNY-native"
+      }
+    ],
+    "TERNARY_PRISM_EV": [
+      {
+        "publisher": "trendforce",
+        "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+        "row": "Battery Cell-Square Ternary Battery Cell: for EV (RMB/Wh) (RMB)",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment",
+        "unit": "RMB/Wh",
+        "currency": "CNY",
+        "statistic": "Average",
+        "latest_public": { "value": "0.62", "as_of": "2026-09-07" },
+        "cadence": "monthly",
+        "access": "public table",
+        "history": "latest value only",
+        "commercial_basis": { "geography": "China", "tax": "unknown", "delivery": "unknown", "price_basis": "unknown" },
+        "product_scope": { "chemistry": "ternary (grade unknown)", "capacity": "unknown" }
+      },
+      {
+        "publisher": "smm",
+        "url": "https://newenergy.smm.cn/price/14042-15013",
+        "row": "8系方形三元电芯(周)",
+        "provider_id": "SMM-LB-EV-011",
+        "spec": "158Ah",
+        "evidence_class": "published_assessment",
+        "currency": "CNY",
+        "latest_public": { "value": "behind login", "as_of": "2026-10-16" },
+        "cadence": "weekly, Fridays",
+        "access": "login",
+        "history": "since 2024-12-20 (locked)",
+        "commercial_basis": { "tax": "13% VAT included", "delivery": "delivered", "price_basis": "transaction" },
+        "product_scope": { "chemistry": "NCM 8-series", "capacity": "158Ah" },
+        "sibling_rows": [
+          "SMM-LB-EV-002 6系方形三元电芯(周) 114Ah, since 2024-05-17",
+          "SMM-LB-EV-009 523方形三元电芯(周） 50-60Ah, since 2021-01-08"
+        ]
+      },
+      {
+        "publisher": "mysteel",
+        "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "row": "三元电芯：方块：动力型：市场价格/最低价/最高价：中华人民共和国（日度）",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment",
+        "unit": "元/Wh",
+        "currency": "CNY",
+        "latest_public": { "value": "0.63 / 0.61 / 0.64 (market / low / high)", "as_of": "unknown" },
+        "cadence": "daily, weekdays",
+        "access": "summary public; reports client-only",
+        "commercial_basis": { "tax": "VAT-inclusive", "delivery": "ex-works" },
+        "note": "The category page shows different figures (0.58 / 0.6 / 0.59, undated); which is current is unknown."
+      }
+    ],
+    "TERNARY_POUCH_EV": [
+      {
+        "publisher": "trendforce",
+        "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+        "row": "Battery Cell-Pouch Ternary Battery Cell: for EV (RMB/Wh) (RMB)",
+        "provider_id": "unknown",
+        "evidence_class": "published_assessment",
+        "unit": "RMB/Wh",
+        "currency": "CNY",
+        "statistic": "Average",
+        "latest_public": { "value": "0.63", "as_of": "2026-09-07" },
+        "cadence": "monthly",
+        "access": "public table",
+        "history": "latest value only",
+        "commercial_basis": { "geography": "China", "tax": "unknown", "delivery": "unknown", "price_basis": "unknown" },
+        "product_scope": { "chemistry": "ternary (grade unknown)", "capacity": "unknown" }
+      },
+      {
+        "publisher": "smm",
+        "url": "https://newenergy.smm.cn/price/14042-15013",
+        "row": "523软包三元电芯(周）",
+        "provider_id": "SMM-LB-EV-010",
+        "spec": "50-60Ah",
+        "evidence_class": "published_assessment",
+        "currency": "CNY",
+        "latest_public": { "value": "behind login", "as_of": "2026-10-16" },
+        "cadence": "weekly, Fridays",
+        "access": "login",
+        "history": "since 2021-01-08 (locked)",
+        "commercial_basis": { "tax": "13% VAT included", "delivery": "delivered", "price_basis": "transaction" },
+        "product_scope": { "chemistry": "NCM523", "capacity": "50-60Ah" }
+      },
+      {
+        "publisher": "benchmark",
+        "row": "NCM523 Pouch EXW China",
+        "currency": "USD",
+        "latest_public": { "value": "84.97 USD/kWh", "as_of": "September 2026" },
+        "routing": "RESEARCH_ONLY: not CNY-native, model-based"
+      }
+    ]
+  },
+  "unverified_leads": [
+    {
+      "publisher": "ICCSino (鑫椤资讯)",
+      "rows": "方形动力电芯 / 三元 / 国产 0.44-0.5 (last month's average 0.47 元/Wh); 方形动力电芯 / 磷酸铁锂 / 国产 0.3-0.4 (0.35 元/Wh), homepage teaser dated 2026-10-20",
+      "status": "unverified: the site blocked automated access; whether its daily \"动力型聚合物锂电池价格行情\" report is a pouch EV series is unknown"
+    }
+  ],
+  "not_found": [
+    "GGII (高工锂电): no primary recurring series found",
+    "BloombergNEF: annual pack survey only",
+    "CBEA: no recurring index found",
+    "Argus: battery materials only"
+  ],
+  "coverage": {
+    "rule": "Distinct publishers with a verified recurring CNY series (brief §6: rows of one publisher count once).",
+    "LFP_STORAGE": { "publishers": ["trendforce", "infolink", "fastmarkets", "smm"], "count": 4 },
+    "LFP_EV": { "publishers": ["trendforce", "smm", "mysteel"], "count": 3 },
+    "TERNARY_PRISM_EV": { "publishers": ["trendforce", "smm", "mysteel"], "count": 3 },
+    "TERNARY_POUCH_EV": { "publishers": ["trendforce", "smm"], "count": 2 },
+    "without_trendforce": "LFP_STORAGE 3, LFP_EV 2, TERNARY_PRISM_EV 2, TERNARY_POUCH_EV 1 (SMM alone)",
+    "settlement_floor": "Mainnet settles a bucket on its own median with at least 3 eligible sources; below that the council decides."
+  },
+  "open_unknowns": [
+    "a licence for derivatives settlement from every publisher; TrendForce's §5(h) reads as a ban unless waived",
+    "TrendForce's tax and delivery basis, the period behind \"Change\", and its history",
+    "Fastmarkets' VAT basis and its values after June 2026",
+    "what SMM's login requires (free registration or a paid tier)",
+    "which Mysteel ternary prismatic figure is current",
+    "ICCSino's daily reports",
+    "how VAT-inclusive (InfoLink, SMM, Mysteel) and unstated (TrendForce, Fastmarkets) bases, and delivered (SMM) and ex-works (Mysteel, Fastmarkets) terms, line up; a reported 2% consumption tax on lithium-ion batteries from 2026-09-01 may shift tax-inclusive series",
+    "why LFP EV levels differ (TrendForce 0.40 in September, Mysteel 0.55 in October)"
+  ]
+}

@@ -45,7 +45,17 @@ pub async fn wide_live_with(
     h: &mut Harness,
     sponsored: Option<ameba_oracle::sponsorship::SponsorTerms>,
 ) -> Wide {
-    let wide = wide_placed(h, sponsored).await;
+    wide_live_paid(h, sponsored, false).await
+}
+
+/// As `wide_live_with`; with `sponsor_pays` the sponsor's own wallet pays its activation, as
+/// petri sends it.
+pub async fn wide_live_paid(
+    h: &mut Harness,
+    sponsored: Option<ameba_oracle::sponsorship::SponsorTerms>,
+    sponsor_pays: bool,
+) -> Wide {
+    let wide = wide_placed_paid(h, sponsored, sponsor_pays).await;
     h.wide_coverage(&wide).await;
     h.wide_recipe(&wide).await;
     h.wide_openings(&wide).await;
@@ -59,6 +69,14 @@ pub async fn wide_live_with(
 pub async fn wide_placed(
     h: &mut Harness,
     sponsored: Option<ameba_oracle::sponsorship::SponsorTerms>,
+) -> Wide {
+    wide_placed_paid(h, sponsored, false).await
+}
+
+async fn wide_placed_paid(
+    h: &mut Harness,
+    sponsored: Option<ameba_oracle::sponsorship::SponsorTerms>,
+    sponsor_pays: bool,
 ) -> Wide {
     let cohort = h.open_cohort(1).await;
     h.fund_schedule(&cohort).await;
@@ -88,7 +106,11 @@ pub async fn wide_placed(
                     sku_index: 0,
                     sku_proof: cohort.sku_proof(0),
                 };
-                let payer = h.payer();
+                let payer = if sponsor_pays {
+                    signer.insecure_clone()
+                } else {
+                    h.payer()
+                };
                 h.send(
                     instruction::sponsored_activate(
                         &program(),
@@ -520,6 +542,11 @@ impl Harness {
     /// Settle every counted pre-listing escrow of a wide cohort: each source's listing bond and
     /// support stake.
     pub async fn settle_wide_escrows(&mut self, wide: &Wide) {
+        self.settle_wide_escrows_except(wide, None).await
+    }
+
+    /// As `settle_wide_escrows`, leaving `skip`'s listing bond for its owner to settle.
+    pub async fn settle_wide_escrows_except(&mut self, wide: &Wide, skip: Option<&Pubkey>) {
         let cranker = self.payer();
         for (source, proposer) in wide.sources.iter().zip(&wide.proposers) {
             for escrow in [
@@ -532,6 +559,11 @@ impl Harness {
                     supporter: wide.supporter.pubkey(),
                 },
             ] {
+                if matches!(escrow, instruction::PrelistingEscrow::ListingBond { .. })
+                    && skip == Some(source)
+                {
+                    continue;
+                }
                 self.send(
                     instruction::settle_oracle_usdc_prelisting_escrow(
                         &program(),

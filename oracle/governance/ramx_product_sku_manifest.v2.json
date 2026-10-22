@@ -1,0 +1,71 @@
+{
+  "schema": "amoeba.oracle-product-sku-manifest",
+  "schemaVersion": 1,
+  "manifestVersion": 2,
+  "product": {
+    "marketId": "ramx",
+    "symbol": "RAMX",
+    "underlyingId": "ram-standardized-baskets"
+  },
+  "provenance": {
+    "sourceDescription": "commodity-submission-spec-v1 RAMX commodity buckets (single-die packaged DDR SDRAM, contract basis); DDR5 32Gb left out as a research candidate (the user, 2026-10-21)",
+    "sourceSha256": "69ad4a0c427f2eada2d18353e0ec5c58e8e326a1d447f9bbee77b9e5423a4309"
+  },
+  "canonicalLabelEncoding": {
+    "name": "printable-ascii-utf8-right-zero-padded-bytes32-v1",
+    "minimumBytes": 1,
+    "maximumBytes": 32,
+    "sort": "ascending-encoded-bytes"
+  },
+  "tag190Plan": {
+    "instructionTag": 190,
+    "maximumChunkSkuIds": 16,
+    "chunkSkuCounts": [
+      4
+    ]
+  },
+  "requiredSkuCount": 4,
+  "requiredSkuRootHex": "bdd8895912b378796860682716c5e6139026b10389254360b7aa7ffa628542eb",
+  "groups": [
+    {
+      "name": "DDR5",
+      "skuCount": 2,
+      "subgroups": [
+        {
+          "name": "16Gb",
+          "skuCount": 1,
+          "skuLabels": [
+            "DDR5_16GBIT"
+          ]
+        },
+        {
+          "name": "24Gb",
+          "skuCount": 1,
+          "skuLabels": [
+            "DDR5_24GBIT"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DDR4",
+      "skuCount": 2,
+      "subgroups": [
+        {
+          "name": "16Gb",
+          "skuCount": 1,
+          "skuLabels": [
+            "DDR4_16GBIT"
+          ]
+        },
+        {
+          "name": "8Gb",
+          "skuCount": 1,
+          "skuLabels": [
+            "DDR4_8GBIT"
+          ]
+        }
+      ]
+    }
+  ]
+}

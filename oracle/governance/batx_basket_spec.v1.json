@@ -1,0 +1,232 @@
+{
+  "document_type": "BATX battery-cell basket specification",
+  "version": "batx-basket-spec-v1-proposed",
+  "date": "2026-10-20",
+  "ticker": "BATX",
+  "ticker_status": "provisional",
+  "source_document": {
+    "file": "batx_battery_cell_basket_brief.v1.pdf",
+    "title": "BATX Battery-cell basket: a model-ready specification for a broad manufactured-cell price index (model handoff, draft 1.0)",
+    "sha256": "9761097947cf590562184ebb59ae09c53451b01b5629e3f44df5547eb0d3317c",
+    "transcription_rule": "This file restates the brief's requirements in machine-readable form. Where they differ, the brief governs."
+  },
+  "status": "Working requirements for the handoff. The allocation and scope are the requester's; the calculation mechanics are a reference proposal. Data access, historical coverage, internal series weights and settlement rules are not launch-approved.",
+  "core_instruction": "Preserve four understandable market categories. Put detailed capacities, product models, and performance specifications underneath them as controlled observations, not as independently weighted headline markets.",
+  "basket": {
+    "weight_bps_total": 10000,
+    "buckets": [
+      {
+        "id": "LFP_STORAGE",
+        "name": "LFP storage",
+        "market_category": "LFP prismatic cells for stationary energy storage",
+        "chemistry_family": "LFP",
+        "casing": "prismatic",
+        "application": "stationary_storage",
+        "weight_bps": 4000
+      },
+      {
+        "id": "LFP_EV",
+        "name": "LFP EV",
+        "market_category": "LFP prismatic cells for electric vehicles",
+        "chemistry_family": "LFP",
+        "casing": "prismatic",
+        "application": "electric_vehicle",
+        "weight_bps": 3000
+      },
+      {
+        "id": "TERNARY_PRISM_EV",
+        "name": "Ternary prismatic EV",
+        "market_category": "Nickel-based ternary prismatic cells for electric vehicles",
+        "chemistry_family": "nickel_ternary",
+        "casing": "prismatic",
+        "application": "electric_vehicle",
+        "weight_bps": 2000
+      },
+      {
+        "id": "TERNARY_POUCH_EV",
+        "name": "Ternary pouch EV",
+        "market_category": "Nickel-based ternary pouch cells for electric vehicles",
+        "chemistry_family": "nickel_ternary",
+        "casing": "pouch",
+        "application": "electric_vehicle",
+        "weight_bps": 1000
+      }
+    ],
+    "mix": "70% LFP / 30% nickel-based ternary; 40% storage / 60% vehicle cells",
+    "weight_basis": "Design allocations, not measured market shares or volatility-optimized weights. Preserve 40/30/20/10 unless the requester approves a new design."
+  },
+  "scope": {
+    "measures": "Manufactured lithium-ion cells",
+    "excluded": [
+      "lithium carbonate",
+      "cathode powders",
+      "assembled packs",
+      "complete storage systems",
+      "used or second-life cells",
+      "retail bundles",
+      "cylindrical cells (excluded from version 1 until comparable industrial-price coverage is established)"
+    ]
+  },
+  "hierarchy": [
+    "category",
+    "approved product or assessment series",
+    "eligible observation",
+    "normalized series",
+    "category index"
+  ],
+  "hierarchy_rule": "A 280 Ah storage cell and a 314 Ah storage cell can both inform the storage category without receiving permanent weights in the headline basket. Broad categories do not authorize unrestricted substitution: freeze the approved series and their internal weights in a versioned source manifest. One supplier appearing on more websites must not gain more influence.",
+  "rejected_design": "Do not restore separate headline weights for 174 Ah, 158 Ah, 144 Ah, NMC811 21700 5 Ah, or similarly narrow specifications. Detailed eligibility belongs in the source manifest, not the four-category allocation.",
+  "controls": {
+    "product_identity": "Record chemistry family, application, casing, model or assessment code, capacity, voltage, performance class, and condition. Keep an observation in exactly one category.",
+    "commercial_basis": "Record geography, currency, unit, tax basis, delivery terms, quantity tier, payment terms, and spot-versus-contract pricing basis. Compare like with like.",
+    "provenance": "Keep the original publisher or seller, the actual assessed market or quoted product, observation date, publication time, capture time, and a retrievable evidence reference.",
+    "composition": "Normalize each approved series against its own base. Do not average whichever listings are available on a given day. New or replacement series require versioned approval."
+  },
+  "collection_basis": {
+    "starting_scope": "China domestic industrial cell pricing in native CNY",
+    "geography": "CN",
+    "currency": "CNY",
+    "do_not_blend": [
+      "US retail prices",
+      "European distributor quotes"
+    ],
+    "commercial_basis_rule": "Preserve each source's commercial basis; a delivered price is not automatically equivalent to an ex-works price.",
+    "unit_rule": "Use CNY per Wh when a valid conversion is possible. For per-cell quotes, use the documented rated energy of the exact cell. Do not guess nominal voltage or capacity. A consistent per-cell series may instead be normalized in its original units.",
+    "normalization_note": "Converting prices to CNY/Wh or indexing them to 100 does not make different performance classes, delivery terms, or product mixes interchangeable. Published category assessments may change their internal sample; track methodology changes rather than assuming composition is fixed."
+  },
+  "calculation": {
+    "method": "fixed-base arithmetic index (proposed reference; production settlement method not yet approved)",
+    "definitions": {
+      "P[c,s,t]": "eligible positive price for series s in category c at observation time t",
+      "t0": "common base date",
+      "w[c]": "category weight",
+      "a[c,s]": "precommitted within-category coefficient, nonnegative, sum to 1 per category"
+    },
+    "formulas": [
+      "R[c,s,t] = P[c,s,t] / P[c,s,t0]",
+      "C[c,t] = sum_s( a[c,s] * R[c,s,t] )",
+      "BATX[t] = 100 * sum_c( w[c] * C[c,t] )",
+      "sum_c(w[c]) = 1; sum_s(a[c,s]) = 1 for each c"
+    ],
+    "category_weights_bps": {
+      "LFP_STORAGE": 4000,
+      "LFP_EV": 3000,
+      "TERNARY_PRISM_EV": 2000,
+      "TERNARY_POUCH_EV": 1000
+    },
+    "internal_coefficients": "unspecified until the eligible panel is selected",
+    "base": "At the base date every R and C equals 1, so BATX equals 100. All required series need valid base observations under a common, documented timing rule.",
+    "missing_inputs": "Missing inputs must not trigger silent reweighting.",
+    "coefficient_type": "Base-period coefficients, not a promise that effective contribution shares stay constant after relative prices move. Do not silently substitute a daily rebalanced return index.",
+    "precision": "Preserve decimal precision through calculation and round only at the documented output stage.",
+    "currency": "The index measures native-CNY price movements; settlement in USDC does not by itself add an FX return. Any currency-conversion exposure must be separately specified.",
+    "rebasing": "Rebase or revise only through an approved new version, with an explicit continuity rule."
+  },
+  "acceptance_tests": [
+    {
+      "id": "ALL_UNCHANGED",
+      "test": "Every category unchanged",
+      "changes_bps": { "LFP_STORAGE": 0, "LFP_EV": 0, "TERNARY_PRISM_EV": 0, "TERNARY_POUCH_EV": 0 },
+      "expected": "BATX = 100",
+      "expected_index": "100"
+    },
+    {
+      "id": "STORAGE_UP_10",
+      "test": "Only storage rises 10%",
+      "changes_bps": { "LFP_STORAGE": 1000, "LFP_EV": 0, "TERNARY_PRISM_EV": 0, "TERNARY_POUCH_EV": 0 },
+      "expected": "BATX = 104",
+      "expected_index": "104"
+    },
+    {
+      "id": "ALL_UP_10",
+      "test": "Every category rises 10%",
+      "changes_bps": { "LFP_STORAGE": 1000, "LFP_EV": 1000, "TERNARY_PRISM_EV": 1000, "TERNARY_POUCH_EV": 1000 },
+      "expected": "BATX = 110",
+      "expected_index": "110"
+    },
+    {
+      "id": "STORAGE_UP_10_LFP_EV_DOWN_5",
+      "test": "Storage +10%; LFP EV -5%; others unchanged",
+      "changes_bps": { "LFP_STORAGE": 1000, "LFP_EV": -500, "TERNARY_PRISM_EV": 0, "TERNARY_POUCH_EV": 0 },
+      "expected": "BATX = 102.5",
+      "expected_index": "102.5"
+    },
+    {
+      "id": "UNAPPROVED_CHEAPER_MODEL",
+      "test": "A cheaper, unapproved model appears",
+      "expected": "No index change from its appearance"
+    },
+    {
+      "id": "REQUIRED_SERIES_MISSING",
+      "test": "A required series disappears",
+      "expected": "Missing-data flag; no weight redistribution"
+    }
+  ],
+  "acceptance_tests_note": "Hypothetical test vectors, not observed battery returns.",
+  "routing_defaults": {
+    "status": "Proposed defaults, not in the brief: the implementing agent's reading of its controls (2026-10-20), so routing is deterministic. The requester may change any of them.",
+    "statuses": "The routing statuses of commodity_submission_spec.v1.json (ELIGIBLE_FOR_CONTRACT, CLASSIFIED_CANDIDATE, DUPLICATE_NO_EXTRA_WEIGHT, NEEDS_METADATA, WRONG_PRODUCT, WRONG_PRICE_BASIS, RESEARCH_ONLY, OUTSIDE_COMMITTED_SERIES, SCOPE_CHANGE, STALE_OR_WRONG_PERIOD). Routing classifies; it never refuses a submission.",
+    "physical_scope": "cell is admitted; battery_module, pack, storage_system, cathode_material, lithium_carbonate and retail_bundle are WRONG_PRODUCT.",
+    "chemistry": "LFP buckets take LFP; ternary buckets take NCM, NCA, NCMA or nickel_ternary; LMFP, LMO, LCO and sodium_ion are WRONG_PRODUCT; a chemistry that doesn't match its bucket is WRONG_PRODUCT.",
+    "casing_and_application": "Must match the bucket (prismatic or pouch; stationary_storage or electric_vehicle); cylindrical is WRONG_PRODUCT (excluded from version 1).",
+    "condition": "new_unused only; used, second_life and refurbished are WRONG_PRODUCT; unknown is NEEDS_METADATA.",
+    "evidence_class": "published_assessment, or direct_price (a seller's recurring quote of one exact cell, with its model, capacity, voltage, performance class and terms exact).",
+    "price_basis": "contract, spot and firm_offer are admitted: the brief records spot versus contract and compares like with like, so a series fixes one and a change is SCOPE_CHANGE. listing and forecast are WRONG_PRICE_BASIS.",
+    "currency": "CNY; any other currency is RESEARCH_ONLY (it would add an FX return).",
+    "geography": "Exactly CN; any other market, or a blend, is RESEARCH_ONLY; an undisclosed market is NEEDS_METADATA.",
+    "capacity": "Fixed (exact) or a documented mix for an assessment; exact for a direct quote. Voltage, performance class, tax basis and delivery terms must be stated, and may be not_disclosed for an assessment.",
+    "duplicates": "Two series reporting the same row of the same publisher (or the same page) are one series: the later is DUPLICATE_NO_EXTRA_WEIGHT, so one supplier on more websites gains no influence.",
+    "on_chain_within_bucket_rule": "The oracle program settles each bucket on the median of its sources' changes from their openings, in whole bps, not on precommitted coefficients a[c,s]. With one series per bucket the two agree. See batx_feasibility.v1.md."
+  },
+  "evidence_and_timing": {
+    "independence": "Attribute evidence to its originating publisher, seller, and ultimate data source where known. Syndicated copies count once. Multiple products from one publisher remain exposed to that publisher's methodology and availability.",
+    "freshness": "Distinguish the assessment period, publication timestamp, capture timestamp, and oracle processing timestamp. Re-fetching a monthly price daily does not produce fresh daily evidence. Do not interpolate prices to manufacture daily volatility.",
+    "missing_or_disputed": "Flag the condition and apply only a precommitted carry-forward, fallback, dispute, or settlement-delay rule. Until that rule is approved, do not manufacture a final settlement value or redistribute the missing series' weight.",
+    "revisions": "Retain original captures and corrected vintages. A historical simulation must use only information available at the simulated time. Published corrections need a documented rule before live contracts exist.",
+    "immutability": "For each open contract, freeze category weights, eligible sources and series, internal coefficients, base values, timing rules, and fallbacks. Replacement products or new sources belong to a future version unless the contract already contains an explicit transition rule.",
+    "source_existence_caveat": "Source existence is not proof of economically independent prices, stable methodology, sufficient volatility, or legal permission to redistribute data. Treat each as a separate verification task."
+  },
+  "starting_points": [
+    {
+      "ref": 1,
+      "publisher": "TrendForce",
+      "title": "Li-Ion Battery Industry Chain Prices: Battery Cell & Pack",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "brief_says_verified": "All four proposed categories appear separately, quoted in RMB/Wh. The price page states a monthly update cadence.",
+      "brief_says_not_established": "Four series are not four independent publishers. The page does not resolve all product, quantity, delivery, or licensing details needed for settlement."
+    },
+    {
+      "ref": 2,
+      "publisher": "InfoLink",
+      "title": "Lithium prices continue to fluctuate as average cell and system prices edge up (2026-03-20)",
+      "url": "https://www.infolink-group.com/energy-article/ess-spot-price-20260320",
+      "brief_says_verified": "A dated public report gives separate Chinese LFP storage-cell assessments for 100, 280, and 314 Ah.",
+      "brief_says_not_established": "Those narrower series are not automatically a broad storage benchmark or substitutes for EV prices."
+    },
+    {
+      "ref": 3,
+      "publisher": "Fastmarkets",
+      "title": "Fastmarkets to launch China PV module, BESS battery cell prices (2026-06-23)",
+      "url": "https://www.fastmarkets.com/insights/fastmarkets-to-launch-china-pv-module-bess-battery-cell-prices/",
+      "brief_says_verified": "A published launch specification defines monthly 314 Ah LFP prismatic cells, ex-works domestic China, in yuan/Wh.",
+      "brief_says_not_established": "The methodology notice alone does not establish unrestricted access, a complete price history, or settlement-use permission."
+    }
+  ],
+  "coverage_note": "Storage has more distinct publisher leads in this review. Independent coverage for each vehicle category remains unproven. Do not describe the four-category basket as launch-ready or multi-source until the exact series and permissions are verified.",
+  "decisions_required_before_settlement": [
+    "exact source panel and internal coefficients",
+    "base-date alignment",
+    "observation and settlement schedule",
+    "minimum evidence and concentration requirements",
+    "stale-data limits and fallbacks",
+    "source revision handling",
+    "numerical precision",
+    "product-transition rules",
+    "data access and use rights for every required source"
+  ],
+  "required_outputs": {
+    "A_source_manifest": "Map each category to exact series, original URLs or provider identifiers, product and commercial definitions, publication cadence, access conditions, data-use status, history coverage, and internal coefficients. Mark unknown fields explicitly.",
+    "B_calculator_and_tests": "Implement the proposed fixed-base method or explain a clearly labeled alternative. Return category indices, total index, contribution diagnostics, evidence lineage, and missing/stale flags. Pass the synthetic tests.",
+    "C_feasibility_assessment": "Distinguish an analytical prototype from a settlement-ready system. Test actual common-window data before reporting one- or three-month returns, volatility, correlations, stale-price frequency, or sensitivity to panel composition."
+  }
+}

@@ -7,6 +7,18 @@ import tomllib
 
 bundle = Path(__file__).resolve().parent
 root = bundle.parents[1]
+# Preserve the installed Futures source and its original dependencies.
+import subprocess, tempfile, tarfile, io
+snapshot = tempfile.TemporaryDirectory(prefix='amoeba-staking-historical-source-')
+archive = subprocess.check_output(['git', '-C', str(root), 'archive', '--format=tar', '8536d411b2af0bd77b37740edc315db2f06db601', '--', 'oracle', 'futures', 'governance'])
+root = Path(snapshot.name).resolve()
+with tarfile.open(fileobj=io.BytesIO(archive)) as members:
+    for member in members:
+        target = (root / member.name).resolve()
+        assert target.is_relative_to(root) and not member.issym() and not member.islnk()
+        if member.isfile():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(members.extractfile(member).read())
 inventory = json.loads((bundle / 'SOURCE_FILES.json').read_text(encoding='utf8'))
 assert inventory['sourceCommit'] == 'c723db776e9d0c639565d89ac761703731b37fb4'
 dependencies = json.loads((bundle / 'DEPENDENCY_INPUTS.json').read_text())

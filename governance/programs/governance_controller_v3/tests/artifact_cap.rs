@@ -172,10 +172,13 @@ fn programdata_grown_by_anyone_never_invalidates_an_action() {
 
 #[test]
 fn controller_actions_bind_the_controller_release_in_former_zero_bytes() {
-    assert_eq!(CONTROLLER_RELEASE, 2, "bump on every controller release");
+    assert_eq!(CONTROLLER_RELEASE, 6, "bump on every controller release");
     let action = upgrade_action(UPGRADE_CONTROLLER, 224_776, 224_776);
     assert_eq!(&action.data[184..], &CONTROLLER_RELEASE.to_le_bytes());
-    assert_eq!(action.upgrade().unwrap().controller_release, 2);
+    assert_eq!(
+        action.upgrade().unwrap().controller_release,
+        CONTROLLER_RELEASE
+    );
     // A proposal created by the deployed controller carries zeros here. It
     // still decodes as release 0, so it can expire and release its buffer.
     let mut legacy = action.clone();

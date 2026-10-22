@@ -12,8 +12,28 @@ use solana_program::pubkey::Pubkey;
 pub const RESERVE_SEED: &[u8] = b"oracle-agent-v1";
 pub const AGREEMENT_SEED: &[u8] = b"oracle-sponsor-v1";
 pub const EXPOSURE_SEED: &[u8] = b"oracle-credit-v1";
-pub const DEFAULT_RESEARCHER_BPS: u16 = 5_000;
+/// A sponsored bounty's split: the sponsor 80%, the researcher 20%, a fifth
+/// of which (`DEFAULT_RETENTION_BPS`) is held in the researcher's reserve.
+pub const DEFAULT_RESEARCHER_BPS: u16 = 2_000;
 pub const DEFAULT_RETENTION_BPS: u16 = 2_000;
+/// The researcher's share before the 80/20 split (half). Agreements made
+/// under it keep it to the end.
+pub const LEGACY_RESEARCHER_BPS: u16 = 5_000;
+/// What the mainnet oracle requires of a new sponsorship: its program
+/// predates the 80/20 split, so clients still send it the legacy share.
+/// Once mainnet runs a program with the new split, this becomes
+/// `DEFAULT_RESEARCHER_BPS`.
+pub const MAINNET_RESEARCHER_BPS: u16 = LEGACY_RESEARCHER_BPS;
+
+/// The researcher's share a new sponsorship on this cluster must name:
+/// mainnet's deployed program, else this one's.
+pub fn researcher_bps_for(mainnet: bool) -> u16 {
+    if mainnet {
+        MAINNET_RESEARCHER_BPS
+    } else {
+        DEFAULT_RESEARCHER_BPS
+    }
+}
 
 pub fn reserve_address(program: &Pubkey, agent: &[u8; 32], authority: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
@@ -183,6 +203,17 @@ mod tests {
         }
         assert!(split_bounty(1, 10_001, 2_000).is_none());
         assert!(split_bounty(1, 5_000, 10_001).is_none());
+    }
+    #[test]
+    fn a_sponsored_bounty_pays_the_sponsor_80_and_the_researcher_20() {
+        // 10 USDC: 8 to the sponsor, 1.6 to the researcher, 0.4 to its reserve.
+        assert_eq!(
+            split_bounty(10_000_000, DEFAULT_RESEARCHER_BPS, DEFAULT_RETENTION_BPS),
+            Some((8_000_000, 1_600_000, 400_000))
+        );
+        // Mainnet's deployed program still takes the legacy half.
+        assert_eq!(researcher_bps_for(true), LEGACY_RESEARCHER_BPS);
+        assert_eq!(researcher_bps_for(false), DEFAULT_RESEARCHER_BPS);
     }
     #[test]
     fn fixed_layout_roundtrips() {

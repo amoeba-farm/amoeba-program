@@ -219,8 +219,9 @@ pub struct OracleOpeningClaim {
     pub canonical_locator_hash: [u8; 32],
     pub source_definition_hash: [u8; 32],
     pub evidence_hash: [u8; 32],
-    /// Commitment to the fully validated Wayback URL supplied by the instruction. The raw URL is
-    /// transport/evidence data and is not retained in this rent-bearing active escrow header.
+    /// Commitment to the fully validated archive evidence (Wayback URL or evidence record) supplied
+    /// by the instruction. The raw text is transport/evidence data and is not retained in this
+    /// rent-bearing active escrow header.
     pub archive_url_hash: [u8; 32],
     pub submitted_slot: u64,
     pub challenge_deadline_slot: u64,
@@ -276,7 +277,7 @@ pub struct OracleOpeningClaimChallenge {
     pub canonical_locator_hash: [u8; 32],
     pub source_definition_hash: [u8; 32],
     pub evidence_hash: [u8; 32],
-    /// Commitment to the fully validated alternative Wayback URL.
+    /// Commitment to the fully validated alternative archive evidence (Wayback URL or record).
     pub archive_url_hash: [u8; 32],
     pub rule_review_slot: u64,
     pub escrow_disposition: OracleEscrowDisposition,

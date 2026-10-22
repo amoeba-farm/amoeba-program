@@ -384,6 +384,224 @@ async fn challenged_update_settles_to_the_alternative_and_the_guard_admits_one_c
     h.assert_live_and_readable(&cohort, now + DAY).await;
 }
 
+/// Evidence kind 4: an update committed (166) and revealed (198) with an authenticated evidence
+/// record, challenged (168) with another, and settled to the alternative on the ordinary path. The
+/// commit hash, the evidence hashes and the stored archive hashes are computed over the record
+/// text, bundle digest included.
+#[tokio::test]
+async fn evidence_records_reveal_and_challenge_an_update_like_wayback_captures() {
+    let mut h = start().await;
+    let (cohort, formed) = live(&mut h).await;
+    let (source, source_id) = formed.sources[0];
+    let claimant = h.participant(PARTICIPANT_USDC).await;
+    let challenger = h.participant(PARTICIPANT_USDC).await;
+    let now = cohort.listing + 3_600;
+    h.at(now).await;
+    let record = evidence_record(&source_id, now - 60);
+    let print = h
+        .print_evidence(
+            &cohort,
+            &claimant,
+            &source,
+            &source_id,
+            105_000_000,
+            now - 60,
+            record.clone(),
+        )
+        .await;
+    let object = instruction::find_evidence_object_address(
+        &program(),
+        &claimant.pubkey(),
+        4,
+        &instruction::archive_url_hash(&record),
+    );
+    let sealed = h.account(object).await.expect("sealed record");
+    assert_eq!((sealed.data[38], sealed.data[75]), (4, 1));
+    assert_eq!(&sealed.data[76..], record.as_bytes());
+    assert_eq!(
+        print.evidence,
+        instruction::update_evidence_hash(
+            &cohort.month,
+            &source,
+            &source_id,
+            105_000_000,
+            now - 60,
+            &locator_hash(&locator(&source_id)),
+            &definition_hash(&definition(&source_id)),
+            &record,
+        )
+    );
+    // `commit` hashes `archive_url_hash(record)` into the commitment.
+    let claim = h
+        .commit(&cohort, &claimant, &source, &source_id, 0, [7; 32], print)
+        .await
+        .unwrap();
+    h.advance_slot().await;
+    h.reveal(&cohort, &claimant, &source, &claim).await.unwrap();
+    let revealed: OracleUpdateClaimV2 = h.read_state(claim.key).await;
+    assert_eq!(revealed.claim.status, OracleClaimStatus::Revealed);
+    assert_eq!(revealed.claim.new_state, 105_000_000);
+    assert_eq!(revealed.claim.source_time, now - 60);
+    assert_eq!(revealed.claim.evidence_hash, claim.print.evidence);
+    assert_eq!(
+        revealed.claim.archive_url_hash,
+        instruction::archive_url_hash(&record)
+    );
+    let link = h
+        .account(instruction::find_evidence_link_address(
+            &program(),
+            &claim.key,
+            4,
+            &claim.print.evidence,
+        ))
+        .await
+        .expect("reveal link");
+    assert_eq!(&link.data[102..134], object.as_ref());
+
+    let alternative_record = evidence_record(&source_id, now - 30);
+    let alternative = h
+        .print_evidence(
+            &cohort,
+            &challenger,
+            &source,
+            &source_id,
+            99_000_000,
+            now - 30,
+            alternative_record.clone(),
+        )
+        .await;
+    h.send(
+        instruction::challenge_oracle_update_claim_v2(
+            &program(),
+            &challenger.pubkey(),
+            &challenger.pubkey(),
+            &cohort.period,
+            &cohort.month,
+            &source,
+            &cohort.sku_ids[0],
+            &claim.key,
+            ChallengeOracleUpdateClaimParams {
+                challenge_id: [8; 32],
+                alternative_state: alternative.state,
+                alternative_source_time: alternative.source_time,
+                bond: challenge_bond(UPDATE_MIN_BOND),
+                evidence_hash: alternative.evidence,
+                archive_url: String::new(),
+            },
+            &alternative.url,
+        ),
+        &[&challenger],
+    )
+    .await
+    .unwrap();
+    let challenge_key = instruction::find_oracle_update_challenge_address(
+        &program(),
+        &cohort.month,
+        &claim.key,
+        &[8; 32],
+    );
+    let challenge: OracleUpdateChallenge = h.read_state(challenge_key).await;
+    assert_eq!(challenge.evidence_hash, alternative.evidence);
+    assert_eq!(
+        challenge.archive_url_hash,
+        instruction::archive_url_hash(&alternative_record)
+    );
+    let link = h
+        .account(instruction::find_evidence_link_address(
+            &program(),
+            &challenge_key,
+            5,
+            &alternative.evidence,
+        ))
+        .await
+        .expect("challenge link");
+    assert_eq!(
+        &link.data[102..134],
+        instruction::find_evidence_object_address(
+            &program(),
+            &challenger.pubkey(),
+            4,
+            &challenge.archive_url_hash,
+        )
+        .as_ref()
+    );
+
+    h.at(now + DAY).await;
+    h.finalize(
+        &cohort,
+        &source,
+        0,
+        &claim.key,
+        OracleUpdateClaimOutcome::RejectClaim,
+        1,
+        UpdateFinalization::Challenged {
+            challenge: challenge_key,
+        },
+    )
+    .await
+    .unwrap();
+    let updated: OracleSourceState = h.read_state(source).await;
+    assert_eq!(updated.current_state, 99_000_000);
+    assert_eq!(updated.latest_source_time, now - 30);
+    assert_eq!(updated.observation_count, 2);
+    let accepted: OracleUpdateChallenge = h.read_state(challenge_key).await;
+    assert_eq!(accepted.status, OracleChallengeStatus::Accepted);
+    h.assert_live_and_readable(&cohort, now + DAY).await;
+}
+
+/// A record binds like a Wayback capture: one naming another source's locator, or another second
+/// than the claim's source time, never reveals, and the claim stays committed.
+#[tokio::test]
+async fn an_evidence_record_of_another_sources_locator_or_time_never_reveals() {
+    let mut h = start().await;
+    let (cohort, formed) = live(&mut h).await;
+    let (source, source_id) = formed.sources[0];
+    let (_, other_id) = formed.sources[1];
+    let claimant = h.participant(PARTICIPANT_USDC).await;
+    let now = cohort.listing + 3_600;
+    h.at(now).await;
+    for (claim_id, record) in [
+        ([0x31; 32], evidence_record(&other_id, now - 60)),
+        ([0x32; 32], evidence_record(&source_id, now - 61)),
+        ([0x33; 32], evidence_record(&source_id, now - 60)),
+    ] {
+        let print = h
+            .print_evidence(
+                &cohort,
+                &claimant,
+                &source,
+                &source_id,
+                105_000_000,
+                now - 60,
+                record,
+            )
+            .await;
+        let claim = h
+            .commit(&cohort, &claimant, &source, &source_id, 0, claim_id, print)
+            .await
+            .unwrap();
+        h.advance_slot().await;
+        let link = instruction::find_evidence_link_address(
+            &program(),
+            &claim.key,
+            4,
+            &claim.print.evidence,
+        );
+        let result = h.reveal(&cohort, &claimant, &source, &claim).await;
+        let state: OracleUpdateClaimV2 = h.read_state(claim.key).await;
+        if claim_id == [0x33; 32] {
+            // Its own locator at the claim's source time reveals.
+            result.unwrap();
+            assert_eq!(state.claim.status, OracleClaimStatus::Revealed);
+            assert!(h.account(link).await.is_some());
+        } else {
+            assert_oracle_error(result, OracleError::InvalidOracleUpdateAccount);
+            assert_eq!(state.claim.status, OracleClaimStatus::Committed);
+            assert!(h.account(link).await.is_none());
+        }
+    }
+}
+
 #[tokio::test]
 async fn update_challenge_rejects_an_initialized_pda_without_debit_or_overwrite() {
     let mut h = start().await;

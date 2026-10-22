@@ -3,6 +3,7 @@ use crate::{
     instruction::Instruction,
     state::*,
 };
+mod retirement;
 mod verification;
 use borsh::BorshSerialize;
 use solana_loader_v3_interface::instruction::{
@@ -479,6 +480,13 @@ pub fn process(program: &Pubkey, accounts: &[AccountInfo<'_>], data: &[u8]) -> R
         }
         Instruction::PublishVerification { digest } => {
             verification::publish(program, accounts, digest, data)
+        }
+        Instruction::RetireTarget { digest } => retirement::retire(program, accounts, digest, data),
+        Instruction::ReclaimRetiredTargetRecords { target } => {
+            retirement::reclaim_records(program, accounts, target)
+        }
+        Instruction::ReclaimRetiredTargetVerification { target } => {
+            retirement::reclaim_verification(program, accounts, target)
         }
         // Retired tags: `Instruction::unpack` rejects them before this match.
         Instruction::ExtendTarget { .. } | Instruction::ExtendController { .. } => {

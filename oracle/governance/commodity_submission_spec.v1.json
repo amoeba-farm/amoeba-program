@@ -1,0 +1,444 @@
+{
+  "document_type": "RAMX and NANDX commodity submission eligibility design",
+  "version": "commodity-submission-spec-v1-proposed",
+  "date": "2026-10-20",
+  "status": "Proposed product and admission specification; not deployed, not a complete active-series manifest, and not a change to existing contracts.",
+  "verdict": "The nine economic buckets are a suitable granularity. Labels alone do not establish comparable prices or settlement eligibility. Add a defined comparison-series layer rather than fragmenting the economic weights.",
+  "related_weight_proposals": [
+    "ramx_chip_bucket_weights_v1.json",
+    "nandx_component_bucket_weights_v1.json"
+  ],
+  "preserves": {
+    "economic_weights": true,
+    "open_evidence_submission": true,
+    "frozen_contract_sources_and_weights": true,
+    "source_local_relative_comparison": true,
+    "nand_wafer_assessment_only": true
+  },
+  "layers": [
+    {
+      "name": "commodity_bucket",
+      "purpose": "Defines the economic allocation and hard product identity."
+    },
+    {
+      "name": "comparison_series",
+      "purpose": "Defines a repeatable priced object or published assessment, its commercial terms and chosen statistic."
+    },
+    {
+      "name": "observation",
+      "purpose": "Identifies one publication/event, reference period, value, provenance and revision."
+    },
+    {
+      "name": "contract_eligibility",
+      "purpose": "Checks that this observation belongs to the contract's committed methodology, series set and reporting window."
+    }
+  ],
+  "baskets": {
+    "RAMX": {
+      "weight_bps_total": 10000,
+      "buckets": [
+        {
+          "id": "DDR5_16GBIT",
+          "generation": "DDR5",
+          "nominal_die_density": "16Gb",
+          "weight_bps": 3500,
+          "profile": "RAMX_MONOLITHIC_CONTRACT"
+        },
+        {
+          "id": "DDR5_24GBIT",
+          "generation": "DDR5",
+          "nominal_die_density": "24Gb",
+          "weight_bps": 2000,
+          "profile": "RAMX_MONOLITHIC_CONTRACT"
+        },
+        {
+          "id": "DDR5_32GBIT",
+          "generation": "DDR5",
+          "nominal_die_density": "32Gb",
+          "weight_bps": 500,
+          "profile": "RAMX_MONOLITHIC_CONTRACT"
+        },
+        {
+          "id": "DDR4_16GBIT",
+          "generation": "DDR4",
+          "nominal_die_density": "16Gb",
+          "weight_bps": 2500,
+          "profile": "RAMX_MONOLITHIC_CONTRACT"
+        },
+        {
+          "id": "DDR4_8GBIT",
+          "generation": "DDR4",
+          "nominal_die_density": "8Gb",
+          "weight_bps": 1500,
+          "profile": "RAMX_MONOLITHIC_CONTRACT"
+        }
+      ]
+    },
+    "NANDX": {
+      "weight_bps_total": 10000,
+      "buckets": [
+        {
+          "id": "tlc_1tb",
+          "cell_type": "TLC",
+          "nominal_die_density": "1Tb",
+          "weight_bps": 4000,
+          "profile": "NANDX_WAFER_CONTRACT_ASSESSMENT"
+        },
+        {
+          "id": "qlc_1tb",
+          "cell_type": "QLC",
+          "nominal_die_density": "1Tb",
+          "weight_bps": 3000,
+          "profile": "NANDX_WAFER_CONTRACT_ASSESSMENT"
+        },
+        {
+          "id": "tlc_512gb",
+          "cell_type": "TLC",
+          "nominal_die_density": "512Gb",
+          "weight_bps": 2000,
+          "profile": "NANDX_WAFER_CONTRACT_ASSESSMENT"
+        },
+        {
+          "id": "tlc_256gb",
+          "cell_type": "TLC",
+          "nominal_die_density": "256Gb",
+          "weight_bps": 1000,
+          "profile": "NANDX_WAFER_CONTRACT_ASSESSMENT"
+        }
+      ]
+    }
+  },
+  "product_profiles": {
+    "RAMX_MONOLITHIC_CONTRACT": {
+      "recommended_core": "New, unused, standard-production, single-die packaged conventional DDR4 or DDR5 SDRAM ICs, with nominal die density equal to the bucket density.",
+      "density_rule": "The row density refers to the monolithic memory die. Total package density equals die density in this initial profile. Two 16Gb dies in a package do not qualify as the 32Gb monolithic row.",
+      "hard_fields": [
+        "memory_family=conventional_DDR_SDRAM",
+        "generation",
+        "nominal_die_density",
+        "physical_form=packaged_IC",
+        "die_count=1",
+        "condition=new_unused",
+        "production_grade_scope",
+        "contract_price_basis"
+      ],
+      "allow_across_separate_comparison_series": [
+        "x4, x8 and x16 organizations",
+        "Documented standard speed bins",
+        "Multiple manufacturers",
+        "Multiple normal production revisions",
+        "Multiple documented procurement quantity tiers"
+      ],
+      "no_universal_thresholds": [
+        "No universal exact MPN",
+        "No one required manufacturer",
+        "No invented speed minimum",
+        "No invented order-quantity minimum",
+        "No exact fabrication-node restriction"
+      ],
+      "excluded_initially": [
+        "DRAM modules",
+        "Bare wafers or dies",
+        "Stacked or multi-die packages",
+        "LPDDR, GDDR, HBM",
+        "Engineering samples",
+        "Reclaimed, desoldered, refurbished or unknown-condition components",
+        "eTT/uTT, downgrade or untested material used as a substitute for the standard-production series"
+      ],
+      "specialty_grade_rule": "Special qualification/temperature grades cannot silently enter a standard-production series. Any separately intended specialty exposure requires an explicit series profile and precommitted treatment, not classification from density alone.",
+      "evidence_route": "Published contract assessment, or direct repeatable contract-price observation only when that evidence class and series are admitted by the contract's existing objective rules. A listing or firm offer is not automatically an agreed contract price."
+    },
+    "NANDX_WAFER_CONTRACT_ASSESSMENT": {
+      "recommended_core": "Recurring assessments of upstream fabricated 3D NAND wafer-market contract prices for the exact native TLC/QLC cell type and nominal per-die density.",
+      "density_rule": "Nominal per-die density identifies the category. It does not specify the dollar quotation denominator. Preserve the source's exact density notation and documented mapping.",
+      "hard_fields": [
+        "memory_family=NAND",
+        "architecture=3D",
+        "cell_type",
+        "nominal_die_density",
+        "physical_scope=fabricated_wafer_market",
+        "evidence_class=published_contract_assessment",
+        "contract_price_basis"
+      ],
+      "live_input_mode": "assessment_only",
+      "excluded_initially": [
+        "Blank silicon wafers",
+        "SLC or MLC rows",
+        "Planar NAND",
+        "Other density categories",
+        "SSD, eMMC or UFS prices",
+        "Bare-die, known-good-die or packaged-chip individual quotes substituted for wafer assessments",
+        "Whole-wafer offers converted using assumed die yield",
+        "Spot prices and forecasts"
+      ],
+      "scope_dimensions": [
+        "Actual native price unit and physical quotation basis",
+        "Quality/testing/yield treatment as defined by the assessment",
+        "Procurement market",
+        "Layer or process-generation scope, including a documented mixed scope"
+      ],
+      "no_universal_thresholds": [
+        "No exact manufacturer or MPN",
+        "No one required layer count",
+        "No invented universal A-grade definition",
+        "No assumption that all wafer material is known-good die",
+        "No guessed yield or wafer-to-die conversion"
+      ],
+      "evolving_mix_rule": "A documented assessment may cover multiple manufacturers and process generations. It measures that defined assessment market. Do not label it a guaranteed constant-quality physical transaction price. A methodology change is distinct from ordinary changes permitted by the established assessment methodology."
+    }
+  },
+  "comparison_series_manifest": {
+    "required_common": [
+      "series_id and definition_version",
+      "commodity_bucket_id",
+      "original economic origin and exact row/locator",
+      "evidence_class and contract-price basis",
+      "technical_scope reference",
+      "physical_scope and native_unit",
+      "price_statistic, fixed before the observation window",
+      "currency and any conversion policy",
+      "procurement_segment and geographic scope",
+      "reference_period semantics",
+      "expected publication cadence",
+      "baseline observation and positive baseline value",
+      "revision/correction policy",
+      "missing-data and continuation/linking policy",
+      "contract inclusion and aggregation treatment"
+    ],
+    "dram_scope": [
+      "organization or expressly documented organization mix",
+      "speed in MT/s or expressly documented speed basket",
+      "package construction and die count",
+      "grade, condition and any qualification scope"
+    ],
+    "nand_scope": [
+      "cell mode and density",
+      "fabricated wafer-market scope",
+      "native quoted unit",
+      "testing/quality scope",
+      "generation/layer scope when specified by the assessment"
+    ],
+    "direct_price_scope": [
+      "Manufacturer and exact MPN/specification revision",
+      "Quantity or quantity tier",
+      "Delivery and pricing period",
+      "Geographic market",
+      "Tax/freight inclusion",
+      "Payment/rebate/bundling treatment relevant to the net unit price"
+    ],
+    "assessment_scope_rule": "A submission may inherit scope from a versioned assessment definition. It need not disclose each underlying customer's MPN, order size or private contract terms. Do not invent such values.",
+    "scope_value_states": [
+      "exact",
+      "documented_mix",
+      "not_disclosed",
+      "not_applicable"
+    ],
+    "ambiguity_rule": "documented_mix is an affirmative scope definition, not a synonym for missing information. Unresolved core product identity, contract basis, native measurement meaning, period or statistic blocks settlement eligibility. Undisclosed underlying transaction details do not automatically invalidate an otherwise defined market assessment.",
+    "metadata_not_new_bucket": [
+      "Manufacturer or MPN where applicable",
+      "Fab/process node",
+      "NAND layer count",
+      "Lot/date code",
+      "Die revision",
+      "Physical package dimensions",
+      "Shipping reel/tray details"
+    ],
+    "metadata_change_rule": "Record changes. Changing manufacturer, qualification, package construction, procurement terms or selected price statistic cannot silently continue a direct comparison series. A process change that stays within the published commodity and assessment definition is not automatically a new economic bucket.",
+    "unit_rule": "A price relative in an unchanged documented native unit is dimensionless. USD/Gb conversion is optional for display and checks and is never a substitute for comparability. An unresolved physical denominator must not be guessed or converted into an absolute chip price."
+  },
+  "observation_fields": {
+    "required": [
+      "observation_id",
+      "series_id",
+      "series_definition_version",
+      "raw_product_label",
+      "raw_price",
+      "raw_currency",
+      "raw_unit",
+      "selected_statistic",
+      "reference_period_start",
+      "reference_period_end",
+      "published_at",
+      "retrieved_or_proved_at",
+      "publication_vintage",
+      "original_evidence_locator",
+      "underlying_event_or_release_id",
+      "evidence_hash_or_proof_reference"
+    ],
+    "conditional_direct_price": [
+      "manufacturer",
+      "mpn_or_exact_product_identity",
+      "product_specification_reference",
+      "quantity_or_tier",
+      "terms_reference"
+    ],
+    "assessment_identity": "Use exact assessment and row identity; no fabricated MPN requirement.",
+    "raw_capture_rule": "Retain original labels and values alongside parsed fields and the evidence supporting each classification.",
+    "time_rule": "Retrieval/proof time does not replace publication time or the economic reference period."
+  },
+  "routing": {
+    "statuses": [
+      "CLASSIFIED_CANDIDATE",
+      "ELIGIBLE_FOR_CONTRACT",
+      "DUPLICATE_NO_EXTRA_WEIGHT",
+      "NEEDS_METADATA",
+      "WRONG_PRODUCT",
+      "WRONG_PRICE_BASIS",
+      "RESEARCH_ONLY",
+      "OUTSIDE_COMMITTED_SERIES",
+      "SCOPE_CHANGE",
+      "STALE_OR_WRONG_PERIOD"
+    ],
+    "ordered_checks": [
+      "Verify evidence provenance under the existing evidence policy.",
+      "Extract hard product and measurement fields without guessing.",
+      "Route to a commodity bucket only when its hard identity matches.",
+      "Match the exact assessment definition or direct product/procurement series.",
+      "Check evidence class and active contract membership.",
+      "Check reference period, publication vintage, chosen statistic and baseline continuity.",
+      "Deduplicate by the underlying economic event/assessment release.",
+      "Apply the already specified deterministic aggregation and missing-data rules."
+    ],
+    "unresolved_action": "Retain useful evidence with a reason code, but give it no settlement contribution until objective missing requirements are met.",
+    "new_sources": "Open submissions may introduce candidates for future contracts; they do not silently change an already-open contract's committed series set.",
+    "no_default_assumptions": [
+      "Unknown condition is not new",
+      "Unknown grade is not standard grade",
+      "Unknown denomination is not USD per chip",
+      "Same source website is not necessarily the same comparison series",
+      "Contract-related material is not necessarily an agreed contract price"
+    ]
+  },
+  "aggregation_constraints": {
+    "price_relative": "R_s,t = P_s,t / P_s,0 using comparable observations of the same series.",
+    "within_bucket": "Use the contract's frozen deterministic aggregation procedure. This document does not replace it with a newly invented mean or source-weight rule.",
+    "outer_weights": "Apply each economic bucket weight once after forming its bucket relative.",
+    "deduplication": "Multiple submitters, screenshots, translations, reposts or child SKU mappings of one parent assessment represent one underlying observation.",
+    "composition_bias": "Source normalization cancels stable price-level differences, not changing product/quality/customer mix.",
+    "missing_data": "Do not automatically redistribute weight when a source or bucket disappears. Expected cadence, carry-forward expiry and any delay/fallback must be fixed before activation.",
+    "daily_vs_monthly": "A daily processing run can retain an in-period monthly assessment. Re-reading it does not create a new economic observation."
+  },
+  "illustrative_cases": [
+    {
+      "id": "RAMX_DIRECT_MATCH",
+      "submission": "New standard-production monolithic DDR5 16Gb x8 component, identified MPN, contractual terms and committed comparison series all match.",
+      "result": "ELIGIBLE_FOR_CONTRACT",
+      "conditional": "Provenance, time and evidence-class checks also pass."
+    },
+    {
+      "id": "RAMX_OTHER_SPEED",
+      "submission": "DDR5 16Gb at a different documented standard speed from another admitted series.",
+      "result": "CLASSIFIED_CANDIDATE",
+      "rule": "Same bucket is possible; it needs its own fixed comparison definition and contract inclusion."
+    },
+    {
+      "id": "RAMX_STACKED_PACKAGE",
+      "submission": "Package containing two 16Gb dies presented as a 32Gb monolithic chip.",
+      "result": "WRONG_PRODUCT"
+    },
+    {
+      "id": "RAMX_MODULE",
+      "submission": "DDR5 16GB DIMM presented as a 16Gb chip.",
+      "result": "WRONG_PRODUCT"
+    },
+    {
+      "id": "RAMX_GRADE_CHANGE",
+      "submission": "A standard-production chip series is replaced with eTT or downgrade material.",
+      "result": "SCOPE_CHANGE"
+    },
+    {
+      "id": "NAND_ASSESSMENT_MATCH",
+      "submission": "Defined 1Tb TLC 3D fabricated-wafer contract assessment at its committed statistic and reference period.",
+      "result": "ELIGIBLE_FOR_CONTRACT",
+      "conditional": "Source scope, unit continuity, provenance and contract inclusion are established."
+    },
+    {
+      "id": "NAND_MIXED_LAYERS",
+      "submission": "Assessment definition expressly covers several process/layer generations.",
+      "result": "CLASSIFIED_CANDIDATE",
+      "rule": "Mixed scope is permissible; no exact layer cutoff is imposed. The series must otherwise qualify."
+    },
+    {
+      "id": "NAND_PACKAGED_QUOTE",
+      "submission": "An authentic packaged 1Tb NAND component quotation.",
+      "result": "RESEARCH_ONLY",
+      "rule": "Does not become an assessment-only wafer observation."
+    },
+    {
+      "id": "SPOT_AS_CONTRACT",
+      "submission": "Matching density on a spot board submitted as a contract assessment.",
+      "result": "WRONG_PRICE_BASIS"
+    },
+    {
+      "id": "UNKNOWN_UNIT",
+      "submission": "A price number with no defined native unit or priced-object meaning.",
+      "result": "NEEDS_METADATA"
+    },
+    {
+      "id": "HIGH_LOW_SWITCH",
+      "submission": "Reporter submits the high instead of the committed average statistic.",
+      "result": "SCOPE_CHANGE"
+    },
+    {
+      "id": "DUPLICATE_PARENT",
+      "submission": "Twenty screenshots or child SKU labels repeat one assessment row and vintage.",
+      "result": "DUPLICATE_NO_EXTRA_WEIGHT"
+    },
+    {
+      "id": "NEW_SOURCE_CURRENT_CONTRACT",
+      "submission": "New otherwise relevant origin that is absent from the contract's committed series set.",
+      "result": "OUTSIDE_COMMITTED_SERIES"
+    },
+    {
+      "id": "MONTHLY_RECAPTURE",
+      "submission": "New web proof captures an unchanged current-month assessment.",
+      "result": "DUPLICATE_NO_EXTRA_WEIGHT",
+      "rule": "Can strengthen provenance or validity checks; cannot create additional price weight."
+    }
+  ],
+  "activation": {
+    "ready": false,
+    "complete_in_this_document": [
+      "Nine commodity identities and unchanged weights",
+      "Recommended physical and quality boundaries",
+      "Direct-versus-assessment field requirements",
+      "Series-comparability rules",
+      "Routing reason codes and illustrative cases"
+    ],
+    "still_required": [
+      "Actual series manifests with documented scope and quotation unit",
+      "Observed comparable contract-price coverage for every bucket, especially RAMX DDR5 24Gb and 32Gb",
+      "Configured internal aggregation, baseline and linking rules",
+      "Exact reporting cadence, stale/missing-data and revision policies",
+      "Implementation against the active oracle and validation using real evidence"
+    ],
+    "anti_overclaim": "This is a specification proposal; the cases are design examples, not results of tests against the deployed pipeline."
+  },
+  "sources": [
+    {
+      "title": "Micron DDR5 DRAM",
+      "url": "https://www.micron.com/products/memory/dram-components/ddr5-sdram",
+      "supports": "16/24/32Gb monolithic DDR5 device densities"
+    },
+    {
+      "title": "Micron DDR5 part catalog",
+      "url": "https://www.micron.com/products/memory/dram-components/ddr5-sdram/part-catalog",
+      "supports": "Separate organization, speed and temperature attributes"
+    },
+    {
+      "title": "TrendForce DRAM price tables",
+      "url": "https://www.trendforce.com/price/dram/dram_contract",
+      "supports": "Separate chip/module, regular/eTT, spot/contract and statistic categories"
+    },
+    {
+      "title": "TrendForce NAND wafer contract price catalog",
+      "url": "https://www.trendforce.com/price/flash/wafer_contract",
+      "supports": "The four NAND contract assessment density/cell-type categories"
+    },
+    {
+      "title": "DRAMeXchange FAQ",
+      "url": "https://dramexchange.com/Service/faqs",
+      "supports": "Contract assessment definition and cadence; fabricated NAND wafer definition"
+    }
+  ]
+}

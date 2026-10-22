@@ -19,7 +19,7 @@ use crate::instruction::{
     find_dev_council_config_address, DevBootstrapMonthParams, DevBootstrapSourceParams,
     DevCompleteFormationParams, DevCouncilConfigParams, DEV_BOOTSTRAP_MONTH_TAG,
     DEV_BOOTSTRAP_SOURCE_TAG, DEV_COMPLETE_FORMATION_TAG, DEV_COUNCIL_CONFIG_TAG,
-    DEV_SETTLEMENT_DIGEST_DOMAIN, DEV_SETTLE_MONTH_TAG,
+    DEV_RESET_MONTH_TAG, DEV_SETTLEMENT_DIGEST_DOMAIN, DEV_SETTLE_MONTH_TAG,
 };
 use crate::state::{derive_settlement_v2_pda, SettlementRecordV2};
 
@@ -95,6 +95,11 @@ pub(super) fn process(
         DEV_COMPLETE_FORMATION_TAG => {
             let params: DevCompleteFormationParams = decode_instruction_payload(payload)?;
             super::dev_formation::process(program_id, accounts, params)
+        }
+        DEV_RESET_MONTH_TAG => {
+            let params: crate::instruction::DevResetMonthParams =
+                decode_instruction_payload(payload)?;
+            super::dev_reset::process(program_id, accounts, params)
         }
         _ => Err(OracleError::InvalidInstructionData.into()),
     }

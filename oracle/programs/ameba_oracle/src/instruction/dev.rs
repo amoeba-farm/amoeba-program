@@ -17,6 +17,10 @@ pub const DEV_COUNCIL_CONFIG_TAG: u8 = 243;
 /// one SKU pool per bucket, so the ordinary indexing (200) and active-weight (121, 122, 124)
 /// instructions can finish it and its Game updates and settlement run through the ordinary path.
 pub const DEV_COMPLETE_FORMATION_TAG: u8 = 244;
+/// Clear a dev month so it can be made again on another bucket set for the same period: close
+/// its accounts (and a product's SKU list), or write its period back to Forming once the month is
+/// gone. See `processor/dev_reset.rs`.
+pub const DEV_RESET_MONTH_TAG: u8 = 245;
 /// Domain of the dev settlement digest:
 /// `sha256(domain ‖ period ‖ month ‖ expiry_ts ‖ base ‖ Δ ‖ value ‖ settled_ts)`, integers
 /// little-endian (Δ as `i64`).
@@ -57,6 +61,15 @@ pub enum DevCompleteFormationParams {
     Bucket(DevFormationBucketParams),
     /// 2: freeze the recipe and fund the (zero-budget) schedule.
     Finalize,
+}
+
+/// Payload of [`DEV_RESET_MONTH_TAG`]: one byte selects the step.
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, Eq, PartialEq)]
+pub enum DevResetMonthParams {
+    /// 0: close the listed oracle accounts into the recipient.
+    CloseAccounts,
+    /// 1: write a Live or Forming period back to Forming once its month is closed.
+    ReformPeriod,
 }
 
 /// One bucket step of [`DevCompleteFormationParams::Bucket`]. The SKU pool carries these bonds
@@ -236,6 +249,59 @@ mod builders {
                     false,
                 ),
                 AccountMeta::new_readonly(system_program::ID, false),
+            ],
+        )
+    }
+
+    /// Accounts: 0 [signer] oracle authority; 1 [writable] rent recipient; 2 config;
+    /// 3 [writable] reward vault; 4.. [writable] the accounts to close.
+    pub fn dev_reset_close_accounts(
+        program_id: &Pubkey,
+        oracle_authority: &Pubkey,
+        recipient: &Pubkey,
+        targets: &[Pubkey],
+    ) -> Instruction {
+        let mut accounts = vec![
+            AccountMeta::new_readonly(*oracle_authority, true),
+            AccountMeta::new(*recipient, false),
+            AccountMeta::new_readonly(find_config_address(program_id).0, false),
+            AccountMeta::new(
+                crate::state::derive_oracle_usdc_reward_vault_pda(program_id).0,
+                false,
+            ),
+        ];
+        accounts.extend(
+            targets
+                .iter()
+                .map(|target| AccountMeta::new(*target, false)),
+        );
+        dev_instruction(
+            program_id,
+            DEV_RESET_MONTH_TAG,
+            &DevResetMonthParams::CloseAccounts,
+            accounts,
+        )
+    }
+
+    /// Accounts: 0 [signer] oracle authority; 1 config; 2 [writable] period; 3 its month PDA.
+    pub fn dev_reset_reform_period(
+        program_id: &Pubkey,
+        oracle_authority: &Pubkey,
+        product_id: &[u8; 32],
+        expiry_ts: u64,
+    ) -> Instruction {
+        let period =
+            ameba_oracle_interface::find_period_address(program_id, product_id, expiry_ts).0;
+        let month = super::super::find_oracle_month_address(program_id, &period, expiry_ts);
+        dev_instruction(
+            program_id,
+            DEV_RESET_MONTH_TAG,
+            &DevResetMonthParams::ReformPeriod,
+            vec![
+                AccountMeta::new_readonly(*oracle_authority, true),
+                AccountMeta::new_readonly(find_config_address(program_id).0, false),
+                AccountMeta::new(period, false),
+                AccountMeta::new_readonly(month, false),
             ],
         )
     }

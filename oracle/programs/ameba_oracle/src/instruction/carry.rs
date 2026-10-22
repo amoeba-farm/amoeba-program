@@ -115,6 +115,10 @@ pub enum OracleCarryForwardActionV1 {
     },
 }
 
+/// Evidence object kinds 1-4 (`processor/oracle_evidence.rs`): locator, definition, Wayback
+/// archive URL, authenticated evidence record.
+const EVIDENCE_KINDS: u8 = crate::constants::ORACLE_EVIDENCE_RECORD_KIND;
+
 impl OracleCarryForwardActionV1 {
     /// Branch-for-branch mirror of `deserialize_reader` on a [`CheckedCursor`]. A short read
     /// poisons the cursor (rejected by the caller's `finish`); every value check rejects
@@ -206,7 +210,12 @@ impl OracleCarryForwardActionV1 {
                 let total = c.u16();
                 let offset = c.u16();
                 let len = usize::from(c.u8());
-                if !(1..=3).contains(&kind) || len == 0 || len > 192 || total == 0 || total > 4096 {
+                if !(1..=EVIDENCE_KINDS).contains(&kind)
+                    || len == 0
+                    || len > 192
+                    || total == 0
+                    || total > 4096
+                {
                     return invalid();
                 }
                 Self::WriteEvidence {
@@ -333,7 +342,12 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
                 let total = u16::deserialize_reader(reader)?;
                 let offset = u16::deserialize_reader(reader)?;
                 let len = usize::from(u8::deserialize_reader(reader)?);
-                if !(1..=3).contains(&kind) || len == 0 || len > 192 || total == 0 || total > 4096 {
+                if !(1..=EVIDENCE_KINDS).contains(&kind)
+                    || len == 0
+                    || len > 192
+                    || total == 0
+                    || total > 4096
+                {
                     return Err(io::ErrorKind::InvalidData.into());
                 }
                 let mut bytes = vec![0; len];
@@ -442,7 +456,7 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
                 offset,
                 bytes,
             } => {
-                if !(1..=3).contains(kind)
+                if !(1..=EVIDENCE_KINDS).contains(kind)
                     || bytes.is_empty()
                     || bytes.len() > 192
                     || *total == 0
@@ -578,6 +592,13 @@ mod compact_borsh_equivalence {
                 total: 4096,
                 offset: 7,
                 bytes: vec![22; 5],
+            },
+            A::WriteEvidence {
+                kind: 4,
+                hash: [23; 32],
+                total: 512,
+                offset: 0,
+                bytes: vec![24; 192],
             },
             A::CloseEvidenceDraft,
             A::BackfillSourceEvidence,

@@ -39,12 +39,13 @@ pub(super) fn load_agreement(
         || value.candidate_hash == [0; 32]
         || value.funding > 1
         || value.outcome > 3
-        || value.researcher_bps
-            != if value.funding == 1 {
-                10_000
-            } else {
-                DEFAULT_RESEARCHER_BPS
-            }
+        // Agreements made before the 80/20 split keep their half.
+        || !(if value.funding == 1 {
+            value.researcher_bps == 10_000
+        } else {
+            value.researcher_bps == DEFAULT_RESEARCHER_BPS
+                || value.researcher_bps == LEGACY_RESEARCHER_BPS
+        })
         || value.retention_bps != DEFAULT_RETENTION_BPS
         || (value.funding == 1 && (value.funder != value.reserve || value.researcher_bps != 10_000))
     {

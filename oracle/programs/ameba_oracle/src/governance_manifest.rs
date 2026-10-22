@@ -11,8 +11,8 @@ use crate::instruction::OracleInstructionTag;
 pub const RESERVED_INSTRUCTION_TAGS: [u8; 1] = [205];
 
 /// Bytes routed only by an explicitly selected feature build: the localnet dev bootstrap
-/// (`localnet-dev-authority`). Every other build classifies them as unassigned.
-pub const FEATURE_GATED_INSTRUCTION_TAGS: [u8; 5] = [240, 241, 242, 243, 244];
+/// (`localnet-dev-authority`) and its month reset (245). Every other build classifies them as unassigned.
+pub const FEATURE_GATED_INSTRUCTION_TAGS: [u8; 6] = [240, 241, 242, 243, 244, 245];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InstructionGovernanceClass {

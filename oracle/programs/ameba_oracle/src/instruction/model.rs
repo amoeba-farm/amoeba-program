@@ -336,7 +336,8 @@ pub enum OracleInstruction {
         params: AccumulateOracleSettlementSourceBucketParams,
     },
 
-    /// Submit the bonded opening print of one Frozen source with its sealed Wayback archive URL.
+    /// Submit the bonded opening print of one Frozen source with its sealed archive evidence (a
+    /// Wayback archive URL, kind 3, or an authenticated evidence record, kind 4).
     ///
     /// Accounts: 0 [signer, writable] claimant and payer; 1 period; 2 [writable] month;
     /// 3 SKU pool; 4 [writable] source; 5 [writable] claimant collateral; 6 [writable] opening
@@ -448,7 +449,8 @@ pub enum OracleInstruction {
         params: ChallengeOracleUpdateClaimParams,
     },
 
-    /// Reveal a committed update with its sealed Wayback archive URL.
+    /// Reveal a committed update with its sealed archive evidence (a Wayback archive URL, kind 3,
+    /// or an authenticated evidence record, kind 4).
     ///
     /// Accounts: 0 [signer, writable] claimant and payer; 1 period; 2 month; 3 source;
     /// 4 finalized active-weight manifest; 5 [writable] claim; 6 system program; 7 sealed

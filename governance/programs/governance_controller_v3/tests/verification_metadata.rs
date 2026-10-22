@@ -58,6 +58,19 @@ fn previous_spread_params(commit: &str, slot: u64) -> Vec<u8> {
         slot,
     ).try_to_vec().unwrap()
 }
+// Independent literal release-5 Futures metadata, not the compatibility constructor.
+fn previous_futures_params(commit: &str, slot: u64) -> Vec<u8> {
+    (
+        "0.5.2".to_string(),
+        "https://github.com/amoeba-farm/amoeba-program".to_string(),
+        commit.to_string(),
+        vec!["--workspace-path", "futures", "--library-name", "ameba_futures",
+            "--base-image", "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/gate-final@sha256:7ad1e567f19831e658f5b892a7269d23d7f1826438e025b5d9d2e385240a4d67",
+            "--arch", "v1", "--cargo-build-sbf-args", "--tools-version v1.53"]
+            .into_iter().map(str::to_string).collect::<Vec<_>>(),
+        slot,
+    ).try_to_vec().unwrap()
+}
 fn install(test: &mut ProgramTest, program: Pubkey, authority: Pubkey, bytes: &[u8]) {
     let pd = Pubkey::find_program_address(&[program.as_ref()], &LOADER).0;
     let mut p = 2u32.to_le_bytes().to_vec();
@@ -84,7 +97,7 @@ async fn send(ctx: &mut ProgramTestContext, instructions: &[Instruction]) -> boo
     }
     result.is_ok()
 }
-async fn run(own: bool) {
+async fn run(target_override: Option<Pubkey>) {
     let elf =
         std::fs::read(std::env::var("AMOEBA_GOV_V3_SBF").expect("exact controller ELF required"))
             .unwrap();
@@ -93,7 +106,8 @@ async fn run(own: bool) {
     )
     .unwrap();
     let controller = Pubkey::new_unique();
-    let target = if own { controller } else { DEVNET_SPREAD };
+    let own = target_override.is_none();
+    let target = target_override.unwrap_or(controller);
     let cfg_key = config_pda(&controller).0;
     let auth = if own {
         authority_pda(&controller).0
@@ -352,13 +366,120 @@ async fn run(own: bool) {
         ctx.banks_client.get_account(auth).await.unwrap().unwrap(),
         &authority_before,
     );
-    if !own {
+    if target == MAINNET_FUTURES {
+        // Real Mainnet shape: exact old minimum rent, zero authority, +2-byte growth.
+        let minimum = account(
+            VERIFY_PROGRAM,
+            record(
+                &target,
+                &auth,
+                &previous_futures_params(&"cd".repeat(20), 19),
+                bump,
+            ),
+            false,
+        );
+        let mut zero_authority = authority_before.clone();
+        zero_authority.lamports = 0;
+        let mut payer = ctx
+            .banks_client
+            .get_account(ctx.payer.pubkey())
+            .await
+            .unwrap()
+            .unwrap();
+        payer.lamports += updated.lamports - minimum.lamports + authority_before.lamports;
+        ctx.set_account(&ctx.payer.pubkey(), &AccountSharedData::from(payer));
+        ctx.set_account(&metadata, &AccountSharedData::from(minimum.clone()));
+        ctx.set_account(&auth, &AccountSharedData::from(zero_authority));
+        let mut minimum_proposal = proposal.clone();
+        minimum_proposal.action.data[40..60].fill(0xa1);
+        minimum_proposal.digest = minimum_proposal.compute_digest(&controller).unwrap();
+        reset(&mut ctx, &minimum_proposal);
+        let expected = record(
+            &target,
+            &auth,
+            &minimum_proposal
+                .action
+                .verification_policy()
+                .unwrap()
+                .params(&controller)
+                .unwrap(),
+            bump,
+        );
+        assert_eq!(expected.len(), minimum.data.len() + 2);
+        let topup = Rent::default().minimum_balance(expected.len()) - minimum.lamports;
+        let payer_before = ctx
+            .banks_client
+            .get_balance(ctx.payer.pubkey())
+            .await
+            .unwrap();
+        let blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[instruction(ctx.payer.pubkey(), &minimum_proposal)],
+            Some(&ctx.payer.pubkey()),
+            &[&ctx.payer],
+            blockhash,
+        );
+        let fee = ctx
+            .banks_client
+            .get_fee_for_message(tx.message.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        ctx.banks_client.process_transaction(tx).await.unwrap();
+        let migrated = ctx
+            .banks_client
+            .get_account(metadata)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(migrated.data, expected);
+        assert_eq!(migrated.lamports, minimum.lamports + topup);
+        assert_eq!(
+            ctx.banks_client
+                .get_balance(ctx.payer.pubkey())
+                .await
+                .unwrap(),
+            payer_before - topup - fee
+        );
+        assert_eq!(
+            ctx.banks_client
+                .get_account(auth)
+                .await
+                .unwrap()
+                .map_or(0, |a| a.lamports),
+            0
+        );
+        let finalized = ctx.banks_client.get_account(pkey).await.unwrap().unwrap();
+        assert_eq!(
+            Proposal::try_from_slice(&finalized.data).unwrap().state,
+            EXECUTED
+        );
+        println!("AMOEBA_FUTURES_MINIMUM_RENT_MIGRATION old_bytes={} new_bytes={} topup={} fee={} authority_lamports=0", minimum.data.len(), migrated.data.len(), topup, fee);
+        // Restore the original authority fixture using a real transfer; later donation cases stay unchanged.
+        let payer_key = ctx.payer.pubkey();
+        assert!(
+            send(
+                &mut ctx,
+                &[solana_system_interface::instruction::transfer(
+                    &payer_key,
+                    &auth,
+                    authority_before.lamports
+                )]
+            )
+            .await
+        );
+    }
+    if target == DEVNET_SPREAD || target == MAINNET_FUTURES {
         // Transition an authentic old record using actual Otter SBF. Include
         // donations to both accounts; Anchor refunds all excess on shrink.
         let legacy_bytes = record(
             &target,
             &auth,
-            &previous_spread_params(&"cd".repeat(20), 19),
+            &if target == MAINNET_FUTURES {
+                previous_futures_params(&"cd".repeat(20), 19)
+            } else {
+                previous_spread_params(&"cd".repeat(20), 19)
+            },
             bump,
         );
         let mut legacy = account(VERIFY_PROGRAM, legacy_bytes, false);
@@ -461,7 +582,8 @@ async fn run(own: bool) {
         );
         assert!(
             logs.iter()
-                .any(|line| line.contains("Computational budget exceeded")),
+                .any(|line| line.contains("Computational budget exceeded")
+                    || line.contains("exceeded CUs meter at BPF instruction")),
             "expected compute exhaustion: {logs:?}"
         );
         unchanged(
@@ -499,7 +621,11 @@ async fn run(own: bool) {
                 .unwrap(),
             bump,
         );
-        assert!(expected.len() < legacy.data.len());
+        if target == DEVNET_SPREAD {
+            assert!(expected.len() < legacy.data.len());
+        } else {
+            assert!(expected.len() > legacy.data.len());
+        }
         assert_eq!(migrated.data, expected);
         assert_eq!(migrated.lamports, legacy.lamports);
         unchanged(
@@ -534,6 +660,8 @@ async fn run(own: bool) {
 #[tokio::test]
 #[ignore = "requires this worktree controller and finalized Mainnet Otter Verify SBF artifacts"]
 async fn actual_sbf_controller_and_frozen_target_metadata() {
-    run(true).await;
-    run(false).await;
+    run(None).await;
+    run(Some(DEVNET_SPREAD)).await;
+    run(Some(MAINNET_ORACLE)).await;
+    run(Some(MAINNET_FUTURES)).await;
 }

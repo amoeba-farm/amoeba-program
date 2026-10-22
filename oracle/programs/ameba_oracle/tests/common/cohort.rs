@@ -285,7 +285,7 @@ impl Harness {
         let hash = match kind {
             1 => locator_hash(bytes),
             2 => definition_hash(bytes),
-            3 => instruction::archive_url_hash(std::str::from_utf8(bytes).unwrap()),
+            3 | 4 => instruction::archive_url_hash(std::str::from_utf8(bytes).unwrap()),
             _ => panic!("unsupported evidence kind"),
         };
         for (index, chunk) in bytes.chunks(192).enumerate() {
@@ -425,6 +425,22 @@ pub fn archive_url(source_id: &[u8; 32], capture: u64) -> String {
         ameba_oracle::constants::ORACLE_OPENING_ARCHIVE_URL_PREFIX,
         wayback_timestamp(capture),
         String::from_utf8(locator(source_id)).unwrap()
+    )
+}
+
+/// The bundle digest the test records name (the program checks only its form).
+pub const RECORD_DIGEST: &str = "abababababababababababababababababababababababababababababababab";
+
+/// An authenticated evidence record (evidence kind 4) of the source's locator at `capture`.
+pub fn evidence_record(source_id: &[u8; 32], capture: u64) -> String {
+    evidence_record_of(&String::from_utf8(locator(source_id)).unwrap(), capture)
+}
+
+/// An authenticated evidence record of `locator` at `capture`.
+pub fn evidence_record_of(locator: &str, capture: u64) -> String {
+    format!(
+        "{}m=web;t={capture};d={RECORD_DIGEST};u={locator}",
+        ameba_oracle::constants::ORACLE_EVIDENCE_RECORD_PREFIX
     )
 }
 

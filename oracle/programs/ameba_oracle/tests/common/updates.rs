@@ -37,7 +37,29 @@ impl Harness {
         source_time: u64,
     ) -> Print {
         let url = archive_url(source_id, source_time);
-        self.upload_evidence(payer, 3, url.as_bytes()).await;
+        self.print_evidence(cohort, payer, source, source_id, state, source_time, url)
+            .await
+    }
+
+    /// One update print whose archive evidence is `url`, a Wayback URL (sealed as kind 3) or an
+    /// evidence record (kind 4); its evidence hash commits to the text.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn print_evidence(
+        &mut self,
+        cohort: &Cohort,
+        payer: &Keypair,
+        source: &Pubkey,
+        source_id: &[u8; 32],
+        state: u64,
+        source_time: u64,
+        url: String,
+    ) -> Print {
+        self.upload_evidence(
+            payer,
+            instruction::archive_evidence_kind(&url),
+            url.as_bytes(),
+        )
+        .await;
         let evidence = instruction::update_evidence_hash(
             &cohort.month,
             source,
