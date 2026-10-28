@@ -1,0 +1,51 @@
+{
+  "schema": "amoeba.private-credit-mainnet-deployment.v1",
+  "cluster": "mainnet-beta",
+  "program": "Bvp9kiRtJ7dT8unxP4Da39gv2eXDLEHLpcDfzcEuRKMu",
+  "artifactBytes": 722520,
+  "artifactSha256": "42118b8193d5e57c886348ef05272456251e970ac944226f7d70a5eb7e4926ec",
+  "normalizedExecutableSha256": "b1fd059b10df9b70e57227686372009a8b347a543ebde7b76ff22e01d6791e29",
+  "deployedSlot": "462346311",
+  "authority": "Gi964re8sQK2Z1fNszd2c7RVUxLeK6nbc6jok6dBkpLx",
+  "gateStatus": "Active",
+  "gateEpoch": "14",
+  "finalizedObservationSlot": 462349185,
+  "transactions": {
+    "extend": {
+      "signature": "5K2CarGndoj9faGVwRt5Wnkxk8bVZpSdMfJuv3LU4Xy6BjWZpoxDLnRwpUH9UhQq48yYnEea4oF3NGm8YrxjJtx6",
+      "slot": 462337461
+    },
+    "freeze": {
+      "signature": "2jd8HybUbdygRvmuVUCuAve53d2gjTqWxAjXMWqXypFraDo7jyJBLapFj6ZKEpXRXEG9kLwNeKvcxAhwH7HKHQax",
+      "slot": 462345792
+    },
+    "upgrade": {
+      "signature": "3ZTymJnZmQrqBJaR1FBvSHTX8wxRhvFE9nTqauBCymFV6ksz89DZoTscwrrtgEYvEVKETndLMQq2yGY1fr4ZgjXZ",
+      "slot": 462346311
+    },
+    "activate": {
+      "signature": "9wzsRafJHRvRKdyAbk5fEoXUjEqxQGuvVjj4j7DL9GDQHwLGUn3a6SkLE3WSQ4RRbXNTJzWt4FZG9zGdAsbpkcM",
+      "slot": 462346805
+    },
+    "publishMetadata": {
+      "signature": "Z16LTXVkq6b9z34zUXztS3ZEcLjKUiaDCHPciQcduRGTHii6BRJMD6kaow9ydHGySv3xVGRFxdetEZ22Fsm7mgB",
+      "slot": 462348190
+    }
+  },
+  "custodyRecordsPreserved": 26,
+  "unrelatedControllerAccountsPreserved": 33,
+  "bufferClosed": true,
+  "bufferRefundLamports": 3671239800,
+  "sourceVerification": {
+    "repository": "https://github.com/amoeba-farm/amoeba-program",
+    "commit": "059bd727fb61b68adf7d5ee3067ed5158674cbbc",
+    "metadata": "4y2644qGMYJtqeSkJVPLiqBruscYd4LqCioFTmWNMMWg",
+    "metadataRecordSha256": "897bfe1675f97fdd5dc7db953ca711191788585b737a198cfdfa1018e0587fe2",
+    "service": "https://verify.osec.io",
+    "requestId": "0393d038-2a73-4903-acbb-906b88aa8d4f",
+    "status": "verified",
+    "observedAt": "2026-10-28T04:59:13.575Z",
+    "canonicalVerified": true,
+    "authorityVerified": true
+  }
+}
