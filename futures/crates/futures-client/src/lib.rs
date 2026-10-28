@@ -8,8 +8,11 @@
 //! * Unit helpers between entry prices, premiums and fine units, and
 //!   [`error_name`] for the program's errors.
 //! * [`governance`]: binds instructions to the controller's gate epochs.
+//! * [`pricing`]: the maker's normal-model fair values, ladders and lot
+//!   sizing (the treasury maker's and petri's bots').
 //! * [`oracle`]: the oracle `Period` layout and readers the markets settle on.
 pub mod governance;
+pub mod pricing;
 
 /// Oracle `Period` layout and readers, for consumers that decode periods.
 pub use ameba_oracle_interface as oracle;
@@ -867,6 +870,60 @@ pub fn operated(mut ix: Instruction, operator: &Pubkey) -> Instruction {
     ix
 }
 
+impl Market {
+    /// Wraps a Quote/Submit (or refreshes the current assessment with None)
+    /// in the vault operator's approval. The exact pre-action account is
+    /// bound into the instruction. The private policy is never encoded.
+    pub fn approve_credit(
+        &self,
+        vault: &Pubkey,
+        operator: &Pubkey,
+        book: &Book,
+        exposure: u64,
+        action: Option<Instruction>,
+    ) -> Result<Instruction, solana_program::program_error::ProgramError> {
+        let invalid =
+            || solana_program::program_error::ProgramError::from(FuturesError::InvalidInstruction);
+        let (mut accounts, data) = match action {
+            Some(ix) => {
+                if ix.program_id != self.program
+                    || ix.accounts.first().map(|a| a.pubkey) != Some(self.market)
+                    || ix.accounts.get(1).map(|a| a.pubkey) != Some(*vault)
+                {
+                    return Err(invalid());
+                }
+                (ix.accounts, ix.data)
+            }
+            None => (
+                vec![
+                    AccountMeta::new(self.market, false),
+                    AccountMeta::new_readonly(*vault, false),
+                ],
+                Vec::new(),
+            ),
+        };
+        accounts[1].is_signer = false;
+        if let Some(a) = accounts.iter_mut().find(|a| a.pubkey == *operator) {
+            a.is_signer = true;
+            a.is_writable = true;
+        } else {
+            accounts.push(AccountMeta::new(*operator, true));
+        }
+        if !accounts.iter().any(|a| a.pubkey == SYSTEM) {
+            accounts.push(AccountMeta::new_readonly(SYSTEM, false));
+        }
+        Ok(ix(
+            self.program,
+            FuturesInstruction::CreditAuthorize {
+                snapshot: state::credit_snapshot(&self.program, &self.market, &book.data),
+                exposure,
+                action: data,
+            },
+            accounts,
+        ))
+    }
+}
+
 /// A pool account.
 pub fn decode_pool(data: &[u8]) -> Result<Pool, solana_program::program_error::ProgramError> {
     Pool::read(data)
@@ -1512,18 +1569,49 @@ impl Book {
         knots: &[Knot],
         now: u64,
     ) -> bool {
-        let Some((t, mut tr)) = self.trader_of(owner) else {
-            return false;
-        };
+        self.quote_admits_in_range(owner, l, core, knots, now, (0, self.header.grid))
+    }
+
+    /// Backend-only quote sizing against a selected settlement interval.
+    /// A privately admitted quote must be sent with `Market::approve_credit`;
+    /// the ordinary instruction independently checks the full grid.
+    #[allow(clippy::too_many_arguments)]
+    pub fn quote_admits_in_range(
+        &self,
+        owner: &Pubkey,
+        l: &Ladder,
+        core: Core,
+        knots: &[Knot],
+        now: u64,
+        range: (u16, u16),
+    ) -> bool {
+        self.quote_risk_in_range(owner, l, core, knots, now, range)
+            .is_some_and(|r| {
+                !self.header.has_credit()
+                    || self.header.credit_owner != *owner
+                    || r.exposure <= self.header.credit_limit
+            })
+    }
+
+    /// The post-quote risk under a caller-selected interval. None means
+    /// the quote cannot be funded or cannot independently carry its debt.
+    #[allow(clippy::too_many_arguments)]
+    pub fn quote_risk_in_range(
+        &self,
+        owner: &Pubkey,
+        l: &Ladder,
+        core: Core,
+        knots: &[Knot],
+        now: u64,
+        range: (u16, u16),
+    ) -> Option<state::CreditRisk> {
+        let (t, mut tr) = self.trader_of(owner)?;
         let mut h = self.header;
         let mut data = self.data.clone();
         let m = if tr.maker > 0 {
             tr.maker - 1
         } else {
-            let Some(m) = (0..h.maker_cap).find(|&m| !Maker::read(&data, h.maker_off(m)).used)
-            else {
-                return false;
-            };
+            let m = (0..h.maker_cap).find(|&m| !Maker::read(&data, h.maker_off(m)).used)?;
             Maker {
                 used: true,
                 trader: t,
@@ -1536,25 +1624,19 @@ impl Book {
         let old = Maker::read(&data, h.maker_off(m)).escrow;
         let (Some(free), Some(reserved)) = (tr.free.checked_add(old), tr.reserved.checked_sub(old))
         else {
-            return false;
+            return None;
         };
-        let Some(escrow) = state::write_ladder(&mut data, &h, m, l, core, knots) else {
-            return false;
-        };
+        let escrow = state::write_ladder(&mut data, &h, m, l, core, knots)?;
         let mut free = free;
         if free < escrow {
             if h.credit_owner != *owner || !self.lends_at(now) {
-                return false;
+                return None;
             }
-            let Some(debt) = h.debt.checked_add(escrow - free) else {
-                return false;
-            };
+            let debt = h.debt.checked_add(escrow - free)?;
             h.debt = debt;
             free = escrow;
         }
-        let Some(reserved) = reserved.checked_add(escrow) else {
-            return false;
-        };
+        let reserved = reserved.checked_add(escrow)?;
         tr.free = free - escrow;
         tr.reserved = reserved;
         tr.write(&mut data, h.trader_off(t));
@@ -1564,7 +1646,11 @@ impl Book {
         mk.hi = l.hi;
         mk.escrow = escrow;
         mk.write(&mut data, h.maker_off(m));
-        state::credit_admits(&data, &h, t).unwrap_or(false)
+        let risk = state::credit_risk_in_range(&data, &h, t, true, range)?;
+        if h.debt > 0 && h.has_credit() && h.credit_owner == *owner && h.debt > risk.carry {
+            return None;
+        }
+        Some(risk)
     }
 
     /// Whether the credit owner may borrow here at `now`: open, its credit
@@ -1586,11 +1672,14 @@ impl Book {
             .saturating_sub(self.credit_exposure())
     }
 
-    /// What `owner`'s next `Quote` here may escrow beyond its own cash (its
-    /// free and reserved cash less its debt) at `now`: as the credit owner
-    /// while its market lends, its limit plus the least its claims and
-    /// inventory pay, less its debt; the program then keeps its exposure
-    /// within the limit. 0 for anyone else.
+    /// A floor on what `owner`'s next `Quote` here may escrow beyond its own
+    /// cash (its free and reserved cash less its debt) at `now`: as the
+    /// credit owner while its market lends, its limit plus the least its
+    /// claims and inventory pay, less its debt. The program also counts the
+    /// escrow a settlement can't take, so it may admit more:
+    /// [`Book::quote_admits`] checks the full grid. A backend policy uses
+    /// [`Book::quote_admits_in_range`] and the operator's approval instead.
+    /// 0 for anyone else.
     pub fn credit_room(&self, owner: &Pubkey, now: u64) -> u64 {
         let h = &self.header;
         if h.credit_owner != *owner || !self.lends_at(now) {
@@ -1687,6 +1776,33 @@ impl Book {
             .iter()
             .map(|m| u128::from(m.lots) * u128::from(payoff::set_value(m.lo, m.hi, self.header.k)))
             .sum()
+    }
+
+    /// How many ladder arcs the book holds once `owner`'s ladder `l` is
+    /// posted, as `Quote` counts them against
+    /// `processor::MAX_BOOK_LADDER_ARCS` (beyond it: `MakerCapacity`);
+    /// `None` without a maker slot for it, or on overflow.
+    pub fn quote_arcs(
+        &self,
+        owner: &Pubkey,
+        l: &Ladder,
+        core: Core,
+        knots: &[Knot],
+    ) -> Option<usize> {
+        let h = self.header;
+        let mut data = self.data.clone();
+        let m = match self.trader_of(owner) {
+            Some((_, t)) if t.maker > 0 => t.maker - 1,
+            _ => (0..h.maker_cap).find(|&m| !Maker::read(&data, h.maker_off(m)).used)?,
+        };
+        state::write_ladder(&mut data, &h, m, l, core, knots)?;
+        let mut mk = Maker::read(&data, h.maker_off(m));
+        mk.used = true;
+        mk.seq = h.next_seq + 1;
+        mk.lo = l.lo;
+        mk.hi = l.hi;
+        mk.write(&mut data, h.maker_off(m));
+        Some(state::ladder_arcs(&data, &h))
     }
 
     /// As [`Book::quote_proposal`], for [`Market::quote_core`].

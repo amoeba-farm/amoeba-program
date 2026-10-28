@@ -1,0 +1,27 @@
+{
+  "schema": "amoeba.private-credit-qualification.v1",
+  "sourceCommit": "bcf0601606617fda7e00a818e7663d031339858f",
+  "artifactSha256": "42118b8193d5e57c886348ef05272456251e970ac944226f7d70a5eb7e4926ec",
+  "publicSourceReproduction": "byte-identical",
+  "fixedArtifactTransactionTests": {
+    "stake": 29,
+    "vault": 11,
+    "wide": 3,
+    "failed": 0,
+    "logSha256": "55c562224c0d834e5a0781aa8a1f773d2777cc24f7908055463cefde5dd5e837"
+  },
+  "api": {
+    "testsPassed": 224,
+    "productionBuild": "passed",
+    "postgresTests": "skipped: no test database URL",
+    "logSha256": "29d0035fdcda19bf67949417437e59ca278c33658d54ec616d392a239385ddbc"
+  },
+  "sdk": {
+    "typecheck": "passed",
+    "typescriptTests": "passed",
+    "rustTests": "passed",
+    "doctest": "passed",
+    "logSha256": "e174c315f7b9b62576b97167d6f4a07363db00f7b7ebd0a7b7daae2f87d4fb32"
+  },
+  "liveExecution": "not performed; user controls Mainnet installation"
+}

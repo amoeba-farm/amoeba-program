@@ -10,3 +10,7 @@ description = "Ameba futures: range-claim payoffs, the package graph, the exact 
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "solve"
+harness = false

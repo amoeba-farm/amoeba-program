@@ -3,7 +3,7 @@
 Solana smart contracts for Amoeba's oracle and range-futures markets, together
 with the preserved source of its earlier index-options / Spread program.
 
-[Website](https://amoeba.farm) Â· [Governance](https://github.com/amoeba-farm/amoeba-governance) Â· [Security](SECURITY.md)
+[Website](https://amoeba.farm) Ã‚Â· [Governance](https://github.com/amoeba-farm/amoeba-governance) Ã‚Â· [Security](SECURITY.md)
 
 The Mainnet oracle and range-futures source is in [oracle](oracle) and
 [futures](futures). The [staking release](contracts/2026-10-18-staking-mainnet)
@@ -21,6 +21,10 @@ and Active at gate epoch **5**. Hosted Solana verification passed for source
 is unchanged. [Installation and verification evidence](deployment-evidence/mainnet-oracle-20261022.json)
 records the exact binary, loader-required zero padding, finalized council transactions,
 state preservation and refunded buffer deposit. API configuration is a separate handoff.
+
+The [operator-assessed Futures credit upgrade](contracts/2026-10-28-private-credit) is prepared.
+Its source and artifact records are published separately from the installed program;
+Mainnet installation and updated hosted verification are pending.
 
 ## Mainnet programs
 

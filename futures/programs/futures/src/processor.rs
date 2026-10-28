@@ -98,6 +98,15 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
     }
     let ix =
         FuturesInstruction::try_from_slice(data).map_err(|_| FuturesError::InvalidInstruction)?;
+    execute(program_id, accounts, ix, None)
+}
+
+fn execute(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    ix: FuturesInstruction,
+    approval: Option<u64>,
+) -> ProgramResult {
     match ix {
         FuturesInstruction::CreateMarket {
             product_id,
@@ -156,6 +165,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
                 close_seq,
             },
             &proposal,
+            approval,
         ),
         FuturesInstruction::Cancel { slot, seq } => cancel(program_id, accounts, slot, seq),
         FuturesInstruction::Quote {
@@ -196,6 +206,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
             },
             &knots,
             &proposal,
+            approval,
         ),
         FuturesInstruction::CancelQuote => cancel_quote(program_id, accounts),
         FuturesInstruction::Split { claim, seq, at } => split(program_id, accounts, claim, seq, at),
@@ -316,6 +327,16 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         FuturesInstruction::PoolPrice => pool_price(program_id, accounts),
         FuturesInstruction::StartUnstake { shares } => start_unstake(program_id, accounts, shares),
         FuturesInstruction::CancelUnstake => cancel_unstake(program_id, accounts),
+        FuturesInstruction::CreditAuthorize {
+            snapshot,
+            exposure,
+            action,
+        } => {
+            if approval.is_some() {
+                return Err(FuturesError::InvalidInstruction.into());
+            }
+            credit_authorize(program_id, accounts, snapshot, exposure, &action)
+        }
     }
 }
 
@@ -339,6 +360,9 @@ fn load<'a, 'b>(
 fn store(b: &mut [u8], h: &Header) -> R<()> {
     let mut h = *h;
     repay(b, &mut h)?;
+    if h.debt == 0 {
+        set_credit_approval(b, &h, 0);
+    }
     audit(b, &h)?;
     h.write(b);
     Ok(())
@@ -411,10 +435,23 @@ fn fund(b: &mut [u8], h: &mut Header, t: u16, need: u64, now: u64) -> R<u64> {
 /// liquidity can break either rule, and no taker's package through it is
 /// refused for its sake (the re-review of 2026-10-18). A no-op for anyone
 /// else.
-fn check_credit(b: &[u8], h: &Header, t: u16) -> R<()> {
-    if !credit_admits(b, h, t).ok_or(FuturesError::Overflow)? {
+fn check_credit(b: &mut [u8], h: &Header, t: u16, approval: Option<u64>) -> R<()> {
+    if !h.has_credit() || trader(b, h, t).owner != h.credit_owner {
+        return Ok(());
+    }
+    if h.debt == 0 || h.credit_settled() || h.status != STATUS_OPEN {
+        set_credit_approval(b, h, 0);
+        return Ok(());
+    }
+    // A new order replaces the old assessment. Never use a cached bound
+    // to admit changed liquidity: either its operator assessed this exact
+    // transition, or the full grid independently funds it.
+    let r = credit_risk_in_range(b, h, t, true, (0, h.grid)).ok_or(FuturesError::Overflow)?;
+    let exposure = approval.unwrap_or(r.exposure);
+    if exposure > h.credit_limit || h.debt > r.carry {
         return Err(FuturesError::CreditLimit.into());
     }
+    set_credit_approval(b, h, exposure);
     Ok(())
 }
 
@@ -1598,6 +1635,7 @@ fn submit(
     a: &[AccountInfo],
     p: SubmitParams,
     proposal: &[u8],
+    approval: Option<u64>,
 ) -> ProgramResult {
     let [market, owner, period, ..] = a else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -1898,9 +1936,13 @@ fn submit(
         &seq.to_le_bytes(),
         &rested.to_le_bytes(),
     ]);
-    check_credit(&b, &h, t)?;
+    check_credit(&mut b, &h, t, approval)?;
+    // The credit owner's own package was just admitted at its worst fill,
+    // which bounds where it stands now: asserted only for someone else's.
     if let (Some(c), true) = (credit_slot, credit_filled) {
-        assert_credit(&b, &h, c)?;
+        if c != t {
+            assert_credit(&b, &h, c)?;
+        }
     }
     let mut ret = Vec::with_capacity(42);
     ret.extend_from_slice(&filled.to_le_bytes());
@@ -2119,6 +2161,7 @@ fn quote(
     core: Core,
     knots: &[Knot],
     proposal: &[u8],
+    approval: Option<u64>,
 ) -> ProgramResult {
     let [market, owner, period, ..] = a else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -2184,7 +2227,7 @@ fn quote(
     mk.ask_spread = p.ask_spread;
     mk.quoted_ts = now;
     mk.write(&mut b, h.maker_off(m));
-    check_credit(&b, &h, t)?;
+    check_credit(&mut b, &h, t, approval)?;
     trace("credit");
 
     if ladder_arcs(&b, &h) > MAX_BOOK_LADDER_ARCS {
@@ -3093,18 +3136,26 @@ fn draw<'a>(
     // While it owes, what it takes out raises its exposure and lowers what
     // carries its debt one for one: no more than both rules leave, at worst
     // over every fill of what still rests (`state::credit_risk`).
-    let room = if credit && h.debt > 0 {
+    let risk = if credit && h.debt > 0 {
         let r = credit_risk_with(&b, &h, t, true, work).ok_or(FuturesError::Overflow)?;
+        Some(r)
+    } else {
+        None
+    };
+    let room = risk.map_or(u64::MAX, |r| {
         r.carry
             .saturating_sub(h.debt)
             .min(h.credit_limit.saturating_sub(r.exposure))
-    } else {
-        u64::MAX
-    };
+    });
     let amount = want
         .min(trader(&b, &h, t).free.saturating_sub(keep))
         .min(room);
     if amount > 0 {
+        if let Some(r) = risk {
+            // Taking cash raises the certified worst-case exposure one for
+            // one. Permissionless withdrawals cannot reuse spent headroom.
+            set_credit_approval(&mut b, &h, add(r.exposure, amount)?);
+        }
         if h.credit_owner == *vault {
             h.credit_clock(now_ts()?).ok_or(FuturesError::Overflow)?;
             h.funded_out = add(h.funded_out, amount)?;
@@ -4438,6 +4489,87 @@ fn stake_rewards_withdraw(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -
 }
 
 // ---------------------------------------------------------------- credit
+
+/// An authority-signed assessment of one exact book transition. Only an
+/// existing credit owner's vault operator may issue it. Users can still
+/// trade, cancel and withdraw through the ordinary instructions.
+#[inline(never)]
+fn credit_authorize(
+    program_id: &Pubkey,
+    a: &[AccountInfo],
+    snapshot: [u8; 32],
+    exposure: u64,
+    action: &[u8],
+) -> ProgramResult {
+    let [market, vault_info, rest @ ..] = a else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    need_writable(market)?;
+    let v = load_vault(program_id, vault_info)?;
+    if !v.markets.contains(market.key) {
+        return Err(FuturesError::Unauthorized.into());
+    }
+    let operator = rest
+        .iter()
+        .find(|a| *a.key == v.operator && a.is_signer)
+        .ok_or(FuturesError::Unauthorized)?;
+    let ix = if action.is_empty() {
+        None
+    } else {
+        let ix = FuturesInstruction::try_from_slice(action)
+            .map_err(|_| FuturesError::InvalidInstruction)?;
+        if !matches!(
+            ix,
+            FuturesInstruction::Quote { .. } | FuturesInstruction::Submit { .. }
+        ) {
+            return Err(FuturesError::InvalidInstruction.into());
+        }
+        Some(ix)
+    };
+    let h = {
+        if market.owner != program_id {
+            return Err(FuturesError::InvalidAccount.into());
+        }
+        let b = market.try_borrow_data()?;
+        let h = Header::read(&b)?;
+        if h.credit_owner != *vault_info.key || !h.has_credit() {
+            return Err(FuturesError::Unauthorized.into());
+        }
+        if h.status != STATUS_OPEN || h.credit_settled() {
+            return Err(FuturesError::NotTradable.into());
+        }
+        if credit_snapshot(program_id, market.key, &b) != snapshot {
+            return Err(FuturesError::BadProposal.into());
+        }
+        if exposure > h.credit_limit {
+            return Err(FuturesError::CreditLimit.into());
+        }
+        h
+    };
+    let base = market_len(h.grid, h.trader_cap, h.order_cap, h.maker_cap, h.claim_cap);
+    if market.data_len() == base {
+        let system = rest
+            .iter()
+            .find(|a| *a.key == solana_system_interface::program::ID)
+            .ok_or(ProgramError::NotEnoughAccountKeys)?;
+        grow_to(market, operator, system, base + CREDIT_APPROVAL_LEN)?;
+        market.try_borrow_mut_data()?[base..base + 8].copy_from_slice(&CREDIT_APPROVAL_MAGIC);
+    }
+    match ix {
+        Some(ix) => execute(program_id, a, ix, Some(exposure)),
+        None => {
+            let (mut b, h) = load(program_id, market)?;
+            if let Some(t) = find_trader(&b, &h, &h.credit_owner) {
+                check_credit(&mut b, &h, t, Some(exposure))?;
+            } else if h.debt != 0 {
+                return Err(FuturesError::CreditLimit.into());
+            } else {
+                set_credit_approval(&mut b, &h, 0);
+            }
+            store(&mut b, &h)
+        }
+    }
+}
 
 #[inline(never)]
 fn credit_fund(program_id: &Pubkey, a: &[AccountInfo], amount: u64) -> ProgramResult {

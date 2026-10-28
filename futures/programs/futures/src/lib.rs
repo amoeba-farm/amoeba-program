@@ -548,6 +548,25 @@ pub enum FuturesInstruction {
     ///
     /// Accounts: 0 pool (w); 1 position (w); 2 owner (s).
     CancelUnstake,
+    /// The Earn vault's operator approves a privately calculated upper
+    /// bound on exposure after `action` (a serialized Quote or Submit), or
+    /// refreshes the current bound when `action` is empty. The assessment
+    /// includes every possible later fill. It is trusted, not a proof.
+    /// The program independently enforces carry, custody and accounting.
+    ///
+    /// `snapshot` binds this program, market address and exact pre-action
+    /// account bytes (`state::credit_snapshot`). No settlement range is
+    /// included. A changed account requires a new assessment and signature.
+    ///
+    /// Accounts: the action's usual accounts (0 market, 1 Earn vault), then
+    /// its operator (s, w) and the system program. A refresh takes 0 market
+    /// (w), 1 Earn vault, 2 operator (s, w), 3 system. The first approval
+    /// appends 16 bytes to the market, with rent paid by the operator.
+    CreditAuthorize {
+        snapshot: [u8; 32],
+        exposure: u64,
+        action: Vec<u8>,
+    },
 }
 
 #[cfg(not(feature = "no-entrypoint"))]
