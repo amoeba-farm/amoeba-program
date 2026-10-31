@@ -4,6 +4,11 @@ use solana_program::pubkey::Pubkey;
 #[cfg(not(target_endian = "little"))]
 compile_error!("fixed state codecs require the little-endian Solana account ABI");
 
+use crate::state::heads::{
+    HeadAccessClass, HeadChallengeKind, HeadChallengeReason, HeadChallengeRuling, HeadClaimKind,
+    HeadClaimStatus, HeadStatus, HeadsChannel, HeadsContractStatus, HeadsSettlementTarget,
+    HeadsWeightsPhase,
+};
 use crate::{
     constants::MAX_SETTLEMENT_SIGNER_COUNT,
     error::OracleError,

@@ -17,8 +17,21 @@ fn latest_safe_boundary_is_abort_eligible_even_if_coverage_count_is_full() {
         + ORACLE_RESOLUTION_FREEZE_WINDOW_SECONDS
         + ORACLE_OPENING_WINDOW_SECONDS;
     let latest_safe = expiry - preserved;
-    assert!(ensure_failed_v5_reward_schedule_window_at(expiry, &month, latest_safe - 1).is_err());
-    assert!(ensure_failed_v5_reward_schedule_window_at(expiry, &month, latest_safe).is_ok());
+    assert!(
+        ensure_failed_v5_reward_schedule_window_at(expiry, &month, latest_safe - 1, false).is_err()
+    );
+    assert!(ensure_failed_v5_reward_schedule_window_at(expiry, &month, latest_safe, false).is_ok());
+    // Pending source challenges hold the lanes, except 194 settling them in a Failed period.
+    let pending = OracleMonthState {
+        pending_resolution_count: 2,
+        ..failed_v5_month()
+    };
+    assert!(
+        ensure_failed_v5_reward_schedule_window_at(expiry, &pending, latest_safe, false).is_err()
+    );
+    assert!(
+        ensure_failed_v5_reward_schedule_window_at(expiry, &pending, latest_safe, true).is_ok()
+    );
     // Coverage count is intentionally not an input: a full-but-unfinalized manifest at this
     // boundary is still unlistable and must be able to release its reservation.
 }

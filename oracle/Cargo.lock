@@ -172,6 +172,7 @@ dependencies = [
 name = "ameba-commodity-spec"
 version = "0.1.0"
 dependencies = [
+ "ameba-oracle-heads",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -187,6 +188,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ameba-oracle-heads"
+version = "0.1.0"
+
+[[package]]
 name = "ameba-oracle-interface"
 version = "0.2.0"
 dependencies = [
@@ -197,7 +202,9 @@ dependencies = [
 name = "ameba_oracle"
 version = "0.1.0"
 dependencies = [
+ "ameba-commodity-spec",
  "ameba-governance-interface",
+ "ameba-oracle-heads",
  "ameba-oracle-interface",
  "borsh 0.10.4",
  "governance_controller_v3",
@@ -211,6 +218,7 @@ dependencies = [
  "solana-system-interface",
  "spl-associated-token-account",
  "spl-token 7.0.0",
+ "spl-token-2022",
  "thiserror 2.0.18",
  "tokio",
 ]

@@ -167,6 +167,18 @@ pub(super) fn write_period_failed(
     Ok(())
 }
 
+/// The failure lanes' clock (tags 191, 194, 195): a failed period can never list, so its month
+/// is past every deadline those lanes wait for. A period the admin failed before its month's
+/// submission deadline (tag 30 selector 25) refunds at once; one that failed on its own already
+/// passed them.
+pub(super) fn failure_lane_now(anchor: &PeriodAnchor, now: u64) -> u64 {
+    if anchor.period.status == PeriodStatus::Failed {
+        u64::MAX
+    } else {
+        now
+    }
+}
+
 /// Whether a Forming period can no longer list, given its month (or the month's absence):
 /// (a) no month exists and the remaining time before expiry can no longer hold a month's
 /// post-submission review calendar, so tag 181 can no longer create it; (b) the month is still in

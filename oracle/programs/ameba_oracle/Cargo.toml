@@ -8,25 +8,48 @@ publish.workspace = true
 crate-type = ["cdylib", "lib"]
 
 [features]
-default = []
+# The production (mainnet) artifact is the build without explicit features. Since 2026-10-30 it
+# routes the heads family (the user: "we need to prepare for PROD ok tonight we upload";
+# ship/releases/2026-10-30-oracle-heads.md). `--no-default-features` builds the v1-only program.
+default = ["heads"]
 no-entrypoint = []
 # Integration tests run against the built SBF artifact; also shortens the
-# rulebook calendar day for host-side unit tests.
-test-sbf = []
+# rulebook calendar day for host-side unit tests. The tests form v1 months, so it routes them.
+test-sbf = ["v1-formation"]
 # Requires the controller-owned governance gate on every top-level instruction.
 # It cannot be compiled without exactly one pinned controller identity.
 governance-gate-v1 = []
-# Governed loopback profile: real controller with shortened council timings.
-localnet-governance = ["ameba-governance-interface/localnet-governance", "governance_controller_v3/localnet-governance"]
+# Governed loopback profile: real controller with shortened council timings. Routes the oracle v2
+# heads family (tag 210) like every dev profile.
+localnet-governance = ["heads", "heads-migrate", "v1-formation", "ameba-governance-interface/localnet-governance", "governance_controller_v3/localnet-governance"]
 # Test-only synthetic controller identity. Never released.
 synthetic-governance-controller = ["governance-gate-v1"]
 # Localnet dev chain only (genesis A5ZLaudxEFvFScV6RzNtNN7fzshRxQgXhC6JB6dishHX): plain-key
 # authorities without a governance tail, the dev bootstrap instructions, and a program id read
 # from AMEBA_ORACLE_PROGRAM_ID at build time. Never built for any other cluster.
-localnet-dev-authority = []
+localnet-dev-authority = ["heads", "v1-formation"]
+# Oracle v2, "heads on pikes" (docs/heads.md): routes tag 210, under the governance envelope in
+# every gated build. On by default (the production artifact), in the dev profiles and on the
+# chain; a `--no-default-features` build rejects byte 210 before reading any account. The family's
+# layouts, payloads and builders compile in every build.
+heads = []
+# Dev only: grows Head accounts made under the 2,688-byte layout to the current one (heads
+# selector 30, `processor::heads::migrate`). The dev profiles have it (`localnet-governance` here,
+# `localnet-dev-authority` in code); the production artifact does not: mainnet has no Head accounts.
+heads-migrate = ["heads"]
+# The v1 monthly formation (governance_manifest::V1_FORMATION_INSTRUCTION_TAGS and
+# V1_FORMATION_CARRY_SELECTORS): one-time setup, month creation, reward budgets, proposals and
+# coverage, source challenges, openings and the move to Game, recipe weights and index, active
+# weights, the CFM launch, carry formation, median certificates, evidence backfills, sponsorship's
+# Activate and tag 59. Mainnet forms no more v1 months, so the production (mainnet) artifact leaves
+# it out and rejects those bytes exactly like unassigned ones; its Live months keep everything up to
+# their payout. The dev profiles, the test-sbf build and the chain enable it. Builders, payloads
+# and the tag table compile in every build.
+v1-formation = []
 
 [dependencies]
 ameba-governance-interface = { path = "../../../governance/crates/governance-interface" }
+ameba-oracle-heads.workspace = true
 ameba-oracle-interface.workspace = true
 borsh = "0.10.4"
 solana-program = { workspace = true, features = ["borsh"] }
@@ -34,6 +57,7 @@ solana-sdk-ids.workspace = true
 thiserror = "2.0"
 
 [dev-dependencies]
+ameba-commodity-spec.workspace = true
 governance_controller_v3 = { path = "../../../governance/programs/governance_controller_v3", features = ["no-entrypoint"] }
 proptest = "1.6.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -43,6 +67,7 @@ solana-sdk = "2.3"
 solana-system-interface.workspace = true
 spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 spl-token = { version = "7.0.0", features = ["no-entrypoint"] }
+spl-token-2022 = { version = "8.0.1", features = ["no-entrypoint"] }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 
 [lints.rust.unexpected_cfgs]

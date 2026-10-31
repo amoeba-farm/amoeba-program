@@ -4,6 +4,7 @@ use borsh::BorshSerialize;
 mod account_loading;
 mod config_governance;
 mod opening_settlement;
+#[cfg(feature = "v1-formation")] // Tag 190 forms a product's SKU manifest.
 mod product_sku;
 mod schedule;
 mod settlement;

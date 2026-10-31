@@ -317,6 +317,23 @@ pub(in crate::processor) fn require_import_complete(
 }
 
 /// A retired month cannot still supply membership to a pending carry import.
+/// Whether `month` is its product's latest registered carry month: the next rung registers
+/// against it alone, so the failed-month path (30/25) neither fails nor closes it.
+pub(in crate::processor) fn is_latest_carry_month(
+    program: &Pubkey,
+    anchor: &PeriodAnchor,
+    month: &Pubkey,
+    registry_info: &AccountInfo,
+) -> Result<bool, ProgramError> {
+    let expected = address(program, REGISTRY_SEED, &anchor.underlying_id);
+    if registry_info.owner != program {
+        validate_canonical_system_zero_pda_proof(&expected.0, registry_info)?;
+        return Ok(false);
+    }
+    let registry: Registry = load(program, registry_info, expected)?;
+    Ok(registry.latest_period == *month)
+}
+
 /// The registry advances monotonically; prior successors must complete imports
 /// before becoming eligible parents. Shared source/checkpoint bytes stay alive.
 pub(in crate::processor) fn require_cleanup_dependencies(

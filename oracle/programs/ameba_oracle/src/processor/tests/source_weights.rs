@@ -510,6 +510,7 @@ fn oracle_security_budget_rejects_invalid_and_overflow_boundaries() {
     assert!(oracle_bucket_security_cap(3, u64::MAX / 2, 1, 5_000).is_err());
 }
 
+#[cfg(feature = "v1-formation")] // Tag 122 folds the cap.
 #[test]
 fn minimum_security_cap_across_economically_active_buckets_is_order_independent() {
     let bucket_cap = |frozen_source_count: u16,

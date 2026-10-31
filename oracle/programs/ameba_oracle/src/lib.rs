@@ -9,6 +9,9 @@ pub mod error;
 mod fixed_codec;
 pub mod governance_gate;
 pub mod governance_manifest;
+/// Oracle v2's board read on the host: decoding and the live indicative numbers.
+#[cfg(not(target_os = "solana"))]
+pub mod heads_view;
 pub mod instruction;
 pub mod live_index;
 pub(crate) mod oracle_rank;

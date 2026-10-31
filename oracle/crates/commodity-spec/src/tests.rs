@@ -39,12 +39,65 @@ pub(crate) fn sku_root(ids: &[[u8; 32]]) -> [u8; 32] {
     nodes[0]
 }
 
+fn hex_of(digest: [u8; 32]) -> String {
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 #[test]
 fn the_spec_is_the_pinned_document() {
-    let digest = sha256(&[SPEC_JSON.as_bytes()]);
-    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
-    assert_eq!(hex, SPEC_SHA256_HEX);
+    assert_eq!(hex_of(sha256(&[SPEC_JSON.as_bytes()])), SPEC_SHA256_HEX);
     assert_eq!(spec()["version"], SPEC_VERSION);
+}
+
+/// Version 2 changed NANDX's definition and nothing else: RAMX's basket and profile are version
+/// 1's, and NANDX keeps its bucket ids, identities and weights (so its on-chain SKU list).
+#[test]
+fn spec_v2_moves_only_nandx_to_packaged_chips() {
+    const V1: &str = include_str!("../../../governance/commodity_submission_spec.v1.json");
+    assert_eq!(hex_of(sha256(&[V1.as_bytes()])), SPEC_V1_SHA256_HEX);
+    let v1: Value = serde_json::from_str(V1).unwrap();
+    let v2 = spec();
+    assert_eq!(v2["supersedes"]["sha256"], SPEC_V1_SHA256_HEX);
+    assert_eq!(v2["supersedes"]["version"], v1["version"]);
+    assert_eq!(v1["baskets"]["RAMX"], v2["baskets"]["RAMX"]);
+    assert_eq!(
+        v1["product_profiles"]["RAMX_MONOLITHIC_CONTRACT"],
+        v2["product_profiles"]["RAMX_MONOLITHIC_CONTRACT"]
+    );
+    let identity = |spec: &Value| -> Vec<Value> {
+        spec["baskets"]["NANDX"]["buckets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                serde_json::json!([
+                    row["id"],
+                    row["cell_type"],
+                    row["nominal_die_density"],
+                    row["weight_bps"]
+                ])
+            })
+            .collect()
+    };
+    assert_eq!(identity(&v1), identity(&v2));
+    assert!(v2["product_profiles"]["NANDX_WAFER_CONTRACT_ASSESSMENT"].is_null());
+    let chips = &v2["product_profiles"]["NANDX_PACKAGED_CONTRACT"];
+    assert_eq!(
+        chips["evidence_route"],
+        v2["product_profiles"]["RAMX_MONOLITHIC_CONTRACT"]["evidence_route"]
+    );
+    for field in [
+        "physical_form=packaged_IC",
+        "die_count=1",
+        "condition=new_unused",
+    ] {
+        assert!(chips["hard_fields"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f == field));
+    }
+    assert_eq!(v2["preserves"]["nand_wafer_assessment_only"], false);
 }
 
 #[test]
@@ -114,9 +167,15 @@ fn the_chip_manifests_list_the_buckets_under_their_pinned_roots() {
         let chips = product.manifest();
         let manifest: Value = serde_json::from_str(chips.json).expect("manifest JSON");
         assert_eq!(manifest["schema"], "amoeba.oracle-product-sku-manifest");
-        assert_eq!(manifest["manifestVersion"], 2);
+        // RAMX's manifest (v2) cites spec v1, whose RAMX version 2 kept; NANDX's packaged chips
+        // (v3) cite version 2.
+        let (version, cites) = match product {
+            Product::Ramx => (2, SPEC_V1_SHA256_HEX),
+            _ => (3, SPEC_SHA256_HEX),
+        };
+        assert_eq!(manifest["manifestVersion"], version);
         assert_eq!(manifest["product"]["symbol"], product.symbol());
-        assert_eq!(manifest["provenance"]["sourceSha256"], SPEC_SHA256_HEX);
+        assert_eq!(manifest["provenance"]["sourceSha256"], cites);
         assert_eq!(manifest["requiredSkuCount"], chips.required_sku_count);
         assert_eq!(manifest["requiredSkuRootHex"], chips.required_sku_root_hex);
         assert_eq!(
@@ -227,27 +286,27 @@ fn ddr5_direct() -> SeriesDefinition {
     series
 }
 
-/// A complete 1Tb TLC fabricated-wafer contract assessment.
-fn tlc_wafer_assessment() -> SeriesDefinition {
+/// A complete published contract assessment of packaged single-die 1Tb TLC chips.
+fn tlc_chip_assessment() -> SeriesDefinition {
     SeriesDefinition {
         schema: SERIES_SCHEMA.into(),
-        series_id: Some("example-wafer-1tb-tlc-avg".into()),
+        series_id: Some("example-nand-1tb-tlc-chip-avg".into()),
         definition_version: Some(1),
         bucket: Some("tlc_1tb".into()),
         evidence_class: Some("published_assessment".into()),
         price_basis: Some("contract".into()),
         origin: Origin {
             publisher: Some("Example Research".into()),
-            locator: Some("https://example.com/price/flash/wafer_contract".into()),
-            row: Some("1Tb TLC".into()),
+            locator: Some("https://example.com/price/flash/component_contract".into()),
+            row: Some("3D TLC 1Tb (128GB) single die".into()),
         },
-        scope_reference: None,
-        physical_scope: Some("fabricated_wafer".into()),
-        native_unit: Some("USD per unit as the assessment quotes it".into()),
+        scope_reference: Some("https://example.com/methodology".into()),
+        physical_scope: Some("packaged_ic".into()),
+        native_unit: Some("USD per chip".into()),
         statistic: Some("average".into()),
         currency: Some("USD".into()),
         conversion_policy: None,
-        procurement_segment: scope("documented_mix", "wafer buyers surveyed by the publisher"),
+        procurement_segment: scope("documented_mix", "OEM and module-maker contract buyers"),
         geography: Some(ScopeValue::state("not_disclosed")),
         reference_period: Some("month".into()),
         cadence: Some("monthly".into()),
@@ -258,16 +317,67 @@ fn tlc_wafer_assessment() -> SeriesDefinition {
             architecture: Some("3D".into()),
             cell_type: Some("TLC".into()),
             die_density: Some("1Tb".into()),
-            testing_scope: scope(
-                "documented_mix",
-                "as the assessment defines its wafer quality",
-            ),
+            die_count: Some(1),
+            condition: Some("new_unused".into()),
+            grade: Some("standard_production".into()),
+            interface: scope("documented_mix", "ONFI and Toggle, 1600-3600 MT/s"),
+            package_construction: scope("documented_mix", "single-die BGA"),
+            qualification: None,
             layer_scope: None,
+            testing_scope: None,
         }),
         cell: None,
         direct: None,
         notes: None,
     }
+}
+
+/// A complete direct contract price of one packaged single-die 1Tb TLC part.
+fn tlc_chip_direct() -> SeriesDefinition {
+    let mut series = tlc_chip_assessment();
+    series.series_id = Some("example-oem-nand-1tb-tlc-10k".into());
+    series.evidence_class = Some("direct_price".into());
+    series.origin.row = Some("EXAMPLE-1T-TLC-BGA132, 10k-50k units".into());
+    series.procurement_segment = scope("exact", "distribution contract, 10k-50k units");
+    series.geography = scope("exact", "US");
+    if let Some(nand) = series.nand.as_mut() {
+        nand.interface = scope("exact", "ONFI 5.0, 2400 MT/s");
+        nand.package_construction = scope("exact", "single-die BGA-132");
+    }
+    series.direct = Some(DirectTerms {
+        manufacturer: Some("Example Memory".into()),
+        mpn: Some("EXAMPLE-1T-TLC-BGA132".into()),
+        specification_reference: Some("https://example.com/datasheet".into()),
+        quantity_tier: Some("10k-50k".into()),
+        delivery_terms: Some("FOB, 8-week lead".into()),
+        pricing_period: Some("calendar month".into()),
+        market: Some("US distribution".into()),
+        tax_freight: Some("ex tax, ex freight".into()),
+        payment_terms: Some("net 30, no rebate".into()),
+    });
+    series
+}
+
+/// A complete 1Tb TLC fabricated-wafer contract assessment: NANDX's definition before 2026-10-22.
+fn tlc_wafer_assessment() -> SeriesDefinition {
+    let mut series = tlc_chip_assessment();
+    series.series_id = Some("example-wafer-1tb-tlc-avg".into());
+    series.origin.locator = Some("https://example.com/price/flash/wafer_contract".into());
+    series.origin.row = Some("1Tb TLC".into());
+    series.physical_scope = Some("fabricated_wafer".into());
+    series.native_unit = Some("USD per unit as the assessment quotes it".into());
+    series.procurement_segment = scope("documented_mix", "wafer buyers surveyed by the publisher");
+    series.nand = Some(NandScope {
+        architecture: Some("3D".into()),
+        cell_type: Some("TLC".into()),
+        die_density: Some("1Tb".into()),
+        testing_scope: scope(
+            "documented_mix",
+            "as the assessment defines its wafer quality",
+        ),
+        ..NandScope::default()
+    });
+    series
 }
 
 fn committed_month<'a>(product: Product, sources: &'a [MonthSeries<'a>]) -> MonthContext<'a> {
@@ -417,8 +527,30 @@ fn ramx_grade_change() {
 }
 
 #[test]
+fn nand_direct_match() {
+    let series = tlc_chip_direct();
+    assert_eq!(
+        route_series(&series, Product::Nandx).status,
+        Status::ClassifiedCandidate,
+        "{:?}",
+        route_series(&series, Product::Nandx)
+    );
+    let sources = [MonthSeries {
+        source_id: "N1",
+        definition: Some(&series),
+        committed: true,
+    }];
+    let routing = route_series_in_month(
+        &series,
+        &committed_month(Product::Nandx, &sources),
+        Some("N1"),
+    );
+    assert_eq!(routing.status, Status::EligibleForContract, "{routing:?}");
+}
+
+#[test]
 fn nand_assessment_match() {
-    let series = tlc_wafer_assessment();
+    let series = tlc_chip_assessment();
     let sources = [MonthSeries {
         source_id: "N1",
         definition: Some(&series),
@@ -434,7 +566,7 @@ fn nand_assessment_match() {
 
 #[test]
 fn nand_mixed_layers() {
-    let mut series = tlc_wafer_assessment();
+    let mut series = tlc_chip_assessment();
     series.nand.as_mut().unwrap().layer_scope = scope("documented_mix", "176, 218 and 232 layers");
     assert_eq!(
         route_series(&series, Product::Nandx).status,
@@ -443,24 +575,126 @@ fn nand_mixed_layers() {
 }
 
 #[test]
-fn nand_packaged_quote() {
-    let mut series = tlc_wafer_assessment();
-    series.physical_scope = Some("packaged_ic".into());
+fn nand_stacked_package() {
+    let mut series = tlc_chip_assessment();
+    series.nand.as_mut().unwrap().die_count = Some(4);
+    series.origin.row = Some("3D TLC 512GB (4 x 1Tb)".into());
+    let routing = route_series(&series, Product::Nandx);
+    assert_eq!(routing.status, Status::WrongProduct);
+    assert!(routing
+        .deciding()
+        .any(|reason| reason.field == "nand.dieCount"));
+}
+
+#[test]
+fn nand_wafer_assessment() {
+    // NANDX's definition before 2026-10-22 still parses, and is now the wrong product.
+    let wafer = tlc_wafer_assessment();
+    let text = wafer.definition_text();
+    assert!(text.contains("testingScope"));
+    assert_eq!(SeriesDefinition::parse(&text).unwrap(), wafer);
+    let routing = route_series(&wafer, Product::Nandx);
+    assert_eq!(routing.status, Status::WrongProduct, "{routing:?}");
+    assert!(routing
+        .deciding()
+        .any(|reason| reason.field == "physicalScope"
+            && reason.message == "NANDX buckets are packaged NAND chips, not a wafer"));
+    for scope in ["bare_die", "known_good_die", "blank_wafer"] {
+        let mut series = tlc_chip_assessment();
+        series.physical_scope = Some(scope.into());
+        assert_eq!(
+            route_series(&series, Product::Nandx).status,
+            Status::WrongProduct,
+            "{scope}"
+        );
+    }
+}
+
+#[test]
+fn nand_ssd() {
+    let mut series = tlc_chip_assessment();
+    series.physical_scope = Some("ssd".into());
+    series.origin.row = Some("SSD 1TB PCIe 4.0".into());
+    let routing = route_series(&series, Product::Nandx);
+    assert_eq!(routing.status, Status::WrongProduct);
+    assert!(routing
+        .deciding()
+        .any(|reason| reason.field == "physicalScope"));
+}
+
+#[test]
+fn nand_grades_and_conditions_are_rams() {
+    for grade in ["downgrade", "ink_die", "white_label", "untested"] {
+        let mut series = tlc_chip_assessment();
+        series.nand.as_mut().unwrap().grade = Some(grade.into());
+        assert_eq!(
+            route_series(&series, Product::Nandx).status,
+            Status::WrongProduct,
+            "{grade}"
+        );
+    }
+    let mut specialty = tlc_chip_assessment();
+    specialty.nand.as_mut().unwrap().grade = Some("specialty".into());
     assert_eq!(
-        route_series(&series, Product::Nandx).status,
+        route_series(&specialty, Product::Nandx).status,
         Status::ResearchOnly
     );
-    let mut direct = tlc_wafer_assessment();
-    direct.evidence_class = Some("direct_price".into());
+    let mut unknown = tlc_chip_assessment();
+    unknown.nand.as_mut().unwrap().condition = Some("unknown".into());
+    unknown.nand.as_mut().unwrap().grade = None;
+    let routing = route_series(&unknown, Product::Nandx);
+    assert_eq!(routing.status, Status::NeedsMetadata);
+    let fields: Vec<&str> = routing
+        .deciding()
+        .map(|reason| reason.field.as_str())
+        .collect();
+    assert_eq!(fields, ["nand.condition", "nand.grade"]);
+    // A direct price fixes its interface and package; an assessment may document a mix.
+    let mut direct = tlc_chip_direct();
+    direct.nand.as_mut().unwrap().interface = scope("documented_mix", "ONFI and Toggle");
+    direct.nand.as_mut().unwrap().package_construction = None;
+    let fields: Vec<String> = route_series(&direct, Product::Nandx)
+        .deciding()
+        .map(|reason| reason.field.clone())
+        .collect();
+    assert!(
+        fields.contains(&"nand.interface".to_string())
+            && fields.contains(&"nand.packageConstruction".to_string()),
+        "{fields:?}"
+    );
+    let mut silent = tlc_chip_assessment();
+    silent.nand.as_mut().unwrap().interface = Some(ScopeValue::state("not_disclosed"));
     assert_eq!(
-        route_series(&direct, Product::Nandx).status,
-        Status::ResearchOnly
+        route_series(&silent, Product::Nandx).status,
+        Status::NeedsMetadata
     );
 }
 
 #[test]
+fn a_nand_grade_change_is_a_scope_change() {
+    let standard = tlc_chip_direct();
+    let mut white_label = tlc_chip_direct();
+    white_label.definition_version = Some(2);
+    white_label.nand.as_mut().unwrap().grade = Some("white_label".into());
+    let sources = [MonthSeries {
+        source_id: "N1",
+        definition: Some(&standard),
+        committed: true,
+    }];
+    let routing = route_series_in_month(
+        &white_label,
+        &committed_month(Product::Nandx, &sources),
+        None,
+    );
+    assert_eq!(routing.status, Status::ScopeChange, "{routing:?}");
+    assert!(routing
+        .deciding()
+        .any(|reason| reason.field == "nand.grade"));
+}
+
+#[test]
 fn spot_as_contract() {
-    let mut series = tlc_wafer_assessment();
+    let mut series = tlc_chip_assessment();
     series.price_basis = Some("spot".into());
     assert_eq!(
         route_series(&series, Product::Nandx).status,
@@ -635,13 +869,13 @@ fn a_wrong_bucket_or_product_is_named() {
         route_series(&ddr4, Product::Ramx).status,
         Status::WrongProduct
     );
-    let mut qlc = tlc_wafer_assessment();
+    let mut qlc = tlc_chip_assessment();
     qlc.nand.as_mut().unwrap().cell_type = Some("QLC".into());
     assert_eq!(
         route_series(&qlc, Product::Nandx).status,
         Status::WrongProduct
     );
-    let mut ssd = tlc_wafer_assessment();
+    let mut ssd = tlc_chip_assessment();
     ssd.physical_scope = Some("ssd".into());
     assert_eq!(
         route_series(&ssd, Product::Nandx).status,
@@ -689,12 +923,12 @@ fn templates_name_every_field_and_route_as_missing_details() {
                 let series = SeriesDefinition::parse(&text).expect("a template parses");
                 assert_eq!(series.bucket_in(product), Some(bucket));
                 let routing = route_series(&series, product);
-                let expected = if direct && product == Product::Nandx {
-                    Status::ResearchOnly
-                } else {
-                    Status::NeedsMetadata
-                };
-                assert_eq!(routing.status, expected, "{} {direct}", bucket.id);
+                assert_eq!(
+                    routing.status,
+                    Status::NeedsMetadata,
+                    "{} {direct}",
+                    bucket.id
+                );
             }
         }
     }
@@ -705,7 +939,13 @@ fn templates_name_every_field_and_route_as_missing_details() {
 
 #[test]
 fn definitions_round_trip_compactly_and_fit_a_source() {
-    for series in [ddr5_assessment(), ddr5_direct(), tlc_wafer_assessment()] {
+    for series in [
+        ddr5_assessment(),
+        ddr5_direct(),
+        tlc_chip_assessment(),
+        tlc_chip_direct(),
+        tlc_wafer_assessment(),
+    ] {
         let text = series.definition_text();
         assert!(
             text.len() <= MAX_DEFINITION_TEXT_BYTES,

@@ -184,8 +184,10 @@ mod tests {
 
     #[test]
     fn unknown_bytes_remain_unassigned() {
+        // 210 is the heads family: feature-gated (`governance_manifest::HEADS_INSTRUCTION_TAG`),
+        // never part of the ordinary registry.
         for byte in [
-            3u8, 12, 29, 31, 32, 34, 35, 69, 87, 89, 96, 97, 189, 203, 204, 211, 212, 214,
+            3u8, 12, 29, 31, 32, 34, 35, 69, 87, 89, 96, 97, 189, 203, 204, 210, 211, 212, 214,
         ] {
             assert!(
                 OracleInstructionTag::from_byte(byte).is_none(),

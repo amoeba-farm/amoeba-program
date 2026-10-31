@@ -52,8 +52,8 @@ pub(in crate::processor) fn settle_counted_v5_source_challenge(
     let listing_settles =
         challenge.status == OracleChallengeStatus::Accepted && source.listing_bond_locked > 0;
     let required_count = if listing_settles { 2 } else { 1 };
-    let (mut schedule, mut month) =
-        load_counted_v5_schedule(program_id, accounts, required_count, require_failed)?;
+    let (mut schedule, mut month, failed) =
+        load_counted_v5_schedule(program_id, accounts, required_count, require_failed, true)?;
     let mut source_reward = super::usdc::load_oracle_usdc_source_reward(
         program_id,
         schedule_info.key,
@@ -150,19 +150,30 @@ pub(in crate::processor) fn settle_counted_v5_source_challenge(
             credit_cash_collateral_at_slot(&mut challenger_collateral, challenge.bond, slot)?;
             challenge.escrow_disposition = OracleEscrowDisposition::Refunded;
         }
-        OracleChallengeStatus::Open | OracleChallengeStatus::RuleReview => {
-            if now < oracle_opening_start_ts(&month)? {
-                return Err(OracleError::OracleEscrowNotSettleable.into());
+        OracleChallengeStatus::Open
+        | OracleChallengeStatus::RuleReview
+        | OracleChallengeStatus::RuleReviewUnresolved => {
+            if failed {
+                // A Failed period never lists, so nothing rules on its open challenges: each
+                // bond goes back to its own challenger, through 194 or 169 alike (30/25 kind 0
+                // fails a month whatever challenges it holds). One under a council case waits
+                // for the case (its guard's release refuses).
+                credit_cash_collateral_at_slot(&mut challenger_collateral, challenge.bond, slot)?;
+                challenge.status = OracleChallengeStatus::Cancelled;
+                challenge.escrow_disposition = OracleEscrowDisposition::Refunded;
+            } else {
+                if challenge.status == OracleChallengeStatus::RuleReviewUnresolved
+                    || now < oracle_opening_start_ts(&month)?
+                {
+                    return Err(OracleError::OracleEscrowNotSettleable.into());
+                }
+                credit_cash_collateral_at_slot(&mut proposer_collateral, challenge.bond, slot)?;
+                challenge.status = OracleChallengeStatus::Rejected;
+                challenge.escrow_disposition = OracleEscrowDisposition::Slashed;
             }
-            credit_cash_collateral_at_slot(&mut proposer_collateral, challenge.bond, slot)?;
-            challenge.status = OracleChallengeStatus::Rejected;
-            challenge.escrow_disposition = OracleEscrowDisposition::Slashed;
             decrement_pending_oracle_resolution(&mut month)?;
             month.last_updated_slot = slot;
             timed_out = true;
-        }
-        OracleChallengeStatus::RuleReviewUnresolved => {
-            return Err(OracleError::OracleEscrowNotSettleable.into())
         }
     }
     challenge.failed_schedule_escrow_counted = true;
@@ -467,17 +478,22 @@ pub(in crate::processor) fn settle_cash_update_challenge(
     store_state(challenger_collateral_info, &challenger_collateral)
 }
 
+/// The month's counted schedule, the month, and whether its period Failed. With `require_failed`
+/// (194) only on the failure lanes' window; a source challenge (`challenge`) of a Failed period
+/// settles there whatever the month's pending count.
 pub(in crate::processor) fn load_counted_v5_schedule(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     required_count: u32,
     require_failed: bool,
-) -> Result<(OracleUsdcRewardSchedule, OracleMonthState), ProgramError> {
+    challenge: bool,
+) -> Result<(OracleUsdcRewardSchedule, OracleMonthState, bool), ProgramError> {
     if accounts.len() < 4 {
         return Err(OracleError::InvalidAccountList.into());
     }
     let (anchor, month) =
         load_valid_period_and_oracle_month(program_id, &accounts[1], &accounts[2])?;
+    let failed = anchor.period.status == PeriodStatus::Failed;
     let schedule_info = &accounts[3];
     let schedule = load_oracle_usdc_reward_schedule(program_id, accounts[2].key, schedule_info)?;
     if schedule.phase == OracleUsdcRewardSchedulePhase::Aborted
@@ -489,9 +505,9 @@ pub(in crate::processor) fn load_counted_v5_schedule(
         if schedule.phase != OracleUsdcRewardSchedulePhase::Funded {
             return Err(OracleError::OracleUsdcRewardScheduleFrozen.into());
         }
-        ensure_failed_v5_reward_schedule_window(&anchor, &month)?;
+        ensure_failed_v5_window(&anchor, &month, challenge && failed)?;
     }
-    Ok((schedule, month))
+    Ok((schedule, month, failed))
 }
 
 pub(in crate::processor) fn decrement_counted_v5_schedule_at(
@@ -517,7 +533,8 @@ pub(in crate::processor) fn settle_counted_v5_listing_bond(
         return Err(OracleError::InvalidAccountList.into());
     }
     let schedule_info = &accounts[3];
-    let (mut schedule, _) = load_counted_v5_schedule(program_id, accounts, 1, require_failed)?;
+    let (mut schedule, ..) =
+        load_counted_v5_schedule(program_id, accounts, 1, require_failed, false)?;
     let source = load_valid_oracle_source(program_id, accounts[2].key, &accounts[4])?;
     let mut reward = super::usdc::load_oracle_usdc_source_reward(
         program_id,
@@ -552,7 +569,8 @@ pub(in crate::processor) fn settle_counted_v5_support_stake(
         return Err(OracleError::InvalidAccountList.into());
     }
     let schedule_info = &accounts[3];
-    let (mut schedule, _) = load_counted_v5_schedule(program_id, accounts, 1, require_failed)?;
+    let (mut schedule, ..) =
+        load_counted_v5_schedule(program_id, accounts, 1, require_failed, false)?;
     let source_info = &accounts[4];
     let support_info = &accounts[5];
     let collateral_info = &accounts[6];

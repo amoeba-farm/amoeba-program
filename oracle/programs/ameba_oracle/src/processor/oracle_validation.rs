@@ -104,6 +104,18 @@ pub(super) fn load_valid_period_and_oracle_month(
     Ok((anchor, month))
 }
 
+/// Formation, funding and weight steps refuse a Failed period: once the admin failed it (30/25
+/// kind 0) only the unwind remains (191, 194, 195, the closes, and 186 reopening stalled coverage
+/// for them; early review B4). Otherwise they
+/// run while it is Forming: it goes Live only as its month enters Game (tag 80), which every one
+/// of them refuses by phase; dev bootstrap alone completes a Live month in place.
+pub(super) fn ensure_period_not_failed(anchor: &PeriodAnchor) -> ProgramResult {
+    if anchor.period.status == PeriodStatus::Failed {
+        return Err(OracleError::InvalidOraclePhase.into());
+    }
+    Ok(())
+}
+
 pub(super) fn load_valid_oracle_month(
     program_id: &Pubkey,
     period_info: &AccountInfo,

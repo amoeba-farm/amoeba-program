@@ -1,6 +1,7 @@
-//! The chip product SKU manifests (`governance/{ramx,nandx}_product_sku_manifest.v2.json`,
-//! the commodity buckets of `governance/commodity_submission_spec.v1.json`): their pinned roots
-//! are what tag 190 computes over their labels.
+//! The chip product SKU manifests (`governance/ramx_product_sku_manifest.v2.json` and
+//! `governance/nandx_product_sku_manifest.v3.json`, the commodity buckets of
+//! `governance/commodity_submission_spec.v2.json`; NANDX's v3 packaged chips keep its v2 wafer
+//! labels): their pinned roots are what tag 190 computes over their labels.
 
 use ameba_oracle::constants::{
     MAX_ORACLE_PRODUCT_SKU_CHUNK_IDS, MAX_ORACLE_REQUIRED_SKUS, ORACLE_SKU_EMPTY_HASH_DOMAIN,
@@ -9,14 +10,23 @@ use ameba_oracle::constants::{
 use serde_json::Value;
 use solana_program::hash::hashv;
 
-const MANIFESTS: [(&str, &str, &[&str]); 2] = [
+const MANIFESTS: [(&str, u64, &str, &[&str]); 3] = [
     (
         "RAMX",
+        2,
         include_str!("../../../governance/ramx_product_sku_manifest.v2.json"),
         &["DDR4_16GBIT", "DDR4_8GBIT", "DDR5_16GBIT", "DDR5_24GBIT"],
     ),
     (
         "NANDX",
+        3,
+        include_str!("../../../governance/nandx_product_sku_manifest.v3.json"),
+        &["qlc_1tb", "tlc_1tb", "tlc_256gb", "tlc_512gb"],
+    ),
+    // The wafer list it replaced: the same labels, so the same root.
+    (
+        "NANDX",
+        2,
         include_str!("../../../governance/nandx_product_sku_manifest.v2.json"),
         &["qlc_1tb", "tlc_1tb", "tlc_256gb", "tlc_512gb"],
     ),
@@ -52,10 +62,10 @@ fn root(ids: &[[u8; 32]]) -> [u8; 32] {
 
 #[test]
 fn chip_manifests_pin_the_roots_tag_190_computes() {
-    for (symbol, source, sorted) in MANIFESTS {
+    for (symbol, version, source, sorted) in MANIFESTS {
         let manifest: Value = serde_json::from_str(source).expect("manifest JSON");
         assert_eq!(manifest["product"]["symbol"], symbol);
-        assert_eq!(manifest["manifestVersion"], 2);
+        assert_eq!(manifest["manifestVersion"], version);
         let mut labels: Vec<&str> = manifest["groups"]
             .as_array()
             .unwrap()

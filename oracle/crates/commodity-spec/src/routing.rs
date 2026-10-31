@@ -354,13 +354,12 @@ fn series_reasons(definition: &SeriesDefinition, product: Product, reasons: &mut
     }
 
     // 4. Evidence class and price basis.
-    match reasons.text("evidenceClass", "the evidence class", &definition.evidence_class) {
+    match reasons.text(
+        "evidenceClass",
+        "the evidence class",
+        &definition.evidence_class,
+    ) {
         Some("published_assessment") => {}
-        Some("direct_price") if product == Product::Nandx => reasons.push(
-            Status::ResearchOnly,
-            "evidenceClass",
-            "NANDX buckets take published wafer contract assessments only; a direct quote is research evidence",
-        ),
         Some("direct_price") => direct_reasons(definition, reasons),
         Some(other) => reasons.push(
             Status::NeedsMetadata,
@@ -585,58 +584,14 @@ fn dram_reasons(definition: &SeriesDefinition, bucket: Option<&Bucket>, reasons:
             );
         }
     }
-    match dram.die_count {
-        Some(1) => {}
-        Some(0) | None => reasons.missing("dram.dieCount", "the number of dies in the package"),
-        Some(count) => reasons.push(
-            Status::WrongProduct,
-            "dram.dieCount",
-            format!("a {count}-die package is not a monolithic chip; total package density doesn't make it one"),
-        ),
-    }
-    match dram.condition.as_deref().map(str::trim) {
-        Some("new_unused") => {}
-        Some(condition @ ("reclaimed" | "desoldered" | "refurbished" | "engineering_sample")) => {
-            reasons.push(
-                Status::WrongProduct,
-                "dram.condition",
-                format!(
-                    "{} material is outside the standard-production exposure",
-                    condition.replace('_', " ")
-                ),
-            )
-        }
-        Some("unknown") | Some("") | None => reasons.missing(
-            "dram.condition",
-            "the condition (an unknown condition is not new)",
-        ),
-        Some(other) => reasons.push(
-            Status::NeedsMetadata,
-            "dram.condition",
-            format!("condition {other:?} is not recognized"),
-        ),
-    }
-    match dram.grade.as_deref().map(str::trim) {
-        Some("standard_production") => {}
-        Some(grade @ ("ett" | "utt" | "downgrade" | "untested")) => reasons.push(
-            Status::WrongProduct,
-            "dram.grade",
-            format!("{} material can't stand in for standard production", grade_words(grade)),
-        ),
-        Some("specialty") => reasons.push(
-            Status::ResearchOnly,
-            "dram.grade",
-            "a specialty qualification or temperature grade needs its own series profile, which no contract has yet",
-        ),
-        Some("unknown") | Some("") | None => {
-            reasons.missing("dram.grade", "the grade (an unknown grade is not standard grade)")
-        }
-        Some(other) => reasons.push(
-            Status::NeedsMetadata,
-            "dram.grade",
-            format!("grade {other:?} is not recognized"),
-        ),
-    }
+    chip_reasons(
+        "dram",
+        dram.die_count,
+        &dram.condition,
+        &dram.grade,
+        &["ett", "utt", "downgrade", "untested"],
+        reasons,
+    );
     reasons.scope(
         "dram.organization",
         "the organization (x4/x8/x16)",
@@ -661,20 +616,15 @@ fn nand_reasons(definition: &SeriesDefinition, bucket: Option<&Bucket>, reasons:
         "the physical scope",
         &definition.physical_scope,
     ) {
-        Some("fabricated_wafer") => {}
-        Some(scope @ ("packaged_ic" | "bare_die" | "known_good_die")) => reasons.push(
-            Status::ResearchOnly,
-            "physicalScope",
-            format!(
-                "a {} quote doesn't become a wafer assessment observation",
-                scope_words(scope)
-            ),
-        ),
-        Some(scope @ ("ssd" | "emmc" | "ufs" | "module" | "blank_wafer")) => reasons.push(
+        Some("packaged_ic") => {}
+        Some(
+            scope @ ("module" | "bare_die" | "known_good_die" | "fabricated_wafer" | "blank_wafer"
+            | "ssd" | "emmc" | "ufs"),
+        ) => reasons.push(
             Status::WrongProduct,
             "physicalScope",
             format!(
-                "NANDX buckets are fabricated 3D NAND wafers, not {}",
+                "NANDX buckets are packaged NAND chips, not {}",
                 scope_words(scope)
             ),
         ),
@@ -723,7 +673,7 @@ fn nand_reasons(definition: &SeriesDefinition, bucket: Option<&Bucket>, reasons:
         }
     }
     if let (Some(density), Some(bucket)) = (
-        reasons.text("nand.dieDensity", "the per-die density", &nand.die_density),
+        reasons.text("nand.dieDensity", "the die density", &nand.die_density),
         bucket,
     ) {
         if density != bucket.die_density {
@@ -731,19 +681,102 @@ fn nand_reasons(definition: &SeriesDefinition, bucket: Option<&Bucket>, reasons:
                 Status::WrongProduct,
                 "nand.dieDensity",
                 format!(
-                    "{density} per die is not {}'s {}",
+                    "a {density} die is not {}'s {} die",
                     bucket.id, bucket.die_density
                 ),
             );
         }
     }
+    chip_reasons(
+        "nand",
+        nand.die_count,
+        &nand.condition,
+        &nand.grade,
+        &["downgrade", "ink_die", "white_label", "untested"],
+        reasons,
+    );
     reasons.scope(
-        "nand.testingScope",
-        "the assessment's quality and testing scope",
-        &nand.testing_scope,
+        "nand.interface",
+        "the interface and I/O speed (ONFI or Toggle, MT/s)",
+        &nand.interface,
         true,
     );
+    if definition.is_direct() {
+        reasons.exact("nand.interface", "interface and I/O speed", &nand.interface);
+        reasons.exact(
+            "nand.packageConstruction",
+            "package construction",
+            &nand.package_construction,
+        );
+    }
     // No universal layer requirement: any stated scope is fine, and it may be left out.
+}
+
+/// What a packaged chip must be, DRAM's or NAND's (`die_count=1`, `condition=new_unused`,
+/// `production_grade_scope`): one die, new, standard production. `substitutes` are the grades
+/// that can't stand in for standard production.
+fn chip_reasons(
+    family: &str,
+    die_count: Option<u8>,
+    condition: &Option<String>,
+    grade: &Option<String>,
+    substitutes: &[&str],
+    reasons: &mut Reasons,
+) {
+    let field = |name: &str| format!("{family}.{name}");
+    match die_count {
+        Some(1) => {}
+        Some(0) | None => reasons.missing(&field("dieCount"), "the number of dies in the package"),
+        Some(count) => reasons.push(
+            Status::WrongProduct,
+            &field("dieCount"),
+            format!("a {count}-die package is not a monolithic chip; total package density doesn't make it one"),
+        ),
+    }
+    match condition.as_deref().map(str::trim) {
+        Some("new_unused") => {}
+        Some(condition @ ("reclaimed" | "desoldered" | "refurbished" | "engineering_sample")) => {
+            reasons.push(
+                Status::WrongProduct,
+                &field("condition"),
+                format!(
+                    "{} material is outside the standard-production exposure",
+                    condition.replace('_', " ")
+                ),
+            )
+        }
+        Some("unknown") | Some("") | None => reasons.missing(
+            &field("condition"),
+            "the condition (an unknown condition is not new)",
+        ),
+        Some(other) => reasons.push(
+            Status::NeedsMetadata,
+            &field("condition"),
+            format!("condition {other:?} is not recognized"),
+        ),
+    }
+    match grade.as_deref().map(str::trim) {
+        Some("standard_production") => {}
+        Some(grade) if substitutes.contains(&grade) => reasons.push(
+            Status::WrongProduct,
+            &field("grade"),
+            format!("{} material can't stand in for standard production", grade_words(grade)),
+        ),
+        Some("specialty") => reasons.push(
+            Status::ResearchOnly,
+            &field("grade"),
+            "a specialty qualification or temperature grade needs its own series profile, which no contract has yet",
+        ),
+        Some("unknown") | Some("") | None => reasons.missing(
+            &field("grade"),
+            "the grade (an unknown grade is not standard grade)",
+        ),
+        Some(other) => reasons.push(
+            Status::NeedsMetadata,
+            &field("grade"),
+            format!("grade {other:?} is not recognized"),
+        ),
+    }
 }
 
 fn cell_reasons(definition: &SeriesDefinition, bucket: Option<&Bucket>, reasons: &mut Reasons) {
@@ -972,7 +1005,6 @@ fn scope_words(scope: &str) -> &'static str {
         "ssd" => "an SSD",
         "emmc" => "eMMC",
         "ufs" => "UFS",
-        "packaged_ic" => "a packaged-chip",
         _ => "that",
     }
 }
@@ -982,6 +1014,8 @@ fn grade_words(grade: &str) -> &'static str {
         "ett" => "eTT",
         "utt" => "uTT",
         "downgrade" => "Downgrade",
+        "ink_die" => "Ink-die",
+        "white_label" => "White-label",
         _ => "Untested",
     }
 }
@@ -1184,6 +1218,18 @@ pub fn comparability_changes(
     let (old_nand, new_nand) = (
         previous.nand.clone().unwrap_or_default(),
         next.nand.clone().unwrap_or_default(),
+    );
+    check("nand.dieCount", old_nand.die_count == new_nand.die_count);
+    check("nand.condition", old_nand.condition == new_nand.condition);
+    check("nand.grade", old_nand.grade == new_nand.grade);
+    check("nand.interface", old_nand.interface == new_nand.interface);
+    check(
+        "nand.packageConstruction",
+        old_nand.package_construction == new_nand.package_construction,
+    );
+    check(
+        "nand.qualification",
+        old_nand.qualification == new_nand.qualification,
     );
     check(
         "nand.testingScope",

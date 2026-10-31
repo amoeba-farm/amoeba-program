@@ -171,6 +171,30 @@ flat_enum_type!(OracleUsdcRewardSchedulePhase {
 flat_enum_type!(OracleEscrowDisposition {
     Unsettled = 0, Refunded = 1, Slashed = 2, Transferred = 3,
 });
+// Oracle v2 heads (`state/heads`).
+flat_enum_type!(HeadStatus {
+    Open = 0, Active = 1, Live = 2, Retired = 3, Expired = 4,
+});
+flat_enum_type!(HeadAccessClass {
+    PublicPage = 0, LoginZkTls = 1, OfflineQuote = 2, Physical = 3,
+});
+flat_enum_type!(HeadClaimKind { Fill = 0, Update = 1 });
+flat_enum_type!(HeadClaimStatus {
+    Committed = 0, Revealed = 1, Stood = 2, Fell = 3, Expired = 4,
+});
+flat_enum_type!(HeadChallengeKind { Claim = 0, Source = 1 });
+flat_enum_type!(HeadChallengeRuling { Pending = 0, Won = 1, Lost = 2 });
+flat_enum_type!(HeadsContractStatus {
+    Accumulating = 0, Collecting = 1, Settled = 2,
+});
+flat_enum_type!(HeadsWeightsPhase { Recording = 0, Settled = 1 });
+flat_enum_type!(HeadsChannel { Spot = 0, Contract = 1, Lta = 2 });
+flat_enum_type!(HeadsSettlementTarget {
+    ContractChannel = 0, FixedMixReference = 1,
+});
+flat_enum_type!(HeadChallengeReason {
+    ValueOrOther = 0, OffChannel = 1, DuplicateOrigin = 2, ExpiredObservation = 3,
+});
 /// Keep the common scalar and key copies at a constant length so the SBF
 /// compiler can emit them directly instead of calling memcpy for every field.
 /// Larger arrays retain the same general copy path.

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/commodity-spec", "crates/oracle-interface", "programs/ameba_oracle"]
+members = ["crates/commodity-spec", "crates/heads", "crates/oracle-interface", "programs/ameba_oracle"]
 
 [workspace.package]
 edition = "2021"
@@ -8,6 +8,7 @@ publish = false
 
 [workspace.dependencies]
 ameba-commodity-spec = { path = "crates/commodity-spec" }
+ameba-oracle-heads = { path = "crates/heads" }
 ameba-oracle-interface = { path = "crates/oracle-interface" }
 solana-program = { version = "2.3", default-features = false }
 solana-sdk-ids = "2.2.1"

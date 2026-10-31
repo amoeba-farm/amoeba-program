@@ -273,6 +273,56 @@ pub(super) fn with_sealed_definition_preimage<T>(
     decode(&data[HEADER..])
 }
 
+/// A sealed evidence object as a heads claim or challenge references it (`docs/heads.md`,
+/// decision 4).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct SealedEvidence {
+    pub kind: u8,
+    pub commitment: [u8; 32],
+    /// The capture time of a Wayback URL (kind 3) or an evidence record (kind 4), which must
+    /// equal the claim's source time; `None` for an opaque definition (kind 2).
+    pub capture_ts: Option<u64>,
+}
+
+/// Validates a sealed object of `expected_kind` (2, 3 or 4) whose recomputed commitment is
+/// `expected_commitment`, and returns what a heads claim records of it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn sealed_evidence(
+    program: &Pubkey,
+    object: &AccountInfo,
+    expected_kind: u8,
+    expected_commitment: &[u8; 32],
+) -> Result<SealedEvidence, ProgramError> {
+    validate_object(program, object)?;
+    let d = object.try_data()?;
+    let kind = d[38];
+    if kind != expected_kind
+        || !matches!(kind, 2 | 3 | ORACLE_EVIDENCE_RECORD_KIND)
+        || d[75] != 1
+        || d[39..71] != expected_commitment[..]
+        || committed_hash(kind, &d[HEADER..])? != *expected_commitment
+    {
+        return invalid();
+    }
+    let capture_ts = if kind == 2 {
+        None
+    } else {
+        let text = std::str::from_utf8(&d[HEADER..])
+            .map_err(|_| OracleError::InvalidOracleOpeningEvidence)?;
+        Some(if kind == 3 {
+            parse_oracle_opening_archive_url(text)?.0
+        } else {
+            parse_oracle_evidence_record(text)?.0
+        })
+    };
+    Ok(SealedEvidence {
+        kind,
+        commitment: *expected_commitment,
+        capture_ts,
+    })
+}
+
 /// The object kinds that carry a claim's archive evidence: a Wayback URL or an evidence record.
 fn is_archive_kind(kind: u8) -> bool {
     kind == 3 || kind == ORACLE_EVIDENCE_RECORD_KIND
@@ -647,6 +697,102 @@ pub(super) fn backfill_claim(program: &Pubkey, a: &[AccountInfo], role: u8) -> P
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A sealed object of `kind` over `body`, as the evidence selectors leave it.
+    fn heads_evidence_object(
+        program: &Pubkey,
+        kind: u8,
+        body: &[u8],
+    ) -> (Pubkey, [u8; 32], Vec<u8>) {
+        let payer = Pubkey::new_from_array([3; 32]);
+        let commitment = committed_hash(kind, body).unwrap();
+        let (key, bump) = bytes_address(program, &payer, kind, &commitment);
+        let mut data = vec![0; HEADER + body.len()];
+        data[..6].copy_from_slice(&[b'O', b'E', b'B', 1, 1, bump]);
+        data[6..38].copy_from_slice(payer.as_ref());
+        data[38] = kind;
+        data[39..71].copy_from_slice(&commitment);
+        data[71..73].copy_from_slice(&(body.len() as u16).to_le_bytes());
+        data[73..75].copy_from_slice(&(body.len() as u16).to_le_bytes());
+        data[75] = 1;
+        data[HEADER..].copy_from_slice(body);
+        (key, commitment, data)
+    }
+
+    #[test]
+    fn heads_claims_read_kind_and_capture_time_of_sealed_evidence() {
+        let program = Pubkey::new_unique();
+        let record = format!(
+            "amoeba-evidence-v1;m=web;t=1761955200;d={};u=https://example.com/ddr5",
+            "ab".repeat(32)
+        );
+        for (kind, body, capture) in [
+            (
+                2u8,
+                b"Mouser DDR5-4800 16Gb spot, USD per chip".to_vec(),
+                None,
+            ),
+            (
+                3,
+                b"https://web.archive.org/web/20251101000000/https://example.com/ddr5".to_vec(),
+                Some(1_761_955_200),
+            ),
+            (4, record.into_bytes(), Some(1_761_955_200)),
+        ] {
+            let (key, commitment, mut data) = heads_evidence_object(&program, kind, &body);
+            let mut lamports = 1;
+            let info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut data,
+                &program,
+                false,
+                0,
+            );
+            assert_eq!(
+                sealed_evidence(&program, &info, kind, &commitment).unwrap(),
+                SealedEvidence {
+                    kind,
+                    commitment,
+                    capture_ts: capture
+                }
+            );
+            // Another kind, another commitment, or an unsealed object reject.
+            assert!(sealed_evidence(&program, &info, kind ^ 1, &commitment).is_err());
+            assert!(sealed_evidence(&program, &info, kind, &[9; 32]).is_err());
+            drop(info);
+            data[75] = 0;
+            let info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut data,
+                &program,
+                false,
+                0,
+            );
+            assert!(sealed_evidence(&program, &info, kind, &commitment).is_err());
+        }
+        // A locator (kind 1) is never claim evidence.
+        let (key, commitment, mut data) =
+            heads_evidence_object(&program, 1, b"https://example.com/x");
+        let mut lamports = 1;
+        let info = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            &mut data,
+            &program,
+            false,
+            0,
+        );
+        assert!(sealed_evidence(&program, &info, 1, &commitment).is_err());
+    }
+
     #[test]
     fn sealed_definition_preimage_requires_owned_exact_hash_object() {
         let program = Pubkey::new_unique();

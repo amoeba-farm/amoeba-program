@@ -42,6 +42,7 @@ pub(super) fn process_expire_oracle_opening_source(
     }
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_game_transition_window(&anchor, &month)?;
     crate::processor::carry::require_carry_resolved_before_expiry(
         program_id,

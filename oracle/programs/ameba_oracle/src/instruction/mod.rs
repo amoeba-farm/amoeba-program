@@ -76,6 +76,8 @@ mod config;
 mod deserialize;
 #[cfg(any(feature = "localnet-dev-authority", feature = "localnet-governance"))]
 mod dev;
+/// Tag 210, oracle v2 heads on pikes: payloads and builders compiled in every build.
+pub mod heads;
 mod model;
 mod month;
 pub(crate) mod payloads;

@@ -11,17 +11,30 @@ pub(in crate::processor) fn ensure_failed_v5_reward_schedule_window(
     anchor: &PeriodAnchor,
     month: &OracleMonthState,
 ) -> ProgramResult {
-    ensure_failed_v5_reward_schedule_window_at(anchor.expiry_ts, month, current_unix_timestamp()?)
+    ensure_failed_v5_window(anchor, month, false)
+}
+
+/// The failure lanes' window. With `challenges_pending` (194 settling a source challenge of a
+/// Failed period) the month may still count pending source challenges: settling them is how the
+/// count reaches zero once 30/25 kind 0 failed a month with challenges open.
+pub(in crate::processor) fn ensure_failed_v5_window(
+    anchor: &PeriodAnchor,
+    month: &OracleMonthState,
+    challenges_pending: bool,
+) -> ProgramResult {
+    let now = super::super::period::failure_lane_now(anchor, current_unix_timestamp()?);
+    ensure_failed_v5_reward_schedule_window_at(anchor.expiry_ts, month, now, challenges_pending)
 }
 
 pub(in crate::processor) fn ensure_failed_v5_reward_schedule_window_at(
     expiry_ts: u64,
     month: &OracleMonthState,
     now: u64,
+    challenges_pending: bool,
 ) -> ProgramResult {
     let latest_safe = source_submission_deadline(month, expiry_ts)?;
     if month.phase != OraclePhase::SourceSubmission
-        || month.pending_resolution_count != 0
+        || (month.pending_resolution_count != 0 && !challenges_pending)
         || month.weight_scheme_version != 0
         || now < latest_safe
     {

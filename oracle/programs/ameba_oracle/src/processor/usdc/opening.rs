@@ -30,6 +30,7 @@ pub(in crate::processor) fn process_submit_oracle_opening_claim_v2(
 
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_opening_window(&month)?;
     ensure_oracle_canonical_weight_scheme(&month)?;
     let mut source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
@@ -182,6 +183,7 @@ pub(in crate::processor) fn process_challenge_oracle_opening_claim_v2(
 
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_opening_window(&month)?;
     ensure_oracle_canonical_weight_scheme(&month)?;
     let source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
@@ -430,8 +432,9 @@ pub(in crate::processor) fn process_finalize_oracle_opening_claim_v2(
     let claim_info = &accounts[5];
     let claimant_collateral_info = &accounts[6];
 
-    let (_anchor, mut month) =
+    let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_opening_window(&month)?;
     let mut source = load_valid_oracle_source(program_id, month_info.key, source_info)?;
     let mut observations = load_valid_oracle_source_observations(

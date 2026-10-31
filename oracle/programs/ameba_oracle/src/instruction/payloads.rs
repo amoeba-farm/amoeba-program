@@ -56,6 +56,7 @@ pub(crate) fn decode_u8_u64_payload(payload: &[u8]) -> Result<(u8, u64), Program
     ))
 }
 
+#[cfg_attr(not(feature = "v1-formation"), allow(dead_code))] // Formation only.
 pub(crate) fn decode_u16_pair_payload(payload: &[u8]) -> Result<(u16, u16), ProgramError> {
     let bytes: [u8; 4] = payload
         .try_into()

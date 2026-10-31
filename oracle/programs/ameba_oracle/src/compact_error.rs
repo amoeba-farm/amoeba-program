@@ -147,6 +147,7 @@ pub(crate) mod cpi {
     use solana_program::{account_info::AccountInfo, instruction::Instruction};
 
     #[inline(always)]
+    #[cfg_attr(not(feature = "v1-formation"), allow(dead_code))] // Formation only.
     pub(crate) fn invoke(
         instruction: &Instruction,
         account_infos: &[AccountInfo],

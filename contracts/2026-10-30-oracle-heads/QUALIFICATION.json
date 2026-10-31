@@ -1,0 +1,29 @@
+{
+  "schema": "amoeba.oracle-input-qualification.v1",
+  "qualifiedSource": "179864284b5ca09e2ce0bfdb94a05884d2e6f1ee",
+  "releaseSource": "2af39bf9f69f783bacf929daf9b1baa103ade351",
+  "releaseTag": "release/2026-10-30-oracle-heads",
+  "sourceBoundGate": {
+    "inputKey": "oracle-3c493f997ca12a8e",
+    "passedAt": "2026-10-31T08:52:53Z",
+    "record": "2026-10-30-oracle-heads"
+  },
+  "compiledInputsIdentical": true,
+  "identicalTrees": {
+    "oracle": "784cfae9b37ffeaad75a8172ebfe8fa914dfc312",
+    "governance": "bb6e2476da3ad3fc657080d1616c636c6fc2319c"
+  },
+  "comparedPaths": [
+    "oracle/programs/ameba_oracle",
+    "oracle/crates/heads",
+    "oracle/crates/oracle-interface",
+    "oracle/crates/commodity-spec",
+    "oracle/Cargo.toml",
+    "oracle/Cargo.lock",
+    "oracle/rust-toolchain.toml",
+    "governance/crates/governance-interface"
+  ],
+  "features": "default = [\"heads\"] only: no heads-migrate, v1-formation or localnet profile",
+  "checksReused": "Oracle release gate at the source commit (2,630 tests); the oracle and governance trees are unchanged at the release commit. Fixed-path builds checked separately.",
+  "artifactSha256": "a634450ad1f671cfd5745d3a99cda389fbee5c73dd5f1d4ff55c363047a349d3"
+}

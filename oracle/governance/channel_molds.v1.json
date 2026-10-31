@@ -1,0 +1,1157 @@
+{
+  "schema": "amoeba.oracle-channel-molds",
+  "schemaVersion": 1,
+  "version": "channel-molds-v1-placeholder",
+  "date": "2026-10-29",
+  "status": "Dev placeholder. The user, 2026-10-29: \"Just build it like a layer. The actual percentages, for now, you can just throw in placeholders that you believe are accurate ... it's all on dev. Nothing's on production yet.\" Every mix is an assumed scenario: contracts settle on it, flagged as assumed. A listed contract freezes its mold; changes apply from the next listing.",
+  "brief": {
+    "file": "oracle/docs/lta-spec.md",
+    "title": "Oracle Long-Term Agreement Fix",
+    "sha256": "be7eaa1998466ae6fd0faeb273cc1d09972b03ff77045bfa2e949a411ec7e1ba"
+  },
+  "decisions": [
+    "BATX gets its own three-channel mold with battery sentences (the user, 2026-10-29: battery pricing also has different agreement types), in place of the brief's section 10 open item.",
+    "Fixed-mix settlement (the user, 2026-10-29: \"NO WE DONT WANT THAT. SPOT LTA AND CONTRACT NEED TO BE WEIGHTED AGAINST EACHOTHER.\"): every listed RAMX, NANDX and BATX contract settles on each item's fixed-mix procurement reference, its spot, contract and LTA channels weighted against each other by the item's mix, assumed or matched. This supersedes the brief's Stage 1 (the Contract channel alone) and its rule that nothing settles on an assumed scenario.",
+    "Slim sentences (the user, 2026-10-29, agreeing that bracketed terms per product are too much listing work: \"agreed just have challenges deal w some of that stuff\"): each sentence keeps only what defines its channel: currency and unit, product, the channel definition and the observation period; LTA keeps an agreement of at least a year with committed volume, the price in effect, its next reset and any band, and BATX's LTA its index-linked formula. Lot size, delivery days, delivery basis, volume tier and payment terms are dropped: each source settles on its own change from its own opening, so a basis it keeps constant cancels out.",
+    "Quarterly contracts with a per-quarter mix (the user, 2026-10-29: \"LTA %ages of weight need to adjust dynamically depending on the Q.\" and \"after the november 1st expiry market i want it to work in Quarters. so Q1 Q2 etc.\"): each item carries a mixSchedule, one mix per calendar quarter; a contract freezes its quarter's mix at listing (the quarter holding its expiry's last second; before the first scheduled quarter the first applies, after the last the last), and its listing terms document carries that mix and its commitment. The item's mixBps is the board's default and display mix, equal to the first scheduled quarter's.",
+    "Placeholders: the terms, the observation periods and the mixes are the implementing agent's reading of how these markets trade (2026-10-29), for dev; each mix is labeled an assumed scenario."
+  ],
+  "channelCodes": {
+    "spot": 0,
+    "contract": 1,
+    "lta": 2
+  },
+  "classificationOrder": [
+    "lta",
+    "contract",
+    "spot"
+  ],
+  "classificationNone": "A purchase that fits none of the channels (unterminated quotes, resales without terms) is eligible nowhere.",
+  "componentOrder": "Item-major in the basket's order, then spot, contract, lta: component index = item index * 3 + channel code.",
+  "mixBasisCodes": {
+    "none": 0,
+    "assumed": 1,
+    "matched": 2
+  },
+  "mixRule": "reference = m_spot * Spot + m_contract * Contract + m_lta * LTA over the channels' settled changes on the contract's base (the mix-weighted channel changes). Each channel enters at its own settlement: its weighted median on live data, or its degraded path's last valid value (its change at the freeze, else the listing value 0), so a failing channel keeps its fixed share; missing weight is never redistributed and the mix never shifts. Listing needs min_live_sources independent origins on every channel the mix weights. Unavailable only when the basis is none or the mix does not sum to 10,000, which no fixed-mix listing accepts; flagged when assumed.",
+  "settlementTargetCodes": {
+    "contract_channel": 0,
+    "fixed_mix_reference": 1
+  },
+  "challengeReasons": [
+    {
+      "code": 0,
+      "id": "value_or_other",
+      "meaning": "The value or the evidence is wrong, or another ground."
+    },
+    {
+      "code": 1,
+      "id": "off_channel",
+      "meaning": "The purchase classifies in another channel, or in none."
+    },
+    {
+      "code": 2,
+      "id": "duplicate_origin",
+      "meaning": "The evidence traces to an earlier live source's origin, which the claim did not declare."
+    },
+    {
+      "code": 3,
+      "id": "expired_observation",
+      "meaning": "An LTA price carried past its own next reset."
+    }
+  ],
+  "challengeRule": "Reason codes label the existing challenge: same bond, same resolution, same slash as any claim challenge.",
+  "evidenceRules": [
+    "Origins, not pages. Sources whose evidence traces to the same underlying report are one origin. A source republishing another live source's origin is challengeable as a duplicate, carries no weight toward min_live_sources, and earns no delegator share.",
+    "Effective vs expired. An old publication documenting a price still in effect is valid LTA evidence. An observation carried past its reset is expired and is a false claim. The bundle must show which.",
+    "Checked at listing and at freeze. Origin count and target match are verified when a contract lists and again when it freezes. A channel that passed at listing and fails at freeze goes to the degraded path; it does not settle on stale sources."
+  ],
+  "mechanismClaim": "Demonstrably off-target submissions are challengeable and slashable. This sorts what surfaces; it does not guarantee that private LTA evidence will surface.",
+  "originRule": "A claim's originId is SHA-256 of \"amoeba-oracle-origin-v1\\n\" + publisher + \"\\n\" + report, each trimmed, ASCII-lowercased and with runs of whitespace made one space. The publisher is whoever first published the price, not a page repeating it; the report is the publication series (the table, assessment or price list), not one of its rows. The first live source of an origin in a component carries it; a later one with the same origin carries no weight, does not count toward min_live_sources and earns no delegator share.",
+  "ltaTermsRule": "An LTA claim carries effectiveFrom, nextReset, floor and ceiling (unix seconds and the value's scale; 0 = none). A print is a current level at time t when effectiveFrom <= t and (nextReset = 0 or t < nextReset); past its own next reset it is no level.",
+  "classificationExamples": [
+    {
+      "case": "A newly signed three-year DDR5 supply agreement with committed volume; first deliveries this month.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 36,
+        "committedVolume": true,
+        "negotiatedWholesale": true,
+        "deliveredInPeriod": true,
+        "immediateInventory": false
+      },
+      "channel": "lta"
+    },
+    {
+      "case": "A quarterly price reset under an LTA signed two years ago.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 48,
+        "committedVolume": true,
+        "negotiatedWholesale": true,
+        "deliveredInPeriod": true,
+        "immediateInventory": false
+      },
+      "channel": "lta"
+    },
+    {
+      "case": "A memory maker and a PC OEM agree this month's contract price; delivered this month.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 0,
+        "committedVolume": false,
+        "negotiatedWholesale": true,
+        "deliveredInPeriod": true,
+        "immediateInventory": false
+      },
+      "channel": "contract"
+    },
+    {
+      "case": "A distributor sells a 2,000-chip lot from stock.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 0,
+        "committedVolume": false,
+        "negotiatedWholesale": false,
+        "deliveredInPeriod": true,
+        "immediateInventory": true
+      },
+      "channel": "spot"
+    },
+    {
+      "case": "A broker's quote nobody accepted (unterminated).",
+      "facts": {
+        "agreed": false,
+        "agreementMonths": 0,
+        "committedVolume": false,
+        "negotiatedWholesale": false,
+        "deliveredInPeriod": false,
+        "immediateInventory": true
+      },
+      "channel": null
+    },
+    {
+      "case": "A one-year frame agreement without committed volume; this quarter's price negotiated with an ODM and delivered in the quarter.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 12,
+        "committedVolume": false,
+        "negotiatedWholesale": true,
+        "deliveredInPeriod": true,
+        "immediateInventory": false
+      },
+      "channel": "contract"
+    },
+    {
+      "case": "A negotiated OEM purchase delivered after the observation period, not from stock.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 0,
+        "committedVolume": false,
+        "negotiatedWholesale": true,
+        "deliveredInPeriod": false,
+        "immediateInventory": false
+      },
+      "channel": null
+    },
+    {
+      "case": "BATX: a five-year cell supply agreement between a cell maker and an automaker, price indexed to lithium carbonate and reset monthly.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 60,
+        "committedVolume": true,
+        "negotiatedWholesale": true,
+        "deliveredInPeriod": true,
+        "immediateInventory": false
+      },
+      "channel": "lta"
+    },
+    {
+      "case": "BATX: an energy-storage integrator's tender award to a cell maker for one project, delivered this quarter.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 0,
+        "committedVolume": false,
+        "negotiatedWholesale": true,
+        "deliveredInPeriod": true,
+        "immediateInventory": false
+      },
+      "channel": "contract"
+    },
+    {
+      "case": "BATX: a trader's 2 MWh of LFP cells in stock, shipped within a week.",
+      "facts": {
+        "agreed": true,
+        "agreementMonths": 0,
+        "committedVolume": false,
+        "negotiatedWholesale": false,
+        "deliveredInPeriod": true,
+        "immediateInventory": true
+      },
+      "channel": "spot"
+    },
+    {
+      "case": "BATX: a resale of cells of unknown origin with no stated terms.",
+      "facts": {
+        "agreed": false,
+        "agreementMonths": 0,
+        "committedVolume": false,
+        "negotiatedWholesale": false,
+        "deliveredInPeriod": true,
+        "immediateInventory": true
+      },
+      "channel": null
+    }
+  ],
+  "products": [
+    {
+      "product": "RAMX",
+      "settlementTarget": "fixed_mix_reference",
+      "disclosure": "This contract settles on a fixed-mix procurement reference: each item's spot, periodic-contract and long-term-agreement prices, weighted by the mix published with this listing (an assumed scenario until matched evidence backs it).",
+      "mixCitation": "Assumed scenario, no matched evidence yet: suppliers say a large and rising share of forward DRAM capacity is under multi-year LTAs (a capacity disclosure, which the brief's section 4 rules out as matched evidence), monthly and quarterly OEM contracts remain the price the industry quotes, and spot is a thin channel market.",
+      "mixScheduleReason": "Assumed scenario: DRAM makers say multi-year agreements cover a rising share of 2027-28 output (HBM and server DRAM first), so each item's LTA share rises about four points a quarter early in 2027 and three later, taken from the contract share; spot, the residual channel, stays flat.",
+      "channels": [
+        {
+          "channel": "spot",
+          "code": 0,
+          "classification": "An immediate-inventory purchase outside both.",
+          "template": "[Currency] per [unit], [product], immediately available inventory, open-market trade, as of the observation date.",
+          "evidence": [
+            "price",
+            "availability and delivery",
+            "as-of date",
+            "venue"
+          ]
+        },
+        {
+          "channel": "contract",
+          "code": 1,
+          "classification": "A negotiated wholesale purchase, supplier → OEM/ODM, delivered in the observation period, and not under an LTA.",
+          "template": "[Currency] per [unit], [product], supplier → OEM/ODM purchase not under an LTA, delivered during the observation [period], price fixed during this negotiation period.",
+          "evidence": [
+            "price",
+            "product",
+            "delivery period",
+            "negotiation period",
+            "counterparty class (supplier → OEM/ODM)"
+          ]
+        },
+        {
+          "channel": "lta",
+          "code": 2,
+          "classification": "Made under a supply agreement of at least one year with committed volume, including prices newly fixed or reset under such an agreement. A newly signed LTA is LTA.",
+          "template": "[Currency] per [unit], [product], price in effect for deliveries during the observation [period] under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+          "evidence": [
+            "price in effect",
+            "delivery period",
+            "agreement start and term",
+            "next reset",
+            "floor/ceiling, if any",
+            "counterparty class"
+          ]
+        }
+      ],
+      "terms": {
+        "all": {
+          "Currency": "USD",
+          "unit": "chip"
+        }
+      },
+      "items": [
+        {
+          "bucket": "DDR5_16GBIT",
+          "basketWeightBps": 4000,
+          "mixBps": {
+            "spot": 1000,
+            "contract": 5000,
+            "lta": 4000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 1000,
+              "contract": 5000,
+              "lta": 4000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 1000,
+              "contract": 4600,
+              "lta": 4400
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 1000,
+              "contract": 4200,
+              "lta": 4800
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 1000,
+              "contract": 3900,
+              "lta": 5100
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 1000,
+              "contract": 3600,
+              "lta": 5400
+            }
+          ],
+          "mixReason": "The mainstream PC and server DDR5 die: large OEMs and ODMs buy it on monthly contracts while hyperscalers and top OEMs have moved much of their volume to LTAs; spot is a small channel market.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged DDR5 16Gb SDRAM",
+              "period": "month"
+            }
+          },
+          "periodReason": "PC and mainstream DRAM contract prices are fixed and published monthly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged DDR5 16Gb SDRAM, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "ab895236be2044df7df7149689c5f16ac00b6354f6585061011c666fe4298ff7"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged DDR5 16Gb SDRAM, supplier → OEM/ODM purchase not under an LTA, delivered during the observation month, price fixed during this negotiation period.",
+              "sha256": "e4b04c941ee4f943172691cee8fa53947e9dff2e6dd16a13bff608a6dacd0864"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged DDR5 16Gb SDRAM, price in effect for deliveries during the observation month under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "37ebaf0d25c93bd22da0b0c7e2b9a16de6e23954bec7d431f6b52c68b94c5660"
+            }
+          }
+        },
+        {
+          "bucket": "DDR5_24GBIT",
+          "basketWeightBps": 2000,
+          "mixBps": {
+            "spot": 500,
+            "contract": 4500,
+            "lta": 5000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 500,
+              "contract": 4500,
+              "lta": 5000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 500,
+              "contract": 4100,
+              "lta": 5400
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 500,
+              "contract": 3700,
+              "lta": 5800
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 500,
+              "contract": 3400,
+              "lta": 6100
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 500,
+              "contract": 3100,
+              "lta": 6400
+            }
+          ],
+          "mixReason": "Goes mostly into server RDIMMs bought by hyperscalers and server OEMs, the buyers most likely to hold LTAs; there is almost no spot market.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged DDR5 24Gb SDRAM",
+              "period": "quarter"
+            }
+          },
+          "periodReason": "Server DRAM prices are negotiated quarterly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged DDR5 24Gb SDRAM, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "f97cfdbbaf1f069659e1e90c9c2ebbd469fb6f1819a1374c03e3f9091f717771"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged DDR5 24Gb SDRAM, supplier → OEM/ODM purchase not under an LTA, delivered during the observation quarter, price fixed during this negotiation period.",
+              "sha256": "372ea42ac9eb9e8b9f042704a70457cbaa09037b332ae9ef6e05f244ec892e33"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged DDR5 24Gb SDRAM, price in effect for deliveries during the observation quarter under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "3822dac5786acdab7f5ae50b892d78f19b64d316653bfbf53201e6692d3ed01f"
+            }
+          }
+        },
+        {
+          "bucket": "DDR4_16GBIT",
+          "basketWeightBps": 2500,
+          "mixBps": {
+            "spot": 1500,
+            "contract": 5500,
+            "lta": 3000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 1500,
+              "contract": 5500,
+              "lta": 3000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 1500,
+              "contract": 5100,
+              "lta": 3400
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 1500,
+              "contract": 4700,
+              "lta": 3800
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 1500,
+              "contract": 4400,
+              "lta": 4100
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 1500,
+              "contract": 4100,
+              "lta": 4400
+            }
+          ],
+          "mixReason": "A legacy die the major suppliers are winding down: industrial and networking buyers fix prices on contract or last-time buys, and spot trade has grown as supply tightens.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged DDR4 16Gb SDRAM",
+              "period": "month"
+            }
+          },
+          "periodReason": "PC and mainstream DRAM contract prices are fixed and published monthly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged DDR4 16Gb SDRAM, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "f5691918e7690b71770134730f40be1ebfe13e6df24ab3f6c6355327087fbe7c"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged DDR4 16Gb SDRAM, supplier → OEM/ODM purchase not under an LTA, delivered during the observation month, price fixed during this negotiation period.",
+              "sha256": "5bf7a21ede8d0ebd11febe89607cbec3a6acdd31f73d4bb05fbb4175ad9941bc"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged DDR4 16Gb SDRAM, price in effect for deliveries during the observation month under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "2251710de3acbce14d9ba43251f964144c5c7e66c4bca32784858dd8c8d878ea"
+            }
+          }
+        },
+        {
+          "bucket": "DDR4_8GBIT",
+          "basketWeightBps": 1500,
+          "mixBps": {
+            "spot": 2000,
+            "contract": 5500,
+            "lta": 2500
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 2000,
+              "contract": 5500,
+              "lta": 2500
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 2000,
+              "contract": 5100,
+              "lta": 2900
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 2000,
+              "contract": 4700,
+              "lta": 3300
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 2000,
+              "contract": 4400,
+              "lta": 3600
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 2000,
+              "contract": 4100,
+              "lta": 3900
+            }
+          ],
+          "mixReason": "The most spot-traded DRAM chip (the usual spot benchmark), bought by consumer-electronics and module makers on short contracts with little multi-year commitment.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged DDR4 8Gb SDRAM",
+              "period": "month"
+            }
+          },
+          "periodReason": "PC and mainstream DRAM contract prices are fixed and published monthly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged DDR4 8Gb SDRAM, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "8a8b781ddf1949ac030d7f144dcd62561311a537915de58571237cb2e1eda805"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged DDR4 8Gb SDRAM, supplier → OEM/ODM purchase not under an LTA, delivered during the observation month, price fixed during this negotiation period.",
+              "sha256": "25bc0c9bc6290d329d93ab9a573e76720d9b0575def1bb6574483894ef51acfe"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged DDR4 8Gb SDRAM, price in effect for deliveries during the observation month under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "2db7db5beb0688a363c130ca1f6680d62980a98001e98a7516c99dd0fa8e9ef3"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "product": "NANDX",
+      "settlementTarget": "fixed_mix_reference",
+      "disclosure": "This contract settles on a fixed-mix procurement reference: each item's spot, periodic-contract and long-term-agreement prices, weighted by the mix published with this listing (an assumed scenario until matched evidence backs it).",
+      "mixCitation": "Assumed scenario, no matched evidence yet: NAND sells mostly on monthly and quarterly contracts to SSD makers, module makers and OEMs, enterprise SSD buyers have begun taking multi-year LTAs for high-density dies, and spot covers channel and legacy parts.",
+      "mixScheduleReason": "Assumed scenario: enterprise SSD buyers move capacity under multi-year NAND agreements more slowly than DRAM buyers, so each item's LTA share rises three points a quarter, taken from the contract share; spot stays flat.",
+      "channels": [
+        {
+          "channel": "spot",
+          "code": 0,
+          "classification": "An immediate-inventory purchase outside both.",
+          "template": "[Currency] per [unit], [product], immediately available inventory, open-market trade, as of the observation date.",
+          "evidence": [
+            "price",
+            "availability and delivery",
+            "as-of date",
+            "venue"
+          ]
+        },
+        {
+          "channel": "contract",
+          "code": 1,
+          "classification": "A negotiated wholesale purchase, supplier → OEM/ODM, delivered in the observation period, and not under an LTA.",
+          "template": "[Currency] per [unit], [product], supplier → OEM/ODM purchase not under an LTA, delivered during the observation [period], price fixed during this negotiation period.",
+          "evidence": [
+            "price",
+            "product",
+            "delivery period",
+            "negotiation period",
+            "counterparty class (supplier → OEM/ODM)"
+          ]
+        },
+        {
+          "channel": "lta",
+          "code": 2,
+          "classification": "Made under a supply agreement of at least one year with committed volume, including prices newly fixed or reset under such an agreement. A newly signed LTA is LTA.",
+          "template": "[Currency] per [unit], [product], price in effect for deliveries during the observation [period] under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+          "evidence": [
+            "price in effect",
+            "delivery period",
+            "agreement start and term",
+            "next reset",
+            "floor/ceiling, if any",
+            "counterparty class"
+          ]
+        }
+      ],
+      "terms": {
+        "all": {
+          "Currency": "USD",
+          "unit": "chip"
+        }
+      },
+      "items": [
+        {
+          "bucket": "tlc_1tb",
+          "basketWeightBps": 4000,
+          "mixBps": {
+            "spot": 1000,
+            "contract": 5500,
+            "lta": 3500
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 1000,
+              "contract": 5500,
+              "lta": 3500
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 1000,
+              "contract": 5200,
+              "lta": 3800
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 1000,
+              "contract": 4900,
+              "lta": 4100
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 1000,
+              "contract": 4600,
+              "lta": 4400
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 1000,
+              "contract": 4300,
+              "lta": 4700
+            }
+          ],
+          "mixReason": "The mainstream die for client and enterprise SSDs: mostly monthly or quarterly contracts with SSD and module makers, a growing LTA share at enterprise SSD buyers, and a little spot.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged 3D NAND 1Tb TLC flash",
+              "period": "month"
+            }
+          },
+          "periodReason": "NAND contract prices are fixed and published monthly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 1Tb TLC flash, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "82eae18382a2207f384e8d41a80ab9bc0da0d9a05c5713638e3d353a8924df61"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 1Tb TLC flash, supplier → OEM/ODM purchase not under an LTA, delivered during the observation month, price fixed during this negotiation period.",
+              "sha256": "971d947c1396911065d6c5bf0f2e6b2c0886d81d79a3e8a9b41de4ea5b455402"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 1Tb TLC flash, price in effect for deliveries during the observation month under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "ff7ffd7d8ed3be2d9045a9a97f21c7e4193637f91572e5e16d81fa5625a73c2b"
+            }
+          }
+        },
+        {
+          "bucket": "qlc_1tb",
+          "basketWeightBps": 3000,
+          "mixBps": {
+            "spot": 1000,
+            "contract": 4500,
+            "lta": 4500
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 1000,
+              "contract": 4500,
+              "lta": 4500
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 1000,
+              "contract": 4200,
+              "lta": 4800
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 1000,
+              "contract": 3900,
+              "lta": 5100
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 1000,
+              "contract": 3600,
+              "lta": 5400
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 1000,
+              "contract": 3300,
+              "lta": 5700
+            }
+          ],
+          "mixReason": "Mostly in high-capacity enterprise SSDs for data centers, whose buyers have taken multi-year LTAs; spot is thin.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged 3D NAND 1Tb QLC flash",
+              "period": "quarter"
+            }
+          },
+          "periodReason": "Enterprise SSD NAND is negotiated quarterly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 1Tb QLC flash, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "d02dd094aab752f2be74ebcbbfcd0f3ba26801be7bec00e4d2c12eb48bb8ec9d"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 1Tb QLC flash, supplier → OEM/ODM purchase not under an LTA, delivered during the observation quarter, price fixed during this negotiation period.",
+              "sha256": "b9d577790966c6775ff54bce392603494a1381d02304f6ed5967e45faeb59906"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 1Tb QLC flash, price in effect for deliveries during the observation quarter under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "15bcf9d4a1bd0d3ec4951d1f330c82611f4b5e947a17f266210fde11203c822e"
+            }
+          }
+        },
+        {
+          "bucket": "tlc_512gb",
+          "basketWeightBps": 2000,
+          "mixBps": {
+            "spot": 2000,
+            "contract": 6000,
+            "lta": 2000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 2000,
+              "contract": 6000,
+              "lta": 2000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 2000,
+              "contract": 5700,
+              "lta": 2300
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 2000,
+              "contract": 5400,
+              "lta": 2600
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 2000,
+              "contract": 5100,
+              "lta": 2900
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 2000,
+              "contract": 4800,
+              "lta": 3200
+            }
+          ],
+          "mixReason": "Used in mobile and client storage that module makers buy on contract, with an active channel spot market and few LTAs.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged 3D NAND 512Gb TLC flash",
+              "period": "month"
+            }
+          },
+          "periodReason": "NAND contract prices are fixed and published monthly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 512Gb TLC flash, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "44df06cb804412bcc4e1e5129e0bb4512e0cd0ec75647d9f2f159f1fe54d585c"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 512Gb TLC flash, supplier → OEM/ODM purchase not under an LTA, delivered during the observation month, price fixed during this negotiation period.",
+              "sha256": "519f46f844d398a5533bf486318ddabf467332d09ae431538a91f3ff13eb3ae8"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 512Gb TLC flash, price in effect for deliveries during the observation month under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "a774fa42be83c2f8c9cd0a9c28dcc2dd1b59ed9cee45ba0d10de0ad88f884ae6"
+            }
+          }
+        },
+        {
+          "bucket": "tlc_256gb",
+          "basketWeightBps": 1000,
+          "mixBps": {
+            "spot": 3000,
+            "contract": 5500,
+            "lta": 1500
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 3000,
+              "contract": 5500,
+              "lta": 1500
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 3000,
+              "contract": 5200,
+              "lta": 1800
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 3000,
+              "contract": 4900,
+              "lta": 2100
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 3000,
+              "contract": 4600,
+              "lta": 2400
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 3000,
+              "contract": 4300,
+              "lta": 2700
+            }
+          ],
+          "mixReason": "A legacy low-density die for consumer and embedded storage, traded heavily in the spot channel and rarely under LTAs.",
+          "terms": {
+            "all": {
+              "product": "new standard-production single-die packaged 3D NAND 256Gb TLC flash",
+              "period": "month"
+            }
+          },
+          "periodReason": "NAND contract prices are fixed and published monthly.",
+          "sentences": {
+            "spot": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 256Gb TLC flash, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "57732b3fa70f4ac43b7bd4f9fcbcb4f336fadc49ab27299557d721b6d297ab27"
+            },
+            "contract": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 256Gb TLC flash, supplier → OEM/ODM purchase not under an LTA, delivered during the observation month, price fixed during this negotiation period.",
+              "sha256": "5239f54c99a9b641005aca1d213f37679bb6b557c7b3ce99577ba8fe1001d52f"
+            },
+            "lta": {
+              "text": "USD per chip, new standard-production single-die packaged 3D NAND 256Gb TLC flash, price in effect for deliveries during the observation month under an agreement of ≥ 1 year with committed volume. Evidence shows the price in effect, the period it covers, the next reset date, and any floor/ceiling.",
+              "sha256": "85122cc871f6f4b4898b2c73b68c5afcf1723bcab033d0298812211639bd5967"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "product": "BATX",
+      "settlementTarget": "fixed_mix_reference",
+      "disclosure": "This contract settles on a fixed-mix procurement reference for battery cells: each item's spot, periodic-contract and long-term-agreement prices, weighted by the mix published with this listing (an assumed scenario until matched evidence backs it).",
+      "mixCitation": "Assumed scenario, no matched evidence yet: EV and energy-storage cells are mostly sold under multi-year supply agreements with metal-indexed price formulas, quarterly and annual negotiated contracts and tenders cover most of the rest, and the spot market for new cells is thin.",
+      "mixScheduleReason": "Assumed scenario: EV and storage cells already sell mostly under multi-year agreements with metal-indexed formulas, so each item's LTA share rises two points a quarter, taken from the contract share; spot stays flat.",
+      "channels": [
+        {
+          "channel": "spot",
+          "code": 0,
+          "classification": "An immediate-inventory purchase outside both (traders' and distributors' cells in stock).",
+          "template": "[Currency] per [unit], [product], immediately available inventory, open-market trade, as of the observation date.",
+          "evidence": [
+            "price",
+            "availability and delivery",
+            "as-of date",
+            "venue"
+          ]
+        },
+        {
+          "channel": "contract",
+          "code": 1,
+          "classification": "A negotiated wholesale purchase, cell maker → vehicle OEM or energy-storage integrator (a monthly or quarterly price agreement, or a tender award), delivered in the observation period, and not under an LTA.",
+          "template": "[Currency] per [unit], [product], cell maker → vehicle OEM or energy-storage integrator purchase not under an LTA, delivered during the observation [period], price fixed during this negotiation period or tender award.",
+          "evidence": [
+            "price",
+            "product",
+            "delivery period",
+            "negotiation period or tender",
+            "counterparty class (cell maker → vehicle OEM or energy-storage integrator)"
+          ]
+        },
+        {
+          "channel": "lta",
+          "code": 2,
+          "classification": "Made under a cell supply agreement of at least one year with committed volume (an automaker's or energy-storage integrator's multi-year agreement), including prices newly fixed or reset under it, by negotiation or by its metal-price formula. A newly signed agreement is LTA.",
+          "template": "[Currency] per [unit], [product], price in effect for deliveries during the observation [period] under a supply agreement of ≥ 1 year with committed volume, [price adjustment]. Evidence shows the price in effect, the period it covers, the next reset date, any floor/ceiling, and the price formula with the index readings it used.",
+          "evidence": [
+            "price in effect",
+            "delivery period",
+            "agreement start and term",
+            "next reset",
+            "floor/ceiling, if any",
+            "counterparty class",
+            "the price formula, its metal-price indexes and the readings it used"
+          ]
+        }
+      ],
+      "terms": {
+        "all": {
+          "Currency": "CNY",
+          "unit": "Wh of rated cell energy"
+        }
+      },
+      "items": [
+        {
+          "bucket": "LFP_STORAGE",
+          "basketWeightBps": 4000,
+          "mixBps": {
+            "spot": 1500,
+            "contract": 3500,
+            "lta": 5000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 1500,
+              "contract": 3500,
+              "lta": 5000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 1500,
+              "contract": 3300,
+              "lta": 5200
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 1500,
+              "contract": 3100,
+              "lta": 5400
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 1500,
+              "contract": 2900,
+              "lta": 5600
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 1500,
+              "contract": 2700,
+              "lta": 5800
+            }
+          ],
+          "mixReason": "Storage cells sell mostly under multi-year agreements with integrators plus project tenders priced each quarter, and an oversupplied market keeps some spot trade in stock cells.",
+          "terms": {
+            "all": {
+              "product": "new LFP prismatic energy-storage cell, China domestic market",
+              "period": "month"
+            },
+            "lta": {
+              "price adjustment": "price set by the agreement's formula indexed to published battery-grade lithium carbonate prices, reset monthly or quarterly as the agreement states, within any agreed band"
+            }
+          },
+          "periodReason": "Storage-cell prices are quoted and tendered monthly.",
+          "sentences": {
+            "spot": {
+              "text": "CNY per Wh of rated cell energy, new LFP prismatic energy-storage cell, China domestic market, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "785ed418db09e2fdf1f8b1f781ed09fd71984c2a39098e46574b281f962418bb"
+            },
+            "contract": {
+              "text": "CNY per Wh of rated cell energy, new LFP prismatic energy-storage cell, China domestic market, cell maker → vehicle OEM or energy-storage integrator purchase not under an LTA, delivered during the observation month, price fixed during this negotiation period or tender award.",
+              "sha256": "f4b1885016256f90c44719592aa043049688329f6ff35a573c01d03eb408e524"
+            },
+            "lta": {
+              "text": "CNY per Wh of rated cell energy, new LFP prismatic energy-storage cell, China domestic market, price in effect for deliveries during the observation month under a supply agreement of ≥ 1 year with committed volume, price set by the agreement's formula indexed to published battery-grade lithium carbonate prices, reset monthly or quarterly as the agreement states, within any agreed band. Evidence shows the price in effect, the period it covers, the next reset date, any floor/ceiling, and the price formula with the index readings it used.",
+              "sha256": "f155d174a19e921dbf10aa1f0f92b9ca91e35343e20a98a5fa7791ce1fb2ed41"
+            }
+          }
+        },
+        {
+          "bucket": "LFP_EV",
+          "basketWeightBps": 3000,
+          "mixBps": {
+            "spot": 500,
+            "contract": 2500,
+            "lta": 7000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 500,
+              "contract": 2500,
+              "lta": 7000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 500,
+              "contract": 2300,
+              "lta": 7200
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 500,
+              "contract": 2100,
+              "lta": 7400
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 500,
+              "contract": 1900,
+              "lta": 7600
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 500,
+              "contract": 1700,
+              "lta": 7800
+            }
+          ],
+          "mixReason": "Automakers buy LFP cells mostly under multi-year supply agreements with lithium-indexed price formulas, annual or quarterly negotiated contracts cover most of the rest, and spot is negligible.",
+          "terms": {
+            "all": {
+              "product": "new LFP prismatic electric-vehicle cell, China domestic market",
+              "period": "quarter"
+            },
+            "lta": {
+              "price adjustment": "price set by the agreement's formula indexed to published battery-grade lithium carbonate prices, reset monthly or quarterly as the agreement states, within any agreed band"
+            }
+          },
+          "periodReason": "Automakers negotiate cell prices quarterly, with metal-price adjustments in between.",
+          "sentences": {
+            "spot": {
+              "text": "CNY per Wh of rated cell energy, new LFP prismatic electric-vehicle cell, China domestic market, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "9c3c4b567529ed66eebb84a102950a730c26b57395e821188e3d577c8ac0284f"
+            },
+            "contract": {
+              "text": "CNY per Wh of rated cell energy, new LFP prismatic electric-vehicle cell, China domestic market, cell maker → vehicle OEM or energy-storage integrator purchase not under an LTA, delivered during the observation quarter, price fixed during this negotiation period or tender award.",
+              "sha256": "625c09e6af6b1dcbd63ab93b0b9ac9b091e12249ac1cf0476e1269fe1648c1a4"
+            },
+            "lta": {
+              "text": "CNY per Wh of rated cell energy, new LFP prismatic electric-vehicle cell, China domestic market, price in effect for deliveries during the observation quarter under a supply agreement of ≥ 1 year with committed volume, price set by the agreement's formula indexed to published battery-grade lithium carbonate prices, reset monthly or quarterly as the agreement states, within any agreed band. Evidence shows the price in effect, the period it covers, the next reset date, any floor/ceiling, and the price formula with the index readings it used.",
+              "sha256": "24d69f793091551bbf0e3a9056110ca7163f543323e045afa31ec52d50109608"
+            }
+          }
+        },
+        {
+          "bucket": "TERNARY_PRISM_EV",
+          "basketWeightBps": 2000,
+          "mixBps": {
+            "spot": 500,
+            "contract": 2500,
+            "lta": 7000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 500,
+              "contract": 2500,
+              "lta": 7000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 500,
+              "contract": 2300,
+              "lta": 7200
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 500,
+              "contract": 2100,
+              "lta": 7400
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 500,
+              "contract": 1900,
+              "lta": 7600
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 500,
+              "contract": 1700,
+              "lta": 7800
+            }
+          ],
+          "mixReason": "As for LFP EV cells: multi-year automaker agreements with lithium, nickel and cobalt-indexed formulas dominate, and there is little spot.",
+          "terms": {
+            "all": {
+              "product": "new nickel-based ternary (NCM, NCA or NCMA) prismatic electric-vehicle cell, China domestic market",
+              "period": "quarter"
+            },
+            "lta": {
+              "price adjustment": "price set by the agreement's formula indexed to published battery-grade lithium carbonate or hydroxide, nickel sulfate and cobalt sulfate prices, reset monthly or quarterly as the agreement states, within any agreed band"
+            }
+          },
+          "periodReason": "Automakers negotiate cell prices quarterly, with metal-price adjustments in between.",
+          "sentences": {
+            "spot": {
+              "text": "CNY per Wh of rated cell energy, new nickel-based ternary (NCM, NCA or NCMA) prismatic electric-vehicle cell, China domestic market, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "f4853f151df0f758940f6fb16c98f365084b781a3fcdd8a9ee8b785efcae22a3"
+            },
+            "contract": {
+              "text": "CNY per Wh of rated cell energy, new nickel-based ternary (NCM, NCA or NCMA) prismatic electric-vehicle cell, China domestic market, cell maker → vehicle OEM or energy-storage integrator purchase not under an LTA, delivered during the observation quarter, price fixed during this negotiation period or tender award.",
+              "sha256": "479879fa58ff3b2d876f21fc87f627e505c5bc8f6025bda94b7f381d2f9f113f"
+            },
+            "lta": {
+              "text": "CNY per Wh of rated cell energy, new nickel-based ternary (NCM, NCA or NCMA) prismatic electric-vehicle cell, China domestic market, price in effect for deliveries during the observation quarter under a supply agreement of ≥ 1 year with committed volume, price set by the agreement's formula indexed to published battery-grade lithium carbonate or hydroxide, nickel sulfate and cobalt sulfate prices, reset monthly or quarterly as the agreement states, within any agreed band. Evidence shows the price in effect, the period it covers, the next reset date, any floor/ceiling, and the price formula with the index readings it used.",
+              "sha256": "e78c8f32ddf023dc3563d9e47744570b2d522f956c1757d637222bfe65cabd5d"
+            }
+          }
+        },
+        {
+          "bucket": "TERNARY_POUCH_EV",
+          "basketWeightBps": 1000,
+          "mixBps": {
+            "spot": 1000,
+            "contract": 3000,
+            "lta": 6000
+          },
+          "mixBasis": "assumed",
+          "mixSchedule": [
+            {
+              "quarter": "2026-Q4",
+              "spot": 1000,
+              "contract": 3000,
+              "lta": 6000
+            },
+            {
+              "quarter": "2027-Q1",
+              "spot": 1000,
+              "contract": 2800,
+              "lta": 6200
+            },
+            {
+              "quarter": "2027-Q2",
+              "spot": 1000,
+              "contract": 2600,
+              "lta": 6400
+            },
+            {
+              "quarter": "2027-Q3",
+              "spot": 1000,
+              "contract": 2400,
+              "lta": 6600
+            },
+            {
+              "quarter": "2027-Q4",
+              "spot": 1000,
+              "contract": 2200,
+              "lta": 6800
+            }
+          ],
+          "mixReason": "A smaller pouch market with fewer, smaller buyers: more short negotiated contracts and some spot alongside multi-year agreements.",
+          "terms": {
+            "all": {
+              "product": "new nickel-based ternary (NCM, NCA or NCMA) pouch electric-vehicle cell, China domestic market",
+              "period": "quarter"
+            },
+            "lta": {
+              "price adjustment": "price set by the agreement's formula indexed to published battery-grade lithium carbonate or hydroxide, nickel sulfate and cobalt sulfate prices, reset monthly or quarterly as the agreement states, within any agreed band"
+            }
+          },
+          "periodReason": "Automakers negotiate cell prices quarterly, with metal-price adjustments in between.",
+          "sentences": {
+            "spot": {
+              "text": "CNY per Wh of rated cell energy, new nickel-based ternary (NCM, NCA or NCMA) pouch electric-vehicle cell, China domestic market, immediately available inventory, open-market trade, as of the observation date.",
+              "sha256": "e9338fb24aefc67b638304334d93bcf63c4e2061786c6b715615fb0511332039"
+            },
+            "contract": {
+              "text": "CNY per Wh of rated cell energy, new nickel-based ternary (NCM, NCA or NCMA) pouch electric-vehicle cell, China domestic market, cell maker → vehicle OEM or energy-storage integrator purchase not under an LTA, delivered during the observation quarter, price fixed during this negotiation period or tender award.",
+              "sha256": "89599dce9b4dab5c082d2898e855b29f797993765501946c48bcebcb10186fbd"
+            },
+            "lta": {
+              "text": "CNY per Wh of rated cell energy, new nickel-based ternary (NCM, NCA or NCMA) pouch electric-vehicle cell, China domestic market, price in effect for deliveries during the observation quarter under a supply agreement of ≥ 1 year with committed volume, price set by the agreement's formula indexed to published battery-grade lithium carbonate or hydroxide, nickel sulfate and cobalt sulfate prices, reset monthly or quarterly as the agreement states, within any agreed band. Evidence shows the price in effect, the period it covers, the next reset date, any floor/ceiling, and the price formula with the index readings it used.",
+              "sha256": "abd35d2657c099ec7baca6f9cc85ac74651beb741fc6cbcb9b8dddefcb6ede71"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

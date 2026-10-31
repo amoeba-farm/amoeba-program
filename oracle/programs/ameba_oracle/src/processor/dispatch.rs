@@ -207,9 +207,11 @@ pub(super) fn process_instruction_with_context(
     ) {
         return Err(OracleError::InvalidInstructionData.into());
     }
-    #[cfg(any(feature = "localnet-dev-authority", feature = "localnet-governance"))]
+    // Feature-gated bytes exist only in builds that route them (`FeatureGates::active`); a build
+    // without them classifies them Unknown above and never reaches this.
+    #[cfg(feature = "heads")]
     if class == InstructionGovernanceClass::FeatureGatedMutating {
-        return dev_bootstrap::process(program_id, accounts, *tag_bytes, payload);
+        return process_feature_gated(program_id, accounts, *tag_bytes, payload);
     }
     let tag =
         OracleInstructionTag::from_byte(*tag_bytes).ok_or(OracleError::InvalidInstructionData)?;
@@ -226,6 +228,25 @@ pub(super) fn process_instruction_with_context(
     }
 }
 
+/// The heads family (210) and, in the dev profiles, the dev bootstrap (240-245).
+#[cfg(feature = "heads")]
+#[inline(never)]
+fn process_feature_gated(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    tag: u8,
+    payload: &[u8],
+) -> ProgramResult {
+    if tag == crate::governance_manifest::HEADS_INSTRUCTION_TAG {
+        return heads::process(program_id, accounts, payload);
+    }
+    #[cfg(any(feature = "localnet-dev-authority", feature = "localnet-governance"))]
+    if crate::governance_manifest::DEV_INSTRUCTION_TAGS.contains(&tag) {
+        return dev_bootstrap::process(program_id, accounts, tag, payload);
+    }
+    Err(OracleError::InvalidInstructionData.into())
+}
+
 #[inline(never)]
 fn dispatch_0_63(
     program_id: &Pubkey,
@@ -236,12 +257,15 @@ fn dispatch_0_63(
     if tag == OracleInstructionTag::OracleCarryForwardV1 {
         return carry::process(program_id, accounts, payload);
     }
+    #[cfg(feature = "v1-formation")]
     if tag == OracleInstructionTag::CloseOracleMonth {
         expect_empty_payload(payload)?;
         return process_close_oracle_month(program_id, accounts);
     }
     let handler: fn(&Pubkey, &[AccountInfo], &[u8]) -> ProgramResult = match tag {
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::InitializeConfig => process_initialize_config_instruction,
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::CreatePeriod => process_create_period_instruction,
         OracleInstructionTag::UpdateConfig => process_update_config_instruction,
         OracleInstructionTag::InitUserCollateral => process_init_user_collateral_instruction,
@@ -264,20 +288,25 @@ fn dispatch_64_127(
             let params: RotateVaultAuthoritiesV2Params = decode_instruction_payload(payload)?;
             process_rotate_vault_authorities_v2(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ConfigureOracleEconomicsTemplateV2 => {
             process_configure_oracle_economics_template_v2_instruction(
                 program_id, accounts, payload,
             )
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::FinalizeOracleOpeningPhase => {
             process_finalize_oracle_opening_phase_instruction(program_id, accounts, payload)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ExpireOracleOpeningSource => {
             process_expire_oracle_opening_source_instruction(program_id, accounts, payload)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::AccumulateOracleRecipeBucketV2 => {
             process_accumulate_oracle_recipe_bucket_v2_instruction(program_id, accounts, payload)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::FinalizeOracleRecipeWeightsV2 => {
             process_finalize_oracle_recipe_weights_v2_instruction(program_id, accounts, payload)
         }
@@ -286,12 +315,15 @@ fn dispatch_64_127(
                 program_id, accounts, payload,
             )
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::BeginOracleActiveWeights => {
             process_begin_oracle_active_weights_instruction(program_id, accounts, payload)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::AccumulateOracleActiveWeightGroup => {
             process_accumulate_oracle_active_weight_group_instruction(program_id, accounts, payload)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::FinalizeOracleActiveWeights => {
             process_finalize_oracle_active_weights_instruction(program_id, accounts, payload)
         }
@@ -303,6 +335,7 @@ fn dispatch_64_127(
             expect_empty_payload(payload)?;
             process_fail_period(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::InitializeSettlementSignerRegistry => {
             let params: InitializeSettlementSignerRegistryParams =
                 decode_instruction_payload(payload)?;
@@ -342,6 +375,7 @@ fn dispatch_128_160(
     payload: &[u8],
 ) -> ProgramResult {
     match tag {
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::BootstrapVaultGovernanceV2 => {
             let params = BootstrapVaultGovernanceV2Params {
                 new_oracle_authority: Pubkey::new_from_array(decode_bytes32_payload(payload)?),
@@ -358,29 +392,35 @@ fn dispatch_128_160(
         OracleInstructionTag::AdminAssistedWithdrawCollateral => {
             process_admin_assisted_withdraw_collateral_instruction(program_id, accounts, payload)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::CfmLaunchV1 => {
             let params: crate::instruction::CfmLaunchV1Params =
                 decode_instruction_payload(payload)?;
             super::cfm_launch::process(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::InitializeOracleUsdcRewardVault => {
             expect_empty_payload(payload)?;
             usdc::process_initialize_oracle_usdc_reward_vault(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::DepositOracleUsdcRewards => {
             let params = DepositOracleUsdcRewardsParams {
                 amount: decode_u64_payload(payload)?,
             };
             usdc::process_deposit_oracle_usdc_rewards(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::BeginOracleUsdcRewardSchedule => {
             expect_empty_payload(payload)?;
             usdc::process_begin_oracle_usdc_reward_schedule(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::AddOracleUsdcSkuBudget => {
             let params: AddOracleUsdcSkuBudgetParams = decode_instruction_payload(payload)?;
             usdc::process_add_oracle_usdc_sku_budget(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::FinalizeOracleUsdcRewardSchedule => {
             expect_empty_payload(payload)?;
             usdc::process_finalize_oracle_usdc_reward_schedule(program_id, accounts)
@@ -397,15 +437,18 @@ fn dispatch_161_255(
     payload: &[u8],
 ) -> ProgramResult {
     match tag {
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::InitializeOracleMonthV5 => {
             let params: InitializeOracleMonthV5Params = decode_instruction_payload(payload)?;
             process_initialize_oracle_month_v5(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ConfigureOracleProductSkuManifest => {
             let params: ConfigureOracleProductSkuManifestParams =
                 decode_instruction_payload(payload)?;
             process_configure_oracle_product_sku_manifest(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ChallengeOracleSourceV2 => {
             let params: ChallengeOracleSourceParams = decode_instruction_payload(payload)?;
             usdc::process_challenge_oracle_source_v2(program_id, accounts, params)
@@ -416,18 +459,22 @@ fn dispatch_161_255(
             };
             rewards::process_settle_oracle_usdc_escrow(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ProposeOracleSourceV3 => {
             let params: ProposeOracleSourceV3Params = decode_instruction_payload(payload)?;
             usdc::process_propose_oracle_source_v3(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::SupportOracleSourceV3 => {
             let params: SupportOracleSourceV3Params = decode_instruction_payload(payload)?;
             usdc::process_support_oracle_source_v3(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::FinalizeOracleSkuCoverage => {
             expect_empty_payload(payload)?;
             process_finalize_oracle_sku_coverage(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ResolveOracleSourceChallengeV2 => {
             let params = ResolveOracleSourceChallengeParams {
                 outcome: match decode_u8_payload(payload)? {
@@ -440,6 +487,7 @@ fn dispatch_161_255(
             };
             process_resolve_oracle_source_challenge(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ReopenOracleSkuCoverage => {
             expect_empty_payload(payload)?;
             process_reopen_oracle_sku_coverage(program_id, accounts)
@@ -448,6 +496,7 @@ fn dispatch_161_255(
             expect_empty_payload(payload)?;
             process_expire_unlistable_oracle_source_v2(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::CancelStaleOracleSourceChallengeV2 => {
             expect_empty_payload(payload)?;
             process_cancel_stale_oracle_source_challenge_v2(program_id, accounts)
@@ -462,18 +511,22 @@ fn dispatch_161_255(
             expect_empty_payload(payload)?;
             rewards::process_abort_oracle_usdc_reward_schedule_v2(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::TimeoutUnsupportedOracleSourceV2 => {
             expect_empty_payload(payload)?;
             usdc::process_timeout_unsupported_oracle_source_v2(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::SubmitOracleOpeningClaimV2 => {
             let params: SubmitOracleOpeningClaimParams = decode_instruction_payload(payload)?;
             usdc::process_submit_oracle_opening_claim_v2(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ChallengeOracleOpeningClaimV2 => {
             let params: ChallengeOracleOpeningClaimParams = decode_instruction_payload(payload)?;
             usdc::process_challenge_oracle_opening_claim_v2(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::ResolveOracleOpeningClaimChallengeV2 => {
             let params = ResolveOracleOpeningClaimChallengeParams {
                 outcome: match decode_u8_payload(payload)? {
@@ -487,10 +540,12 @@ fn dispatch_161_255(
             };
             usdc::process_resolve_oracle_opening_claim_challenge_v2(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::FinalizeOracleOpeningClaimV2 => {
             expect_empty_payload(payload)?;
             usdc::process_finalize_oracle_opening_claim_v2(program_id, accounts)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::BeginOracleRecipeWeightsV3 => {
             let (expected_source_count, expected_bucket_count) = decode_u16_pair_payload(payload)?;
             let params = BeginOracleRecipeWeightsV2Params {
@@ -503,6 +558,7 @@ fn dispatch_161_255(
             let params: RecomputeOracleBucketMedianV1Params = decode_instruction_payload(payload)?;
             process_recompute_oracle_bucket_median_v1(program_id, accounts, params)
         }
+        #[cfg(feature = "v1-formation")]
         OracleInstructionTag::IndexOracleRecipeSourceV1 => {
             let params: IndexOracleRecipeSourceV1Params = decode_instruction_payload(payload)?;
             oracle_membership::process_index_oracle_recipe_source(program_id, accounts, params)
@@ -579,6 +635,43 @@ fn decode_escrow_kind_payload(payload: &[u8]) -> Result<OracleEscrowKind, Progra
         6 => OracleEscrowKind::UpdateChallenge,
         _ => return Err(OracleError::InvalidInstructionData.into()),
     })
+}
+
+/// Builds without `heads` (`--no-default-features`) reject byte 210 exactly like an unassigned
+/// byte: before its payload is decoded and before any account is read.
+#[cfg(all(test, not(feature = "heads")))]
+mod heads_absent_tests {
+    use crate::error::OracleError;
+    use crate::instruction::heads::tests::samples;
+    use crate::processor::process_instruction_compact;
+    use crate::ProgramError;
+    use solana_program::account_info::AccountInfo;
+    use solana_program::pubkey::Pubkey;
+
+    #[test]
+    fn tag_210_is_unknown_without_the_heads_feature() {
+        let key = Pubkey::new_unique();
+        let mut lamports = 1;
+        let mut data = [0u8; 4];
+        let account = AccountInfo::new(&key, false, true, &mut lamports, &mut data, &key, false, 0);
+        let guard = account.try_borrow_mut_data().unwrap();
+        let invalid = Err(ProgramError::Custom(
+            OracleError::InvalidInstructionData as u32,
+        ));
+        for (instruction, _) in samples() {
+            let data = instruction.data().unwrap();
+            assert_eq!(
+                process_instruction_compact(&crate::id(), core::slice::from_ref(&account), &data),
+                invalid,
+                "{instruction:?}"
+            );
+        }
+        assert_eq!(
+            process_instruction_compact(&crate::id(), core::slice::from_ref(&account), &[210]),
+            invalid
+        );
+        drop(guard);
+    }
 }
 
 #[cfg(all(test, feature = "localnet-dev-authority"))]
@@ -1007,6 +1100,19 @@ mod governance_precedence_tests {
 
         for (index, tag) in OracleInstructionTag::ALL.into_iter().enumerate() {
             let legacy_data = vec![tag as u8, 0x10 + index as u8, 0x20, 0x30];
+            // A build without the v1 formation routes none of its bytes: they stop at
+            // classification, as an unassigned byte does, before the envelope.
+            if classify_active_instruction_tag(tag as u8) == InstructionGovernanceClass::Unknown {
+                assert!(crate::governance_manifest::is_v1_formation_tag(tag as u8));
+                assert!(!cfg!(feature = "v1-formation"));
+                assert_eq!(
+                    process_top_level_instruction(&crate::id(), &accounts, &legacy_data),
+                    Err(ProgramError::Custom(
+                        OracleError::InvalidInstructionData as u32
+                    ))
+                );
+                continue;
+            }
             let capture = capture_top_level_handler_boundary(&accounts, &legacy_data);
             assert_eq!(capture.tag, legacy_data[0]);
             assert_eq!(capture.payload, legacy_data[1..]);

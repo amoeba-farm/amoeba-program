@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_initialize_config_instruction(
     program_id: &Pubkey,
@@ -10,6 +11,7 @@ pub(super) fn process_initialize_config_instruction(
     process_initialize_config(program_id, accounts, admin)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_create_period_instruction(
     program_id: &Pubkey,
@@ -78,6 +80,7 @@ pub(super) fn process_admin_assisted_withdraw_collateral_instruction(
     process_collateral_withdrawal(program_id, accounts, amount, true)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_configure_oracle_economics_template_v2_instruction(
     program_id: &Pubkey,
@@ -88,6 +91,7 @@ pub(super) fn process_configure_oracle_economics_template_v2_instruction(
     process_configure_oracle_economics_template_v2(program_id, accounts, params)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_accumulate_oracle_recipe_bucket_v2_instruction(
     program_id: &Pubkey,
@@ -98,6 +102,7 @@ pub(super) fn process_accumulate_oracle_recipe_bucket_v2_instruction(
     process_accumulate_oracle_recipe_bucket_v2(program_id, accounts, params)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_finalize_oracle_recipe_weights_v2_instruction(
     program_id: &Pubkey,
@@ -118,6 +123,7 @@ pub(super) fn process_accumulate_oracle_settlement_source_bucket_instruction(
     process_accumulate_oracle_settlement_source_bucket(program_id, accounts, params)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_begin_oracle_active_weights_instruction(
     program_id: &Pubkey,
@@ -132,6 +138,7 @@ pub(super) fn process_begin_oracle_active_weights_instruction(
     process_begin_oracle_active_weights(program_id, accounts, params)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_accumulate_oracle_active_weight_group_instruction(
     program_id: &Pubkey,
@@ -142,6 +149,7 @@ pub(super) fn process_accumulate_oracle_active_weight_group_instruction(
     process_accumulate_oracle_active_weight_group(program_id, accounts, params)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_finalize_oracle_active_weights_instruction(
     program_id: &Pubkey,
@@ -152,6 +160,7 @@ pub(super) fn process_finalize_oracle_active_weights_instruction(
     process_finalize_oracle_active_weights(program_id, accounts)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_finalize_oracle_opening_phase_instruction(
     program_id: &Pubkey,
@@ -162,6 +171,7 @@ pub(super) fn process_finalize_oracle_opening_phase_instruction(
     process_finalize_oracle_opening_phase(program_id, accounts)
 }
 
+#[cfg(feature = "v1-formation")]
 #[inline(always)]
 pub(super) fn process_expire_oracle_opening_source_instruction(
     program_id: &Pubkey,

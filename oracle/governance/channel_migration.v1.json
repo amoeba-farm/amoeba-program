@@ -1,0 +1,4936 @@
+{
+  "schema": "amoeba.oracle-channel-migration",
+  "schemaVersion": 1,
+  "version": "channel-migration-v1",
+  "date": "2026-10-29",
+  "status": "The migration step (§8 G) of the LTA brief: every existing RAMX, NANDX and BATX source re-read against the Spot / Contract / LTA definitions, with the before/after published in oracle/docs/lta-migration.md (§9.5). A classification is this file's reading of what the source publishes; under the heads design eligibility stays a challenge outcome (OFF_CHANNEL, DUPLICATE_ORIGIN), never a review.",
+  "brief": {
+    "title": "Oracle Long-Term Agreement Fix",
+    "sections": [
+      "§3 channel hierarchy",
+      "§5 evidence rules",
+      "§8 G migration",
+      "§9.5 acceptance"
+    ]
+  },
+  "channels": {
+    "order": [
+      "lta",
+      "contract",
+      "spot"
+    ],
+    "lta": "A purchase under a supply agreement of at least one year with committed volume, including prices newly fixed or reset under it.",
+    "contract": "A negotiated wholesale purchase, supplier → OEM/ODM (BATX: cell maker → vehicle OEM or storage integrator, or a tender award), delivered in the observation period and not under an LTA.",
+    "spot": "An immediate-inventory purchase outside both.",
+    "none": "Fits none of the above (unterminated quotes, resales without terms, model outputs, test rows): eligible nowhere.",
+    "appliedTo": "A published assessment is classified by what its publisher says it measures (its own label, methodology and counterparty), since the brief's §6 treats published contract assessments as Contract-channel evidence; a direct price by what the page shows (stock, quantity, terms)."
+  },
+  "originRule": {
+    "identity": "\"amoeba-oracle-origin-v1\" + \"\\n\" + publisher + \"\\n\" + report, each trimmed, ASCII-lowercased and with runs of whitespace made one space",
+    "originId": "lowercase hex SHA-256 of the UTF-8 identity",
+    "publisher": "Whoever first published the price, not a page repeating it: CFM for memorymarket.com and chinaflashmarket.com; TrendForce for trendforce.com, trendforce.cn and EnergyTrend (energytrend.cn); SMM for newenergy.smm.cn, car.smm.cn and metal.com.",
+    "report": "The publication series (the table, assessment or price list), never one of its rows: rows of one report share its sample and methodology, so they are one origin (brief §5.1; batx_source_manifest.v1.json: rows of one publisher count once). For CFM the report is its table's own slug (rdimmcontract, ddroem, ddrchannel, ssdoem, ssdchannel, emmc, ufs, nandflash, ddr).",
+    "sameAs": "The rule of channel_molds.v1.json (originRule), so originIds here are the ones heads will declare.",
+    "duplicates": "Within one board (mainnet, dev, or the catalog), item and channel, the first row of an origin carries it and every later one names it in duplicateOf: on-chain sources first in source-id order (the inventory order routing uses), then off-chain candidates by creation, then catalog rows in manifest order. collapse is 'republication' (the same row again, on another site or listing) or 'sibling-row' (another row of the same report). Under heads the first live source of an origin carries it."
+  },
+  "boards": {
+    "mainnet": "Mainnet oracle as served by https://api.amoeba.farm/v1/oracle/public-snapshot and /oracle/source-candidates/recent, read 2026-10-29 ~05:30 UTC: RAMX/NANDX Oct 26 (launch, Game) and BATX Nov 26 (source window). RAMX/NANDX Nov 26 are not open on mainnet.",
+    "dev": "Dev chain as served by the dev API (127.0.0.1:4500), read 2026-10-29 ~05:30 UTC: the launch months (same 35 sources as mainnet), RAMX/NANDX/BATX Nov 26 and Dec 26 (one source per bucket, dev-oracle-chip-sources.json) and the off-chain candidate store; the Jan 27 months have no sources yet.",
+    "catalog": "governance/batx_source_manifest.v1.json: candidate series documented for BATX, not on any chain.",
+    "notIncluded": "governance/commodity_submission_spec.v*.json 'sources' (Micron, KIOXIA, TrendForce DRAM/NAND tables, DRAMeXchange FAQ) are references for product definitions, not sources; the SKU manifests list part numbers, not sources; futures/ops test URLs are fixtures. The chain experiment mirrors mainnet months and was not read separately."
+  },
+  "blockerCodes": {
+    "terms_ban": "TrendForce Terms of Use §5(h) prohibit using its prices in connection with a prediction market (batx_source_manifest.v1.json).",
+    "licence_required": "The publisher limits commercial use or redistribution without a written licence (CFM's copyright notice; InfoLink, SMM, Mysteel, Fastmarkets, Benchmark terms).",
+    "login": "Values behind a login.",
+    "no_public_values": "Values not public (subscription).",
+    "unverified": "Not read: no defined series."
+  },
+  "origins": [
+    {
+      "label": "cfm/rdimmcontract",
+      "publisher": "cfm",
+      "report": "rdimmcontract",
+      "name": "CFM (China Flash Market, 闪存市场) server memory modules, monthly (内存条(服务器))",
+      "sites": [
+        "chinaflashmarket.com/price/rdimmcontract",
+        "memorymarket.com/price/rdimm",
+        "*/price/ems/<series>"
+      ],
+      "channelBasis": "contract: the monthly price 'reflects the contract market' (当月价反映合约行情变化趋势); the month low follows CSP and other large-customer contract prices, the month high small immediate-delivery spot trades",
+      "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nrdimmcontract",
+      "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd"
+    },
+    {
+      "label": "cfm/ddroem",
+      "publisher": "cfm",
+      "report": "ddroem",
+      "name": "CFM memory modules, industry market, weekly (内存条(行业市场))",
+      "sites": [
+        "chinaflashmarket.com/price/ddroem",
+        "memorymarket.com/price/sodimm",
+        "*/price/ews/<series>"
+      ],
+      "channelBasis": "contract: priced to OEM and industry buyers (the table's slug is 'oem'), re-quoted every Tuesday",
+      "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nddroem",
+      "originId": "553a90699dd8cdee86e043e604fd1482fbb7a85cac2df5127b49794668e3515f"
+    },
+    {
+      "label": "cfm/ddrchannel",
+      "publisher": "cfm",
+      "report": "ddrchannel",
+      "name": "CFM memory modules, channel market, weekly (内存条(渠道市场))",
+      "sites": [
+        "chinaflashmarket.com/price/ddrchannel",
+        "memorymarket.com/price/udimm",
+        "*/price/ews/<series>"
+      ],
+      "channelBasis": "spot: modules sold through the distribution channel from stock",
+      "verification": "web 2026-10-29: the table name and slug; CFM's weekly review covers it as the 存储现货市场 (spot market)",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nddrchannel",
+      "originId": "a512925c5ae1cc735676774f84489978ef2bfa1c61dd9b42f6746d5234027461"
+    },
+    {
+      "label": "cfm/ssdoem",
+      "publisher": "cfm",
+      "report": "ssdoem",
+      "name": "CFM SSDs, industry market, weekly (SSD(行业市场))",
+      "sites": [
+        "chinaflashmarket.com/price/ssdoem",
+        "memorymarket.com/price/oem-ssd",
+        "*/price/ews/<series>"
+      ],
+      "channelBasis": "contract: priced to OEM and industry buyers (slug 'oem'), re-quoted every Tuesday",
+      "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nssdoem",
+      "originId": "76d425f599b196c59ee14756c6f1bd882301b9b3803213768abf78ca315a785c"
+    },
+    {
+      "label": "cfm/ssdchannel",
+      "publisher": "cfm",
+      "report": "ssdchannel",
+      "name": "CFM SSDs, channel market, weekly (SSD(渠道市场))",
+      "sites": [
+        "chinaflashmarket.com/price/ssdchannel",
+        "memorymarket.com/price/channel-ssd",
+        "*/price/ews/<series>"
+      ],
+      "channelBasis": "spot: SSDs sold through the distribution channel from stock",
+      "verification": "web 2026-10-29: the table name and slug",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nssdchannel",
+      "originId": "6eb0c643c35c337ed8dbbcca28f2af895af3e71c7dbd8b6da5796ec98ee5e77c"
+    },
+    {
+      "label": "cfm/emmc",
+      "publisher": "cfm",
+      "report": "emmc",
+      "name": "CFM embedded eMMC, weekly",
+      "sites": [
+        "chinaflashmarket.com/price/emmc",
+        "memorymarket.com/price/emmc",
+        "*/price/ews/<series>"
+      ],
+      "channelBasis": "spot (low confidence): no OEM or channel label; CFM's weekly review ties these prices to the trade market (贸易端) as against suppliers' prices",
+      "verification": "web 2026-10-29: row page (no methodology text) and CFM weekly review of 2026-10-13",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nemmc",
+      "originId": "2054fab163a1bbbc36ffaf854c824a76ed0e8dd5cf4fa25f6cf90b93588a7ca5"
+    },
+    {
+      "label": "cfm/ufs",
+      "publisher": "cfm",
+      "report": "ufs",
+      "name": "CFM embedded UFS, weekly",
+      "sites": [
+        "chinaflashmarket.com/price/ufs",
+        "memorymarket.com/price/ufs",
+        "*/price/ews/<series>"
+      ],
+      "channelBasis": "spot (low confidence): as eMMC",
+      "verification": "web 2026-10-29: CFM weekly review of 2026-10-13 (no UFS row page read)",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nufs",
+      "originId": "65b4a023dd1f4171ae87c2cc8e2bba9aa45b0e2467bbc095197351a24b7c79a3"
+    },
+    {
+      "label": "cfm/nandflash",
+      "publisher": "cfm",
+      "report": "nandflash",
+      "name": "CFM Flash Wafer, three sessions a business day",
+      "sites": [
+        "chinaflashmarket.com/price/nandflash",
+        "memorymarket.com/price/flash-wafer",
+        "*/price/in/<series>"
+      ],
+      "channelBasis": "spot: wafer trade prices (贸易价), quoted at 11:00, 14:30 and 18:00 Beijing time",
+      "verification": "web 2026-10-29: chinaflashmarket.com/price/in/100242 and CFM weekly review of 2026-10-13",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nnandflash",
+      "originId": "7a7cd4ef93faea90869c490b48f7905f2b301afc92fd374303dd03abc8db1211"
+    },
+    {
+      "label": "cfm/ddr",
+      "publisher": "cfm",
+      "report": "ddr",
+      "name": "CFM DRAM chips ('DDR'), weekly",
+      "sites": [
+        "chinaflashmarket.com/price/ddr",
+        "memorymarket.com/price/ddr",
+        "*/price/ews/<series>"
+      ],
+      "channelBasis": "spot: trade-market DRAM 'resource' prices (Major and eTT grades), covered by CFM's weekly review of the spot market",
+      "verification": "web 2026-10-29: memorymarket.com/price/ddr, chinaflashmarket.com/price/ews/100266 and CFM weekly review of 2026-10-13",
+      "identity": "amoeba-oracle-origin-v1\ncfm\nddr",
+      "originId": "09bb032833c89ab8615f7487f82f657153a3e7b20f3786237bf3dc857da7a241"
+    },
+    {
+      "label": "digikey/catalog",
+      "publisher": "digikey",
+      "report": "catalog",
+      "name": "DigiKey catalog list prices",
+      "sites": [
+        "digikey.com/en/products/detail/<mpn>"
+      ],
+      "channelBasis": "none for the rows read: one quantity break, 0 in stock, no backorders accepted",
+      "verification": "web 2026-10-29: the three priced Micron NAND pages",
+      "identity": "amoeba-oracle-origin-v1\ndigikey\ncatalog",
+      "originId": "8f9f4ddbb4307eae8f2193de6fb9e1d6bfb6b237e477599185a39cc54a136e01"
+    },
+    {
+      "label": "infolink/ess-spot-price",
+      "publisher": "infolink",
+      "report": "ess spot price",
+      "name": "InfoLink Consulting weekly ESS spot price (energy-storage cells, China, VAT incl.)",
+      "sites": [
+        "infolink-group.com/spot-price-energy-storage/",
+        "infolink-group.com/energy-article/ess-spot-price-<date>"
+      ],
+      "channelBasis": "spot: 'InfoLink Spot Price', cells 'based on after-tax transactions from nearly 20 leading manufacturers'",
+      "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+      "identity": "amoeba-oracle-origin-v1\ninfolink\ness spot price",
+      "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743"
+    },
+    {
+      "label": "smm/lithium-battery-cells",
+      "publisher": "smm",
+      "report": "lithium battery cell prices",
+      "name": "SMM (Shanghai Metals Market) lithium-battery cell prices, weekly (codes SMM-LB-EV-*, SMM-LB-ES-*)",
+      "sites": [
+        "newenergy.smm.cn/price/<id>",
+        "car.smm.cn/price/<id>",
+        "metal.com"
+      ],
+      "channelBasis": "spot: SMM's cell-price launch notice defines them as spot prices, 'the most likely tradable tax-inclusive ex-factory price range'",
+      "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+      "identity": "amoeba-oracle-origin-v1\nsmm\nlithium battery cell prices",
+      "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e"
+    },
+    {
+      "label": "mysteel/battery-cell-market-prices",
+      "publisher": "mysteel",
+      "report": "power battery cell market prices",
+      "name": "Mysteel power-battery cell market prices, daily (动力电池电芯市场价格)",
+      "sites": [
+        "list1.mysteel.com/zhishi/dldcdxscjgzs.html"
+      ],
+      "channelBasis": "spot: the page is Mysteel's '电芯现货价格' (cell spot price); rows are 市场价格 (market price), daily",
+      "verification": "web 2026-10-29: list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+      "identity": "amoeba-oracle-origin-v1\nmysteel\npower battery cell market prices",
+      "originId": "0bf0b3c8e4ed21e8e5ec017c8ae8201c71dc5ef17684656ea7dfded7bcbdf95a"
+    },
+    {
+      "label": "trendforce/battery-cell-and-pack",
+      "publisher": "trendforce",
+      "report": "battery cell and pack prices",
+      "name": "TrendForce li-ion battery industry chain prices: battery cell and pack, monthly",
+      "sites": [
+        "trendforce.com/price/battery-price/battery_cell_and_pack",
+        "trendforce.cn/price/battery-price/battery_cell_and_pack",
+        "energytrend.cn/battery-price.html (EnergyTrend, a TrendForce division)"
+      ],
+      "channelBasis": "spot: the page describes 'monthly spot prices for key products of the supply chain'",
+      "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+      "identity": "amoeba-oracle-origin-v1\ntrendforce\nbattery cell and pack prices",
+      "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4"
+    },
+    {
+      "label": "fastmarkets/china-bess-battery-cell",
+      "publisher": "fastmarkets",
+      "report": "china bess battery cell price",
+      "name": "Fastmarkets LFP prismatic 314Ah cell, ex-works China (MB-LFP-0001), monthly",
+      "sites": [
+        "fastmarkets.com"
+      ],
+      "channelBasis": "spot (inferred): ex-works China, no minimum quantity, loading within 60 days, monthly assessment; the specification names no agreement term",
+      "verification": "web 2026-10-29: Fastmarkets launch notice of 2026-06-23 (values not public)",
+      "identity": "amoeba-oracle-origin-v1\nfastmarkets\nchina bess battery cell price",
+      "originId": "356d94fff2f214aeb70d9aa4740b87e18451ee9a3b2fba02be88e3326ea6c98e"
+    },
+    {
+      "label": "benchmark/battery-cell-assessment",
+      "publisher": "benchmark",
+      "report": "lithium-ion battery cell price assessment",
+      "name": "Benchmark Mineral Intelligence cell price assessments (USD/kWh, partly modelled)",
+      "sites": [
+        "subscription"
+      ],
+      "channelBasis": "none: a partly modelled assessment, not an observed purchase",
+      "verification": "inferred from batx_source_manifest.v1.json (subscription; not read)",
+      "identity": "amoeba-oracle-origin-v1\nbenchmark\nlithium-ion battery cell price assessment",
+      "originId": "4fd3638c2051cdb9db528b96231a643b681da69088775257cc353f40851fe439"
+    },
+    {
+      "label": "iccsino/battery-cell-prices",
+      "publisher": "iccsino",
+      "report": "battery cell prices",
+      "name": "ICCSino (鑫椤资讯) cell prices (unverified lead)",
+      "sites": [
+        "iccsino.com"
+      ],
+      "channelBasis": "none: unverified; its site blocked automated reading on 2026-10-20",
+      "verification": "inferred from batx_source_manifest.v1.json (unverified_leads)",
+      "identity": "amoeba-oracle-origin-v1\niccsino\nbattery cell prices",
+      "originId": "484e01c7f9894b2d0c61e74a23c668aad51151cb57fec45d86ef4c6376091224"
+    },
+    {
+      "label": "test/petri-cli-check",
+      "publisher": "example.com",
+      "report": "petri cli candidate check",
+      "name": "A Petri CLI round-trip test row (not a source)",
+      "sites": [
+        "example.com"
+      ],
+      "channelBasis": "none: a test row with no price",
+      "verification": "inferred from the candidate's own evidence text",
+      "identity": "amoeba-oracle-origin-v1\nexample.com\npetri cli candidate check",
+      "originId": "c64e46e53defe5a57fd8abeab24bb594b7ef1f274b8a6da78ceefa4625cd1de6"
+    }
+  ],
+  "sources": [
+    {
+      "id": "d29f5a159e87a06da4e5514d105a220111eed1afda5ef7801d1dcc8dff4cda59",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR5 RDIMM 32GB",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R01",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/rdimm",
+      "row": "DDR5 RDIMM 32GB (series 100262, field Latest, monthly)",
+      "before": {
+        "bucket": "DDR5 RDIMM 32GB (launch category R01, its own bucket)",
+        "bucketWeightBps": 800,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's server-module month price 'reflects the contract market' (its low follows CSP contract prices, its high spot trades), a supplier → OEM/CSP negotiated price with no ≥ 1-year committed agreement shown, so it is Contract (§3.1 order 2).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "dcb5e9b0e1018c9a66457d1f0b71df3e782f8d5e2a2f43202fd62784b3215dcf",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR5 RDIMM 64GB",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R02",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/rdimm",
+      "row": "DDR5 RDIMM 64GB (series 100263, field Latest, monthly)",
+      "before": {
+        "bucket": "DDR5 RDIMM 64GB (launch category R02, its own bucket)",
+        "bucketWeightBps": 1500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's server-module month price 'reflects the contract market' (its low follows CSP contract prices, its high spot trades), a supplier → OEM/CSP negotiated price with no ≥ 1-year committed agreement shown, so it is Contract (§3.1 order 2).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "40c8c489a05a280fd9c5353a16a23da107003aaea802038268015d31540eb4bb",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR5 RDIMM 96GB",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R03",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/rdimm",
+      "row": "DDR5 RDIMM 96GB (series 100264, field Latest, monthly)",
+      "before": {
+        "bucket": "DDR5 RDIMM 96GB (launch category R03, its own bucket)",
+        "bucketWeightBps": 2000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's server-module month price 'reflects the contract market' (its low follows CSP contract prices, its high spot trades), a supplier → OEM/CSP negotiated price with no ≥ 1-year committed agreement shown, so it is Contract (§3.1 order 2).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "b0bf2302bd593a4bab44b3e0de26e1cbd02b7d4f9dbe7d5e561cc2c313882aaf",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 RDIMM 16GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R04",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/rdimm",
+      "row": "DDR4 RDIMM 16GB 3200 (series 100254, field Latest, monthly)",
+      "before": {
+        "bucket": "DDR4 RDIMM 16GB 3200 (launch category R04, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's server-module month price 'reflects the contract market' (its low follows CSP contract prices, its high spot trades), a supplier → OEM/CSP negotiated price with no ≥ 1-year committed agreement shown, so it is Contract (§3.1 order 2).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "19872c50986293f9fae9a0bb97dad83043c7e13a2fc1b800cfe8c3e8b27ae545",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 RDIMM 32GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R05",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/rdimm",
+      "row": "DDR4 RDIMM 32GB 3200 (series 100255, field Latest, monthly)",
+      "before": {
+        "bucket": "DDR4 RDIMM 32GB 3200 (launch category R05, its own bucket)",
+        "bucketWeightBps": 800,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's server-module month price 'reflects the contract market' (its low follows CSP contract prices, its high spot trades), a supplier → OEM/CSP negotiated price with no ≥ 1-year committed agreement shown, so it is Contract (§3.1 order 2).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "28bcdb7740e11dd90393524b3be778479b2daa7158d2d42020837d8cd743f13e",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 RDIMM 64GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R06",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/rdimm",
+      "row": "DDR4 RDIMM 64GB 3200 (series 100256, field Latest, monthly)",
+      "before": {
+        "bucket": "DDR4 RDIMM 64GB 3200 (launch category R06, its own bucket)",
+        "bucketWeightBps": 1200,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's server-module month price 'reflects the contract market' (its low follows CSP contract prices, its high spot trades), a supplier → OEM/CSP negotiated price with no ≥ 1-year committed agreement shown, so it is Contract (§3.1 order 2).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "60eb54acfdc33fc57de7e7086407fb4d71183176b10ee44c7ab0905931dd3b38",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR5 UDIMM 16GB 5600",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R07",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/udimm",
+      "row": "DDR5 UDIMM 16GB 5600 (series 100268, field Latest, weekly)",
+      "before": {
+        "bucket": "DDR5 UDIMM 16GB 5600 (launch category R07, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddrchannel",
+        "originId": "a512925c5ae1cc735676774f84489978ef2bfa1c61dd9b42f6746d5234027461",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market module table prices finished modules sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug; CFM's weekly review covers it as the 存储现货市场 (spot market)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "59d9bc31d6b3c99a8679c0f7e9b16bf92e21cae90c78019ea8ee36ea09686468",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR5 UDIMM 32GB 5600",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R08",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/udimm",
+      "row": "DDR5 UDIMM 32GB 5600 (series 100270, field Latest, weekly)",
+      "before": {
+        "bucket": "DDR5 UDIMM 32GB 5600 (launch category R08, its own bucket)",
+        "bucketWeightBps": 400,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddrchannel",
+        "originId": "a512925c5ae1cc735676774f84489978ef2bfa1c61dd9b42f6746d5234027461",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market module table prices finished modules sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug; CFM's weekly review covers it as the 存储现货市场 (spot market)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "a165995eac5c94f7b6570849cc27c731fc6006fd6af12db1c97a38f9af4e4f11",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 UDIMM 8GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R09",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/udimm",
+      "row": "DDR4 UDIMM 8GB 3200 (series 100223, field Latest, weekly)",
+      "before": {
+        "bucket": "DDR4 UDIMM 8GB 3200 (launch category R09, its own bucket)",
+        "bucketWeightBps": 300,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddrchannel",
+        "originId": "a512925c5ae1cc735676774f84489978ef2bfa1c61dd9b42f6746d5234027461",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market module table prices finished modules sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug; CFM's weekly review covers it as the 存储现货市场 (spot market)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "691d8271bbad278678d390ee61aa64cf89a43ce975751a5d38ea8cddfa979f17",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 UDIMM 16GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R10",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/udimm",
+      "row": "DDR4 UDIMM 16GB 3200 (series 100224, field Latest, weekly)",
+      "before": {
+        "bucket": "DDR4 UDIMM 16GB 3200 (launch category R10, its own bucket)",
+        "bucketWeightBps": 700,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddrchannel",
+        "originId": "a512925c5ae1cc735676774f84489978ef2bfa1c61dd9b42f6746d5234027461",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market module table prices finished modules sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug; CFM's weekly review covers it as the 存储现货市场 (spot market)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "97ee285fc55afd86d068c2e7b71102971723f1879339a2b0368852fd473a2a03",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 UDIMM 32GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R11",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/udimm",
+      "row": "DDR4 UDIMM 32GB 3200 (series 100225, field Latest, weekly)",
+      "before": {
+        "bucket": "DDR4 UDIMM 32GB 3200 (launch category R11, its own bucket)",
+        "bucketWeightBps": 400,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddrchannel",
+        "originId": "a512925c5ae1cc735676774f84489978ef2bfa1c61dd9b42f6746d5234027461",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market module table prices finished modules sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug; CFM's weekly review covers it as the 存储现货市场 (spot market)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "21b638035e041b8b7fdbc967c592df0f60e7a415802e4b0c0f41b2c7701381ee",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 SODIMM 8GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R12",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/sodimm",
+      "row": "DDR4 SODIMM 8GB 3200 (series 100227, field Latest, weekly)",
+      "before": {
+        "bucket": "DDR4 SODIMM 8GB 3200 (launch category R12, its own bucket)",
+        "bucketWeightBps": 400,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ddroem",
+        "originId": "553a90699dd8cdee86e043e604fd1482fbb7a85cac2df5127b49794668e3515f",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM market table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "e5fe992fcc3b8a641d9912c4b146a82cbbce903897ad562e138a916e53a9a6b3",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 SODIMM 16GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet RAMX-202610 (Oct 26 launch month, Game)",
+        "dev RAMX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json R13",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/sodimm",
+      "row": "DDR4 SODIMM 16GB 3200 (series 100228, field Latest, weekly)",
+      "before": {
+        "bucket": "DDR4 SODIMM 16GB 3200 (launch category R13, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ddroem",
+        "originId": "553a90699dd8cdee86e043e604fd1482fbb7a85cac2df5127b49794668e3515f",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM market table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "ae347f6b43befd4619b67674867bda22cfcd5932095c81a15230aefc891c2199",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "Channel SSD 256GB PCIe 3.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N01",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/channel-ssd",
+      "row": "Channel SSD 256GB PCIe 3.0 (series 100231, field Latest, weekly)",
+      "before": {
+        "bucket": "Channel SSD 256GB PCIe 3.0 (launch category N01, its own bucket)",
+        "bucketWeightBps": 300,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ssdchannel",
+        "originId": "6eb0c643c35c337ed8dbbcca28f2af895af3e71c7dbd8b6da5796ec98ee5e77c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market SSD table prices finished SSDs sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "0c4a2bbf35d63b370fe1b3e4fef1ed43b96b53c76e2169e53c51b0bfe9cdf57a",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "Channel SSD 512GB PCIe 3.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N02",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/channel-ssd",
+      "row": "Channel SSD 512GB PCIe 3.0 (series 100232, field Latest, weekly)",
+      "before": {
+        "bucket": "Channel SSD 512GB PCIe 3.0 (launch category N02, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ssdchannel",
+        "originId": "6eb0c643c35c337ed8dbbcca28f2af895af3e71c7dbd8b6da5796ec98ee5e77c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market SSD table prices finished SSDs sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "de5b8bb343e5cfe853efcc5f49552f9a96af031cd6e15f7c6936a47c7b6189e9",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "Channel SSD 1TB PCIe 3.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N03",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/channel-ssd",
+      "row": "Channel SSD 1TB PCIe 3.0 (series 100233, field Latest, weekly)",
+      "before": {
+        "bucket": "Channel SSD 1TB PCIe 3.0 (launch category N03, its own bucket)",
+        "bucketWeightBps": 600,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ssdchannel",
+        "originId": "6eb0c643c35c337ed8dbbcca28f2af895af3e71c7dbd8b6da5796ec98ee5e77c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market SSD table prices finished SSDs sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "878fd3324de8227565f2cbd33ea0c4dcf973749cb678247ceaca458232d4f7dc",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "Channel SSD 512GB PCIe 4.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N04",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/channel-ssd",
+      "row": "Channel SSD 512GB PCIe 4.0 (series 100243, field Latest, weekly)",
+      "before": {
+        "bucket": "Channel SSD 512GB PCIe 4.0 (launch category N04, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ssdchannel",
+        "originId": "6eb0c643c35c337ed8dbbcca28f2af895af3e71c7dbd8b6da5796ec98ee5e77c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market SSD table prices finished SSDs sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "52ed9bcd32e1c4630d82334d3b48209f81a892421611590c5c3e047bd568e961",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "Channel SSD 1TB PCIe 4.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N05",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/channel-ssd",
+      "row": "Channel SSD 1TB PCIe 4.0 (series 100244, field Latest, weekly)",
+      "before": {
+        "bucket": "Channel SSD 1TB PCIe 4.0 (launch category N05, its own bucket)",
+        "bucketWeightBps": 700,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ssdchannel",
+        "originId": "6eb0c643c35c337ed8dbbcca28f2af895af3e71c7dbd8b6da5796ec98ee5e77c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market SSD table prices finished SSDs sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "40a6c6b01f758d51c7bebf212f7d503d5bce9a40fe2a9588b12db63327156de3",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "Channel SSD 2TB PCIe 4.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N06",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/channel-ssd",
+      "row": "Channel SSD 2TB PCIe 4.0 (series 100245, field Latest, weekly)",
+      "before": {
+        "bucket": "Channel SSD 2TB PCIe 4.0 (launch category N06, its own bucket)",
+        "bucketWeightBps": 400,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ssdchannel",
+        "originId": "6eb0c643c35c337ed8dbbcca28f2af895af3e71c7dbd8b6da5796ec98ee5e77c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's channel-market SSD table prices finished SSDs sold from stock through distribution, outside any supplier → OEM negotiation, so it moves to Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the table name and slug",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "adb677ee1cda09566180263e68c6595e50aaa88c7d9e8c376acf9806596bd74a",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "OEM SSD 256GB PCIe 3.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N07",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/oem-ssd",
+      "row": "OEM SSD 256GB PCIe 3.0 (series 100172, field Latest, weekly)",
+      "before": {
+        "bucket": "OEM SSD 256GB PCIe 3.0 (launch category N07, its own bucket)",
+        "bucketWeightBps": 250,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ssdoem",
+        "originId": "76d425f599b196c59ee14756c6f1bd882301b9b3803213768abf78ca315a785c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM SSD table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "e80d5e78a9d603f83c994cebd62a6bc3b9e5ee6c60f5d8e596907c902596d672",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "OEM SSD 512GB PCIe 3.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N08",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/oem-ssd",
+      "row": "OEM SSD 512GB PCIe 3.0 (series 100173, field Latest, weekly)",
+      "before": {
+        "bucket": "OEM SSD 512GB PCIe 3.0 (launch category N08, its own bucket)",
+        "bucketWeightBps": 400,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ssdoem",
+        "originId": "76d425f599b196c59ee14756c6f1bd882301b9b3803213768abf78ca315a785c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM SSD table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "ec712a7850db3a6eda843c2818cf51c800677a1ae3531416910b4ea0d0e018fc",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "OEM SSD 1TB PCIe 3.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N09",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/oem-ssd",
+      "row": "OEM SSD 1TB PCIe 3.0 (series 100250, field Latest, weekly)",
+      "before": {
+        "bucket": "OEM SSD 1TB PCIe 3.0 (launch category N09, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ssdoem",
+        "originId": "76d425f599b196c59ee14756c6f1bd882301b9b3803213768abf78ca315a785c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM SSD table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "51dc9a1d4545bc09e6f410f2f0a00819b4e0d0b08e4181bffe02c8a6efd69ff9",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "OEM SSD 512GB PCIe 4.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N10",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/oem-ssd",
+      "row": "OEM SSD 512GB PCIe 4.0 (series 100251, field Latest, weekly)",
+      "before": {
+        "bucket": "OEM SSD 512GB PCIe 4.0 (launch category N10, its own bucket)",
+        "bucketWeightBps": 400,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ssdoem",
+        "originId": "76d425f599b196c59ee14756c6f1bd882301b9b3803213768abf78ca315a785c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM SSD table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "2baa3324a8aef91a89e165124d15f7057d84b4568f3bd94019ea0709869105e9",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "OEM SSD 1TB PCIe 4.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N11",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/oem-ssd",
+      "row": "OEM SSD 1TB PCIe 4.0 (series 100252, field Latest, weekly)",
+      "before": {
+        "bucket": "OEM SSD 1TB PCIe 4.0 (launch category N11, its own bucket)",
+        "bucketWeightBps": 600,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ssdoem",
+        "originId": "76d425f599b196c59ee14756c6f1bd882301b9b3803213768abf78ca315a785c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM SSD table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "51f6d0e88746416194c61a8c320aa3767f343ae55bf8f538d99fb27105396ba5",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "OEM SSD 2TB PCIe 4.0",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N12",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/oem-ssd",
+      "row": "OEM SSD 2TB PCIe 4.0 (series 100253, field Latest, weekly)",
+      "before": {
+        "bucket": "OEM SSD 2TB PCIe 4.0 (launch category N12, its own bucket)",
+        "bucketWeightBps": 350,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/ssdoem",
+        "originId": "76d425f599b196c59ee14756c6f1bd882301b9b3803213768abf78ca315a785c",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM files this row in its industry/OEM SSD table (行业市场, slug 'oem'), a wholesale price to OEM and industry buyers re-quoted weekly with no LTA terms, so it reads as Contract (§3.1 order 2) on a weekly negotiation period.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: the table name and slug; the row pages carry no methodology text",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "bcce486602545cbd0c238c82e9e05162ef3f46c5670bfdfb5fb95e8bf46db91d",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "eMMC 64GB 5.1",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N13",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/emmc",
+      "row": "eMMC 64GB 5.1 (series 100142, field Latest, weekly)",
+      "before": {
+        "bucket": "eMMC 64GB 5.1 (launch category N13, its own bucket)",
+        "bucketWeightBps": 200,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/emmc",
+        "originId": "2054fab163a1bbbc36ffaf854c824a76ed0e8dd5cf4fa25f6cf90b93588a7ca5",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM quotes embedded eMMC weekly with no OEM label and its weekly review ties the price to the trade market (贸易端), so no supplier → OEM counterparty or negotiation period is shown and it reads as Spot (§3.1 order 3), low confidence.",
+        "confidence": "low",
+        "verification": "web 2026-10-29: row page (no methodology text) and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "56030684b122f96bee8c6340751930355e08cd570bdea33345ea5c3cee14c778",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "eMMC 128GB 5.1",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N14",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/emmc",
+      "row": "eMMC 128GB 5.1 (series 100143, field Latest, weekly)",
+      "before": {
+        "bucket": "eMMC 128GB 5.1 (launch category N14, its own bucket)",
+        "bucketWeightBps": 300,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/emmc",
+        "originId": "2054fab163a1bbbc36ffaf854c824a76ed0e8dd5cf4fa25f6cf90b93588a7ca5",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM quotes embedded eMMC weekly with no OEM label and its weekly review ties the price to the trade market (贸易端), so no supplier → OEM counterparty or negotiation period is shown and it reads as Spot (§3.1 order 3), low confidence.",
+        "confidence": "low",
+        "verification": "web 2026-10-29: row page (no methodology text) and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "d4809e158973146b6a273a46e77430e47d3a32ace985e28185cd7213a79f4313",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "eMMC 256GB 5.1",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N15",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/emmc",
+      "row": "eMMC 256GB 5.1 (series 100260, field Latest, weekly)",
+      "before": {
+        "bucket": "eMMC 256GB 5.1 (launch category N15, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/emmc",
+        "originId": "2054fab163a1bbbc36ffaf854c824a76ed0e8dd5cf4fa25f6cf90b93588a7ca5",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM quotes embedded eMMC weekly with no OEM label and its weekly review ties the price to the trade market (贸易端), so no supplier → OEM counterparty or negotiation period is shown and it reads as Spot (§3.1 order 3), low confidence.",
+        "confidence": "low",
+        "verification": "web 2026-10-29: row page (no methodology text) and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "d1eea6bfce0559415c0cc88283983ab8112ebc21b2ef71ede19685f02c36c0dc",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "UFS 2.2 64GB",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N16",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ufs",
+      "row": "UFS 2.2 64GB (series 100234, field Latest, weekly)",
+      "before": {
+        "bucket": "UFS 2.2 64GB (launch category N16, its own bucket)",
+        "bucketWeightBps": 200,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ufs",
+        "originId": "65b4a023dd1f4171ae87c2cc8e2bba9aa45b0e2467bbc095197351a24b7c79a3",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM quotes embedded UFS weekly with no OEM label and its weekly review ties the price to the trade market (贸易端), so no supplier → OEM counterparty or negotiation period is shown and it reads as Spot (§3.1 order 3), low confidence.",
+        "confidence": "low",
+        "verification": "web 2026-10-29: CFM weekly review of 2026-10-13 (no UFS row page read)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "ba0d555ad5e32fbed41b509323f2f8c31bb6320f348a670c54309f80c175dd80",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "UFS 2.2 128GB",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N17",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ufs",
+      "row": "UFS 2.2 128GB (series 100185, field Latest, weekly)",
+      "before": {
+        "bucket": "UFS 2.2 128GB (launch category N17, its own bucket)",
+        "bucketWeightBps": 300,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ufs",
+        "originId": "65b4a023dd1f4171ae87c2cc8e2bba9aa45b0e2467bbc095197351a24b7c79a3",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM quotes embedded UFS weekly with no OEM label and its weekly review ties the price to the trade market (贸易端), so no supplier → OEM counterparty or negotiation period is shown and it reads as Spot (§3.1 order 3), low confidence.",
+        "confidence": "low",
+        "verification": "web 2026-10-29: CFM weekly review of 2026-10-13 (no UFS row page read)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "9fb2f5ac8552dab9bbed76db70dad636c71fb6f2ab9c1769a0a85cfff0729fff",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "UFS 2.2 256GB",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N18",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ufs",
+      "row": "UFS 2.2 256GB (series 100186, field Latest, weekly)",
+      "before": {
+        "bucket": "UFS 2.2 256GB (launch category N18, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ufs",
+        "originId": "65b4a023dd1f4171ae87c2cc8e2bba9aa45b0e2467bbc095197351a24b7c79a3",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM quotes embedded UFS weekly with no OEM label and its weekly review ties the price to the trade market (贸易端), so no supplier → OEM counterparty or negotiation period is shown and it reads as Spot (§3.1 order 3), low confidence.",
+        "confidence": "low",
+        "verification": "web 2026-10-29: CFM weekly review of 2026-10-13 (no UFS row page read)",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "81306e350819b5c0a0d98af35b0ee01bbbff6a8480523a4d7bd4f9833f79484b",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "1Tb QLC",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N19",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/flash-wafer",
+      "row": "1Tb QLC (series 100257, field Latest, business_day_sessions)",
+      "before": {
+        "bucket": "1Tb QLC (launch category N19, its own bucket)",
+        "bucketWeightBps": 750,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/nandflash",
+        "originId": "7a7cd4ef93faea90869c490b48f7905f2b301afc92fd374303dd03abc8db1211",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's Flash Wafer price is a trade price (贸易价) quoted at three sessions each business day, an open-market price outside supplier contracts, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/in/100242 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "40eb7eabf4000d09ad65eaa5ab6ecd984e15d8318a834fff67f9f76f430c2479",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "1Tb TLC",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N20",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/flash-wafer",
+      "row": "1Tb TLC (series 100242, field Latest, business_day_sessions)",
+      "before": {
+        "bucket": "1Tb TLC (launch category N20, its own bucket)",
+        "bucketWeightBps": 1000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/nandflash",
+        "originId": "7a7cd4ef93faea90869c490b48f7905f2b301afc92fd374303dd03abc8db1211",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's Flash Wafer price is a trade price (贸易价) quoted at three sessions each business day, an open-market price outside supplier contracts, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/in/100242 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "f8e18e4d7a00c392f4ccb1369e041a38814589b7c0ce8ca8a9b534acb6c0c097",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "512Gb TLC",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N21",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/flash-wafer",
+      "row": "512Gb TLC (series 100170, field Latest, business_day_sessions)",
+      "before": {
+        "bucket": "512Gb TLC (launch category N21, its own bucket)",
+        "bucketWeightBps": 500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/nandflash",
+        "originId": "7a7cd4ef93faea90869c490b48f7905f2b301afc92fd374303dd03abc8db1211",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's Flash Wafer price is a trade price (贸易价) quoted at three sessions each business day, an open-market price outside supplier contracts, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/in/100242 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "79087e0526f30e7cc3f2bd3e4adce22b5adc89de1a9e09f9c78e5545d5b30264",
+      "kind": "source",
+      "boards": [
+        "mainnet",
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "256Gb TLC",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "mainnet NANDX-202610 (Oct 26 launch month, Game)",
+        "dev NANDX-202610 (Game)",
+        "governance/cfm_parent_proxy_registry.v1.json N22",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/flash-wafer",
+      "row": "256Gb TLC (series 100164, field Latest, business_day_sessions)",
+      "before": {
+        "bucket": "256Gb TLC (launch category N22, its own bucket)",
+        "bucketWeightBps": 250,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "CFM published category assessment (CFM_PARENT_PROXY_V1; no channel stated)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/nandflash",
+        "originId": "7a7cd4ef93faea90869c490b48f7905f2b301afc92fd374303dd03abc8db1211",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's Flash Wafer price is a trade price (贸易价) quoted at three sessions each business day, an open-market price outside supplier contracts, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/in/100242 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Launch months expire 2026-11-01 and finish under v1; module, SSD and wafer rows are WRONG_PRODUCT for the chip buckets, so no current component takes them."
+    },
+    {
+      "id": "302e2eccf3d9b74ed33a0587e2bacf45c7291aa41caecd6ff3c2baae5ff39138",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR5_16GBIT",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev RAMX-202611 (Game)",
+        "dev RAMX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ews/100266",
+      "row": "DDR5 16Gb Major",
+      "before": {
+        "bucket": "DDR5_16GBIT",
+        "bucketWeightBps": 4000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddr",
+        "originId": "09bb032833c89ab8615f7487f82f657153a3e7b20f3786237bf3dc857da7a241",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's weekly DDR chip table reports trade-market 'resource' prices covered by its spot-market review, not a supplier → OEM negotiated price, so this chip-bucket source moves from the Contract basis to Spot (§3.1 order 3, §8 G).",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: memorymarket.com/price/ddr, chinaflashmarket.com/price/ews/100266 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "5095187f275101ae2ad7274acabc0e3bad96e846084f753292b8c09b01ac7afb",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR5_24GBIT",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev RAMX-202611 (Game)",
+        "dev RAMX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ews/100265",
+      "row": "DDR5 24Gb Major",
+      "before": {
+        "bucket": "DDR5_24GBIT",
+        "bucketWeightBps": 2000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddr",
+        "originId": "09bb032833c89ab8615f7487f82f657153a3e7b20f3786237bf3dc857da7a241",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's weekly DDR chip table reports trade-market 'resource' prices covered by its spot-market review, not a supplier → OEM negotiated price, so this chip-bucket source moves from the Contract basis to Spot (§3.1 order 3, §8 G).",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: memorymarket.com/price/ddr, chinaflashmarket.com/price/ews/100266 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "626192f4a94355c4ef0eee22429316714be931770383cf20a3f8480f6de1ee6a",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4_16GBIT",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev RAMX-202611 (Game)",
+        "dev RAMX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ews/100222",
+      "row": "DDR4 16Gb 3200",
+      "before": {
+        "bucket": "DDR4_16GBIT",
+        "bucketWeightBps": 2500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddr",
+        "originId": "09bb032833c89ab8615f7487f82f657153a3e7b20f3786237bf3dc857da7a241",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's weekly DDR chip table reports trade-market 'resource' prices covered by its spot-market review, not a supplier → OEM negotiated price, so this chip-bucket source moves from the Contract basis to Spot (§3.1 order 3, §8 G).",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: memorymarket.com/price/ddr, chinaflashmarket.com/price/ews/100266 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "74a388560119103ceba41018ae4681f602fbd54b6adcce3533fc0fbbf4bbba25",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4_8GBIT",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev RAMX-202611 (Game)",
+        "dev RAMX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ews/100221",
+      "row": "DDR4 8Gb 3200",
+      "before": {
+        "bucket": "DDR4_8GBIT",
+        "bucketWeightBps": 1500,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "cfm/ddr",
+        "originId": "09bb032833c89ab8615f7487f82f657153a3e7b20f3786237bf3dc857da7a241",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "CFM's weekly DDR chip table reports trade-market 'resource' prices covered by its spot-market review, not a supplier → OEM negotiated price, so this chip-bucket source moves from the Contract basis to Spot (§3.1 order 3, §8 G).",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: memorymarket.com/price/ddr, chinaflashmarket.com/price/ews/100266 and CFM weekly review of 2026-10-13",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "0f04f9a041633bcbf5130eb079076fa666af6a4ce46648c4a57c5404c2e20560",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "tlc_1tb",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev NANDX-202611 (Game)",
+        "dev NANDX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "DigiKey",
+      "url": "https://www.digikey.com/en/products/detail/micron-technology-inc/MT29F1T08EBLEHD4-ITF-E/29306353",
+      "row": "MT29F1T08EBLEHD4-ITF:E",
+      "before": {
+        "bucket": "tlc_1tb",
+        "bucketWeightBps": 4000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "none",
+        "origin": "digikey/catalog",
+        "originId": "8f9f4ddbb4307eae8f2193de6fb9e1d6bfb6b237e477599185a39cc54a136e01",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "DigiKey shows one quantity-break list price with 0 in stock and no backorders accepted (2026-10-29), neither immediately available inventory nor a negotiated wholesale purchase, so it is an unterminated quote eligible nowhere (§3.1 'none').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the three priced Micron NAND pages",
+        "blockers": []
+      }
+    },
+    {
+      "id": "9150baad02e0dc5dc6a25c277439f6584a55b1ca7f5a0abe237d18180983d908",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "qlc_1tb",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev NANDX-202611 (Game)",
+        "dev NANDX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "DigiKey",
+      "url": "https://www.digikey.com/en/products/detail/micron-technology-inc/MT29F1T08GBLCEJ4-M-C/17632390",
+      "row": "MT29F1T08GBLCEJ4-M:C",
+      "before": {
+        "bucket": "qlc_1tb",
+        "bucketWeightBps": 3000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "none",
+        "origin": "digikey/catalog",
+        "originId": "8f9f4ddbb4307eae8f2193de6fb9e1d6bfb6b237e477599185a39cc54a136e01",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "DigiKey shows one quantity-break list price with 0 in stock and no backorders accepted (2026-10-29), neither immediately available inventory nor a negotiated wholesale purchase, so it is an unterminated quote eligible nowhere (§3.1 'none').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the three priced Micron NAND pages",
+        "blockers": []
+      }
+    },
+    {
+      "id": "5ad719e37e78dafcbeac5682e506b3b19402456b364d8c6e0ba778b30f4ef05a",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "tlc_512gb",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev NANDX-202611 (Game)",
+        "dev NANDX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "DigiKey",
+      "url": "https://www.digikey.com/en/products/detail/micron-technology-inc/MT29F512G08EBLKEJ4-ITF-K/22041408",
+      "row": "MT29F512G08EBLKEJ4-ITF:K",
+      "before": {
+        "bucket": "tlc_512gb",
+        "bucketWeightBps": 2000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "none",
+        "origin": "digikey/catalog",
+        "originId": "8f9f4ddbb4307eae8f2193de6fb9e1d6bfb6b237e477599185a39cc54a136e01",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "DigiKey shows one quantity-break list price with 0 in stock and no backorders accepted (2026-10-29), neither immediately available inventory nor a negotiated wholesale purchase, so it is an unterminated quote eligible nowhere (§3.1 'none').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: the three priced Micron NAND pages",
+        "blockers": []
+      }
+    },
+    {
+      "id": "62f493820f6f2e4c319cbb8317875a88e538d0bdc67fdfc0dd78961cc4801952",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "NANDX",
+      "item": "tlc_256gb",
+      "itemKind": "chip-bucket",
+      "appearsIn": [
+        "dev NANDX-202611 (Game)",
+        "dev NANDX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "DigiKey",
+      "url": "https://www.digikey.com/en/products/result?keywords=MT29F256G08EBHAFJ4-3R",
+      "row": "MT29F256G08EBHAFJ4-3R:A",
+      "before": {
+        "bucket": "tlc_256gb",
+        "bucketWeightBps": 1000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "contract (spec v2 profile)"
+      },
+      "after": {
+        "channel": "none",
+        "origin": "digikey/catalog",
+        "originId": "8f9f4ddbb4307eae8f2193de6fb9e1d6bfb6b237e477599185a39cc54a136e01",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "No public page prices this single-die 256Gb TLC chip (obsolete part, synthetic dev baseline), so there is no purchase to classify and it is none (§3.1).",
+        "confidence": "high",
+        "verification": "inferred from the fixture's own note (placeholder locator)",
+        "blockers": []
+      }
+    },
+    {
+      "id": "c7702973c50ff22c4ee51bbdd6e2b5cb9edfd755db1c7c87db222e059f18df67",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev BATX-202611 (Game)",
+        "dev BATX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "InfoLink Consulting",
+      "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+      "row": "Prismatic LFP cell- 314Ah (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": 4000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "infolink/ess-spot-price",
+        "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "InfoLink publishes this row as its weekly 'Spot Price' from transactions of about 20 leading makers, with no agreement term or negotiation period, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "5251b20d323e78c45b89b975ee2d113834ed3df9b4c2ad1e7b2633744d8ec52e",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev BATX-202611 (Game)",
+        "dev BATX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "Mysteel",
+      "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+      "row": "磷酸铁锂电芯 / 动力型 / 方形",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": 3000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "mysteel/battery-cell-market-prices",
+        "originId": "0bf0b3c8e4ed21e8e5ec017c8ae8201c71dc5ef17684656ea7dfded7bcbdf95a",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "Mysteel publishes this row as a daily cell market price on its cell spot-price page, with no agreement or counterparty terms, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "05f63fe24d52af753166203d418bcef3d9c5c9fec701b3d0c7637e9e8ac93c67",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev BATX-202611 (Game)",
+        "dev BATX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "Mysteel",
+      "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+      "row": "三元电芯：方块：动力型：市场价格：中华人民共和国（日度）",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": 2000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "mysteel/battery-cell-market-prices",
+        "originId": "0bf0b3c8e4ed21e8e5ec017c8ae8201c71dc5ef17684656ea7dfded7bcbdf95a",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "Mysteel publishes this row as a daily cell market price on its cell spot-price page, with no agreement or counterparty terms, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "46ceb5ea7324f2d9e7279a5f70a16abe3ffd0e48b66d9ea8168b92a04a59960a",
+      "kind": "source",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev BATX-202611 (Game)",
+        "dev BATX-202612 (Game)",
+        "programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json"
+      ],
+      "publisher": "SMM",
+      "url": "https://newenergy.smm.cn/price/14042-15013",
+      "row": "523软包三元电芯(周）",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": 1000,
+        "sourcesInBucket": 1,
+        "status": "Active",
+        "weighting": "The only source of its bucket on dev: the bucket moves with this row (v1 equal-weight median of one).",
+        "declaredPriceBasis": null,
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "174860c2333e05575f74ce316600a80602a84826eedc026294d1a4375737fbbb",
+      "kind": "source",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "mainnet BATX-202611 (SourceSubmission; source Candidate, read 2026-10-29)"
+      ],
+      "publisher": "SMM",
+      "url": "https://car.smm.cn/price/202105120001",
+      "row": "SMM-LB-EV-009: 523 Prismatic Ternary Battery (50-60Ah)",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "Candidate",
+        "weighting": "A proposal in BATX Nov 26's source window: no weight until the month freezes; frozen, it would be one equal-weight source of its bucket's median.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "67d37d515234413f85401714059bbad543cc1a259df3c2971c9d3336c1332287",
+      "kind": "source",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "mainnet BATX-202611 (SourceSubmission; source Candidate, read 2026-10-29)",
+        "prod API candidate 40c5c24900520a74b6e99fc20d5cca459ebc858e086829f7e71122ad55a59744"
+      ],
+      "publisher": "InfoLink Consulting",
+      "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+      "row": "Prismatic LFP cell- 100Ah (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "Candidate",
+        "weighting": "A proposal in BATX Nov 26's source window: no weight until the month freezes; frozen, it would be one equal-weight source of its bucket's median.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "infolink/ess-spot-price",
+        "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "InfoLink publishes this row as its weekly 'Spot Price' from transactions of about 20 leading makers, with no agreement term or negotiation period, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "84b7a25c6da5f39b747a78abc7c03202509a1611bbfa898f3931cc6cc7361136",
+      "kind": "source",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "mainnet BATX-202611 (SourceSubmission; source Candidate, read 2026-10-29)",
+        "prod API candidate 4d1058ba33668ebbe16074c4ff7ec34410444e44a740f6363f58a91ae65047f2"
+      ],
+      "publisher": "InfoLink Consulting",
+      "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+      "row": "Prismatic LFP cell- 280Ah (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "Candidate",
+        "weighting": "A proposal in BATX Nov 26's source window: no weight until the month freezes; frozen, it would be one equal-weight source of its bucket's median.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "infolink/ess-spot-price",
+        "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743",
+        "duplicateOf": "67d37d515234413f85401714059bbad543cc1a259df3c2971c9d3336c1332287",
+        "collapse": "sibling-row",
+        "reason": "It is another row of the same InfoLink weekly ESS spot price report that 67d37d515234… already carries, so the two are one origin and this one adds no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "9d7b42cfd63b1a51d837d1ba156fc98503c9d685e347987ee749aaf5cf06346a",
+      "kind": "source",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "mainnet BATX-202611 (SourceSubmission; source Candidate, read 2026-10-29)"
+      ],
+      "publisher": "SMM",
+      "url": "https://car.smm.cn/price/202405230001",
+      "row": "SMM-LB-EV-005: Prismatic LFP Battery (174Ah)",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "Candidate",
+        "weighting": "A proposal in BATX Nov 26's source window: no weight until the month freezes; frozen, it would be one equal-weight source of its bucket's median.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "ca9d6127f8e25da2ed391896834cad61cac3427de32a7bb60d10942d9aee4334",
+      "kind": "source",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "mainnet BATX-202611 (SourceSubmission; source Candidate, read 2026-10-29)"
+      ],
+      "publisher": "SMM",
+      "url": "https://car.smm.cn/price/202105120002",
+      "row": "SMM-LB-EV-010: 523 Pouch Ternary Battery (50-60Ah)",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "Candidate",
+        "weighting": "A proposal in BATX Nov 26's source window: no weight until the month freezes; frozen, it would be one equal-weight source of its bucket's median.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "d40ef063e3b55c488841a54b11d0498ef74221775d7e9a5d9dc52c874e197a97",
+      "kind": "source",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "mainnet BATX-202611 (SourceSubmission; source Candidate, read 2026-10-29)",
+        "prod API candidate 9019c6b58b8a94b04a746e65735da8b2d7bd4128f1fa64f19d6bdefb7960c6f0"
+      ],
+      "publisher": "InfoLink Consulting",
+      "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+      "row": "Prismatic LFP cell- 314Ah (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "Candidate",
+        "weighting": "A proposal in BATX Nov 26's source window: no weight until the month freezes; frozen, it would be one equal-weight source of its bucket's median.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": "one of spot, contract or firm offer, fixed per series (batx_basket_spec routing defaults)"
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "infolink/ess-spot-price",
+        "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743",
+        "duplicateOf": "67d37d515234413f85401714059bbad543cc1a259df3c2971c9d3336c1332287",
+        "collapse": "sibling-row",
+        "reason": "It is another row of the same InfoLink weekly ESS spot price report that 67d37d515234… already carries, so the two are one origin and this one adds no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "candidate:0e56cf77e77d8d98ca1bd87a9f9f1fd7bd76a79c0cfc8fb0fe4d5bde0da24233",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 UDIMM 8GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "dev API candidate for RAMX-202611 (expired, created 1791881376963 ms)"
+      ],
+      "publisher": "none (test)",
+      "url": "https://example.com/petri-cli-candidate-check-20261013",
+      "row": "Petri CLI round-trip check: DDR5 UDIMM 16GB retail price (test row, not a real source)",
+      "before": {
+        "bucket": "DDR4 UDIMM 8GB 3200",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "none",
+        "origin": "test/petri-cli-check",
+        "originId": "c64e46e53defe5a57fd8abeab24bb594b7ef1f274b8a6da78ceefa4625cd1de6",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "A Petri CLI test row with no real price is no purchase at all, so it is none (§3.1).",
+        "confidence": "high",
+        "verification": "inferred from the candidate's own evidence text",
+        "blockers": []
+      }
+    },
+    {
+      "id": "candidate:ecbc0acbac8652f32fa62bab13213f5e4e2331cdfe79862679d3e7e44956937a",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 RDIMM 16GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "dev API candidate for RAMX-202612 (expired, created 1792370558352 ms)"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.chinaflashmarket.com/price/ems/100254",
+      "row": "DDR4 RDIMM 16GB 3200; CFM series 100254, governed parent R04. Monthly category assessment, not an individual manufacture",
+      "before": {
+        "bucket": "DDR4 RDIMM 16GB 3200",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": "b0bf2302bd593a4bab44b3e0de26e1cbd02b7d4f9dbe7d5e561cc2c313882aaf",
+        "collapse": "republication",
+        "reason": "It repeats the same CFM server-module monthly price row that b0bf2302bd59… already carries (another site or listing), so it is one origin with no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Targets a launch-category bucket in a chip-bucket month (RAMX-202612): WRONG_PRODUCT there; expired."
+    },
+    {
+      "id": "candidate:08a83b01ba223eb6d5bc1531560f0873e6c4de7b5854d863336958b6bd578945",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "RAMX",
+      "item": "DDR4 RDIMM 16GB 3200",
+      "itemKind": "launch-category",
+      "appearsIn": [
+        "dev API candidate for RAMX-202612 (expired, created 1792370561451 ms)"
+      ],
+      "publisher": "CFM",
+      "url": "https://www.memorymarket.com/price/ems/100254",
+      "row": "DDR4 RDIMM 16GB 3200; CFM series 100254, governed parent R04. Monthly category assessment, not an individual manufacture",
+      "before": {
+        "bucket": "DDR4 RDIMM 16GB 3200",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "contract",
+        "origin": "cfm/rdimmcontract",
+        "originId": "f0c3d31623811f39ad4a3e9da3500cd81dc83c23be11945856c2f43c34fc4ecd",
+        "duplicateOf": "b0bf2302bd593a4bab44b3e0de26e1cbd02b7d4f9dbe7d5e561cc2c313882aaf",
+        "collapse": "republication",
+        "reason": "It repeats the same CFM server-module monthly price row that b0bf2302bd59… already carries (another site or listing), so it is one origin with no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: chinaflashmarket.com/price/ems/100254 价格说明 and the table's slug rdimmcontract",
+        "blockers": [
+          "licence_required"
+        ]
+      },
+      "note": "Targets a launch-category bucket in a chip-bucket month (RAMX-202612): WRONG_PRODUCT there; expired."
+    },
+    {
+      "id": "candidate:9f62d325265a9fb3d27f4d7af5338de5bf3b426b60bbaab15ed5994e508815d2",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793080634038 ms)"
+      ],
+      "publisher": "SMM",
+      "url": "https://car.smm.cn/price/202405230001",
+      "row": "SMM-LB-EV-005: Prismatic LFP Battery (174Ah)",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "candidate:50e6e85f2d3f07cfe42746bc43cfd1f24cfe19875a6628863de790f86d6c814b",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793080715219 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.energytrend.cn/battery-price.html",
+      "row": "电芯-方形铁锂电芯：动力型（元/Wh） (RMB)",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      },
+      "note": "A TrendForce row on www.energytrend.cn; the origin is TrendForce's."
+    },
+    {
+      "id": "candidate:f69d0799d92ccbf26f59f311f7dfbfefdf2bbd6d855b28f9efe8d4b3c4a9f428",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793080733045 ms)"
+      ],
+      "publisher": "Mysteel",
+      "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+      "row": "磷酸铁锂电芯：方块：动力型：市场价格：中华人民共和国（日度）",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "mysteel/battery-cell-market-prices",
+        "originId": "0bf0b3c8e4ed21e8e5ec017c8ae8201c71dc5ef17684656ea7dfded7bcbdf95a",
+        "duplicateOf": "5251b20d323e78c45b89b975ee2d113834ed3df9b4c2ad1e7b2633744d8ec52e",
+        "collapse": "republication",
+        "reason": "It repeats the same Mysteel cell market price row that 5251b20d323e… already carries (another listing), so it is one origin with no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "candidate:80c0a9d97b02046580810d6733db09486af7e79ef34cff40562c43197a6a9ee8",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793084998739 ms)"
+      ],
+      "publisher": "InfoLink Consulting",
+      "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+      "row": "Prismatic LFP cell- 100Ah (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "infolink/ess-spot-price",
+        "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743",
+        "duplicateOf": "c7702973c50ff22c4ee51bbdd6e2b5cb9edfd755db1c7c87db222e059f18df67",
+        "collapse": "sibling-row",
+        "reason": "It is another row of the same InfoLink weekly ESS spot price report that c7702973c50f… already carries, so the two are one origin and this one adds no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "candidate:b4551047dcd31f626a3aac9dffd145657444af9038a26a59a5928ab9bb60a61f",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085001220 ms)"
+      ],
+      "publisher": "InfoLink Consulting",
+      "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+      "row": "Prismatic LFP cell- 314Ah (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "infolink/ess-spot-price",
+        "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743",
+        "duplicateOf": "c7702973c50ff22c4ee51bbdd6e2b5cb9edfd755db1c7c87db222e059f18df67",
+        "collapse": "republication",
+        "reason": "It repeats the same InfoLink weekly ESS spot price row that c7702973c50f… already carries (another listing), so it is one origin with no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "candidate:7eb5899a22550d2297cafca4d9f9d28e3bb56350e29591db19d71fda9f8f4633",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085004394 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.energytrend.cn/battery-price.html",
+      "row": "电芯-方形铁锂电芯：储能型（元/Wh） (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      },
+      "note": "A TrendForce row on www.energytrend.cn; the origin is TrendForce's."
+    },
+    {
+      "id": "candidate:9749c0efcb2e1c88b60d4fb7bedd11b012ab7a14ce703046daaec1d6045aa525",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085043535 ms)"
+      ],
+      "publisher": "SMM",
+      "url": "https://car.smm.cn/price/202105120001",
+      "row": "SMM-LB-EV-009: 523 Prismatic Ternary Battery (50-60Ah)",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "candidate:b335d285dc720aa68c5a393a94d53cc45220bef39824a937cae9a898b5387c67",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085046892 ms)"
+      ],
+      "publisher": "Mysteel",
+      "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+      "row": "三元电芯：方块：动力型：市场价格：中华人民共和国（日度）",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "mysteel/battery-cell-market-prices",
+        "originId": "0bf0b3c8e4ed21e8e5ec017c8ae8201c71dc5ef17684656ea7dfded7bcbdf95a",
+        "duplicateOf": "05f63fe24d52af753166203d418bcef3d9c5c9fec701b3d0c7637e9e8ac93c67",
+        "collapse": "republication",
+        "reason": "It repeats the same Mysteel cell market price row that 05f63fe24d52… already carries (another listing), so it is one origin with no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "candidate:e856a5adb7a6497196970958bcb980eaa697f5ed1d61ff0d44b961bf8533c945",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085049579 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.energytrend.cn/battery-price.html",
+      "row": "电芯-方形三元电芯：动力型（元/Wh） (RMB)",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      },
+      "note": "A TrendForce row on www.energytrend.cn; the origin is TrendForce's."
+    },
+    {
+      "id": "candidate:dcebc3d552d23197d90debb28f8bf98807ddc832b712856166d789344968f631",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085361206 ms)"
+      ],
+      "publisher": "SMM",
+      "url": "https://car.smm.cn/price/202105120002",
+      "row": "SMM-LB-EV-010: 523 Pouch Ternary Battery (50-60Ah)",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": "46ceb5ea7324f2d9e7279a5f70a16abe3ffd0e48b66d9ea8168b92a04a59960a",
+        "collapse": "republication",
+        "reason": "It repeats the same SMM lithium-battery cell price row that 46ceb5ea7324… already carries (another site or listing), so it is one origin with no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "candidate:92f034a665ffc26178c33eafa67a9490087b59866e0443ef1c212a27891d2117",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085364567 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.cn/price/battery-price/battery_cell_and_pack",
+      "row": "电芯-软包三元电芯：动力型（元/Wh） (RMB)",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      },
+      "note": "A TrendForce row on www.trendforce.cn; the origin is TrendForce's."
+    },
+    {
+      "id": "candidate:71f06620bc4c43f3f85ba0d5bdb4ac48b8a8720a9d3e52b4fa68ef5f94fbcee9",
+      "kind": "candidate",
+      "boards": [
+        "dev"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "dev API candidate for BATX-202701 (unexpired, created 1793085367143 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.energytrend.cn/battery-price.html",
+      "row": "电芯-软包三元电芯：动力型（元/Wh） (RMB)",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": "candidate:92f034a665ffc26178c33eafa67a9490087b59866e0443ef1c212a27891d2117",
+        "collapse": "republication",
+        "reason": "It repeats the same TrendForce battery cell and pack price row that 92f034a665ff… already carries (another site or listing), so it is one origin with no weight toward min_live_sources (§5.1 'origins, not pages').",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      },
+      "note": "A TrendForce row on www.energytrend.cn; the origin is TrendForce's."
+    },
+    {
+      "id": "candidate:e4b1414823350176811b4f30c1f6b13f3e1a4213f42268a262fff6c4c35d9201",
+      "kind": "candidate",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "prod API candidate for BATX-202611 (unexpired, created 1792961326625 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Square LFP Battery Cell: Energy Storage (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "candidate:53d6edfe6483bd78cfac676e4ecb4959de217d3b64e1fc395a1cb7f1a3a1accc",
+      "kind": "candidate",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "prod API candidate for BATX-202611 (unexpired, created 1792961356052 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Square Ternary Battery Cell: for EV (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "candidate:0dece024fd19653bef167f2b720766597d57a9b7614d65b098b85a4ab2d81454",
+      "kind": "candidate",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "prod API candidate for BATX-202611 (unexpired, created 1792997413846 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Square LFP Battery Cell: for EV (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "candidate:732cc225fd52c3e723ab237fd34d8f57a8365664b8d96e5c1db6e9fc8fa7d019",
+      "kind": "candidate",
+      "boards": [
+        "mainnet"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "prod API candidate for BATX-202611 (unexpired, created 1792997415353 ms)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Pouch Ternary Battery Cell: for EV (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "off-chain candidate",
+        "weighting": "An off-chain research candidate: no oracle weight unless sponsored or proposed.",
+        "declaredPriceBasis": "spot",
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_STORAGE:trendforce",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Square LFP Battery Cell: Energy Storage (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_STORAGE:infolink",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "InfoLink Consulting",
+      "url": "https://www.infolink-group.com/spot-price-energy-storage/",
+      "row": "Prismatic LFP cell- 314Ah (RMB)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "infolink/ess-spot-price",
+        "originId": "715b0c357bd1e03310b2228d82e832b1ae2d6add6991dcf551b46fb33480b743",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "InfoLink publishes this row as its weekly 'Spot Price' from transactions of about 20 leading makers, with no agreement term or negotiation period, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: infolink-group.com/spot-price-energy-storage/",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_STORAGE:fastmarkets",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "Fastmarkets",
+      "url": "https://www.fastmarkets.com/insights/fastmarkets-to-launch-china-pv-module-bess-battery-cell-prices/",
+      "row": "LFP prismatic cell, 314Ah, ex-works domestic China basis, yuan per Wh",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "fastmarkets/china-bess-battery-cell",
+        "originId": "356d94fff2f214aeb70d9aa4740b87e18451ee9a3b2fba02be88e3326ea6c98e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "Fastmarkets assesses ex-works cells with no minimum quantity and loading within 60 days and names no agreement term, so it is Spot (§3.1 order 3) if the listing's [D days] admits 60-day loading, and none otherwise.",
+        "confidence": "medium",
+        "verification": "web 2026-10-29: Fastmarkets launch notice of 2026-06-23 (values not public)",
+        "blockers": [
+          "licence_required",
+          "no_public_values"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_STORAGE:smm",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "SMM",
+      "url": "https://newenergy.smm.cn/price/14042-15013",
+      "row": "方形磷酸铁锂电池(周)",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_STORAGE:benchmark",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_STORAGE",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "Benchmark Mineral Intelligence",
+      "url": "unknown (subscription)",
+      "row": "LFP Prismatic 314Ah EXW China",
+      "before": {
+        "bucket": "LFP_STORAGE",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "none",
+        "origin": "benchmark/battery-cell-assessment",
+        "originId": "4fd3638c2051cdb9db528b96231a643b681da69088775257cc353f40851fe439",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "A partly modelled USD/kWh assessment is not an observed purchase in any channel, so it is none (§3.1), as routing's RESEARCH_ONLY already says.",
+        "confidence": "medium",
+        "verification": "inferred from batx_source_manifest.v1.json (subscription; not read)",
+        "blockers": [
+          "licence_required",
+          "no_public_values"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_EV:trendforce",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Square LFP Battery Cell: for EV (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_EV:smm",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "SMM",
+      "url": "https://newenergy.smm.cn/price/14042-15013",
+      "row": "方形磷酸铁锂电芯(周)",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_EV:mysteel",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "Mysteel",
+      "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+      "row": "磷酸铁锂电芯 / 动力型 / 方形",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "mysteel/battery-cell-market-prices",
+        "originId": "0bf0b3c8e4ed21e8e5ec017c8ae8201c71dc5ef17684656ea7dfded7bcbdf95a",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "Mysteel publishes this row as a daily cell market price on its cell spot-price page, with no agreement or counterparty terms, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_EV:benchmark",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "Benchmark Mineral Intelligence",
+      "url": "unknown",
+      "row": "Standard LFP prismatic cells in China",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "none",
+        "origin": "benchmark/battery-cell-assessment",
+        "originId": "4fd3638c2051cdb9db528b96231a643b681da69088775257cc353f40851fe439",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "A partly modelled USD/kWh assessment is not an observed purchase in any channel, so it is none (§3.1), as routing's RESEARCH_ONLY already says.",
+        "confidence": "medium",
+        "verification": "inferred from batx_source_manifest.v1.json (subscription; not read)",
+        "blockers": [
+          "licence_required",
+          "no_public_values"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:TERNARY_PRISM_EV:trendforce",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Square Ternary Battery Cell: for EV (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:TERNARY_PRISM_EV:smm",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "SMM",
+      "url": "https://newenergy.smm.cn/price/14042-15013",
+      "row": "8系方形三元电芯(周)",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:TERNARY_PRISM_EV:mysteel",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "Mysteel",
+      "url": "https://list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+      "row": "三元电芯：方块：动力型：市场价格/最低价/最高价：中华人民共和国（日度）",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "mysteel/battery-cell-market-prices",
+        "originId": "0bf0b3c8e4ed21e8e5ec017c8ae8201c71dc5ef17684656ea7dfded7bcbdf95a",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "Mysteel publishes this row as a daily cell market price on its cell spot-price page, with no agreement or counterparty terms, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: list1.mysteel.com/zhishi/dldcdxscjgzs.html",
+        "blockers": [
+          "licence_required"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:TERNARY_POUCH_EV:trendforce",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "TrendForce",
+      "url": "https://www.trendforce.com/price/battery-price/battery_cell_and_pack",
+      "row": "Battery Cell-Pouch Ternary Battery Cell: for EV (RMB/Wh) (RMB)",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "trendforce/battery-cell-and-pack",
+        "originId": "44af8bd774f370fa60b83b085a4e15b7fff6bf636175e498e7fcceeaece550c4",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "TrendForce describes its monthly battery figures as spot prices, so this row is Spot (§3.1 order 3); its Terms §5(h) bar prediction-market use.",
+        "confidence": "high",
+        "verification": "web 2026-10-29: trendforce.com battery_cell_and_pack and energytrend.cn/battery-price.html (same four cell values)",
+        "blockers": [
+          "terms_ban"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:TERNARY_POUCH_EV:smm",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "SMM",
+      "url": "https://newenergy.smm.cn/price/14042-15013",
+      "row": "523软包三元电芯(周）",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "spot",
+        "origin": "smm/lithium-battery-cells",
+        "originId": "2a7b16bcc69e57c3d839d964e34f2755725ed48d5e50c898b7469c9be0e07f8e",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "SMM defines its cell prices as spot prices, the most likely tradable ex-factory price range collected weekly, with no agreement term, so it is Spot (§3.1 order 3).",
+        "confidence": "high",
+        "verification": "web 2026-10-29: news.smm.cn/news/101476634 (2021-05-13)",
+        "blockers": [
+          "licence_required",
+          "login"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:TERNARY_POUCH_EV:benchmark",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_POUCH_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json (candidate series, read 2026-10-20)"
+      ],
+      "publisher": "Benchmark Mineral Intelligence",
+      "url": "unknown",
+      "row": "NCM523 Pouch EXW China",
+      "before": {
+        "bucket": "TERNARY_POUCH_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "candidate series (not on chain)",
+        "weighting": "A documented candidate series: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "none",
+        "origin": "benchmark/battery-cell-assessment",
+        "originId": "4fd3638c2051cdb9db528b96231a643b681da69088775257cc353f40851fe439",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "A partly modelled USD/kWh assessment is not an observed purchase in any channel, so it is none (§3.1), as routing's RESEARCH_ONLY already says.",
+        "confidence": "medium",
+        "verification": "inferred from batx_source_manifest.v1.json (subscription; not read)",
+        "blockers": [
+          "licence_required",
+          "no_public_values"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:TERNARY_PRISM_EV:iccsino",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "TERNARY_PRISM_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json unverified_leads"
+      ],
+      "publisher": "ICCSino",
+      "url": "unknown",
+      "row": "方形动力电芯 / 三元 / 国产",
+      "before": {
+        "bucket": "TERNARY_PRISM_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "unverified lead",
+        "weighting": "An unverified lead: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "none",
+        "origin": "iccsino/battery-cell-prices",
+        "originId": "484e01c7f9894b2d0c61e74a23c668aad51151cb57fec45d86ef4c6376091224",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "An unverified lead with no defined series shows no purchase to classify, so it is none (§3.1) until someone posts it with evidence.",
+        "confidence": "low",
+        "verification": "inferred from batx_source_manifest.v1.json (unverified_leads)",
+        "blockers": [
+          "unverified"
+        ]
+      }
+    },
+    {
+      "id": "batx-manifest:LFP_EV:iccsino",
+      "kind": "catalog",
+      "boards": [
+        "catalog"
+      ],
+      "product": "BATX",
+      "item": "LFP_EV",
+      "itemKind": "cell-category",
+      "appearsIn": [
+        "governance/batx_source_manifest.v1.json unverified_leads"
+      ],
+      "publisher": "ICCSino",
+      "url": "unknown",
+      "row": "方形动力电芯 / 磷酸铁锂 / 国产",
+      "before": {
+        "bucket": "LFP_EV",
+        "bucketWeightBps": null,
+        "sourcesInBucket": null,
+        "status": "unverified lead",
+        "weighting": "An unverified lead: no weight.",
+        "declaredPriceBasis": null,
+        "bucketBasis": null
+      },
+      "after": {
+        "channel": "none",
+        "origin": "iccsino/battery-cell-prices",
+        "originId": "484e01c7f9894b2d0c61e74a23c668aad51151cb57fec45d86ef4c6376091224",
+        "duplicateOf": null,
+        "collapse": null,
+        "reason": "An unverified lead with no defined series shows no purchase to classify, so it is none (§3.1) until someone posts it with evidence.",
+        "confidence": "low",
+        "verification": "inferred from batx_source_manifest.v1.json (unverified_leads)",
+        "blockers": [
+          "unverified"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "note": "Independent origins per item and channel (distinct originIds; 'none' rows count nowhere). 'all' is every board and the catalog together: what could be posted today.",
+    "currentItems": {
+      "mainnet": {
+        "RAMX": {
+          "DDR5_16GBIT": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR5_24GBIT": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR4_16GBIT": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR4_8GBIT": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        },
+        "NANDX": {
+          "tlc_1tb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "qlc_1tb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "tlc_512gb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "tlc_256gb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        },
+        "BATX": {
+          "LFP_STORAGE": {
+            "spot": {
+              "origins": 2,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "LFP_EV": {
+            "spot": {
+              "origins": 2,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "TERNARY_PRISM_EV": {
+            "spot": {
+              "origins": 2,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "TERNARY_POUCH_EV": {
+            "spot": {
+              "origins": 2,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        }
+      },
+      "dev": {
+        "RAMX": {
+          "DDR5_16GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR5_24GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR4_16GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR4_8GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        },
+        "NANDX": {
+          "tlc_1tb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "qlc_1tb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "tlc_512gb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "tlc_256gb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        },
+        "BATX": {
+          "LFP_STORAGE": {
+            "spot": {
+              "origins": 2,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "LFP_EV": {
+            "spot": {
+              "origins": 3,
+              "withoutTermsBan": 2
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "TERNARY_PRISM_EV": {
+            "spot": {
+              "origins": 3,
+              "withoutTermsBan": 2
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "TERNARY_POUCH_EV": {
+            "spot": {
+              "origins": 2,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        }
+      },
+      "all": {
+        "RAMX": {
+          "DDR5_16GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR5_24GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR4_16GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "DDR4_8GBIT": {
+            "spot": {
+              "origins": 1,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        },
+        "NANDX": {
+          "tlc_1tb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "qlc_1tb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "tlc_512gb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "tlc_256gb": {
+            "spot": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        },
+        "BATX": {
+          "LFP_STORAGE": {
+            "spot": {
+              "origins": 4,
+              "withoutTermsBan": 3
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "LFP_EV": {
+            "spot": {
+              "origins": 3,
+              "withoutTermsBan": 2
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "TERNARY_PRISM_EV": {
+            "spot": {
+              "origins": 3,
+              "withoutTermsBan": 2
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          },
+          "TERNARY_POUCH_EV": {
+            "spot": {
+              "origins": 2,
+              "withoutTermsBan": 1
+            },
+            "contract": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            },
+            "lta": {
+              "origins": 0,
+              "withoutTermsBan": 0
+            }
+          }
+        }
+      }
+    },
+    "launchItems": {
+      "RAMX": {
+        "DDR5 RDIMM 32GB": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR5 RDIMM 64GB": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR5 RDIMM 96GB": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 RDIMM 16GB 3200": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 RDIMM 32GB 3200": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 RDIMM 64GB 3200": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR5 UDIMM 16GB 5600": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR5 UDIMM 32GB 5600": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 UDIMM 8GB 3200": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 UDIMM 16GB 3200": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 UDIMM 32GB 3200": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 SODIMM 8GB 3200": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "DDR4 SODIMM 16GB 3200": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        }
+      },
+      "NANDX": {
+        "Channel SSD 256GB PCIe 3.0": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "Channel SSD 512GB PCIe 3.0": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "Channel SSD 1TB PCIe 3.0": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "Channel SSD 512GB PCIe 4.0": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "Channel SSD 1TB PCIe 4.0": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "Channel SSD 2TB PCIe 4.0": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "OEM SSD 256GB PCIe 3.0": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "OEM SSD 512GB PCIe 3.0": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "OEM SSD 1TB PCIe 3.0": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "OEM SSD 512GB PCIe 4.0": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "OEM SSD 1TB PCIe 4.0": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "OEM SSD 2TB PCIe 4.0": {
+          "spot": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "contract": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "eMMC 64GB 5.1": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "eMMC 128GB 5.1": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "eMMC 256GB 5.1": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "UFS 2.2 64GB": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "UFS 2.2 128GB": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "UFS 2.2 256GB": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "1Tb QLC": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "1Tb TLC": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "512Gb TLC": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        },
+        "256Gb TLC": {
+          "spot": {
+            "origins": 1,
+            "withoutTermsBan": 1
+          },
+          "contract": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          },
+          "lta": {
+            "origins": 0,
+            "withoutTermsBan": 0
+          }
+        }
+      }
+    },
+    "contractChannelsWithThreeOrigins": []
+  }
+}

@@ -259,17 +259,21 @@ impl<const LENGTH: usize> FixedField for [u16; LENGTH] {
     }
 }
 
-impl FixedField for [u32; 3] {
+impl<const LENGTH: usize> FixedField for [u32; LENGTH] {
     #[inline(never)]
     fn read(input: &mut FixedCursor<'_>) -> Self {
-        [input.u32(), input.u32(), input.u32()]
+        let mut value = [0; LENGTH];
+        for item in &mut value {
+            *item = input.u32();
+        }
+        value
     }
 
     #[inline(always)]
     fn write(&self, output: &mut FixedWriter<'_>) {
-        output.u32(self[0]);
-        output.u32(self[1]);
-        output.u32(self[2]);
+        for item in self {
+            output.u32(*item);
+        }
     }
 }
 
@@ -386,4 +390,62 @@ fixed_enum_field!(OracleOpeningClaimStatus {
     3 => OracleOpeningClaimStatus::Accepted,
     4 => OracleOpeningClaimStatus::Rejected,
     5 => OracleOpeningClaimStatus::TimedOut,
+});
+// Oracle v2 heads (`state/heads`).
+fixed_enum_field!(HeadStatus {
+    0 => HeadStatus::Open,
+    1 => HeadStatus::Active,
+    2 => HeadStatus::Live,
+    3 => HeadStatus::Retired,
+    4 => HeadStatus::Expired,
+});
+fixed_enum_field!(HeadAccessClass {
+    0 => HeadAccessClass::PublicPage,
+    1 => HeadAccessClass::LoginZkTls,
+    2 => HeadAccessClass::OfflineQuote,
+    3 => HeadAccessClass::Physical,
+});
+fixed_enum_field!(HeadClaimKind {
+    0 => HeadClaimKind::Fill,
+    1 => HeadClaimKind::Update,
+});
+fixed_enum_field!(HeadClaimStatus {
+    0 => HeadClaimStatus::Committed,
+    1 => HeadClaimStatus::Revealed,
+    2 => HeadClaimStatus::Stood,
+    3 => HeadClaimStatus::Fell,
+    4 => HeadClaimStatus::Expired,
+});
+fixed_enum_field!(HeadChallengeKind {
+    0 => HeadChallengeKind::Claim,
+    1 => HeadChallengeKind::Source,
+});
+fixed_enum_field!(HeadChallengeRuling {
+    0 => HeadChallengeRuling::Pending,
+    1 => HeadChallengeRuling::Won,
+    2 => HeadChallengeRuling::Lost,
+});
+fixed_enum_field!(HeadsContractStatus {
+    0 => HeadsContractStatus::Accumulating,
+    1 => HeadsContractStatus::Collecting,
+    2 => HeadsContractStatus::Settled,
+});
+fixed_enum_field!(HeadsWeightsPhase {
+    0 => HeadsWeightsPhase::Recording,
+    1 => HeadsWeightsPhase::Settled,
+});
+fixed_enum_field!(HeadsChannel {
+    0 => HeadsChannel::Spot,
+    1 => HeadsChannel::Contract,
+    2 => HeadsChannel::Lta,
+});
+fixed_enum_field!(HeadsSettlementTarget {
+    0 => HeadsSettlementTarget::ContractChannel,
+    1 => HeadsSettlementTarget::FixedMixReference,
+});
+fixed_enum_field!(HeadChallengeReason {
+    0 => HeadChallengeReason::ValueOrOther,
+    1 => HeadChallengeReason::OffChannel,
+    2 => HeadChallengeReason::DuplicateOrigin,
+    3 => HeadChallengeReason::ExpiredObservation,
 });

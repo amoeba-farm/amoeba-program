@@ -104,6 +104,7 @@ fn coverage_schedule_month(phase: OraclePhase) -> OracleMonthState {
     }
 }
 
+#[cfg(feature = "v1-formation")] // Tags 156-158 build a forming month's rewards.
 #[test]
 fn late_source_submission_can_build_rewards_only_while_full_review_still_fits() {
     let source_submission = coverage_schedule_month(OraclePhase::SourceSubmission);

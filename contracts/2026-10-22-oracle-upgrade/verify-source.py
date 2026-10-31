@@ -7,6 +7,18 @@ import tomllib
 
 bundle = Path(__file__).resolve().parent
 root = bundle.parents[1]
+# Preserve the 2026-10-22 Oracle source while the current Oracle source advances.
+import subprocess, tempfile, tarfile, io
+snapshot = tempfile.TemporaryDirectory(prefix='amoeba-oracle-20261022-historical-source-')
+archive = subprocess.check_output(['git', '-C', str(root), 'archive', '--format=tar', '482f01f7774205595b13c83608c2693465420706', '--', 'oracle', 'futures', 'governance'])
+root = Path(snapshot.name).resolve()
+with tarfile.open(fileobj=io.BytesIO(archive)) as members:
+    for member in members:
+        target = (root / member.name).resolve()
+        assert target.is_relative_to(root) and not member.issym() and not member.islnk()
+        if member.isfile():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(members.extractfile(member).read())
 inventory = json.loads((bundle / 'SOURCE_FILES.json').read_text(encoding='utf8'))
 assert inventory['sourceCommit'] == 'da0e9143f44635dcbce7288ea6510ddf042de215'
 records = inventory['files']

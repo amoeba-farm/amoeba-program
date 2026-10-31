@@ -54,6 +54,7 @@ pub(in crate::processor) fn process_begin_oracle_usdc_reward_schedule(
     let config = load_current_canonical_vault_config(program_id, config_info)?;
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_usdc_schedule_build_window(&anchor, &month)?;
     if *authority_info.key != month.authority {
         return Err(OracleError::Unauthorized.into());
@@ -146,6 +147,7 @@ pub(in crate::processor) fn process_add_oracle_usdc_sku_budget(
     validate_system_program(system_program_info)?;
     let _config = load_current_canonical_vault_config(program_id, config_info)?;
     let (anchor, month) = load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_usdc_schedule_build_window(&anchor, &month)?;
     let mut schedule = load_oracle_usdc_reward_schedule(program_id, month_info.key, schedule_info)?;
     if *authority_info.key != month.authority
@@ -240,6 +242,7 @@ pub(in crate::processor) fn process_finalize_oracle_usdc_reward_schedule(
     let config = load_current_canonical_vault_config(program_id, config_info)?;
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_usdc_schedule_build_window(&anchor, &month)?;
     let mut vault = load_oracle_usdc_reward_vault(program_id, reward_vault_info)?;
     let mut schedule = load_oracle_usdc_reward_schedule(program_id, month_info.key, schedule_info)?;

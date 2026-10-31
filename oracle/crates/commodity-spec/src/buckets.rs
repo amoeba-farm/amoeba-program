@@ -1,23 +1,30 @@
 //! The commodity buckets, their weights and the products' SKU manifests.
 //!
-//! RAMX's and NANDX's tables mirror `governance/commodity_submission_spec.v1.json` (`baskets`)
-//! and `governance/{ramx,nandx}_product_sku_manifest.v2.json`. BATX's mirror
+//! RAMX's and NANDX's tables mirror `governance/commodity_submission_spec.v2.json` (`baskets`),
+//! `governance/ramx_product_sku_manifest.v2.json` and `governance/nandx_product_sku_manifest.v3.json`.
+//! BATX's mirror
 //! `governance/batx_basket_spec.v1.json` (`basket`) and
 //! `governance/batx_product_sku_manifest.v1.json`. The tests hold each table to its files.
 
-/// The governed submission spec, compiled in byte for byte.
-pub const SPEC_JSON: &str = include_str!("../../../governance/commodity_submission_spec.v1.json");
-/// SHA-256 of [`SPEC_JSON`], also the manifests' `provenance.sourceSha256`.
+/// The governed submission spec, compiled in byte for byte. Version 2 (2026-10-22) defines NANDX
+/// as packaged single-die 3D NAND chips, as RAMX's DRAM chips are defined; version 1
+/// (`commodity_submission_spec.v1.json`, kept as history) had it on fabricated-wafer assessments.
+pub const SPEC_JSON: &str = include_str!("../../../governance/commodity_submission_spec.v2.json");
+/// SHA-256 of [`SPEC_JSON`], also NANDX's manifest `provenance.sourceSha256`.
 pub const SPEC_SHA256_HEX: &str =
-    "69ad4a0c427f2eada2d18353e0ec5c58e8e326a1d447f9bbee77b9e5423a4309";
+    "68b0c58d33cb37788c92818332f323266961216999b3473c5dab17f5b601423e";
 /// The spec's `version`.
-pub const SPEC_VERSION: &str = "commodity-submission-spec-v1-proposed";
+pub const SPEC_VERSION: &str = "commodity-submission-spec-v2-proposed";
+/// SHA-256 of spec version 1, which RAMX's manifest (v2) cites: version 2 left RAMX as it was.
+pub const SPEC_V1_SHA256_HEX: &str =
+    "69ad4a0c427f2eada2d18353e0ec5c58e8e326a1d447f9bbee77b9e5423a4309";
 
 /// The chip product SKU manifests: what tag 190 registers for each product.
 pub const RAMX_MANIFEST_JSON: &str =
     include_str!("../../../governance/ramx_product_sku_manifest.v2.json");
+/// NANDX's packaged chips (v3). Its labels, and so its root, are the wafer manifest's (v2).
 pub const NANDX_MANIFEST_JSON: &str =
-    include_str!("../../../governance/nandx_product_sku_manifest.v2.json");
+    include_str!("../../../governance/nandx_product_sku_manifest.v3.json");
 
 /// BATX's specification: the user's battery-cell basket brief of 2026-10-20
 /// (`governance/batx_battery_cell_basket_brief.v1.pdf`), restated as JSON. Where they differ,
@@ -47,7 +54,7 @@ pub enum Product {
 
 impl Product {
     pub const ALL: [Product; 3] = [Product::Ramx, Product::Nandx, Product::Batx];
-    /// The products of `commodity_submission_spec.v1.json`.
+    /// The products of `commodity_submission_spec.v2.json`.
     pub const CHIPS: [Product; 2] = [Product::Ramx, Product::Nandx];
 
     /// `RAMX`/`NANDX`/`BATX`, any case, or the market ids `ramx`/`nandx`/`batx`.
@@ -103,7 +110,7 @@ impl Product {
     pub fn profile(self) -> Profile {
         match self {
             Product::Ramx => Profile::RamxMonolithicContract,
-            Product::Nandx => Profile::NandxWaferContractAssessment,
+            Product::Nandx => Profile::NandxPackagedContract,
             Product::Batx => Profile::BatxChinaIndustrialCell,
         }
     }
@@ -124,8 +131,9 @@ impl Product {
 pub enum Profile {
     /// New, standard-production, single-die packaged DDR4/DDR5 SDRAM on a contract basis.
     RamxMonolithicContract,
-    /// Published contract assessments of fabricated 3D NAND wafers (assessment only).
-    NandxWaferContractAssessment,
+    /// New, standard-production, single-die packaged 3D NAND flash chips (TLC/QLC) on a contract
+    /// basis, as RAMX's DRAM chips (since 2026-10-22; the wafer assessments of spec v1 before).
+    NandxPackagedContract,
     /// New manufactured lithium-ion cells, China domestic industrial pricing in native CNY
     /// (BATX brief, "Collection basis").
     BatxChinaIndustrialCell,
@@ -135,7 +143,7 @@ impl Profile {
     pub fn as_str(self) -> &'static str {
         match self {
             Profile::RamxMonolithicContract => "RAMX_MONOLITHIC_CONTRACT",
-            Profile::NandxWaferContractAssessment => "NANDX_WAFER_CONTRACT_ASSESSMENT",
+            Profile::NandxPackagedContract => "NANDX_PACKAGED_CONTRACT",
             Profile::BatxChinaIndustrialCell => "BATX_CHINA_INDUSTRIAL_CELL",
         }
     }
@@ -219,7 +227,7 @@ const fn nand(
         id,
         name,
         weight_bps,
-        profile: Profile::NandxWaferContractAssessment,
+        profile: Profile::NandxPackagedContract,
         generation: None,
         cell_type: Some(cell_type),
         die_density,
@@ -270,6 +278,9 @@ pub const RAMX_BUCKETS: [Bucket; 4] = [
 pub const RAMX_RESEARCH_CANDIDATES: [Bucket; 1] =
     [dram("DDR5_32GBIT", "DDR5 32Gb", "DDR5", "32Gb", 0)];
 
+/// NANDX's buckets and weights: the spec's 40/30/20/10. Packaged single-die 3D NAND chips since
+/// 2026-10-22 (the user: "Switch NANDX to packaged chips ... similar to ram please"), under the
+/// labels the wafer assessments had.
 pub const NANDX_BUCKETS: [Bucket; 4] = [
     nand("tlc_1tb", "1Tb TLC", "TLC", "1Tb", 4_000),
     nand("qlc_1tb", "1Tb QLC", "QLC", "1Tb", 3_000),

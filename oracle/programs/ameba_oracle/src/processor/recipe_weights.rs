@@ -22,6 +22,7 @@ pub(super) fn process_begin_oracle_recipe_weights_v2(
     validate_oracle_recipe_weight_actor(&config, authority_info.key)?;
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     if params.expected_source_count == 0
         || params.expected_bucket_count == 0
         || params.expected_bucket_count > params.expected_source_count
@@ -112,6 +113,7 @@ pub(super) fn process_accumulate_oracle_recipe_bucket_v2(
     }
     let config = load_active_oracle_vault_config(program_id, config_info)?;
     let (anchor, month) = load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     let mut manifest =
         load_valid_oracle_recipe_weight_manifest(program_id, month_info.key, manifest_info)?;
     validate_oracle_recipe_weight_actor(&config, authority_info.key)?;
@@ -235,6 +237,7 @@ pub(super) fn process_finalize_oracle_recipe_weights_v2(
     let config = load_active_oracle_vault_config(program_id, config_info)?;
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     let mut manifest =
         load_valid_oracle_recipe_weight_manifest(program_id, month_info.key, manifest_info)?;
     validate_oracle_recipe_weight_actor(&config, authority_info.key)?;

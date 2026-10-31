@@ -53,6 +53,8 @@ macro_rules! stable_borsh_enum {
 
 mod config;
 mod custody;
+/// Oracle v2, heads on pikes (`docs/heads.md`): layouts compiled in every build.
+pub mod heads;
 mod manifests;
 mod median;
 mod oracle_activity;

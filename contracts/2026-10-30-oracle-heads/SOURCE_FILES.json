@@ -1,0 +1,2950 @@
+{
+  "sourceCommit": "179864284b5ca09e2ce0bfdb94a05884d2e6f1ee",
+  "packageSourceCommit": "179864284b5ca09e2ce0bfdb94a05884d2e6f1ee",
+  "releaseCommit": "2af39bf9f69f783bacf929daf9b1baa103ade351",
+  "releaseTag": "release/2026-10-30-oracle-heads",
+  "sourceRepository": "spacematter78/amoeba",
+  "exportedFileCount": 420,
+  "files": [
+    {
+      "path": "governance/Cargo.lock",
+      "bytes": 199253,
+      "sha256": "949babb125c109e145517496dad3df4d9029bc34c2d48f3609b69da9f0742475",
+      "gitMode": "100644",
+      "gitBlobSha1": "3e95412ba8d8ca25f0a747f834d7337693c22232"
+    },
+    {
+      "path": "governance/Cargo.toml",
+      "bytes": 815,
+      "sha256": "5dbe98ea78a7e0a71153275995ce302241a3eff0215d0afdfbdb8a39172b0b69",
+      "gitMode": "100644",
+      "gitBlobSha1": "1d6c0bc6dbb952b82d019b23e17dca295c935366"
+    },
+    {
+      "path": "governance/LICENSE",
+      "bytes": 10847,
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+      "gitMode": "100644",
+      "gitBlobSha1": "16fe87b06e802f094b3fbb0894b137bca2b16ef1"
+    },
+    {
+      "path": "governance/crates/governance-interface/Cargo.toml",
+      "bytes": 287,
+      "sha256": "1e03dee1d70daabb27199fff1651758dc0fbad3e4bc5f105b50f70bb17c0b82c",
+      "gitMode": "100644",
+      "gitBlobSha1": "1c68f30a7a3964bb734d238f8558d90cbcb073d1"
+    },
+    {
+      "path": "governance/crates/governance-interface/build.rs",
+      "bytes": 1259,
+      "sha256": "3288dbd22349766a1db8cf9f74d86a0088cff1bd234d78af0f8a4346fcf145f2",
+      "gitMode": "100644",
+      "gitBlobSha1": "fb16b6d75ea77ef431ac46b8938a6093048becb8"
+    },
+    {
+      "path": "governance/crates/governance-interface/src/lib.rs",
+      "bytes": 35264,
+      "sha256": "38edc5dc063411797fbfe1ed1d27a1973b82e0ba0139bb4dbe95b13dc5086656",
+      "gitMode": "100644",
+      "gitBlobSha1": "a8bb283d035215e9b0ac1cf9790ffa05af60a098"
+    },
+    {
+      "path": "governance/fixtures/README.md",
+      "bytes": 612,
+      "sha256": "ff0583c9619d917c0844115497b4cb818cac7d0b7cf006b955bc94a5ae0a45b2",
+      "gitMode": "100644",
+      "gitBlobSha1": "56d3c80947ce3a990a8262c757d1ff1124d1bd70"
+    },
+    {
+      "path": "governance/fixtures/release1_ceremony_accounts_v1.json",
+      "bytes": 15319,
+      "sha256": "0881fc62546c05610467c0259908380eaf5de8ddcaa41b2bcf3ad02fd07b1c52",
+      "gitMode": "100644",
+      "gitBlobSha1": "25b2cdc503d2173a82ca4a3a60a1a3cf45ddbe0f"
+    },
+    {
+      "path": "governance/fixtures/spread_gate_bridge_v1.json",
+      "bytes": 2832,
+      "sha256": "798fd8a9a6374190a0d6283fa3d84789391f8040ba5c3bae95ce5c187aa10776",
+      "gitMode": "100644",
+      "gitBlobSha1": "e9b8ee8566c81aa9ad1bec574f0b20b5e053ad93"
+    },
+    {
+      "path": "governance/fixtures/upgrade_governance_release1.json",
+      "bytes": 36747,
+      "sha256": "277c6831615b84dd9ea144f6d1f84aa6dc6a350c1f6952e047f7ee2c9ff11c38",
+      "gitMode": "100644",
+      "gitBlobSha1": "9cfd78bda38d928f551da6d2fa322b67c770dfc1"
+    },
+    {
+      "path": "governance/fixtures/upgrade_governance_v1.json",
+      "bytes": 9680,
+      "sha256": "d22742ed2341e2403589cd08f358048fa6220e1420be27f595d3dbff724eb8ea",
+      "gitMode": "100644",
+      "gitBlobSha1": "5bb423dd975dd7fa5a40aaa792a5736b747755ea"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/Cargo.toml",
+      "bytes": 906,
+      "sha256": "ad24f6c695abd9050b5dee7265f8094f8c683e9c269168e453e20e48a2bb73dd",
+      "gitMode": "100644",
+      "gitBlobSha1": "cb204cc0877c927857447e90acaf40f0334448a3"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/artifact.rs",
+      "bytes": 5896,
+      "sha256": "74816c2051a73efa2cae0cca69200d2177c01e1e44f2c1692db7e9c05eccd90d",
+      "gitMode": "100644",
+      "gitBlobSha1": "75fabdb3a8463ee28c7b613a893925b75bc5c1f9"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/instruction.rs",
+      "bytes": 1989,
+      "sha256": "25a8d7906cbab1fc02eeb0caeffa0fbc638c0e10c208e23af7fd6c1d1125a948",
+      "gitMode": "100644",
+      "gitBlobSha1": "808a405adb37e6da4ac90b69b46b42d95bb3f7e1"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/lib.rs",
+      "bytes": 1251,
+      "sha256": "561f74b4c9d6cab3a31b66e2dd6ea56d7c556df0e2ee6c562b35b8cb6ca47f3a",
+      "gitMode": "100644",
+      "gitBlobSha1": "8dbffb0bc6683813db404bc418edb497dd2b8079"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/processor.rs",
+      "bytes": 37137,
+      "sha256": "c2a0856d45c3b5bcc8f761c3fe95f2bc324efde5afda02a1131503cf9551966a",
+      "gitMode": "100644",
+      "gitBlobSha1": "78825a4db08607a8f32f43385f986617a3616167"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/processor/retirement.rs",
+      "bytes": 7962,
+      "sha256": "019d806bf4a0f5b2da8850deb730cacf096af7f8cdf9b98c8a715866faec17dc",
+      "gitMode": "100644",
+      "gitBlobSha1": "39332484452ea468f006fecfb42cba1fc637022f"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/processor/verification.rs",
+      "bytes": 6679,
+      "sha256": "94cebba0b4a8bdab04a2e3ca53a723075d7608f7473b40ceab2a278030727104",
+      "gitMode": "100644",
+      "gitBlobSha1": "c160c448b08dc5ca736cacea2920d46e9ff9a6c8"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/state.rs",
+      "bytes": 22742,
+      "sha256": "0473a9f1cc16222411a505e309fda1bd7f68166c657fd65b588bf7d459a68b23",
+      "gitMode": "100644",
+      "gitBlobSha1": "4eb28995a5c9ec0a0ec8fd86c1eb90c7d0cc267d"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/src/verification.rs",
+      "bytes": 11468,
+      "sha256": "30959b317509ffcef2533d43bc6e15ce642aa7cdedc3d0ef19c746b18c4f35e9",
+      "gitMode": "100644",
+      "gitBlobSha1": "6ba48ad6228d33da07a32dd08af0817e5527e7f3"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/artifact_cap.rs",
+      "bytes": 13306,
+      "sha256": "b653171e6a37242f6ef37e18084e31f495a5e8c216eced66250b3fdd5f1894b2",
+      "gitMode": "100644",
+      "gitBlobSha1": "743059fccb945bcfc601091b6f0dbcdfb6279e9a"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/core.rs",
+      "bytes": 14064,
+      "sha256": "4006ebd9fe46ced9f398b030d73c6a7a4eb12c61528c78482e82359604d2fb2e",
+      "gitMode": "100644",
+      "gitBlobSha1": "de621f66c7362894719a77203811de0dbe070ff5"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/self_upgrade.rs",
+      "bytes": 11263,
+      "sha256": "73bf1782bbead8650601ce9743bf76d100114ffd5206397dd172592f4928497d",
+      "gitMode": "100644",
+      "gitBlobSha1": "15ef1731995fcb26a3dd39bd6b29eff39d5bc153"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/spread_gate.rs",
+      "bytes": 3493,
+      "sha256": "bf70d33ba228cfe59cc77970f7e9d9d6863d7e63208be64e119734ef61e45253",
+      "gitMode": "100644",
+      "gitBlobSha1": "21b52175155b4a94fd8654cf3cbda93794b37a70"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/spread_light_config.rs",
+      "bytes": 14301,
+      "sha256": "dcda2cabda870f1427abd32ec19450b06e090286ce21ab70c7f5bca913198255",
+      "gitMode": "100644",
+      "gitBlobSha1": "de13bc01f30bdefc087a53a5e8b3828ffcdf7db6"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/target_upgrade.rs",
+      "bytes": 14300,
+      "sha256": "99a354a42a3b9893177b6a70debaccccdc8548115ac0dd77358261e3b253e2bf",
+      "gitMode": "100644",
+      "gitBlobSha1": "1ad23c78c61258b2c672ed7b08f4b8111a99cd8d"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/two_mib_sbf.rs",
+      "bytes": 42325,
+      "sha256": "0439a5765a4afd76e1beb81e6edd742cfdf22ed76666863d01fb85262e0dfdc5",
+      "gitMode": "100644",
+      "gitBlobSha1": "3e80be7e0665723a64ce92b3c9b08f3e84d55878"
+    },
+    {
+      "path": "governance/programs/governance_controller_v3/tests/verification_metadata.rs",
+      "bytes": 24479,
+      "sha256": "0d0e826f9304df57e531dc11b13fb44fd73cb89b6d55e8142db28f2da75b1f89",
+      "gitMode": "100644",
+      "gitBlobSha1": "0dc4cc3952ad311aad37243914dab64a12a9c568"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/Cargo.toml",
+      "bytes": 1280,
+      "sha256": "9007e10b915bd3593644dbf7cd3a2df869e55dc905ce82bd5ed947c6339b2c61",
+      "gitMode": "100644",
+      "gitBlobSha1": "bd2a7f59a694513b44bad7fb3434b28f2348390e"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/artifact_merkle.rs",
+      "bytes": 11560,
+      "sha256": "92f684fe771bb0b2ebd3f0d8caf5328b6bdce7349817729ac2ed078646a10aad",
+      "gitMode": "100644",
+      "gitBlobSha1": "b8bf889460858b1f8f717040d876090a3bad8f34"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/authorization.rs",
+      "bytes": 686,
+      "sha256": "9e00e6c2ebfae3ff1442fb6910094c330dcd7c4570a3cbcf94c2712de61cebcd",
+      "gitMode": "100644",
+      "gitBlobSha1": "d511daf157f8ba47bd4fc92f7c36ea2a21888cd4"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/council.rs",
+      "bytes": 10738,
+      "sha256": "876ecdf9aea3922cd45aaf9d0c95c39eb3ab9eb3ebc7ed32986687acd49534dd",
+      "gitMode": "100644",
+      "gitBlobSha1": "d2bd78aa1f9c6aaa89472739c48feabc18d1310e"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/digest.rs",
+      "bytes": 5517,
+      "sha256": "c5b3535999f85a0f9bd2fa72d599be26209394114fffac6fe3be0de312db266e",
+      "gitMode": "100644",
+      "gitBlobSha1": "c00ead3952d648db886b1162ba1d78de3dfc69c8"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/entrypoint.rs",
+      "bytes": 364,
+      "sha256": "deef87a24c3828eae4742be7a642597d72c76def41fec0c922998ee5ab332c01",
+      "gitMode": "100644",
+      "gitBlobSha1": "5faa71f86126f36eef1488efee35c37334fd131f"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/error.rs",
+      "bytes": 8850,
+      "sha256": "9b83c2827834dba227243b031d8e4606bee9bde975d92aa27ae0480572dd6fc6",
+      "gitMode": "100644",
+      "gitBlobSha1": "0fedb1c1e55cef77a7c7534a5e1a74d7e3f6466c"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/gate_abi.rs",
+      "bytes": 11076,
+      "sha256": "7f64707237153588871e41ea6696c4d9b81beb9cf3de045e4dda8d561cae3f0c",
+      "gitMode": "100644",
+      "gitBlobSha1": "e98b59a609c0cee66bea3674b31784a3cbb84b9e"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/instruction.rs",
+      "bytes": 179584,
+      "sha256": "dfe02a32edd8f93951d6392410a66850eca96c37486ce9fbdeb1e99f61ea3051",
+      "gitMode": "100644",
+      "gitBlobSha1": "afda38e4ec65abaf88e84cf1f3f18b110f01eb4a"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/lib.rs",
+      "bytes": 2134,
+      "sha256": "0a4b32f54919e11b766353e8984ae64187330bee009365ff37f605d2127765cf",
+      "gitMode": "100644",
+      "gitBlobSha1": "0fba1f24815d9e81dd8ad87e3a9273e2fc113651"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/pda.rs",
+      "bytes": 21257,
+      "sha256": "bdcc8e44ac7b3da74c7d4c5d28bb30538652e5d91fe4f308725fd76b268d461f",
+      "gitMode": "100644",
+      "gitBlobSha1": "8540b9ec7f2a14f2469508951c269ed6ecf56915"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/policy.rs",
+      "bytes": 5340,
+      "sha256": "62c56b064d5808f755c094ec7949077c77da69cc2670694faea38dd3d18a44eb",
+      "gitMode": "100644",
+      "gitBlobSha1": "f7c7c8025eb36e8784ac5065bd1a03c308921d8a"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/processor.rs",
+      "bytes": 40525,
+      "sha256": "117fcfe25e64461b1d5dd78d9f19bf984e5ae9bef4c428b3a2121077d9ee892f",
+      "gitMode": "100644",
+      "gitBlobSha1": "e07fa56f79bee1aa4b2c9e5da74a5af20b4fa905"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/programdata_observation_merkle.rs",
+      "bytes": 29049,
+      "sha256": "3e0ed5b23fd3da0bfe0acf729c3f26665f4814a035735dacb604823a9d459681",
+      "gitMode": "100644",
+      "gitBlobSha1": "b82d1cbb0840e46bcfad3a0c945c7d93a5b6e164"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/proposal.rs",
+      "bytes": 8440,
+      "sha256": "5c94154c295a6088c3cae7a814fac32d2e6ff29f1d351c2294924d7ea3c19284",
+      "gitMode": "100644",
+      "gitBlobSha1": "d7e7772516650a805993637fa52cfe6a9ef004ea"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_account_io.rs",
+      "bytes": 9086,
+      "sha256": "ad64920b45a57e73b0db245f994334003224ff6062ed7110cab098d5940930de",
+      "gitMode": "100644",
+      "gitBlobSha1": "f065c294ad88f813c51d0627bfe13b7ba91e4806"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_authority_instruction.rs",
+      "bytes": 12086,
+      "sha256": "627d3f8f436cc8f593afeca439ddfae4af853b9eea88265d7ace5400f3a9103d",
+      "gitMode": "100644",
+      "gitBlobSha1": "489cfedf7b0980a3e01d1516f2cae0a95c54395b"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_ceremony_digest.rs",
+      "bytes": 16862,
+      "sha256": "4a57ef8994e8aa42ce2fe6d824fdfdbe6c1267244e0cdbb35007fcb563e60843",
+      "gitMode": "100644",
+      "gitBlobSha1": "7d8fb48fe239bfebb1bd65985e28f301317b9cf5"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_ceremony_instruction.rs",
+      "bytes": 30016,
+      "sha256": "52844a43fd2b6eac31b60bc44ea261e8f0fdf04182079ca1e394a3239d56cead",
+      "gitMode": "100644",
+      "gitBlobSha1": "e7638bdffe57fbf44f7fff7a5309ee6b2b94fa79"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_ceremony_state.rs",
+      "bytes": 111061,
+      "sha256": "56b3cdbc70d4ba6f0dbd83ba6d92ff9e22159004e9e765cdb4f795df0aa7502e",
+      "gitMode": "100644",
+      "gitBlobSha1": "78501c12acc647d158db6d01e06fefe142e6fd2d"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_digest.rs",
+      "bytes": 23432,
+      "sha256": "bb223ed087e930bcd5ea89abff61fed293b0012a8e910c18440eec2ed0b9ca77",
+      "gitMode": "100644",
+      "gitBlobSha1": "b332827eb6826068970593834d0283786a18d483"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_governance_v2.rs",
+      "bytes": 88277,
+      "sha256": "2988b6b1984025ce5f841710c14f6af8daea709e370334252eb77a770955953d",
+      "gitMode": "100644",
+      "gitBlobSha1": "f05f2f3a882eb39bf1dd5f334b0aeadbc1052fa3"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_governance_v2_authority_processor.rs",
+      "bytes": 117933,
+      "sha256": "103408fa1fb2752ca846a7836cd1caf7b7db0c6072a624385a8944e1f833e1cd",
+      "gitMode": "100644",
+      "gitBlobSha1": "6273dcd755a781503df2df3d63c3b7a4620f9701"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_governance_v2_processor.rs",
+      "bytes": 73058,
+      "sha256": "5e713f4427cf6231c64994cbfe70ff3945575b02b3208afca0100d20fcc770d2",
+      "gitMode": "100644",
+      "gitBlobSha1": "463b79ec482d52325975c0342a51269e63af7b40"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_loader_accounts.rs",
+      "bytes": 13321,
+      "sha256": "d5d8fcd6d925b70425c9cb0c59b050765a9a98f9ed5dadf702873b8557fa8d3d",
+      "gitMode": "100644",
+      "gitBlobSha1": "ba5a96fca726ddc7ce0c645b46876628524f25f8"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_model.rs",
+      "bytes": 115866,
+      "sha256": "0aabd41519d0b67386c9a7f471a4d04ad1a136b79bc1449cd1ff66f7fecc1b82",
+      "gitMode": "100644",
+      "gitBlobSha1": "89a4ec94ce176b4fccb190ea2984d65f75cf28b6"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority.rs",
+      "bytes": 8267,
+      "sha256": "4e713c5c9cf879c1ec646c828b8089051d52daf9324e888da4fde4f54254656a",
+      "gitMode": "100644",
+      "gitBlobSha1": "2e20442470fc0f4176bcc4240015b8cbd59262b2"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/account_context.rs",
+      "bytes": 19652,
+      "sha256": "85e14924a4956983d5242eeb5e0a511f5da55758f17e9fbc365b548e3edd56c4",
+      "gitMode": "100644",
+      "gitBlobSha1": "3943f0cf85bfdb80d0d6dd145c554c42f1030d04"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/activation.rs",
+      "bytes": 27188,
+      "sha256": "ddcb1a15289d945cf24b71c847995551029116cb6119ed4c1dadbed58971263a",
+      "gitMode": "100644",
+      "gitBlobSha1": "db71c0206fce65d760a24e03812a6458e98d846d"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/approval.rs",
+      "bytes": 3176,
+      "sha256": "e794cc23e1103437bb957de1cc3c7291b8c015f7ad444faeaa09357ab6c4dcec",
+      "gitMode": "100644",
+      "gitBlobSha1": "6c064103e012b2352a107c78d6f9c289294bc9b6"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/evidence.rs",
+      "bytes": 18221,
+      "sha256": "063b9f8fabe956e34dfc50b9461534746ac9318064ced43d0b2e09b379b4e8d0",
+      "gitMode": "100644",
+      "gitBlobSha1": "c82ff8258437c724379e902fab7a0b3e41159934"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/handoff.rs",
+      "bytes": 24401,
+      "sha256": "e882ff08756ca3f3bb04b96e1d876d65c68f24cce2c53cf24cb2228b2d775821",
+      "gitMode": "100644",
+      "gitBlobSha1": "b6fd5af357dc9ed02118db65651f1cfedc3a63fb"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/immutability.rs",
+      "bytes": 6524,
+      "sha256": "3972f9402964a0a83a6a966323aa5c994be408829b774332f20d9a075ffba25a",
+      "gitMode": "100644",
+      "gitBlobSha1": "75ee6bc45006faa3cfafbe1b54f173dab006d6bf"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/loader_contract.rs",
+      "bytes": 7356,
+      "sha256": "6b361a463e766fca1c71505ef380609254d648ee8f79d5f07ea51f8c88b37ce5",
+      "gitMode": "100644",
+      "gitBlobSha1": "75ff8708c162cd14f7bea2e281387da8a6f1cf50"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_authority/tests.rs",
+      "bytes": 12029,
+      "sha256": "27ce30464f3696162ea121bc20bfec532fc0fdd5abd8251419bc2ec02a6ff1c7",
+      "gitMode": "100644",
+      "gitBlobSha1": "c03d7b876d2a981793eab1b4df66c864976233f9"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_buffer.rs",
+      "bytes": 38712,
+      "sha256": "40ae363e2c1f7f4c1d0143a4d8eb6bdf379cca3333b7ce059f9835d9978bd1c7",
+      "gitMode": "100644",
+      "gitBlobSha1": "59ead67095bebd10f8b08faaaabfe54d9859a145"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint.rs",
+      "bytes": 8570,
+      "sha256": "df85a7877b4f1eedb788e53829d0cdd460b881506eb4f59cd06ecd19863e561a",
+      "gitMode": "100644",
+      "gitBlobSha1": "1b053151a38feb6cc1dc5daf926ce8df3f86e9e1"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/account_context.rs",
+      "bytes": 7088,
+      "sha256": "d3c31f8780f8cd67ee1b08ae4712879650a1af0ba1bbfff287db60f5c9f17bea",
+      "gitMode": "100644",
+      "gitBlobSha1": "bac25ee92d374381061f5baeb08c45d888185af5"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/approval.rs",
+      "bytes": 2055,
+      "sha256": "83ebacbbed29b3509f145efe4ef235b0272aece77852eebaf1e64c846f336512",
+      "gitMode": "100644",
+      "gitBlobSha1": "74e9d71262cca7ad50976a9fb6dd8170e2173415"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/attestations.rs",
+      "bytes": 14294,
+      "sha256": "e020120041b2cac540218b74a3f6855bcc7d7f93cb7b0a29396f1ab7667fd959",
+      "gitMode": "100644",
+      "gitBlobSha1": "39f6e0cdf07c3f0a450c5346549f84c786bd25ff"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/council.rs",
+      "bytes": 7279,
+      "sha256": "d52b5433eaf3d357443d9a35b65011b57c035c5830100fc3a243728bdddb5d12",
+      "gitMode": "100644",
+      "gitBlobSha1": "90f84fce9d4d066028abff3005fc5964f5190737"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/emergency.rs",
+      "bytes": 4112,
+      "sha256": "aa041fdf73f22e4c0fbc063c94e843e440690bbbab8fe553cb2ebde2a913340c",
+      "gitMode": "100644",
+      "gitBlobSha1": "ca7f295d90b9edc6e03b90359858ff68a2323f2b"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/evidence.rs",
+      "bytes": 25643,
+      "sha256": "af3e69c27d40927c384a1e84ac326f150b0cd6d9a5049ced2e394de6183e10ec",
+      "gitMode": "100644",
+      "gitBlobSha1": "5413ac27aad655b26069031e59da396fdf0cc0d0"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/finalization.rs",
+      "bytes": 11187,
+      "sha256": "274964e9b8be5e0801302e198d26e4d78f756a7ffdc3ce815fb6e0bd4102ee6e",
+      "gitMode": "100644",
+      "gitBlobSha1": "b38366931a0b2a2b42b88cf541d51dbaf4f72f6c"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/rotation.rs",
+      "bytes": 11682,
+      "sha256": "162c043f87de2af66c2ad12ec02a80a141882fe3803e1acad9eab75d81636d77",
+      "gitMode": "100644",
+      "gitBlobSha1": "83c3a880affaf97920aeba16b70cb7d14832d637"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/rotation_context.rs",
+      "bytes": 10889,
+      "sha256": "4d7b84eb44526e3b389aaa04974f869e6160dcb916f52ba089389ba4752a6eb6",
+      "gitMode": "100644",
+      "gitBlobSha1": "747ae53b44ca3c7ba9b2b1fb217cf73d838cca1a"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/subject.rs",
+      "bytes": 6802,
+      "sha256": "0deb03070a98f76c816b9fab914a00a57c876f1c8ffd54ad6113368c99754122",
+      "gitMode": "100644",
+      "gitBlobSha1": "7fddd4b1191f5df21370bc7c301af09b67da6929"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_checkpoint/tests.rs",
+      "bytes": 56199,
+      "sha256": "572400ac9d81d5ac2c4fbb2c32e58c1e9c2195a5c6522a7fef0fa7775d2f5e30",
+      "gitMode": "100644",
+      "gitBlobSha1": "609b247a6ef3816f8f883741f841a698a8a74d22"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_initialize.rs",
+      "bytes": 41373,
+      "sha256": "5070e50ecc2e883226c99770d728368cf0cb903e984b68c46c3a1a474bda3fb6",
+      "gitMode": "100644",
+      "gitBlobSha1": "884922b8587a27eb2978d603f045ae76c118992c"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_initialize_v2.rs",
+      "bytes": 56049,
+      "sha256": "4b73905ef7ca3816faa6918809e18b64add28bad18cc88c282f42bc50a883af3",
+      "gitMode": "100644",
+      "gitBlobSha1": "e35f517609012fe4f1d29aafce0d6819cb08ea49"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader.rs",
+      "bytes": 4014,
+      "sha256": "b25daf6045ec9f65460287cadd1db7bd178f6dafa33f3eae84b209b7147399b9",
+      "gitMode": "100644",
+      "gitBlobSha1": "b70161147cb72e593f2d2a24d73bf39d1d3c3549"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/account_context.rs",
+      "bytes": 11054,
+      "sha256": "69372a330e51466c139b6820a42876328329e4ddd77f12a40d8976a04b0b7200",
+      "gitMode": "100644",
+      "gitBlobSha1": "083edce56bd646ce700c8656de553dd413f2793b"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/buffer.rs",
+      "bytes": 2552,
+      "sha256": "b14d81bf53bc99482845f7a191af9e127e2e53dc65b9d80910db625448a9663f",
+      "gitMode": "100644",
+      "gitBlobSha1": "249e297326773ebda34ae79f9dae05fc48cc0e49"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/execution.rs",
+      "bytes": 20236,
+      "sha256": "24e4990801a3536a774a82cbc3fab8452b406084a68d207a9d2351cb69a5cfb6",
+      "gitMode": "100644",
+      "gitBlobSha1": "28f079a9d4b9938072d693d25eac04c6c2095ca2"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/loader_contract.rs",
+      "bytes": 6412,
+      "sha256": "64d56b29525fb7641491c1913518cfe714c4842d0cb4b78f5a7d47228afe9029",
+      "gitMode": "100644",
+      "gitBlobSha1": "2df81c7990b128b904e69a0e79f9d0b9210659b3"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/programdata.rs",
+      "bytes": 3173,
+      "sha256": "83ceda022a1d7311d49b0d6bb1f5d6eb017355fd34df8919dee46a21cfe2a6ed",
+      "gitMode": "100644",
+      "gitBlobSha1": "36dbf6be1aa4b85f4a159584729eb585d5f3b646"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/rollback.rs",
+      "bytes": 5086,
+      "sha256": "d360e955e4440b2f131bb7bbe39b3850f0a85037e7b3bf15b683d55c6a84d937",
+      "gitMode": "100644",
+      "gitBlobSha1": "9228b59d7e36ff4bfa9dfb5e7dd3c63051bb6b32"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/tests.rs",
+      "bytes": 23919,
+      "sha256": "453177e929df9a73c283087a7b422ac3ad46cc14d8d6846689a1442634fffd4f",
+      "gitMode": "100644",
+      "gitBlobSha1": "fecd61145b0435e174b9040247db4077b1e72c3d"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/timing.rs",
+      "bytes": 3416,
+      "sha256": "a4e7de7e32aa945ef09706c21e3066f6e8402b09ac5f94e53d9fbece84fc59e9",
+      "gitMode": "100644",
+      "gitBlobSha1": "25dbdf43735c20c4fe991d2b12738a5d5881f1a0"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_loader/verification.rs",
+      "bytes": 15350,
+      "sha256": "9dae25eef786fd81c8a06f0443f6293e80131314e30518569499ebab6dcaeb5e",
+      "gitMode": "100644",
+      "gitBlobSha1": "b1b808096814fef1a9b9b2bc39e07306d229a7a7"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_observation.rs",
+      "bytes": 55443,
+      "sha256": "07cbb3e80df2263a8f582603ef846427761de120a04eaa866e83446e4bd7aca3",
+      "gitMode": "100644",
+      "gitBlobSha1": "4dba22e94812638b9c2310b596d1e9aaea6e5573"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal.rs",
+      "bytes": 7345,
+      "sha256": "9a4252f5ba6e9371b180af9a3e9acff44fac8ff86d6fe66487bcf20a840fe87a",
+      "gitMode": "100644",
+      "gitBlobSha1": "8d9bbfa4e43b52703f3fdf9ee773c0d231a89a89"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/account_context.rs",
+      "bytes": 8852,
+      "sha256": "d4c7ab58d75a1079bf2ea144e539b8bdb030b45fc23c373257ec3157b674537c",
+      "gitMode": "100644",
+      "gitBlobSha1": "02cfa0891e70d0961cf3805d4b8c7c2c2070c4a9"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/emergency.rs",
+      "bytes": 27537,
+      "sha256": "48bc0ecae95ee16658c395325c77ae9551f0e4be8db28469d0367c79159ab5e0",
+      "gitMode": "100644",
+      "gitBlobSha1": "0268e5d82257db1312888ad29b7c8ea4140104b5"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/emergency_guards.rs",
+      "bytes": 5369,
+      "sha256": "6cdc0597694e78cb32b4cc5ee1b97d1dae28e91d0bf264f6aa6ae61a11b951bc",
+      "gitMode": "100644",
+      "gitBlobSha1": "f0127c1e948f974a861cb5fe0e8b251ba44b997e"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/lifecycle.rs",
+      "bytes": 19081,
+      "sha256": "2c369b7b353ea65df9175b1d7752411392ad180a2bf48343c1e8e902d2bedd5c",
+      "gitMode": "100644",
+      "gitBlobSha1": "41fdc09fa59b8a4d05b96d4a57e73314c363227f"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/observations.rs",
+      "bytes": 11654,
+      "sha256": "f4bb571b81263ea2c00ee721a8db50417a4f02bbd767f8ed799263ff32dad3bf",
+      "gitMode": "100644",
+      "gitBlobSha1": "d7f237ef9c7f8f94b202b7cd9b10d17e3c9411f7"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/proposal_guards.rs",
+      "bytes": 9004,
+      "sha256": "1df0dd6d71aa429105a08732f35f9f59e78df90f98c6c17bc32e2ced9d682780",
+      "gitMode": "100644",
+      "gitBlobSha1": "ccecbdf1abc04743d158dce4f47813037b4acaba"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/proposals.rs",
+      "bytes": 18819,
+      "sha256": "fc02395d4ed0822ea37cc0aed92287ffe85f4e9dd44a8863d14ce569e8ffc61c",
+      "gitMode": "100644",
+      "gitBlobSha1": "eba6ffcbb9c6994e558fe3635e62d060b9504de2"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_proposal/tests.rs",
+      "bytes": 33956,
+      "sha256": "5c822bf5ea52ed67aab6c95951187a45dd5e9ed5a36f836a41ee55a65ae2d66d",
+      "gitMode": "100644",
+      "gitBlobSha1": "b901bce97f7f976a8ba7bbf1ace7224d6a59741a"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal.rs",
+      "bytes": 6878,
+      "sha256": "6cbc76c886b9c0b6815a7eccea853f8938c4b02388f2b045d6634d5ab0eb68b2",
+      "gitMode": "100644",
+      "gitBlobSha1": "dcd32f2554eed3f3623b71c6f9164489739e0dab"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/account_context.rs",
+      "bytes": 11062,
+      "sha256": "e8defeab1b139a6a11d8d8e8b6a1009656537bbd818be9bac751f15452a7328c",
+      "gitMode": "100644",
+      "gitBlobSha1": "29f7a19b833fc887982dc5097bac958380db5ded"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/buffer.rs",
+      "bytes": 9375,
+      "sha256": "af5f0165715558fda0592de4894db3d53b5d78d4ae02df7833238325eba1d350",
+      "gitMode": "100644",
+      "gitBlobSha1": "ceb92f071cc197bc935a5ee6e32deaf6ac530a45"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/failure.rs",
+      "bytes": 20155,
+      "sha256": "e68f18a1085a411cf62287bd474ab33caad45e4627d1f3f19e46258ecee839d2",
+      "gitMode": "100644",
+      "gitBlobSha1": "601d0e716bc77a38682e082ec90058f85da53d35"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/loader_contract.rs",
+      "bytes": 3902,
+      "sha256": "14a0db29ce6d5cf3593d49a796b612de336039727c1eedbada4a1d055f7ce4ca",
+      "gitMode": "100644",
+      "gitBlobSha1": "6924431120cb871d9ae15ae48c12b4726ffb062b"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/proofs.rs",
+      "bytes": 7244,
+      "sha256": "77f7b0c278e20f3b8100b602041f9d63f8e21dd3f11eb51523bcafd6d05610aa",
+      "gitMode": "100644",
+      "gitBlobSha1": "6823e0009b70f35bd2b2eb3107feef9c0d54e395"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/rollback.rs",
+      "bytes": 17789,
+      "sha256": "f097375fecb0e22d16f73f9e5dd4b4119a247f653be110a9c7da9eaf36fc3b0b",
+      "gitMode": "100644",
+      "gitBlobSha1": "dcd22c94d29afa800f8c6962a1a78d9f6fa80c2d"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/tests.rs",
+      "bytes": 35374,
+      "sha256": "0390d0b96470a31053ec403a5995af4d085431151eed82404bdb7f94970bc4f2",
+      "gitMode": "100644",
+      "gitBlobSha1": "6ade74b5be238f6d22f12d4830aee6567869bfe6"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/timing.rs",
+      "bytes": 1808,
+      "sha256": "38cb7cc6c9b6de0615d7f68eb1fef7fdfead7ef5fac6613e63c59ff748733ced",
+      "gitMode": "100644",
+      "gitBlobSha1": "3bf07e8a7def2acf4b4fa9731e9b90324aca00a3"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_terminal/unfreeze.rs",
+      "bytes": 20710,
+      "sha256": "0faf7f5898869280d89051a0059ac5c09507a6a81ac4b02afcab8daf6983d00e",
+      "gitMode": "100644",
+      "gitBlobSha1": "948da41f1acb1d5ff1469c2e0fa774f4ee531e44"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody.rs",
+      "bytes": 7757,
+      "sha256": "aaa793a599245cd1bdf53dfe6d3b4fbebf69c82537ecc2235eca474689af86d4",
+      "gitMode": "100644",
+      "gitBlobSha1": "3e520ccbd96e52208fa0cab9d70e0cce42068754"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/account_context.rs",
+      "bytes": 17554,
+      "sha256": "cf500d085abf2ad76b9c13dd3355da1dcb9f9bb4facd935422f0e975d12d1936",
+      "gitMode": "100644",
+      "gitBlobSha1": "daa923d1bb0e91b4880ac0073533aa1e92c8aedb"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/buffer.rs",
+      "bytes": 25519,
+      "sha256": "3cb3d49b93ace5c8f589d65e295f0ab384d8766adb3cdd04893f77fcab612b7f",
+      "gitMode": "100644",
+      "gitBlobSha1": "6f907fd503d0960417eff89a1cdb36192b8429e6"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/execution.rs",
+      "bytes": 23254,
+      "sha256": "3a9bcc5611832aa334ca51e96470bd1cb61aff832cbbd5c862a781e9ea9f211d",
+      "gitMode": "100644",
+      "gitBlobSha1": "01ce7a4969981df352a04cc9c5a4626cc0de761f"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/failure.rs",
+      "bytes": 22766,
+      "sha256": "81ee1b4c842595dfb2e13e04f4d7c051cbd848490ce078a5f3e64e8468e68b18",
+      "gitMode": "100644",
+      "gitBlobSha1": "ad356c892531c4bd6b39439ef1982e4f1144f596"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/loader_contract.rs",
+      "bytes": 7286,
+      "sha256": "0cf30dfdac24aef81637dec24425dc344a1a62bdd1119d752cbd4a085c3e72ff",
+      "gitMode": "100644",
+      "gitBlobSha1": "70c36af7d1c6c3bbe65b6da4fc01f28021d69038"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/observations.rs",
+      "bytes": 11770,
+      "sha256": "666fe8eadba0ba924979d93608a3c801f5093075abae0a0a67be6a01f9b32d4a",
+      "gitMode": "100644",
+      "gitBlobSha1": "31c21dc7129f50f4a94c3c5e18eed78a5250545c"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/proofs.rs",
+      "bytes": 6473,
+      "sha256": "f851565110dc2054b6094c130b1cda95d7e10373b0cb69ea195628c68bfc3bfa",
+      "gitMode": "100644",
+      "gitBlobSha1": "e31db0ec6898dfd8455515fc0f0aa801402c06c3"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/rollback.rs",
+      "bytes": 23535,
+      "sha256": "85ee522197ba29d9033615ce290d8fcc7f5a2d9610a0edb0943fbde778e6e140",
+      "gitMode": "100644",
+      "gitBlobSha1": "780e16055888d46bad05b018341b11a50bf5bbde"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/tests.rs",
+      "bytes": 7390,
+      "sha256": "60e0af07579a7b332318132eb5eb00285bf988974780f0f303832d0550ff56ef",
+      "gitMode": "100644",
+      "gitBlobSha1": "33fb552cd75a186e85cd2092b21b3d3dbb50f4a4"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_custody/verification.rs",
+      "bytes": 19249,
+      "sha256": "50fb0ed74c7cbbd48909186a141cb13de3f576303a3de91b8178260a80c845b0",
+      "gitMode": "100644",
+      "gitBlobSha1": "62cc1d2baff93ea2a0999ac7e5cca2fd75304e95"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle.rs",
+      "bytes": 11552,
+      "sha256": "63da0a71ee913e106c51d22e5ec465e544d13527024ee67374a77ae025008a11",
+      "gitMode": "100644",
+      "gitBlobSha1": "6376f409a9ab927206778eb4159f0b49f2b288fc"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/account_context.rs",
+      "bytes": 14402,
+      "sha256": "c908230ec6cde1443e6d92bca5366781b3e6611cfe42acfeb16b32677788f1bf",
+      "gitMode": "100644",
+      "gitBlobSha1": "0a7df76e832dd0272ce0cc65d7fd05789935a428"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/activation.rs",
+      "bytes": 9418,
+      "sha256": "c6441f0afa977863c76a405b9748c3857a703a463165d4c47153840cf14bfc54",
+      "gitMode": "100644",
+      "gitBlobSha1": "79f642457ba3aea6e1ba98df4d52236244bb7083"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/checkpoint_evidence.rs",
+      "bytes": 23556,
+      "sha256": "524ccfbfe32d43e5cbfb4b8bd4d423e8d669fdebe78bd799208a9f77c279db32",
+      "gitMode": "100644",
+      "gitBlobSha1": "3ea9286915056b1276e7c79337e4c8eddf40d291"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/checkpoints.rs",
+      "bytes": 14566,
+      "sha256": "91590b818eaeef6623beb06f9eef29fb8f3973af4c802f064017cc49f545c99b",
+      "gitMode": "100644",
+      "gitBlobSha1": "b148977536eedff3bb225364febe397631ceab5b"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/emergency.rs",
+      "bytes": 22953,
+      "sha256": "cc38e46074d89e59245fd206b2713d5845a92452125ce3fd50f2f3060c7b8f6c",
+      "gitMode": "100644",
+      "gitBlobSha1": "36a21e410eebe22fbad187c53db0392f05e6408f"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/emergency_evidence.rs",
+      "bytes": 9837,
+      "sha256": "783efc5ff31e33bc48a17614a0ca7ee36fa3080d1ad21c9553e18b503c6f0f81",
+      "gitMode": "100644",
+      "gitBlobSha1": "b32e03eb603f9e0b8925854b44c26d3e5792ea26"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/envelope.rs",
+      "bytes": 3377,
+      "sha256": "e4e7749a9312c799b3e1456d818b9446fd8b94b1d1222fd19c5bcd21c61f4ed7",
+      "gitMode": "100644",
+      "gitBlobSha1": "09b0e3ab8048b3fa5bebd9d2d1e26d06a079f19f"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/guardian.rs",
+      "bytes": 6628,
+      "sha256": "8a2a3e81294131407010f6e30f983cefb47c824786cdde1aa3a139835244e926",
+      "gitMode": "100644",
+      "gitBlobSha1": "bd4126a5f2f5291b847b4aa833df38aa1cbb9fb0"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/lifecycle.rs",
+      "bytes": 16638,
+      "sha256": "3fe00b2819342a7aa4f2dbe6e94ac5d2f0fc8ddee308e379b62a4c01fe2bcad0",
+      "gitMode": "100644",
+      "gitBlobSha1": "02ba5c36208fd0e5cfc6d8eae0ef88f22d8b6021"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/observations.rs",
+      "bytes": 11847,
+      "sha256": "6f6d2c3bd99ef45a5c60a1153b93a2ff8c2b10a789c27f3dcbc643fa97a8092d",
+      "gitMode": "100644",
+      "gitBlobSha1": "511ea4974e6fe8854e3b7c1477b60d9afc5b1652"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/proposal_guards.rs",
+      "bytes": 4688,
+      "sha256": "fae0625d5ffa39e72bb72e1148019fcb3724bf35c224495541a2aeeb2deea431",
+      "gitMode": "100644",
+      "gitBlobSha1": "352423f16068efdf77eb8dd7c267b76606fae361"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/proposals.rs",
+      "bytes": 20332,
+      "sha256": "98b051e59a3e8c5a1b92746f8594b7d60fbe7bed889acc901cf74c898cc36fba",
+      "gitMode": "100644",
+      "gitBlobSha1": "71810c51097a81a1667a5f37a5045f8d554dab06"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/tests.rs",
+      "bytes": 11850,
+      "sha256": "a7df90bce71b0d9b7dd50b5d8f9249d399a514b9c1592047f197b349efc92980",
+      "gitMode": "100644",
+      "gitBlobSha1": "9dd31f362b08632b4f1d600ce96abace29d942a8"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/unfreeze.rs",
+      "bytes": 9066,
+      "sha256": "4c524b6318d4e240867536837a35e00bf71d054a9fcbd779f14ee2fa59182917",
+      "gitMode": "100644",
+      "gitBlobSha1": "6313bacb679797d2eb123cb9ecb98d786b470f6c"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_processor_v3_lifecycle/unfreeze_evidence.rs",
+      "bytes": 12957,
+      "sha256": "2174a81fde6e6ac38de6b89f312e0634c2897e6e2091cbd118936b4e53cce953",
+      "gitMode": "100644",
+      "gitBlobSha1": "4600ec4a02d1d1b2026a0a794341a04c5a39cadb"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_state.rs",
+      "bytes": 82469,
+      "sha256": "5d97e7358350bedd5b74ea805d4d30fa981429e716edf185240fce66dec25e4b",
+      "gitMode": "100644",
+      "gitBlobSha1": "4539d7034a4d59e2f479500d29eaabe73188b53f"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_v3_custody_instruction.rs",
+      "bytes": 30385,
+      "sha256": "5a299e314f6aad3cf2aef693d2754544d06a5c01ae2689c7f5340d866087a7bf",
+      "gitMode": "100644",
+      "gitBlobSha1": "9b85e883e4e6a6568f24a593aede0e49126de415"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_v3_digest.rs",
+      "bytes": 17409,
+      "sha256": "33293f3faa28a6d11d8f3b55afb64cf5fc605db9915a843f6ef01e19af812f5a",
+      "gitMode": "100644",
+      "gitBlobSha1": "b46947767b53806255386753055973a7b0b649ef"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_v3_instruction.rs",
+      "bytes": 89851,
+      "sha256": "54dbdf824eb91579e9b409f941a3abc93781d06055f4cb4f096b7192ab872d3b",
+      "gitMode": "100644",
+      "gitBlobSha1": "ba8a27b497a90b8b742029f37b05c0b27b973ecf"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/release1_v3_state.rs",
+      "bytes": 113531,
+      "sha256": "c19c35bb7be0d5727b631d8bc2b53a215344d078718f3daf740374e82be16e45",
+      "gitMode": "100644",
+      "gitBlobSha1": "c0c5c122bef83140dba08f1253b2bca8160726fe"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/state.rs",
+      "bytes": 20768,
+      "sha256": "72b6f824d9616ab8fe5a51c9744aedca5bf6c90c85e97e397778660e5846a279",
+      "gitMode": "100644",
+      "gitBlobSha1": "786f6bd5ed7527ae086f591997890e105cfcfa40"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/council_policy.rs",
+      "bytes": 17471,
+      "sha256": "c8f61f078efd529c60753696530570e64fb9d24cecebdfa1ac8fb88afacb2cc2",
+      "gitMode": "100644",
+      "gitBlobSha1": "9ebf4c0c0089fb8d607381120086433a481a0e23"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/digest_vectors.rs",
+      "bytes": 4641,
+      "sha256": "4518427fe4a872e645590bc93a3d0ac9e4271f3645943941373578e126d88e4d",
+      "gitMode": "100644",
+      "gitBlobSha1": "75a6c44f75608b21132030e4380932cc75b5b508"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/gate_abi.rs",
+      "bytes": 10202,
+      "sha256": "ed02a87eabf07218eff7e2a4c42bbbf554846418877e554fea9bfc4f7874cf43",
+      "gitMode": "100644",
+      "gitBlobSha1": "85656dc437aaa093512ec56aa0e499aea8b2506c"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/golden_vectors.rs",
+      "bytes": 7781,
+      "sha256": "f2310e67df20ecd8149b6f9a5065a84d6e03d4dd8b04eac5edf18890c1bf921a",
+      "gitMode": "100644",
+      "gitBlobSha1": "4b89c579d613b410102e767cae23f7b4688be5cd"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/layouts.rs",
+      "bytes": 5389,
+      "sha256": "6a6c8be21d10970cdf8559ea49308a9d0621ac4abc6ae1b83f74e46750eceb3d",
+      "gitMode": "100644",
+      "gitBlobSha1": "ece2573b99612d1717bd3504d113d03756160328"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/mod.rs",
+      "bytes": 158,
+      "sha256": "83d55b20b7af261481f1b597c4cf80e0e82be605d4b2db49cd2c53141884b228",
+      "gitMode": "100644",
+      "gitBlobSha1": "cb961a0e326e0ca4f17cac707a79e71f61c37794"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/release1_model.rs",
+      "bytes": 148963,
+      "sha256": "48e911cd054840e2a38be618c703ffdcc548228b1a9da2fc1d4b921e3c7afe50",
+      "gitMode": "100644",
+      "gitBlobSha1": "9c47985047e5553d9617a8f3a198eb0428169432"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/release1_schema.rs",
+      "bytes": 124659,
+      "sha256": "eaacb3b0ff8068977d476dcc5769983fb64606bd925f9911bac83d5112dc015c",
+      "gitMode": "100644",
+      "gitBlobSha1": "acca6080309bb857f8ca9cb138caea4b00e30ae2"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/support.rs",
+      "bytes": 7115,
+      "sha256": "c552699917087b0d683deb48e5eb356ea54d92b2f5dcf300c754e6572b0cb3c4",
+      "gitMode": "100644",
+      "gitBlobSha1": "b6e66b7813b37fbc39d443ee75e07ae77fd474fa"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/src/tests/transitions.rs",
+      "bytes": 7095,
+      "sha256": "6c8dcfe6a12880a28fe2f287e2dae960ca0812c458d21d7e1554b695f5e08a34",
+      "gitMode": "100644",
+      "gitBlobSha1": "791365aaca6d5e134644a6ca7b1c37dbf555a3da"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/capacity_liveness_regression.rs",
+      "bytes": 2687,
+      "sha256": "da3188281c718cac59b7fc0236f2762fc75fb34b420bf028fc7d21800d16e802",
+      "gitMode": "100644",
+      "gitBlobSha1": "a26009a96fd2ca7350d0e08ec2e232fc1da36f09"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/ceremony_closure_program_test.rs",
+      "bytes": 207486,
+      "sha256": "a1ada1f0d5080d10772d91da32a2eaba42cc134d4d80ec4f29e649a87c000d5c",
+      "gitMode": "100644",
+      "gitBlobSha1": "4793bfd9d6a6ad4872e9c5df071776c69ed26a5b"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/loader_deploy_bincode_vector.rs",
+      "bytes": 3115,
+      "sha256": "33735636d2c59b9cbe35e349817f6dd31ae586fd44431ca15d962a7729be1c2e",
+      "gitMode": "100644",
+      "gitBlobSha1": "4c22b5fa0ad289b4c60f9dfabd798e7bd18dfba4"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/loader_program_test.rs",
+      "bytes": 218069,
+      "sha256": "d957ef76b3e492706b966a6b9f3e99ab86eefe974a76c2d32f01210940a39f2b",
+      "gitMode": "100644",
+      "gitBlobSha1": "aaea542bb1f906ec86015cb1739d8bfcf4ce5bd0"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/max_artifact_chunk_sbf.rs",
+      "bytes": 25608,
+      "sha256": "89b2ba76dc0b831f07768b62417c6208a26dc1aaff41c619248791d5b1ba7f1f",
+      "gitMode": "100644",
+      "gitBlobSha1": "2523beedf4d310fda140ed16bcfb726ab8dbf37c"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/program_test.rs",
+      "bytes": 184572,
+      "sha256": "a557525f84da3862b5eaaa0f1af338ef76b3f4c26ca936509ec4c5b4f796dff5",
+      "gitMode": "100644",
+      "gitBlobSha1": "3bde0fd8caafe88a27d5fed60bcbc77e5d4179e4"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/programdata_observation_chunk_sbf.rs",
+      "bytes": 25238,
+      "sha256": "bb493f0d2bc1a876c0266e74b71a636a9350fa5db1cb63f888b9a7e94164b434",
+      "gitMode": "100644",
+      "gitBlobSha1": "4b5e11e824e4828177591a0edead93465d7d8bf8"
+    },
+    {
+      "path": "governance/programs/upgrade_controller/tests/release1_ceremony_golden.rs",
+      "bytes": 15288,
+      "sha256": "183048a3eab5dbfb0004ad676fb8db54cc86bd974351b47f13f27be2209093e7",
+      "gitMode": "100644",
+      "gitBlobSha1": "c8e0c60643e83399ff16490fe76a467f84081352"
+    },
+    {
+      "path": "governance/rust-toolchain.toml",
+      "bytes": 86,
+      "sha256": "92d22712000a7d8c1a6c236f19967550b431b6c3ec8d89d798b214da15dd3c7f",
+      "gitMode": "100644",
+      "gitBlobSha1": "edc4de49ca7afb65e469c826fdcada7d07ba7f80"
+    },
+    {
+      "path": "oracle/Cargo.lock",
+      "bytes": 217205,
+      "sha256": "b80dcc6b8d5fba9dfcc3db07104f876108f86b9087257614ff532267d6d1c1d9",
+      "gitMode": "100644",
+      "gitBlobSha1": "70191d81aee7032724512162bbbc143032063454"
+    },
+    {
+      "path": "oracle/Cargo.toml",
+      "bytes": 667,
+      "sha256": "bb0444374e2ed86ee6d92ce169d14b6e47e92c78941ea6e649b2cb59d54a4f8c",
+      "gitMode": "100644",
+      "gitBlobSha1": "2b30f81e3f3bc682bd499a616b4f6269a2086c46"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/Cargo.toml",
+      "bytes": 604,
+      "sha256": "667f6211eb7eff15287df8c3a50af0a99e4d283649c24b13db645d861f5517ee",
+      "gitMode": "100644",
+      "gitBlobSha1": "cd29af3fd723fe192a55bba34c2df1441a393fe3"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/buckets.rs",
+      "bytes": 14964,
+      "sha256": "94b53588a0e6b8ae464e7cff194d0607e1dd35477235204c95e7e545a930a0f7",
+      "gitMode": "100644",
+      "gitBlobSha1": "97bce6570e504a9a768d42f9b26e056788d0c9dc"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/index.rs",
+      "bytes": 15543,
+      "sha256": "25dcefb8885d3b8c143288426a199b47b4628cd53842cbda63e74176605b7a1e",
+      "gitMode": "100644",
+      "gitBlobSha1": "4ca5db53fc0397ddbfcaf18a6953fd4d3bd03ac9"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/lib.rs",
+      "bytes": 2554,
+      "sha256": "14b6df864d369ca1cb05e39398450e708d928eeedb4350460d8e85aeb5a0408b",
+      "gitMode": "100644",
+      "gitBlobSha1": "f5ef0a7ea103bd33dea56bee10180a3df7d66e2a"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/molds.rs",
+      "bytes": 43515,
+      "sha256": "628fd0023a24dc6512669724763d0aa7c5b638ab77ea1a359995aafab1fcc6bf",
+      "gitMode": "100644",
+      "gitBlobSha1": "6ff25d6426fbee066b1a8d67d486ff764ee2c43d"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/routing.rs",
+      "bytes": 55449,
+      "sha256": "7329e2b582356e38d77c91b5d245a018313f037d34d645b78fc0246daadaa9d2",
+      "gitMode": "100644",
+      "gitBlobSha1": "33e708d9748019014757bcb228b9a090e061e45b"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/series.rs",
+      "bytes": 26597,
+      "sha256": "3e97c7b7d4119cd3817673a6b60514188b90333ba67b7428f728f29c58d355ee",
+      "gitMode": "100644",
+      "gitBlobSha1": "bcb5b225c6f7a64d862cd383fde8570db1e8a276"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/tests.rs",
+      "bytes": 39217,
+      "sha256": "305186014d9311d72664a08dd073cd2c01365e70583f52196564c325ada41812",
+      "gitMode": "100644",
+      "gitBlobSha1": "ac87fa05a9c5f92543597f69b6f6f812ff4afac7"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/tests_batx.rs",
+      "bytes": 28326,
+      "sha256": "935c49fdeb39c4a697464da304b1fd1874315ecc92d354a98cfde2e8aa819076",
+      "gitMode": "100644",
+      "gitBlobSha1": "79a0c4a846f8e6ae5dce7e4d7a5fe5ec0f6ecbb1"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/tests_molds.rs",
+      "bytes": 25416,
+      "sha256": "2a5f0927cb146974bbb4d4ab40d11ced9974771205d1a967cd7e87a75a61f5b8",
+      "gitMode": "100644",
+      "gitBlobSha1": "f24a7483fc6dc9cb0d134088576ff12e835f30a5"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/src/time.rs",
+      "bytes": 4216,
+      "sha256": "6552b616f809354d80831313b73a28d3937636e08ff0cdeadae614ce7e9ac9fe",
+      "gitMode": "100644",
+      "gitBlobSha1": "97e738c50e2c93c6a5ef9dc8980b24eb91cbfc69"
+    },
+    {
+      "path": "oracle/crates/commodity-spec/tests/channel_migration.rs",
+      "bytes": 13448,
+      "sha256": "68de0621c73161f5ff87d1da05c451168ea102d6467e4509afa7002453c1cfcd",
+      "gitMode": "100644",
+      "gitBlobSha1": "39fcbedc52e068d403edab819b466b448f1a75a8"
+    },
+    {
+      "path": "oracle/crates/heads/Cargo.toml",
+      "bytes": 321,
+      "sha256": "177118a9708297f3c1915359e9982a78bb98d980393571acd770d977753487a7",
+      "gitMode": "100644",
+      "gitBlobSha1": "d37a5c2a730fb1fd99bdeda754eb98bfa24471b9"
+    },
+    {
+      "path": "oracle/crates/heads/src/channels.rs",
+      "bytes": 26613,
+      "sha256": "02628b3cd9c0319b2ef044a1d8f45ed79fbadbe28a35730a6e1f114e7bbc9a70",
+      "gitMode": "100644",
+      "gitBlobSha1": "2769477a96a08edc286f9021349cccd4cf3a8b09"
+    },
+    {
+      "path": "oracle/crates/heads/src/liability.rs",
+      "bytes": 3200,
+      "sha256": "ec0eb5aea2f9fc7f5e102afe9fc502047dd6ddc4f0c747713f8d245338487f6a",
+      "gitMode": "100644",
+      "gitBlobSha1": "1699fe0d0469a9168e8e58c6c9dfb0951b7509e2"
+    },
+    {
+      "path": "oracle/crates/heads/src/lib.rs",
+      "bytes": 1756,
+      "sha256": "71e1dfa29de2a4915009cf9e37612914982371725e427f946af32e45f08f1e44",
+      "gitMode": "100644",
+      "gitBlobSha1": "fbcb0e059bdb29800f91553268d48451b847f23b"
+    },
+    {
+      "path": "oracle/crates/heads/src/median.rs",
+      "bytes": 4480,
+      "sha256": "0015414c04674f5e57d61655413f6a17e56e4b3650cf9495e10ae57a428f2a46",
+      "gitMode": "100644",
+      "gitBlobSha1": "559b24948fcea0edf3e8cac9a4317a678db1c4d8"
+    },
+    {
+      "path": "oracle/crates/heads/src/outcome.rs",
+      "bytes": 5588,
+      "sha256": "03a3ca395940d0eac254ef3e09e80fad03f3483c71a00501dba637ae7caf5064",
+      "gitMode": "100644",
+      "gitBlobSha1": "2d602a4ff1bbba87739ae84966b0564db6edfa11"
+    },
+    {
+      "path": "oracle/crates/heads/src/params.rs",
+      "bytes": 5150,
+      "sha256": "07b0e809d507ca249a468d4dda7506fad431d17399d0d52b72782d9482ce0852",
+      "gitMode": "100644",
+      "gitBlobSha1": "5e59a03fe6bae81dcfa6fda861db1e058b6b8706"
+    },
+    {
+      "path": "oracle/crates/heads/src/rewards.rs",
+      "bytes": 3425,
+      "sha256": "f39e53a42baa1e7411819d47337557a825c4d224fcfae87197b9f2a873ebdf25",
+      "gitMode": "100644",
+      "gitBlobSha1": "01743bd5bfd9d2240860f1a96186f180899b5720"
+    },
+    {
+      "path": "oracle/crates/heads/src/settle.rs",
+      "bytes": 10557,
+      "sha256": "8f06757d74984e179081df966ed2301256d8693523be8a3f834625953fe726fb",
+      "gitMode": "100644",
+      "gitBlobSha1": "d542ee26d5143ca34acc27dd510b8665d24b6df3"
+    },
+    {
+      "path": "oracle/crates/heads/src/tests.rs",
+      "bytes": 13061,
+      "sha256": "b02195ccf41eabe3e3ac7db52c848592010e23579a5d4547a03a7118ca67eb87",
+      "gitMode": "100644",
+      "gitBlobSha1": "6508f5fe404328b2fd63b19a202a7b2e51baab15"
+    },
+    {
+      "path": "oracle/crates/heads/src/tests_channels.rs",
+      "bytes": 23587,
+      "sha256": "c2b8f3511872624140f430bb4a762e1836cabe92fd4b3c802759ff0acc7822c6",
+      "gitMode": "100644",
+      "gitBlobSha1": "abf6a1552603f2a8ee2a82ac1e0fb4e3ede077ec"
+    },
+    {
+      "path": "oracle/crates/heads/src/thresholds.rs",
+      "bytes": 1377,
+      "sha256": "5bb9f0597ab4fba693f62838e41b60b11784f9dbf7a657c0d0d8848811b7f408",
+      "gitMode": "100644",
+      "gitBlobSha1": "9eadb977f2410299f1811544ca3df89c0244e91d"
+    },
+    {
+      "path": "oracle/crates/heads/src/time.rs",
+      "bytes": 4489,
+      "sha256": "57e4733c9d1bfd8d550e8d34c0651d26256d32c65076cdd47593cbcaf70eab32",
+      "gitMode": "100644",
+      "gitBlobSha1": "1f47fef83a9a3ea916bea4e872b4c6549911bce7"
+    },
+    {
+      "path": "oracle/crates/oracle-interface/Cargo.toml",
+      "bytes": 254,
+      "sha256": "3ec50a92a4e9fd82e3dcdb0d669b90898abb707b572d250e95ed22a64eeaef0f",
+      "gitMode": "100644",
+      "gitBlobSha1": "aa194132306c51fbdb1d65dca2db90ec3ca0abd5"
+    },
+    {
+      "path": "oracle/crates/oracle-interface/src/lib.rs",
+      "bytes": 16649,
+      "sha256": "a8c990aa959990427cfe9f3327a6212587d23edb535aaa0e510d361ea6230332",
+      "gitMode": "100644",
+      "gitBlobSha1": "080b91b80daf649b167e4f6a5450b2f1249bd4f2"
+    },
+    {
+      "path": "oracle/docs/lta-spec.md",
+      "bytes": 13162,
+      "sha256": "be7eaa1998466ae6fd0faeb273cc1d09972b03ff77045bfa2e949a411ec7e1ba",
+      "gitMode": "100644",
+      "gitBlobSha1": "28244e5741ac0f54f61fdaef9457c556e303e072"
+    },
+    {
+      "path": "oracle/governance/batx_basket_spec.v1.json",
+      "bytes": 15984,
+      "sha256": "48c7a9722ccb397f9c46814f7dae0cb8d996645d120fb11b63978e23bdfdbb38",
+      "gitMode": "100644",
+      "gitBlobSha1": "96126233437bceef4d505c1f12311bb2f654c733"
+    },
+    {
+      "path": "oracle/governance/batx_battery_cell_basket_brief.v1.pdf",
+      "bytes": 122013,
+      "sha256": "9761097947cf590562184ebb59ae09c53451b01b5629e3f44df5547eb0d3317c",
+      "gitMode": "100644",
+      "gitBlobSha1": "7d0a45238fa0e84047e10fc5df9f1f1c41e9d75c"
+    },
+    {
+      "path": "oracle/governance/batx_product_sku_manifest.v1.json",
+      "bytes": 1759,
+      "sha256": "f087bc484fbb34b28d289bdfa3c1862e542a49db01b1a895e40818491eee6eed",
+      "gitMode": "100644",
+      "gitBlobSha1": "ef01ab309ee603e91ba1ccdb450dcb1d4199d77d"
+    },
+    {
+      "path": "oracle/governance/batx_source_manifest.v1.json",
+      "bytes": 17730,
+      "sha256": "8585e80e6a88510ba90b4e4c37f7482c50f648252275fa47db5a13a2d9dd4177",
+      "gitMode": "100644",
+      "gitBlobSha1": "248fc1e5b46c3b4d0cbecd5ffb5adb198984e181"
+    },
+    {
+      "path": "oracle/governance/cfm_parent_proxy_registry.v1.json",
+      "bytes": 53692,
+      "sha256": "a9ccce1a990fc93024a9ed989dec9638614928dea716add5df3bcbc31964ac4a",
+      "gitMode": "100644",
+      "gitBlobSha1": "1c0e3989a4fd1ec38f82f0a40a5cb7a2896b46b4"
+    },
+    {
+      "path": "oracle/governance/channel_migration.v1.json",
+      "bytes": 194799,
+      "sha256": "39eda00e7f57988c8fa3c31ca9f02389ab7d9f02bfa640231b19a9ba8b035f66",
+      "gitMode": "100644",
+      "gitBlobSha1": "2152dc6d212744511022474a9899afaa19fa20f8"
+    },
+    {
+      "path": "oracle/governance/channel_molds.v1.json",
+      "bytes": 54583,
+      "sha256": "d8311ecaf0678196ede01d3cc10d9e7bbacaeafdcacd62b4a6bfe6625c694d8c",
+      "gitMode": "100644",
+      "gitBlobSha1": "c4b8dc6b033ffa9f819cf357d64e304fefe50713"
+    },
+    {
+      "path": "oracle/governance/commodity_submission_spec.v1.json",
+      "bytes": 19775,
+      "sha256": "69ad4a0c427f2eada2d18353e0ec5c58e8e326a1d447f9bbee77b9e5423a4309",
+      "gitMode": "100644",
+      "gitBlobSha1": "f43b6531737647b99269e1ff78aa2707f7779e3e"
+    },
+    {
+      "path": "oracle/governance/commodity_submission_spec.v2.json",
+      "bytes": 22288,
+      "sha256": "68b0c58d33cb37788c92818332f323266961216999b3473c5dab17f5b601423e",
+      "gitMode": "100644",
+      "gitBlobSha1": "cee98c119aa54a300c98fd402639c6d5e8d9b836"
+    },
+    {
+      "path": "oracle/governance/nandx_benchmark_basket.v1.json",
+      "bytes": 5216,
+      "sha256": "db7eeb9cd6e4086a05873ad3ed7490fcc9c7d93a51e079791fa43e39d39be95a",
+      "gitMode": "100644",
+      "gitBlobSha1": "cea7f5932e38dbec88b1e352125e02bc82787495"
+    },
+    {
+      "path": "oracle/governance/nandx_product_sku_manifest.v1.json",
+      "bytes": 5477,
+      "sha256": "d34f4f05e7025e66e651ae017503a223a71898d5567efd0f6dc70416408203e9",
+      "gitMode": "100644",
+      "gitBlobSha1": "690d9c2905b2c211983b3fa59a4e4c7b3b6051f3"
+    },
+    {
+      "path": "oracle/governance/nandx_product_sku_manifest.v2.json",
+      "bytes": 1529,
+      "sha256": "463e503c02164e78d09d0144d465bb00da93b982a2a8cf38dc83eb76d2022d95",
+      "gitMode": "100644",
+      "gitBlobSha1": "75d99bb7157fe601f9c295aa7613bee0c3afcc67"
+    },
+    {
+      "path": "oracle/governance/nandx_product_sku_manifest.v3.json",
+      "bytes": 1693,
+      "sha256": "56776e949c204ffa4f14969d3b4b5f4df4d4c2ee6d23c32ded95eb8fd90c5168",
+      "gitMode": "100644",
+      "gitBlobSha1": "9fa92827d9c6ca5d7c85f5dab139baa43a111e66"
+    },
+    {
+      "path": "oracle/governance/ramx_product_sku_manifest.v1.json",
+      "bytes": 4409,
+      "sha256": "a4382c10d8d45d45f222f30be8ff8dfc250dd0c67e55c8078777f65bc6369c7c",
+      "gitMode": "100644",
+      "gitBlobSha1": "e2a58cf7058448a0bb5a1a8069f4028659cfd7f4"
+    },
+    {
+      "path": "oracle/governance/ramx_product_sku_manifest.v2.json",
+      "bytes": 1661,
+      "sha256": "d799e536d84461116790cc6a7f33ed71bfebe0446129c93fff6534db8ba360b6",
+      "gitMode": "100644",
+      "gitBlobSha1": "6d4ddcb6f7d28726df81a3c2da3c5d4863bad699"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/Cargo.toml",
+      "bytes": 4046,
+      "sha256": "ef159f6140e8e87e45622783889c0c447a07dca3e7b9e1acd9917d60f757b40c",
+      "gitMode": "100644",
+      "gitBlobSha1": "4144d314bc4d362fbce8204017f89faa73818a92"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/associated_token.rs",
+      "bytes": 2468,
+      "sha256": "f0decc014e46b95a3a3ea96369e413e3bebb9b71c6df0f1909e91a4694acdb1f",
+      "gitMode": "100644",
+      "gitBlobSha1": "32f9a107438e066f70fd6ed68c1e82b4be49372f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/bounded_heap.rs",
+      "bytes": 3819,
+      "sha256": "5c22e238cb0a8dc9bb7f2c56f91a47f3280dfbee0ade4438f892e28edfe07099",
+      "gitMode": "100644",
+      "gitBlobSha1": "e9da396349b5539d3061ce7cd69134a2665761de"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/cfm.rs",
+      "bytes": 30492,
+      "sha256": "8d42b56b557e7da46b3df4d099d36a8cae27983dc0272417b81c4dc2fbb4409c",
+      "gitMode": "100644",
+      "gitBlobSha1": "ecc9611500307f5913f3549491d37b7068611241"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/compact_error.rs",
+      "bytes": 15059,
+      "sha256": "1a50627dee3ef7f3b3ee0a65c49862e0f5b5d0ce0b9fc6af9356a60ebd9be691",
+      "gitMode": "100644",
+      "gitBlobSha1": "fda037772f9fbc26336a373d3b3cb09985c129de"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/compact_error/account_info.rs",
+      "bytes": 4028,
+      "sha256": "1ed4eff601787a70d6c617cb4f4d4afc61ff85cf1b2fc30e652577b78c1c40aa",
+      "gitMode": "100644",
+      "gitBlobSha1": "3c9b5e467465c59b2fbd6025dbc55770c88db3cd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/compact_error/sysvars.rs",
+      "bytes": 571,
+      "sha256": "0d2e35eb6245ef63e7bcf36e4a34308a69eb1317a382f718dd469a64e309e28a",
+      "gitMode": "100644",
+      "gitBlobSha1": "049eb259193fb2c81ab53fb55774513ee9ae8cb7"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/constants.rs",
+      "bytes": 13040,
+      "sha256": "22af8ca53ced166450f49d1d66b003b6c166fd1e66adfd3142eea727894e48ba",
+      "gitMode": "100644",
+      "gitBlobSha1": "8a61f3e3a49b7a8e96a6f99fecccca3e983a3b29"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/error.rs",
+      "bytes": 12846,
+      "sha256": "8ea5a69cf718be589d253f5dcb3d160cfe6bf168b9db2ded2611cf3b058660cf",
+      "gitMode": "100644",
+      "gitBlobSha1": "0d391f7c0e2f4f85d4063925bfac418023e04f01"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec.rs",
+      "bytes": 2276,
+      "sha256": "07164082074643cdb381d5a8881aca6fb2eca1655957ba6816e7851dfd312e75",
+      "gitMode": "100644",
+      "gitBlobSha1": "23ce8f68ecd09f0681f9950ac13c838712667413"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/accounts.rs",
+      "bytes": 6756,
+      "sha256": "6f5b0a2fdecc2336f3f0996c6cd030c9863e46879c0e55eb500c17fad56cd896",
+      "gitMode": "100644",
+      "gitBlobSha1": "4065478a0ac7b18ace5a4835428f181d8c7d0fcd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/compact_borsh.rs",
+      "bytes": 14237,
+      "sha256": "540d5a60bcb0810b7ebc1ffc192372f91a155b05184b056c2a1bf0d4bab8b112",
+      "gitMode": "100644",
+      "gitBlobSha1": "12cfbed2c72a73700dd12bb9ec8e93272105fc17"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/compact_flat_tests.rs",
+      "bytes": 6223,
+      "sha256": "cad1c9b9e618ee38dbd3db8ecd9e5385af69e8428e73a8d04a15c25838404ab6",
+      "gitMode": "100644",
+      "gitBlobSha1": "59812cf09c3cb6a0755e50aa5f5626c165da2a3d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/copy_value_tests.rs",
+      "bytes": 2836,
+      "sha256": "1745e23276a8eaa2d7ea055471e83bdb175fc693031c15bf3dbefbdc87b7b69a",
+      "gitMode": "100644",
+      "gitBlobSha1": "42f7c79c828f372333865661f4e15129eb0889d4"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/cursor.rs",
+      "bytes": 10224,
+      "sha256": "e2ae282d7230ef9e7916accdb1458f155a35acf735175604707d990c2401d3ca",
+      "gitMode": "100644",
+      "gitBlobSha1": "9cc24679e995fc258864780d2bd4328818d82824"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/fields.rs",
+      "bytes": 14509,
+      "sha256": "7b255cdb5aa0fc6aa550200b5aa93950723ee6a76059ec43065d2037332c98a8",
+      "gitMode": "100644",
+      "gitBlobSha1": "d36792b7d480a98a97d1e0a0ce9f256558a6a187"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/flat.rs",
+      "bytes": 17783,
+      "sha256": "bf37d8d3ba7cf007f3f9e903ef76991d8fa34dad89cfe70f7680b832865bed8e",
+      "gitMode": "100644",
+      "gitBlobSha1": "293831732e6e8ff11ceb0767abffc0baf6bd74fd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/instruction_flat_tests.rs",
+      "bytes": 5107,
+      "sha256": "c807c6006ec3fa5b73fce398a9f577bbd51cdc07f6832c908b4ff21ce9190626",
+      "gitMode": "100644",
+      "gitBlobSha1": "bee3e1e4879aeba29f9c2d2d54b5c7cdbcb43276"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/nested_leaf_tests.rs",
+      "bytes": 3556,
+      "sha256": "ac6af2513e22fa34c9de93b046919f382bfbcdf8bdb38195c7016bb0d80f296b",
+      "gitMode": "100644",
+      "gitBlobSha1": "e5b9dbfd3ee0c306930bf3c3118a551e1a79ce40"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/oracle.rs",
+      "bytes": 2955,
+      "sha256": "e536ad6a19a0de176fb77c87d3f15e4e2f3f2d581d7f73523f4f257a77b6c295",
+      "gitMode": "100644",
+      "gitBlobSha1": "2591b1024b9966157620af0515d9e4c0a0ed8728"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/oracle_flat_tests.rs",
+      "bytes": 8790,
+      "sha256": "44e4db4e767845111036cc383885ef3956a761d7385020b0b68d13b250593f3f",
+      "gitMode": "100644",
+      "gitBlobSha1": "f52365fb87f51f88fc4f16a3b24aaa795a1234d1"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/payload_equivalence_tests.rs",
+      "bytes": 1360,
+      "sha256": "ae744a32c70f513528a66c770a021a9d92abb295537a9e7c6d82bebf9f81a642",
+      "gitMode": "100644",
+      "gitBlobSha1": "8712760c23a84f263e34d1f57003a6162d4eebaf"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/state_codecs.rs",
+      "bytes": 8106,
+      "sha256": "226042cebbbfecd3ae62b40d1a921d8bb11c68172fa4413168fa4e436c3f8bca",
+      "gitMode": "100644",
+      "gitBlobSha1": "1c9217ce3e32a51c300d06e120c51c71ab71ce61"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/state_macros.rs",
+      "bytes": 35806,
+      "sha256": "b4635be2fd2e8e119b985d09eff9a2599edec43c2e5d308e57552217aaf8c3d8",
+      "gitMode": "100644",
+      "gitBlobSha1": "b50f4b6f8959cdea262223038a341dfe2df0ed4f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/tests.rs",
+      "bytes": 4146,
+      "sha256": "87edb8f4efd5df33d036f925dd8d67d68ddc0d8645c4b8034399c1f823c0dd66",
+      "gitMode": "100644",
+      "gitBlobSha1": "5ad16e88cec910f9136209cc9351f6046612ac1c"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/fixed_codec/variable.rs",
+      "bytes": 2347,
+      "sha256": "768c23d33bb91f9ad4c55c35fb194fff4402a1d39b75205f94378e05ced2daaa",
+      "gitMode": "100644",
+      "gitBlobSha1": "0414379c00a6c22e02d1aeeb81bf79f8481446b0"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/governance_gate.rs",
+      "bytes": 29910,
+      "sha256": "3aae96e726dfe540fa49ff3e4c5ce8465930a55d60d75adc4d68191ce25ddbbe",
+      "gitMode": "100644",
+      "gitBlobSha1": "213d2cc13a7f5bf4beacbd705db6e3e2839454af"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/governance_manifest.rs",
+      "bytes": 16178,
+      "sha256": "9b2ee2c0ab71d7e77a80e9afa7a3cb77b9cc79a15aeedf0ba31a8fa727800081",
+      "gitMode": "100644",
+      "gitBlobSha1": "158a5765267696746c6ba89a9530a71892ca817f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/heads_view.rs",
+      "bytes": 49021,
+      "sha256": "8b501f33bd0f73a83cce1827475680634f80f7e3965257a2ce9e03e51dad2079",
+      "gitMode": "100644",
+      "gitBlobSha1": "111a803b3d3a22618f50d365fc0dafdefd2fc355"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/heads_view/tests.rs",
+      "bytes": 21947,
+      "sha256": "1cf775c74fa7a8abb6c6c4975b8c64706cf3696da263a11463d3e6e88e3bf637",
+      "gitMode": "100644",
+      "gitBlobSha1": "28846ea014b5764542e280c3a794dabe3d32ce83"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/builders.rs",
+      "bytes": 123436,
+      "sha256": "b53109dcd6b46a53423973aae4bbaddff6b913c9adcc7c1d56ee496dac23fea2",
+      "gitMode": "100644",
+      "gitBlobSha1": "9d0b1fd12839643a1bc499e56bfcde31e19d57f2"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/carry.rs",
+      "bytes": 23591,
+      "sha256": "066c0dde515e196070adb555d287c3ca23b6276dff0a2edb5017c828a484fb27",
+      "gitMode": "100644",
+      "gitBlobSha1": "1c067ee0c6bbd37af5cfaca5f1d61111a4d9841c"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/cash.rs",
+      "bytes": 5481,
+      "sha256": "5b7aef01536e9a9f8728d43e8af259421b3d4d3a0d6407ce902232f71d214364",
+      "gitMode": "100644",
+      "gitBlobSha1": "bf2f733613fcc71f8722bd4cc733451c7c017b79"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/cfm.rs",
+      "bytes": 9005,
+      "sha256": "090a3f67dc95c33000994f4dfb55b17a2745bf8d326149a804959a3fb2d987cd",
+      "gitMode": "100644",
+      "gitBlobSha1": "f2f8201d6c31d768a7ac20f713cefa799cc4ca17"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/config.rs",
+      "bytes": 1123,
+      "sha256": "8550091dd7390f37c42c2430e23ff402ad8fa68906261a285c1dcbeff12eb55e",
+      "gitMode": "100644",
+      "gitBlobSha1": "f66377b744985d713920fd5460dfa5463c87cb63"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/deserialize.rs",
+      "bytes": 29703,
+      "sha256": "5f5d1e54275a6c19a4fd3a28592791074ddd7b37a607dbff8d4f5d56219ed6cd",
+      "gitMode": "100644",
+      "gitBlobSha1": "f0486679dad13742bd9553690606e7d252f668ef"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/dev.rs",
+      "bytes": 20849,
+      "sha256": "1a7caf012e04b5117ef74f27a7d74a6bf80b18711770e613a5dd92f5870d2525",
+      "gitMode": "100644",
+      "gitBlobSha1": "6d37289975aa17b1cdfb74b7a0e1e8806d215dea"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/heads/builders.rs",
+      "bytes": 39926,
+      "sha256": "f50b2a8d91a66f0f9d50ebddfdbbc392e263c4b4737e9af013ae7dce8a2a75d8",
+      "gitMode": "100644",
+      "gitBlobSha1": "47fe7fd3fa30dc45b18f529d04d661d699be9748"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/heads/mod.rs",
+      "bytes": 43003,
+      "sha256": "139ae963dc29a71871be7b9a13d0e6ec935b4208ed5bc6d0239d55ff7501e45b",
+      "gitMode": "100644",
+      "gitBlobSha1": "b94d4c74795502e29b4ed7317cc4072c78b0fd97"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/heads/tests.rs",
+      "bytes": 32941,
+      "sha256": "0f85b3bbe8049e7381b350b68e413362f91cdfab9ecfafcb6f6e0dcb0d3f6fd5",
+      "gitMode": "100644",
+      "gitBlobSha1": "7401acce005334bfa05560581fe51c976b075a19"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/mod.rs",
+      "bytes": 2888,
+      "sha256": "c47d8f9bb717c9ddaf593d2bddc88d99d0daabd5819d21f07d576d68ed77c9e5",
+      "gitMode": "100644",
+      "gitBlobSha1": "945b6dbc27b79325b8733c7dfd9df9302bb448d2"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/model.rs",
+      "bytes": 30420,
+      "sha256": "19c0a8b225540eff54735dac8e637ec153c17b13bbe05a38261188175fc2cf59",
+      "gitMode": "100644",
+      "gitBlobSha1": "bf2c3fbaf36ec59a20b3d22bac2d1c6c5d3d018e"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/month.rs",
+      "bytes": 3011,
+      "sha256": "35b985fa78f4d20254684da66afab013e39a65ad9d61d9aa5b0091dace3d198c",
+      "gitMode": "100644",
+      "gitBlobSha1": "c2b9e1cbc84522882055c787414848f7cfcffe52"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/payloads.rs",
+      "bytes": 7939,
+      "sha256": "db7cf8997b9b77c709afeb872466af35559f96cb3d3ae8066434e613cc80d909",
+      "gitMode": "100644",
+      "gitBlobSha1": "1533b5f2c1b249952fb4b53d78a0a379a5857c68"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/serialize.rs",
+      "bytes": 13348,
+      "sha256": "fe15f0dc1cf9e87791fb60e6a8a5a46b1f9b15b9c89d1d6a8e18b2f6abe21d55",
+      "gitMode": "100644",
+      "gitBlobSha1": "bebb453152f26081566f6b3fb386cb0dc5cb24ac"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/settlement.rs",
+      "bytes": 14983,
+      "sha256": "e4677da26807e6d49a2c543e0bb3ae3a195c6136ba130c3127a8f6e258a040f1",
+      "gitMode": "100644",
+      "gitBlobSha1": "4d3c0d992cfc1ea590708525548381f3214f7699"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/tags.rs",
+      "bytes": 7515,
+      "sha256": "b95fc7313f7bd5caf79deac7430afcbea6be54dcc5bc2d17acbd6f8747b425dd",
+      "gitMode": "100644",
+      "gitBlobSha1": "a497e7d8d9e5fc24a9896701f94b2c50745dc277"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/instruction/work.rs",
+      "bytes": 10282,
+      "sha256": "a5a98d8a11c4410cf8837b65a719d2570c6b39e3bf998b20d5f40356a93643e2",
+      "gitMode": "100644",
+      "gitBlobSha1": "776ca8f0d425b12b0a4d960a66066275eaba7def"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/lib.rs",
+      "bytes": 7696,
+      "sha256": "8a23328071aebc62c6d959650b65a445f14db8509781e7fbbd8eb0644f38e7be",
+      "gitMode": "100644",
+      "gitBlobSha1": "a039a16bdf957ae5cf2fed527887eed6014bf7af"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/live_index.rs",
+      "bytes": 3526,
+      "sha256": "3beb68c774ed89fe6061c921cd1b4576611b553041c8c7cb41bd814ca735f899",
+      "gitMode": "100644",
+      "gitBlobSha1": "14da720c04b359372f4a9b8f9e34f479ae669399"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/oracle_rank.rs",
+      "bytes": 4649,
+      "sha256": "b597aa7922dc2b0debb61bdd3eb6e5016ae953d0912fbb4a78c90821a2e565fd",
+      "gitMode": "100644",
+      "gitBlobSha1": "c43ed814fc792a7038ce1d1f61638c262c386441"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/account_addresses.rs",
+      "bytes": 13141,
+      "sha256": "d345020c821a4b9d888494c39bc6ecb55dcc725af498a364becbe8fa7a5cd000",
+      "gitMode": "100644",
+      "gitBlobSha1": "e8cd0a091b2aebedd9da16fbba6a32fcafc3fe33"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/account_io.rs",
+      "bytes": 29974,
+      "sha256": "e3de0327c49a587cb92060af14222dc4fa2c18b9502aa4189aab8b75a7aa6ce4",
+      "gitMode": "100644",
+      "gitBlobSha1": "56707c56fe4de040bd3cfd3608ad6f90c3d39322"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/account_io_tokens.rs",
+      "bytes": 4958,
+      "sha256": "186040ce63431d400319fc2e10205d4d82721fa969e139eedbc84d6065a8a6b7",
+      "gitMode": "100644",
+      "gitBlobSha1": "64baf9b4a518a0040592c4ec711bf4a4404f8442"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/active_weights.rs",
+      "bytes": 21115,
+      "sha256": "533600e28f38bd4a26632566bb9a99aae306c796af29b954aa132e57dde0cdc2",
+      "gitMode": "100644",
+      "gitBlobSha1": "ffda27e22d1194ffdb1f34d183943501546e2b45"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/adapters.rs",
+      "bytes": 5578,
+      "sha256": "8170ded2d416b058e39cfff65703003d9e459942538a391f3d5b0aa47060888b",
+      "gitMode": "100644",
+      "gitBlobSha1": "4e3c3c3b1c0c6f3d10a3ce167bd03d25abf7541e"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/bucket_medians.rs",
+      "bytes": 12879,
+      "sha256": "2c4a54ce89935520d3646136aaf458ec621c4de7515a8557b391e5df9e5c83fd",
+      "gitMode": "100644",
+      "gitBlobSha1": "5efc8f42f47d3439244124418e575c17b3b0cb11"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/bucket_rank.rs",
+      "bytes": 9038,
+      "sha256": "a7805f955d5a44d7351ecfd8ef08fa53a4ce30d4c5954dbb680c75a59daa9f2f",
+      "gitMode": "100644",
+      "gitBlobSha1": "2221e779f8a6b41ee28d648ba9eda0ef0068a7dd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/checkpoints.rs",
+      "bytes": 11633,
+      "sha256": "49c33a567354b8b1faff6de11829a7526378ab7f01d55a5ce754bb43318870c0",
+      "gitMode": "100644",
+      "gitBlobSha1": "a046bd8f555f2641a88a590c2f574fd20ad425b3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/critical_tests.rs",
+      "bytes": 14829,
+      "sha256": "cc98697a6c36609af6e4efa9ebecc680cc2e4ad90291a73e16b5e48f86ec13f7",
+      "gitMode": "100644",
+      "gitBlobSha1": "e68f130cfeff3805c863455ade33372d72e0960d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/history.rs",
+      "bytes": 17840,
+      "sha256": "7008afc1a0c21be065a28e10019be67a8a4b2a52520b8ebb812cfcdbc5945387",
+      "gitMode": "100644",
+      "gitBlobSha1": "d3eade27fbaeaac10ccd1b797ba8b4b2164f6892"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/mod.rs",
+      "bytes": 9808,
+      "sha256": "8bf03edac0f69b125f87a88f7580446f5d84c290f7e0526983f41e5e2a52b6c0",
+      "gitMode": "100644",
+      "gitBlobSha1": "d5102d07894bb7a584e280bc44fd0bb3357eca0a"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/openings.rs",
+      "bytes": 12460,
+      "sha256": "92de115003f8d199c376aae81b8aa2ef11136917a18827b48b231352e5d47038",
+      "gitMode": "100644",
+      "gitBlobSha1": "94ac08c7792bbc0b345a52fc587eade4d8fc0d87"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/periods.rs",
+      "bytes": 14047,
+      "sha256": "3802f314fb7ce9534083cf9359dc7055c3e3e39de8a6f07517fc2c913d531a9c",
+      "gitMode": "100644",
+      "gitBlobSha1": "b9c912db9eb6a8d2c32e207536c0de6756c1aada"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/reads.rs",
+      "bytes": 4023,
+      "sha256": "12f97060ddefc1d940f37f621b6397750c3de8bc0f9eb1058a1b4fc689abd0bb",
+      "gitMode": "100644",
+      "gitBlobSha1": "ecc63ca11751122edaca17337bd8effb1c9caf2b"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/scan_transition.rs",
+      "bytes": 2490,
+      "sha256": "78b3555ec3f224b4e9eb380674c839172b5efb1c25dd88dc1a4acb2b2300e39e",
+      "gitMode": "100644",
+      "gitBlobSha1": "c870c4f774fd79a673585af7ad1683feaf5e699a"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/carry/state.rs",
+      "bytes": 10397,
+      "sha256": "4917cedc5439ce5ebb4f9d8ac59739e9b8f691660b1621df6ea8b9c69bb76732",
+      "gitMode": "100644",
+      "gitBlobSha1": "2e20df26288d14598f7f6e5e3740c479f26589f8"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/cfm_launch.rs",
+      "bytes": 29600,
+      "sha256": "922e483d32766628a9e38c2dbcd83041d9d61f395099b518c4eb51b2b5377cda",
+      "gitMode": "100644",
+      "gitBlobSha1": "cf102834704c0557f3e51d4fab81bc970a7e897d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/cfm_receipt.rs",
+      "bytes": 2573,
+      "sha256": "a39bac7ee0a823e22418b4d4668d5eb7a9076c9482dc4af884934b8d8a8c50e3",
+      "gitMode": "100644",
+      "gitBlobSha1": "d8ca01cac31931ce2a5f278cad254018a905e205"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/collateral_accounts.rs",
+      "bytes": 8030,
+      "sha256": "c4cb0eca3ed7ef0e157846f00a5cb8a62295c67eed681f5f2ce5aaec77dfff2b",
+      "gitMode": "100644",
+      "gitBlobSha1": "5c04c7e17322ec2bace3291a61dd4a23c67902f5"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/config.rs",
+      "bytes": 17829,
+      "sha256": "2011d81df560d21250783987043a6388a961ae1fec753c9369a0caec4b00f43c",
+      "gitMode": "100644",
+      "gitBlobSha1": "66ccf5373da4290b82821633f855503d638ec3ad"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/authority.rs",
+      "bytes": 3746,
+      "sha256": "11603ea3d7cef1280fea6406a6fff657570c09275ba91f1f3b7519ec96c283cd",
+      "gitMode": "100644",
+      "gitBlobSha1": "a143f581e0968ba5c35602d168ac86b3aa0bedbf"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/checkpoint_runtime_tests.rs",
+      "bytes": 15557,
+      "sha256": "a49f2c900b79d8d71a1c30bc5b1c2ec2c524cafdd9eb04d92af20a7f77fcb575",
+      "gitMode": "100644",
+      "gitBlobSha1": "200230cd267f760aeade8f751cf65b1274966ad0"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/effects.rs",
+      "bytes": 19285,
+      "sha256": "ea5a69adabaabdcefd43cc1efce7c3ebadefd11a0cc7baf8835e0170c047f8ef",
+      "gitMode": "100644",
+      "gitBlobSha1": "c94eeffa6faa9ef46e7e26ba3fa7a0bf05baf854"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/helpers.rs",
+      "bytes": 1484,
+      "sha256": "2db88013d498dbb109b36cb6f9be1b7ed11998433c92d1f28dca7a36611bde87",
+      "gitMode": "100644",
+      "gitBlobSha1": "926ce1786577c3ed9a3a1c423b3f15518f5c5e7c"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/mod.rs",
+      "bytes": 22544,
+      "sha256": "7fd7bdd68a7252d8a46627448fdd29775e9c6f467cdb2d33cc9f48efb01d18fa",
+      "gitMode": "100644",
+      "gitBlobSha1": "c944df2901ac046b1e3b93d32ebf0d13e237134e"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/state.rs",
+      "bytes": 4822,
+      "sha256": "5c011ea5cad6f303f372ff3fce7df56db9e4204119ccae6dcb8892cd30b8919f",
+      "gitMode": "100644",
+      "gitBlobSha1": "6a0cd72a2cb42049135f882654d8cc3640ed3edb"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/targets.rs",
+      "bytes": 18156,
+      "sha256": "e91ce55c5243b67887210236292e249aa1ab32a6410ba074da09f1b523af1c2e",
+      "gitMode": "100644",
+      "gitBlobSha1": "b0810fc49758e8e3007b194da7a9a1a0dbea32dc"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/council/tests.rs",
+      "bytes": 10189,
+      "sha256": "536d4f768726d6493b0c29a43e3f21907696b690a5f7d0e16255f4ceb31d7abb",
+      "gitMode": "100644",
+      "gitBlobSha1": "80ccd4718321a2f322165e26ed020096e45e07d5"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/dev_bootstrap.rs",
+      "bytes": 24600,
+      "sha256": "3724d51e089f78610942224119d41c80e7f912d9aa52b6f432897e8bef088a08",
+      "gitMode": "100644",
+      "gitBlobSha1": "63ec387265bd7a05e6b552cabe8c0adfc2045d4f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/dev_formation.rs",
+      "bytes": 20209,
+      "sha256": "3b34061da5c87ed6b064857f4471bf1a628a9e5b4b1f8f373074059308d678c1",
+      "gitMode": "100644",
+      "gitBlobSha1": "9d2ddad266eaacd779a22d7fa53627c2a57facdd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/dev_reset.rs",
+      "bytes": 8364,
+      "sha256": "fab3d2d7788c40686c7f0f85a411049d6440aa31374e56e5010380d8231e9e98",
+      "gitMode": "100644",
+      "gitBlobSha1": "a04e1098baff491dfa18a3975abdb13b02ab64e0"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/dispatch.rs",
+      "bytes": 48035,
+      "sha256": "0c4baf2ec819ca7d07f3f4f0ebd260de4c84489a8edfd97e6cc2b4d696617e3a",
+      "gitMode": "100644",
+      "gitBlobSha1": "46179fd2c4447dba0bb32f25152800d8a8b07594"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/failed_month.rs",
+      "bytes": 16979,
+      "sha256": "b1d666dfcb6a2f5de41e198f191558dea5af864a9c0577e4892fd9438e1351c8",
+      "gitMode": "100644",
+      "gitBlobSha1": "786f44ef003784f5286c707950abad170c0f75c8"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/accounts.rs",
+      "bytes": 13239,
+      "sha256": "b428bd5026f6c48d2bcae95976fef0879b862d3f63a45eeca5beb29ddbde14e2",
+      "gitMode": "100644",
+      "gitBlobSha1": "fee51dbfadd4da8c470aedb27b5452433ff45761"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/claims.rs",
+      "bytes": 44916,
+      "sha256": "8e3ad8b8a6c2c7574e6c1a7b476717df4393e0bc754ed9424caa7a4d4485d5bd",
+      "gitMode": "100644",
+      "gitBlobSha1": "de1e94a22f4dcaa770b9cb54fe7b488f49968d04"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/config.rs",
+      "bytes": 16743,
+      "sha256": "94587256da59d4c43fa2870aea322a38bbd30e0ea21f835fbc287f381e52d315",
+      "gitMode": "100644",
+      "gitBlobSha1": "9ff39a72198198fc0660962b24266c5d17d53749"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/contracts.rs",
+      "bytes": 43889,
+      "sha256": "81624632a7482d8bf65a7314876cade9db9895704f0343a6793e7460ea358884",
+      "gitMode": "100644",
+      "gitBlobSha1": "d8bfba377b101377ba5b0e1460d206f2b1a3654b"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/delegation.rs",
+      "bytes": 11130,
+      "sha256": "04a0c8ec55888f961486476ebc3c106715646fc618ec37d54db0b4af45acf3c8",
+      "gitMode": "100644",
+      "gitBlobSha1": "b31177549b32523e1d7eacb65763384675f9bc73"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/migrate.rs",
+      "bytes": 8019,
+      "sha256": "a6dc3b1048c20185d25e21960a8019d2c9573278f1067f019d8388209e3bdd63",
+      "gitMode": "100644",
+      "gitBlobSha1": "0900aace38392ee0079de9cb03b6b7251e6f007b"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/mod.rs",
+      "bytes": 4728,
+      "sha256": "46595dd14feec7809fed336917bcf7fb9c4e4b1b1aaf0b0f3ebb127ada87729c",
+      "gitMode": "100644",
+      "gitBlobSha1": "d4c01172cbef85e789b735b6bdcbd231f9eab004"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/rewards.rs",
+      "bytes": 6654,
+      "sha256": "7714cfd52e3afcdd53d8323ff3114f0eff3a5579ca6b051f3b8becc8bfc597fc",
+      "gitMode": "100644",
+      "gitBlobSha1": "bfd8a43a8188c104c49b58a780ce8a17f147ef25"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/samples.rs",
+      "bytes": 18769,
+      "sha256": "1b09323bc95631f0f75c419673cc85aa99c00c1a87a81fc4f312069836249172",
+      "gitMode": "100644",
+      "gitBlobSha1": "de6747e183bce312a10ef29bc37d94561bbd1cf5"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/sources.rs",
+      "bytes": 12056,
+      "sha256": "827e5c037d691154a7cc024425da3744ddffb521a0a9dda0b699358c27d9bfa2",
+      "gitMode": "100644",
+      "gitBlobSha1": "514577431ed9b52db314bed66c91f6100a3e813e"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/tests.rs",
+      "bytes": 3133,
+      "sha256": "c494496af7996e2329d9c6671c8c38dc3b9c9d2fd52f49896e8e6c6cff937762",
+      "gitMode": "100644",
+      "gitBlobSha1": "cda6051c7a8009c3bc26e9521a2b193a9ba4ff12"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/token.rs",
+      "bytes": 15317,
+      "sha256": "4290ec7d9e4041df4d536f428dc396d9c0d970d62fc39d42dd086dad7beb38d3",
+      "gitMode": "100644",
+      "gitBlobSha1": "3a985eabee9941f6e88bbd2a5a74ce86f8bcf448"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/transitions.rs",
+      "bytes": 58614,
+      "sha256": "0425621a65ceb244dcbae712f58e7b8ea9bc3f7312c9a29348911e73b4061179",
+      "gitMode": "100644",
+      "gitBlobSha1": "fe5f95cf8d8b62b30e741f4af720535c605f774d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/heads/transitions_tests.rs",
+      "bytes": 23673,
+      "sha256": "a9c7fdf515d9ff3e2d4370a21bcbed2029dfb06bd86cc8b459b2a0a02e2abdf0",
+      "gitMode": "100644",
+      "gitBlobSha1": "312a879374f112fa1528a028d8563188ef148ecc"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/median.rs",
+      "bytes": 13616,
+      "sha256": "e6b38863e782b20e89aac879a2f7a677f6f5fad9e35d4a376ece918516a80401",
+      "gitMode": "100644",
+      "gitBlobSha1": "2408112236370d747aab6780243f337db70d775e"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/mod.rs",
+      "bytes": 11325,
+      "sha256": "e103c7f5a362c99611e2ad40a2ff506c86067bc126aaac722443375d60f4dc39",
+      "gitMode": "100644",
+      "gitBlobSha1": "edc7bc2eea3200ed18ab2d76600aefa5d7c8903c"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/month_terminal.rs",
+      "bytes": 4688,
+      "sha256": "85673b5bc8e88903680cd144144ba78d60192a4ba13caa12dbc0113d99a213b1",
+      "gitMode": "100644",
+      "gitBlobSha1": "164036aecf5109553ebdde46bf13c728da1b6df7"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_core.rs",
+      "bytes": 2099,
+      "sha256": "583e9d15cc091c04a8cf939635fd3f6f3cae5c710fe35f5470022f6e7c1e768e",
+      "gitMode": "100644",
+      "gitBlobSha1": "8483380811b38bbebfaf4607881fbf146437bd36"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_economics.rs",
+      "bytes": 2819,
+      "sha256": "3922849709dfcce6d227511124d0185aa570588570486bdef03fd76fc6f1db8e",
+      "gitMode": "100644",
+      "gitBlobSha1": "02322dc4344eb135ea5d4d07b17843351435c94d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_evidence.rs",
+      "bytes": 48391,
+      "sha256": "267ecff7f84044348138a2ddb2c7f64d14325daf07b1ed878f7f3d4be5760174",
+      "gitMode": "100644",
+      "gitBlobSha1": "102c1c590048663985fa253f41f91e7093e97b27"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_membership.rs",
+      "bytes": 22865,
+      "sha256": "1d6a04700f0f1707bd3973f270aec4f3cb49a04bd350de73d3883ab9c1386a22",
+      "gitMode": "100644",
+      "gitBlobSha1": "6f2269d4749fe361dcb6306e4d19c804c106ed5f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_rules.rs",
+      "bytes": 17504,
+      "sha256": "67d34b135a9def564d9bb34a3a39021a6b0afe64ce0c98ef56d46cc00a9b88bc",
+      "gitMode": "100644",
+      "gitBlobSha1": "b082aef77818377408886026edc110d29c658c18"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_schedule_validation.rs",
+      "bytes": 26686,
+      "sha256": "f098b8700fbc98f266e3414c1d09336cf4df983137449e346afb7e33d994e5be",
+      "gitMode": "100644",
+      "gitBlobSha1": "d4c118a65e0c5792447c63a55f9b2711338a7541"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_state_validation.rs",
+      "bytes": 5529,
+      "sha256": "12b881e8b5dd3a5ba7ff8212558739aba70d70fcb6759aafca4554ba518987ad",
+      "gitMode": "100644",
+      "gitBlobSha1": "5367b952f3357f16c1ba29203ce891266f670251"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/oracle_validation.rs",
+      "bytes": 16305,
+      "sha256": "38439da04f07afefefda84e9bb081f182caba8f35a2c356631d16d06556f779e",
+      "gitMode": "100644",
+      "gitBlobSha1": "ad2fd00c97cd0bea6b1a020ed56bb117a8f8298a"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/period.rs",
+      "bytes": 8992,
+      "sha256": "1cab84f550208ca3350f14f43e77bbaa078e6d1fd0d020aa0e81f35532629f43",
+      "gitMode": "100644",
+      "gitBlobSha1": "623d7758132ebf005449ff6fdff8ff7bd05e9e0f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/recipe_weights.rs",
+      "bytes": 11947,
+      "sha256": "9c7a7ea7a22884ca05a2ba393707439087b8b2e0adc7e00c1ba74fc8b02923a0",
+      "gitMode": "100644",
+      "gitBlobSha1": "610498d465ed3445015635a3bd1b1e2fb40acec7"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/rewards.rs",
+      "bytes": 1635,
+      "sha256": "d48c4cd353f9b8992bc54ec50e73fed952e32c7ad183bc80d95031f180c274c6",
+      "gitMode": "100644",
+      "gitBlobSha1": "8d50b91efa063288455a094cebbba26940abce2f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/rewards/claims.rs",
+      "bytes": 17954,
+      "sha256": "cc736c93ad833a1a360755e72e13d5213f1e075cba8f84ebc3d0c027100c81e7",
+      "gitMode": "100644",
+      "gitBlobSha1": "1ab0f5f527788cbbaaa16bd8da2b9f12b6015e8e"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/rewards/escrow.rs",
+      "bytes": 30290,
+      "sha256": "e9c7bcbace0f61e13f711c1d3ebae06481ed3be049c3c22269249cd8620b09ab",
+      "gitMode": "100644",
+      "gitBlobSha1": "0737cb49a19d27b79cdde631b943368499421339"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/rewards/registration.rs",
+      "bytes": 17881,
+      "sha256": "b00a1800aff1d037878b0e186545a050f4725ae901e397bacaf5cfb9f939944d",
+      "gitMode": "100644",
+      "gitBlobSha1": "36ddd3c75bd358c7c02d571e38b842ae2f214200"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/rewards/tests.rs",
+      "bytes": 2837,
+      "sha256": "57ca6f318d7f800e7c1c00980714c588d45119446a3081bc95a7f2153347c901",
+      "gitMode": "100644",
+      "gitBlobSha1": "cfd8dc482887b019f6a5689e9963fc2efc5dfd64"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/schedule.rs",
+      "bytes": 3330,
+      "sha256": "a6dd71bc1afa78e87cc4d5ddb02d1c75601be454f6b596e135bb996dec13c934",
+      "gitMode": "100644",
+      "gitBlobSha1": "d5adfd850b731be9afa45ffffa776669fc8b6c39"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/settlement.rs",
+      "bytes": 6512,
+      "sha256": "7ae434ab6a42e5e3a7e1e2d8526f6948789831eabb1fb2efb0c7d7c467ba9a7d",
+      "gitMode": "100644",
+      "gitBlobSha1": "0a30cf1ec91ec9194f9d512d08fa79efe54a26cf"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/settlement_signers.rs",
+      "bytes": 17561,
+      "sha256": "3b7c08e2dfb18cf70d8868c173d6ee1960ab75317d4ac10625eb1e88a918751c",
+      "gitMode": "100644",
+      "gitBlobSha1": "5cc4ee8083219202dd9ca8ab104b1a54f684769f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/settlement_sources.rs",
+      "bytes": 5621,
+      "sha256": "ca2d42e3cb19859743d8d46e913f1de72eea8b2346080725181dee606b8285f2",
+      "gitMode": "100644",
+      "gitBlobSha1": "a487a88897ebd932747a163bcda9a9cec6752172"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/settlement_validation.rs",
+      "bytes": 13866,
+      "sha256": "4cbd46dfa200973977dfac9d2aeb3ab3045f443f5de08578af2710e63d329ed0",
+      "gitMode": "100644",
+      "gitBlobSha1": "a42ddbbb125b4b643bab0ef18afdddc7db9008dd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/sku_coverage.rs",
+      "bytes": 22957,
+      "sha256": "d026210e6d47e6630852b70d39edd3596be7328cb52b56e8cfb2cdc14d168eeb",
+      "gitMode": "100644",
+      "gitBlobSha1": "b0147b8f3503055d26e57ff532c838459587cba5"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/sku_coverage_resolution.rs",
+      "bytes": 9893,
+      "sha256": "b65468e7e191233cb592cdb782ddf52d1ca77796fc0a019f9d6985df707475cf",
+      "gitMode": "100644",
+      "gitBlobSha1": "27d02a3ca7f55dd870a6abf885e1248888df42fe"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/sku_manifest.rs",
+      "bytes": 21882,
+      "sha256": "4d048812ada5c2ecbfe67017967c0d667a88b754d50e95c065408d94ee7d0dce",
+      "gitMode": "100644",
+      "gitBlobSha1": "ed56d1d860bcd44080fd4ffbbe18eb5becab4757"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/sponsorship/custody.rs",
+      "bytes": 4310,
+      "sha256": "4a6f498509a50bf90cbc6c004ac7ca4800bbfe1ae8882b2ab5781ef6037f139d",
+      "gitMode": "100644",
+      "gitBlobSha1": "bb134cbc70f5a8e6213d01bce79b25739c16f112"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/sponsorship/mod.rs",
+      "bytes": 6958,
+      "sha256": "59b0dd505127a1ae7bc3b3e15b7e2332a86fdb63f8d13b1f60e930494a1e8e05",
+      "gitMode": "100644",
+      "gitBlobSha1": "ce3d031077413c06512e56345ab07f78133bd05f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/sponsorship/settlement.rs",
+      "bytes": 3659,
+      "sha256": "60ec545d98bed5b6f89c107d7f46d34e09f46e4dec75523e352bb589489695f2",
+      "gitMode": "100644",
+      "gitBlobSha1": "4a82eb81b75903fae1bfe16f534160d9084e3508"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/terminal_cleanup.rs",
+      "bytes": 7689,
+      "sha256": "3005011e834fc3baf735afc541608bcb2913a1525bc890be33bb8f49d21c5d3b",
+      "gitMode": "100644",
+      "gitBlobSha1": "0de204b6d58a32a283dfdd3f4e93241166d196f3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/terminal_cleanup/targets.rs",
+      "bytes": 2150,
+      "sha256": "8a44bafd9043a786aa93b3cdf0ef6bbd9ba947658e568461e6e3d9bc1cd8eb0e",
+      "gitMode": "100644",
+      "gitBlobSha1": "be36a3b455334a84ef858220e784aea2519df821"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/account_loading.rs",
+      "bytes": 26987,
+      "sha256": "3720f278f60405b9359d67d1498833bbeff90ffe21e9f9654d6672cd78188e71",
+      "gitMode": "100644",
+      "gitBlobSha1": "9dbf09724ac7c3ca77ae4e56272b0554b70a77b2"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/config_governance.rs",
+      "bytes": 13664,
+      "sha256": "6b88e07ca85fd5fbd43d8c1d5b604186d20c2a27cebf1af15e5be8684488c119",
+      "gitMode": "100644",
+      "gitBlobSha1": "0086fca4640af476d1760f4005f164b156c7a933"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/mod.rs",
+      "bytes": 2316,
+      "sha256": "d30436b7abbac74dee0a90586b1201e784b56ecffece1d6d6e9f89c9af6cfb46",
+      "gitMode": "100644",
+      "gitBlobSha1": "525d06ef9d51fb4b2c33fa40f7f4aac656b05ae8"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/opening_settlement.rs",
+      "bytes": 25182,
+      "sha256": "24a4e82328d37e5d325f8370c84543c478206c794161ce567fb4f2f1b526dd3a",
+      "gitMode": "100644",
+      "gitBlobSha1": "2213e31127bd7550b980443ebfa5e637260e4a2a"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/product_sku.rs",
+      "bytes": 11520,
+      "sha256": "8a769708765eec832421c87bc93ccd4f59ac7c2d6ead6f3d9b8683246dbbcb30",
+      "gitMode": "100644",
+      "gitBlobSha1": "470a67ede62a5d1c14e105f68c6a83cec4e3cb7a"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/schedule.rs",
+      "bytes": 7062,
+      "sha256": "60fc3bf3322bfea1657e99124a93bfd82d755faf360ee9a3dae548f0634296a9",
+      "gitMode": "100644",
+      "gitBlobSha1": "9f10856022f460909ee9d3d4d19d86f1cc30b47f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/settlement.rs",
+      "bytes": 16799,
+      "sha256": "b8df895839638c43d5c547ffdd4d2766ca4875dac0003260d8acb30bf3caef56",
+      "gitMode": "100644",
+      "gitBlobSha1": "1f042954fc1102493fbf95608d112a42048abc2c"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/sku_coverage.rs",
+      "bytes": 7160,
+      "sha256": "d2d168c7259ce6ffb1a67cc1ad744ac9429ab91cdacacfdd43756fe526f3da7f",
+      "gitMode": "100644",
+      "gitBlobSha1": "e4a57f5afe1dbc3dab1c0ae8bcf887a19b638020"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/source_weights.rs",
+      "bytes": 32045,
+      "sha256": "31e1c2b2c6468b79376bb991bdacd1ce42dff9d3532b2d2321d2812e4f1926b7",
+      "gitMode": "100644",
+      "gitBlobSha1": "b3c0193dd06aec66339a9bf1cc35e2599bcb3fca"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/tests/stale_cleanup.rs",
+      "bytes": 11695,
+      "sha256": "2ac003e80695e7e57c1e4a0d9383e6a94df5dfd3a5dd6ce9aea33d8f9748a792",
+      "gitMode": "100644",
+      "gitBlobSha1": "6523b78680462c577a6beac39ca57dbe5b72d1c3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc.rs",
+      "bytes": 1824,
+      "sha256": "f7f7dcb0e9bea4af08de5fae0d52ebccaf252ed25e9522ba5833ac12d3034bd7",
+      "gitMode": "100644",
+      "gitBlobSha1": "ca7e5721fdf53d3aa8b5041a4e8f62a7b541967c"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc/accounting.rs",
+      "bytes": 19667,
+      "sha256": "1262d15e1eab1fa39796c786c4fb90c13e6cabd7abb88c8cd2037705f118d207",
+      "gitMode": "100644",
+      "gitBlobSha1": "21b6d8646ead78a391b911db30b0cd38db63c8e0"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc/opening.rs",
+      "bytes": 19802,
+      "sha256": "dccc90d6b4f71e01aa32f0e8ec17806f13957428e8538e4fb6ed73ae171a80ae",
+      "gitMode": "100644",
+      "gitBlobSha1": "f2e0e516b05d5dcea1ee5f195937ab23804912ca"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc/schedule.rs",
+      "bytes": 11223,
+      "sha256": "2b2709a73e8f1c87fd7b8e1814cae45137a94a25ba962435e5384a8325db938c",
+      "gitMode": "100644",
+      "gitBlobSha1": "5c562141e0b967a362f578fc54936c7d70877246"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc/sources.rs",
+      "bytes": 31157,
+      "sha256": "80b73a7e4f0fc1d96e13c93b24d411f656f339eff3ee51d9b698bfec50fec64d",
+      "gitMode": "100644",
+      "gitBlobSha1": "db3232f7c14032895ed86961ea842ab33c5f7f08"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc/tests.rs",
+      "bytes": 14467,
+      "sha256": "ee629fde843325c9666b809774845b19307ba13ce2444e4537ac360ce95eaed3",
+      "gitMode": "100644",
+      "gitBlobSha1": "e4b4d3c0d9895954e9146fec4812bfa21ce585c8"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc/update_claims.rs",
+      "bytes": 11681,
+      "sha256": "af8692196e3e3ddc9397471a1e6f637e6f42d6ecbe13bde9421be94439bebb61",
+      "gitMode": "100644",
+      "gitBlobSha1": "997842b5d2832f54232e955bd973a9e2d80d82a3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/processor/usdc/update_settlement.rs",
+      "bytes": 27524,
+      "sha256": "188e883b3d5e8e6b567110e048f46c069172dcf36dc07b285b7309513afbedb3",
+      "gitMode": "100644",
+      "gitBlobSha1": "ed122b19539eac8f7d6e745409b491d73989d78f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/sponsorship.rs",
+      "bytes": 8769,
+      "sha256": "2067ffe9f4219e9ab78a24bd6f98ad0f79626e1cdfc4550abe736b989df4509e",
+      "gitMode": "100644",
+      "gitBlobSha1": "798e95045252c1a161a8e52a21e5bcbd7b3199fd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/config.rs",
+      "bytes": 5694,
+      "sha256": "9918606917558ec2397f3f5de185a68ce88f0efccc11c45bc28d78fe3cf19fec",
+      "gitMode": "100644",
+      "gitBlobSha1": "59d41625b98ddbc64d62f6fdc21d7c3079bc8b4b"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/custody.rs",
+      "bytes": 1236,
+      "sha256": "36bbf59a8c0684746fb3c7ee92ef2005f4cf7025de5318b7bf435e154bad1917",
+      "gitMode": "100644",
+      "gitBlobSha1": "8b690f6db7880a1988ecfa1cda6bc926c3157abe"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/heads/gen_layouts.py",
+      "bytes": 55950,
+      "sha256": "2ed3ba0bb2c13b5a38c956754388f49f2f0b078a3a7d4515c79d71a48fb07049",
+      "gitMode": "100644",
+      "gitBlobSha1": "a92f27057a2b1b9508d341c32d7cacd49e1ae827"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/heads/layouts.rs",
+      "bytes": 93555,
+      "sha256": "5b4800741046d9b5eb23dde190e64dbb2d10beeaddb8caa930e2dd16056c8b97",
+      "gitMode": "100644",
+      "gitBlobSha1": "5c3edf50a8f6dd9c3d18d9692bf708bdb0e3f04d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/heads/mod.rs",
+      "bytes": 72036,
+      "sha256": "b2f9fff80a3b20351992ba9a125c18749941326354030755a6e870e4bdb06395",
+      "gitMode": "100644",
+      "gitBlobSha1": "f2c0dde8e50821305edd43f033cde9820dc3ff3d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/heads/settlement.rs",
+      "bytes": 4740,
+      "sha256": "93fd51a66f84f166b3fec5969b79034ac6457ae3ee8a11f8916ad8922221cd9d",
+      "gitMode": "100644",
+      "gitBlobSha1": "c1e18d473aaba264441e99a2a3f16c8f29da1777"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/heads/tests.rs",
+      "bytes": 34786,
+      "sha256": "00c626d6eeb180cb1d488b93d01f584d496665efd28005da4495eb25356be801",
+      "gitMode": "100644",
+      "gitBlobSha1": "8c56c8f7986e1c9d16daf20793f43b3e0a70114f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/manifests.rs",
+      "bytes": 6391,
+      "sha256": "bf64a584adcb54af710011b531206da6a816ebfebc475c38e1b01ba595e368d5",
+      "gitMode": "100644",
+      "gitBlobSha1": "3d8d526b42472b325f3cdfc62e1e7ca6e2f3f2d9"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/median.rs",
+      "bytes": 4141,
+      "sha256": "5b823cc8ce90b3bc55cc3b0797f327e92a60d453a2cc8e0eaa35368877346e81",
+      "gitMode": "100644",
+      "gitBlobSha1": "e0316691b20110f090d2ca1335e3babbe3b805af"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/mod.rs",
+      "bytes": 2790,
+      "sha256": "a0099c849f638ddd248f7ecb28fbfcea327c35dda7105870c4c2854f31af38a0",
+      "gitMode": "100644",
+      "gitBlobSha1": "97891cd4ce0048e92c2afe311aa2f91e39a9bd9b"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/oracle_activity.rs",
+      "bytes": 18077,
+      "sha256": "0d5271992bfbb196d867a4778e955b9888761972c120bca49d69905004233b97",
+      "gitMode": "100644",
+      "gitBlobSha1": "99fb58fb21554372915fd2532bdbe953897e90bc"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/oracle_common.rs",
+      "bytes": 16067,
+      "sha256": "3fb9b1e3fd91ce460af429d23255c524d6fe2732de4c69427be1d5ef5fbf1121",
+      "gitMode": "100644",
+      "gitBlobSha1": "0caf27d6f6968c6bf745ac97cbf8c01f6501d6b7"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/oracle_membership.rs",
+      "bytes": 2480,
+      "sha256": "bb008186040adde19d70c109281ab2bf5fb2ad01483549e4c8034fcb5655b091",
+      "gitMode": "100644",
+      "gitBlobSha1": "afe503828eef46cfe038685a8d5a37b403b8279a"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/rewards.rs",
+      "bytes": 9298,
+      "sha256": "29889d0b415fbc5ff7c85b24f3276c14d41e685afdc2775bb5450c0ca3dfbf5b",
+      "gitMode": "100644",
+      "gitBlobSha1": "b4cae0f3ac5b58ed4c42b1d94999d7f56bd3bece"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/settlement.rs",
+      "bytes": 1723,
+      "sha256": "d4df995b69b1803eadc6c89c60f472f295ee053c0f8e887b6d3e2f5f9141853e",
+      "gitMode": "100644",
+      "gitBlobSha1": "08f955ea3586b9cefa420a2b0ac3a759e68cd4dc"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/sku.rs",
+      "bytes": 9530,
+      "sha256": "5d89efe4367c038e2297f4f700135f2f044f33106cc1183e848ca84fc1c3f87e",
+      "gitMode": "100644",
+      "gitBlobSha1": "109d35d5b981068ca0e5f048b6dfa9d21b95716f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/state/tests.rs",
+      "bytes": 19979,
+      "sha256": "5d7120749592155ba4d8c430db37044aac74331f398b29372d2cae0f2005c918",
+      "gitMode": "100644",
+      "gitBlobSha1": "eaca6c5ab2310f901c5366e8ee61e7cf9e80e8cf"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/system_instruction.rs",
+      "bytes": 3126,
+      "sha256": "76a4dc394bd18f225c67307f95364fd46a1413027d1063cc640535a15d00a72f",
+      "gitMode": "100644",
+      "gitBlobSha1": "8f73de2d039551b27212dee4b1d86806a2f2f4b8"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/token_instruction.rs",
+      "bytes": 8573,
+      "sha256": "4268a4a921ed26f51608db3058245b9c330fe04a420b74f5258b56be994549b1",
+      "gitMode": "100644",
+      "gitBlobSha1": "1a4b0cf3cb8dfe67dd4be7533aa7d7c3149bd494"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/src/token_state.rs",
+      "bytes": 26653,
+      "sha256": "998908b85b6a44bd83a9d2ba405375786f1059eab0e6442da0b080aa301cda56",
+      "gitMode": "100644",
+      "gitBlobSha1": "447527b9c896d6854480d4c1f0a6728766fac0b3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/batx_index.rs",
+      "bytes": 8527,
+      "sha256": "f07131de69fee6998efb477b4c0f2e27002a3a5019d4757784ce818f00facbee",
+      "gitMode": "100644",
+      "gitBlobSha1": "09e32fc6be9203b59690174e59a4c96a252cd1ad"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/borsh_bounds_security.rs",
+      "bytes": 5866,
+      "sha256": "24e31a252b04b4570fd883a3e23e65985d3285afce921877ebe105add3ad0624",
+      "gitMode": "100644",
+      "gitBlobSha1": "085ed856769f71cd30e626d3a80e0e5f33b6a02f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/carry_forward.rs",
+      "bytes": 10609,
+      "sha256": "3d0abbf3e539b5d89b85ff5f86b530049268cb16c17575a0685c7beb1dd1db13",
+      "gitMode": "100644",
+      "gitBlobSha1": "32198ed05c880b76c631d1764d444295a7ac0f85"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/cfm_launch.rs",
+      "bytes": 29344,
+      "sha256": "fb5d56a6fcaed54613307c5e1042b9d7102f44e1327432919276528477eb66f4",
+      "gitMode": "100644",
+      "gitBlobSha1": "0f4defb78606cd1be06bf91a8c8f452698d875fb"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/chip_product_sku_manifests.rs",
+      "bytes": 3584,
+      "sha256": "b3c7c5d4ba7fdee5fbfb5f35c9725e787490d04efe9ead9ee541cf15d0769f37",
+      "gitMode": "100644",
+      "gitBlobSha1": "e30ba61230ed428c7be33564170379329b7b93bb"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/common/cfm.rs",
+      "bytes": 15729,
+      "sha256": "980f62a7b2dbf6faec360077239557f9d394c045e26e7f2e9178c4c53d835cc9",
+      "gitMode": "100644",
+      "gitBlobSha1": "d7c4730f9cafe33049f8e93a0f97d5301a749d69"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/common/cohort.rs",
+      "bytes": 25302,
+      "sha256": "7a75180c1a288b4ea9b9bdc38bc08ca9ff1ce25502cd7940e712224aa9c673f9",
+      "gitMode": "100644",
+      "gitBlobSha1": "441aaf630c5987809a8bdcf985fbbdc5dfb4bb35"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/common/mod.rs",
+      "bytes": 33750,
+      "sha256": "ca07147719710640445d516b1626b8d41cf9ec2e6bdb49d887ec14a9c4572a6f",
+      "gitMode": "100644",
+      "gitBlobSha1": "56b9d855888121df270c6fdb20ea4922d77dbe8b"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/common/production.rs",
+      "bytes": 1894,
+      "sha256": "e18e2ebf9faea7c2a3ee13d19596b34efa9ffe00c2dc9275ea375e9745617441",
+      "gitMode": "100644",
+      "gitBlobSha1": "037db5039ee95b651c8e9320fd6fdccc4c740a7f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/common/settle.rs",
+      "bytes": 22929,
+      "sha256": "0da3e47ebce56195f9b350f0762b308a96c436c1c95c7baf73c277fd870d01f5",
+      "gitMode": "100644",
+      "gitBlobSha1": "541def1e045eb77968f0c7fa85b93baa2d307846"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/common/updates.rs",
+      "bytes": 5793,
+      "sha256": "04510afdb9b36fcc50459dcc205e0c58b8c2e115a3602d4beeef8629ced5220f",
+      "gitMode": "100644",
+      "gitBlobSha1": "2e00f4fdf688bf89b2c2ffef5e0a0f55a75232e6"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/council_dev.rs",
+      "bytes": 20919,
+      "sha256": "6a893c6df1bfb71a92f63ecac995e9d6bf6cd0ec924d2a739d8c5242b77184b7",
+      "gitMode": "100644",
+      "gitBlobSha1": "a7120a465cff262e613246ffc14febbebcd55fb7"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/custody.rs",
+      "bytes": 16538,
+      "sha256": "192814a040f5b11da40f82e659178ecc7ad9500895801c3283a91418ad992913",
+      "gitMode": "100644",
+      "gitBlobSha1": "1639cb38d7f7b439118f18591ae12776d2bafeb6"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/dev_bootstrap.rs",
+      "bytes": 30253,
+      "sha256": "00d9b2418d24a614e51db1367db707687bb09b5ae1c1003d75b7f3766044c3a7",
+      "gitMode": "100644",
+      "gitBlobSha1": "9250ba1be63138911b781914c409ea9c1a20e2eb"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/dev_completion.rs",
+      "bytes": 35608,
+      "sha256": "fccd7784eb2fa17e61c2a855d5d326ee38428bf076d3befeb655ae4aafa06f84",
+      "gitMode": "100644",
+      "gitBlobSha1": "31094ac9f8c22b6152a6c7a7a18d08266a345baf"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/evidence.rs",
+      "bytes": 24133,
+      "sha256": "9093de1ed309aebfde1660c0075a8989140862b2eaf105dfa60bc51027e2f6ce",
+      "gitMode": "100644",
+      "gitBlobSha1": "28d0af2c8065a553d10fe1e50e40fd14725e9570"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/failed_month.rs",
+      "bytes": 41846,
+      "sha256": "37b8f9d0c8ca5c7fd42de3bc16630837c38be6cf63ee3a17b243c3678e3d3032",
+      "gitMode": "100644",
+      "gitBlobSha1": "e1b355357d6fd46c5dc0dc01d121af41917c21ed"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/fixtures/dev-oracle-chip-sources.json",
+      "bytes": 9675,
+      "sha256": "2b93befe361777ac45122d0a9223f803a7b9845ca073768f6573e0706a4ceb6c",
+      "gitMode": "100644",
+      "gitBlobSha1": "b58a5bb28e2ce3a407bffd72f6fb2969731e2640"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/fixtures/dev-oracle-sources.json",
+      "bytes": 21791,
+      "sha256": "c6edeb7e532653e8d35dec3f382a2c95de73a8447a923ab0d6ef30357fe5f127",
+      "gitMode": "100644",
+      "gitBlobSha1": "91dd555039a8857013becadfe5399a8b18ae4acd"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/full_cohort.rs",
+      "bytes": 20833,
+      "sha256": "36dbc0bcf06de622ffd9f483bc5476ee7f9991031c37d01d43b03265cc86e3cd",
+      "gitMode": "100644",
+      "gitBlobSha1": "aaedb4c9ce65549860052c72b60605872884f1f0"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/governance.rs",
+      "bytes": 11252,
+      "sha256": "5da09500734c7bbff114b0985fe1eec56c676daefedfdb3e712aa7ad539549e2",
+      "gitMode": "100644",
+      "gitBlobSha1": "4db5e28f1619fc0d71e648f3e6c501719d4abdf9"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/heads.rs",
+      "bytes": 33441,
+      "sha256": "4d22798a065482626b6ed68333efce512c2d15013d756fe426d260c8a18cb58f",
+      "gitMode": "100644",
+      "gitBlobSha1": "82b346cad08021698a358808c1f55a3b9073b18d"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/heads_claims.rs",
+      "bytes": 379906,
+      "sha256": "460aa1461b079e9e0542ddda87bd7760128c39de9c7b6996d01282be6b72c849",
+      "gitMode": "100644",
+      "gitBlobSha1": "622972ffaa5858220ccfd1a5f47b29ee3c32ea6c"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/heads_governed.rs",
+      "bytes": 5054,
+      "sha256": "5af122003023d9cf23d8ef08c8acd317a810bf12dafbef6f652438d6387fd9d4",
+      "gitMode": "100644",
+      "gitBlobSha1": "ee77c088a4ba7f990aca93c89d23cf3d00525713"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/month_initialization.rs",
+      "bytes": 18417,
+      "sha256": "164a424207d442c373367cfd056d1afd74a3b3679883ad0bc9f97e903ef76b83",
+      "gitMode": "100644",
+      "gitBlobSha1": "b16b35c4f80e8a8711e3882a4fb48905888cb142"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/nandx_product_sku_manifest.rs",
+      "bytes": 23050,
+      "sha256": "0f934d92f56416df5cc51ecfa48d1700ccf5649de57986bc2d6fe9eb7129a82b",
+      "gitMode": "100644",
+      "gitBlobSha1": "1f45169ec5ad824ed38e81638a7cdd38ca310b04"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/oracle_active_weight_and_commitment_v2.rs",
+      "bytes": 10057,
+      "sha256": "5fd0376b32a82df37f8274c98e617aa0f7d1624265fd7cd198153990022278cd",
+      "gitMode": "100644",
+      "gitBlobSha1": "155d3bb65f0791d338ca28059404576d05e46dd3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/oracle_challenge_guard_security.rs",
+      "bytes": 1684,
+      "sha256": "94b7f127cce338a2127ef12e487285b9f24f753f67d8e8ccd8a6cad20435d722",
+      "gitMode": "100644",
+      "gitBlobSha1": "67086286eb3a4ed195e4efb411b76f11311dadd1"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/oracle_economics_security.rs",
+      "bytes": 1640,
+      "sha256": "d50ea85e2fa98512d31184cc826134e9861ce67fef1ab0bec9205a4e8f1e984f",
+      "gitMode": "100644",
+      "gitBlobSha1": "85b17a116af4fa016cce72db385acdce064481a9"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/oracle_escrow_security_contract.rs",
+      "bytes": 753,
+      "sha256": "ee57af45eceb0754ae2f8d6385780c9fdee0811c35f78a96d7526635bf748515",
+      "gitMode": "100644",
+      "gitBlobSha1": "7171275308b58760a4fe9a374bb09e4be765adc3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/oracle_opening_security_contract.rs",
+      "bytes": 1341,
+      "sha256": "0b2a59e94b2a75d7140a14aa7a2786ea472b7fabf61a967d0011dbd77f121cfd",
+      "gitMode": "100644",
+      "gitBlobSha1": "3ce69bc20bad5fd5338e237d2a671534fa8e0083"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/oracle_settlement_source_manifest.rs",
+      "bytes": 7560,
+      "sha256": "ccaf220a7aa03482b91cfa4a8279cd6c8db482f4a7ec2ff054a096a15407aa7b",
+      "gitMode": "100644",
+      "gitBlobSha1": "e1b9c4e4cbfdd15452566bdbb5a58e420907cfa6"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/oracle_weight_security_contract.rs",
+      "bytes": 12339,
+      "sha256": "04690752916bf19c470deb585c0a22d6a10e7f25568307c2d7827ecd6258c0a5",
+      "gitMode": "100644",
+      "gitBlobSha1": "e839cb0770aa7742e6756ddf24941938a8518b3f"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/period_live.rs",
+      "bytes": 22166,
+      "sha256": "40434486b3719015cf41c02b13ded5e25af869e18b3b7c08a53ec333c3a5e8c6",
+      "gitMode": "100644",
+      "gitBlobSha1": "6e16ade76ea3c6aadab7cfa36e166fb3f20e7308"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/product_sku_registration.rs",
+      "bytes": 6831,
+      "sha256": "a6672d6f49dd95c148eb2a21ff7572f9a8e82b32af5e02481677111af6f482a0",
+      "gitMode": "100644",
+      "gitBlobSha1": "3b67149a7b59bbd3d76ee9a4c57db4e3b58a2055"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/production_artifact.rs",
+      "bytes": 30572,
+      "sha256": "6ab4757375182b43e67a18f31a4340e90cc3f1bc7d49d3c27c2f309955110bb2",
+      "gitMode": "100644",
+      "gitBlobSha1": "38349c10a8ab515e6732c144f7891b722ae25238"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/production_failed_month.rs",
+      "bytes": 48584,
+      "sha256": "b42a36032f62399d0b6d13d76d521369d7c09bd03acc1862e49aeadb2c4be5f0",
+      "gitMode": "100644",
+      "gitBlobSha1": "b84ee95f4e63c102885a3400a9df560889239d10"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/program.rs",
+      "bytes": 10755,
+      "sha256": "6aa8e8a49ef9d54dc98a22630928a6ab5e653d7945fe3923ffac51e41762d010",
+      "gitMode": "100644",
+      "gitBlobSha1": "f1cf48175864d6cc8499f3929574381a3a5ddf96"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/ramx_product_sku_manifest.rs",
+      "bytes": 13641,
+      "sha256": "493a8403a50a37de67c99d23163cb281f78074564808d7ffecc540993a4984e5",
+      "gitMode": "100644",
+      "gitBlobSha1": "61a4ec2ae93a1572ba9f311cd2552158b470f378"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/rewards_cleanup.rs",
+      "bytes": 11871,
+      "sha256": "89f124c9d79a9e734cc479b12aa2e2294c79ba40637f267ba5c75f7042532b36",
+      "gitMode": "100644",
+      "gitBlobSha1": "ba073ecfe59817343b3fe88608e7a373c5fe1106"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/settlement.rs",
+      "bytes": 19270,
+      "sha256": "2623a6cdf64c76bd83cea07c9dccdc2efeef8c7d5d1a2bd34248738e28b8fc24",
+      "gitMode": "100644",
+      "gitBlobSha1": "d643a5261e289141c6aaf4f34c6933357e3c4afa"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/signer_governance.rs",
+      "bytes": 13675,
+      "sha256": "22593c1ba4a58077220d31a614b3850e57f67d9322f694e52edb5c7e06fa0dd1",
+      "gitMode": "100644",
+      "gitBlobSha1": "24c54ecd5b277de50cc95c488e301f53a022ec76"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/sku_frontier_close.rs",
+      "bytes": 11220,
+      "sha256": "175a521d522e3c4326a945dc8569dfcefe5438a657a1b02540a0512fd2628b97",
+      "gitMode": "100644",
+      "gitBlobSha1": "b9e5f7290eb6900db0831cfd60269e5bb701afb3"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/source_formation.rs",
+      "bytes": 32947,
+      "sha256": "4d387192a3ac3fe6e533145942de74d56de9e7c51b05077893e6f0523a9ccefe",
+      "gitMode": "100644",
+      "gitBlobSha1": "26e68d79fe9757cd70aa50c9e34d61ed5c22e662"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/sponsorship.rs",
+      "bytes": 17646,
+      "sha256": "82c39348a2b751fa74803aa5693141475dcbe53a041634db7861e83794591186",
+      "gitMode": "100644",
+      "gitBlobSha1": "7989b0b3b94cc56d3ed8d8d5d476a4da3db08485"
+    },
+    {
+      "path": "oracle/programs/ameba_oracle/tests/update_lane.rs",
+      "bytes": 36924,
+      "sha256": "efa696d70404f06b9db1afc52b6f01836b67dd23692c984da0f53e564b699890",
+      "gitMode": "100644",
+      "gitBlobSha1": "be007c98f78b4f744abe037b404f84c2e2a5038a"
+    },
+    {
+      "path": "oracle/rust-toolchain.toml",
+      "bytes": 76,
+      "sha256": "4a0a7590572c5859a0487da76cddeffd17d175e34b7338914d2915ce18bc0d3d",
+      "gitMode": "100644",
+      "gitBlobSha1": "25ad1d78383605099e8d67f0edd2ad46f217f4c8"
+    }
+  ]
+}

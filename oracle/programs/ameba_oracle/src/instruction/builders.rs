@@ -3164,6 +3164,70 @@ pub fn find_cleanup_receipt_address(program_id: &Pubkey, month: &Pubkey) -> Pubk
 /// registry of the product (or its absent PDA); 9 the registry's latest carry period (or the
 /// system program); 10 [writable] target (kinds 1-6); 11 the kind's extra account (the reward
 /// schedule for kind 1, the recipe source index for kind 2, the council case for kind 5).
+/// Tag 30 selector 25 (the admin): kind 0 fails a Forming `period` that never listed and puts its
+/// month back in source submission (`target` none; `parent` the coverage manifest PDA, written
+/// when the month is in Scramble, or none); kinds 1-12 close `target`, one account of its
+/// failed, refunded month, into `recipient` (`parent`: the target's source for kinds 1-3, the
+/// coverage manifest PDA for kind 10; `processor::failed_month`). Accounts: 0 [signer] admin;
+/// 1 config; 2 [writable] period; 3 [writable] month; 4 [writable] the month's reward schedule
+/// PDA; 5 [writable] recipient; 6 [writable] target or the system program; 7 parent or the
+/// system program (a sponsored source's agreement for kind 5; writable for kind 0); 8 the
+/// product's carry registry PDA; 9 that agreement's `UserCollateral` for kind 5, else the system
+/// program.
+#[allow(clippy::too_many_arguments)]
+pub fn failed_month(
+    program_id: &Pubkey,
+    admin: &Pubkey,
+    underlying_id: &[u8; 32],
+    period: &Pubkey,
+    month: &Pubkey,
+    recipient: &Pubkey,
+    kind: u8,
+    target: Option<&Pubkey>,
+    parent: Option<&Pubkey>,
+) -> Instruction {
+    oracle_carry_forward(
+        program_id,
+        OracleCarryForwardActionV1::FailedMonth { kind },
+        vec![
+            AccountMeta::new_readonly(*admin, true),
+            AccountMeta::new_readonly(find_config_address(program_id).0, false),
+            AccountMeta::new(*period, false),
+            AccountMeta::new(*month, false),
+            AccountMeta::new(
+                crate::state::derive_oracle_usdc_reward_schedule_pda(program_id, month).0,
+                false,
+            ),
+            AccountMeta::new(*recipient, recipient == admin),
+            match target {
+                Some(target) => AccountMeta::new(*target, false),
+                None => AccountMeta::new_readonly(system_program::ID, false),
+            },
+            match parent {
+                Some(manifest) if kind == 0 => AccountMeta::new(*manifest, false),
+                _ => {
+                    AccountMeta::new_readonly(parent.copied().unwrap_or(system_program::ID), false)
+                }
+            },
+            AccountMeta::new_readonly(
+                find_carry_registry_address(program_id, underlying_id),
+                false,
+            ),
+            // A sponsored source's close (kind 5, its agreement the parent): the agreement's
+            // ledger, which must be empty.
+            AccountMeta::new_readonly(
+                match (kind, parent) {
+                    (5, Some(agreement)) => {
+                        crate::state::derive_user_collateral_pda(program_id, agreement).0
+                    }
+                    _ => system_program::ID,
+                },
+                false,
+            ),
+        ],
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn terminal_cleanup(
     program_id: &Pubkey,

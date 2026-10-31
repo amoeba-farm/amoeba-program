@@ -7,6 +7,19 @@ import tomllib
 
 bundle = Path(__file__).resolve().parent
 root = bundle.parents[1]
+repository = root
+# Preserve the installed Futures source and its original dependencies.
+import subprocess, tempfile, tarfile, io
+snapshot = tempfile.TemporaryDirectory(prefix='amoeba-private-credit-historical-source-')
+archive = subprocess.check_output(['git', '-C', str(root), 'archive', '--format=tar', '059bd727fb61b68adf7d5ee3067ed5158674cbbc', '--', 'oracle', 'futures', 'governance'])
+root = Path(snapshot.name).resolve()
+with tarfile.open(fileobj=io.BytesIO(archive)) as members:
+    for member in members:
+        target = (root / member.name).resolve()
+        assert target.is_relative_to(root) and not member.issym() and not member.islnk()
+        if member.isfile():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(members.extractfile(member).read())
 inventory = json.loads((bundle / 'SOURCE_FILES.json').read_text(encoding='utf8'))
 assert inventory['sourceCommit'] == 'bcf0601606617fda7e00a818e7663d031339858f'
 records = inventory['files']
@@ -65,5 +78,5 @@ for filename, key in [('SOURCE_FILES.json', 'sourceInventorySha256'), ('DEPENDEN
     assert hashlib.sha256((bundle / filename).read_bytes()).hexdigest() == reproduction[key]
 assert reproduction['artifactBytes'] == 722520 and reproduction['elfFlags'] == 1
 assert reproduction['devMarkersFound'] == []
-assert not (root / 'futures/ops').exists(), 'Private operator configuration must not be exported'
+assert not (repository / 'futures/ops').exists(), 'Private operator configuration must not be exported'
 print('Release metadata and private-configuration exclusion verified')

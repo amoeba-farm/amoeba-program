@@ -29,10 +29,12 @@ jobs:
         run: python3 contracts/2026-10-17-inventory-netting/verify-source.py
       - name: Verify staking Futures source
         run: python3 contracts/2026-10-18-staking-mainnet/verify-source.py
-      - name: Verify current Oracle source inventory
+      - name: Verify 2026-10-22 Oracle source inventory
         run: python3 contracts/2026-10-22-oracle-upgrade/verify-source.py
       - name: Verify operator-assessed Futures source
         run: python3 contracts/2026-10-28-private-credit/verify-source.py
+      - name: Verify current Oracle heads source inventory
+        run: python3 contracts/2026-10-30-oracle-heads/verify-source.py
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
         with:
           toolchain: 1.90.0

@@ -68,6 +68,12 @@ crate::fixed_codec::compact_borsh_struct! {
 pub enum OracleCarryForwardActionV1 {
     /// Selector 24 ("TRC1"): reclaim the paid terminal bookkeeping of a settled month.
     TerminalCleanup(TerminalCleanupParams),
+    /// Selector 25 ("FMC1"), the admin: kind 0 fails a Forming period that never listed (its
+    /// month back in source submission); kinds 1-12 close one account of its refunded month
+    /// (`processor::failed_month`).
+    FailedMonth {
+        kind: u8,
+    },
     /// Selector 22 ("OSB1"): underwritten source activation, reconciliation, bounty and reserve.
     SponsoredSource(OracleSponsoredActionV1),
     /// Selector 18 ("CV01"): council adjudication of an unresolved dispute.
@@ -118,6 +124,8 @@ pub enum OracleCarryForwardActionV1 {
 /// Evidence object kinds 1-4 (`processor/oracle_evidence.rs`): locator, definition, Wayback
 /// archive URL, authenticated evidence record.
 const EVIDENCE_KINDS: u8 = crate::constants::ORACLE_EVIDENCE_RECORD_KIND;
+/// The last kind of selector 25 (`processor::failed_month`).
+pub const FAILED_MONTH_KINDS: u8 = 12;
 
 impl OracleCarryForwardActionV1 {
     /// Branch-for-branch mirror of `deserialize_reader` on a [`CheckedCursor`]. A short read
@@ -132,6 +140,16 @@ impl OracleCarryForwardActionV1 {
                     return invalid();
                 }
                 Self::TerminalCleanup(crate::fixed_codec::CursorField::read(c))
+            }
+            25 => {
+                if c.bytes::<4>() != *b"FMC1" {
+                    return invalid();
+                }
+                let kind = c.u8();
+                if kind > FAILED_MONTH_KINDS {
+                    return invalid();
+                }
+                Self::FailedMonth { kind }
             }
             22 => {
                 if c.bytes::<4>() != *b"OSB1" {
@@ -265,6 +283,16 @@ impl BorshDeserialize for OracleCarryForwardActionV1 {
                 }
                 Self::TerminalCleanup(TerminalCleanupParams::deserialize_reader(reader)?)
             }
+            25 => {
+                if <[u8; 4]>::deserialize_reader(reader)? != *b"FMC1" {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                let kind = u8::deserialize_reader(reader)?;
+                if kind > FAILED_MONTH_KINDS {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                Self::FailedMonth { kind }
+            }
             22 => {
                 if <[u8; 4]>::deserialize_reader(reader)? != *b"OSB1" {
                     return Err(io::ErrorKind::InvalidData.into());
@@ -378,6 +406,7 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         let tag: u8 = match self {
             Self::TerminalCleanup(_) => 24,
+            Self::FailedMonth { .. } => 25,
             Self::SponsoredSource(_) => 22,
             Self::Council(_) => 18,
             Self::RegisterRoot => 0,
@@ -404,6 +433,14 @@ impl BorshSerialize for OracleCarryForwardActionV1 {
                 tag.serialize(writer)?;
                 writer.write_all(b"TRC1")?;
                 params.serialize(writer)
+            }
+            Self::FailedMonth { kind } => {
+                if *kind > FAILED_MONTH_KINDS {
+                    return Err(io::ErrorKind::InvalidData.into());
+                }
+                tag.serialize(writer)?;
+                writer.write_all(b"FMC1")?;
+                kind.serialize(writer)
             }
             Self::SponsoredSource(action) => {
                 tag.serialize(writer)?;

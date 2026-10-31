@@ -233,6 +233,23 @@ pub enum OracleError {
     InvalidCfmLaunchReceipt = 6307,
     #[error("three distinct current council seats must sign the CFM launch")]
     CfmLaunchCouncilRequired = 6308,
+    // Oracle v2, heads on pikes (tag 210, `heads` builds only).
+    #[error("this heads instruction is not implemented in this build yet")]
+    HeadsNotImplemented = 6309,
+    #[error("invalid heads account: owner, length, discriminator, version, PDA or identity")]
+    InvalidHeadsAccount = 6310,
+    #[error("invalid heads AMBA mint, vault or token program")]
+    InvalidHeadsTokenAccount = 6311,
+    #[error("the heads account is not in the state this instruction requires")]
+    InvalidHeadsState = 6312,
+    #[error("a heads account is at its structural capacity")]
+    HeadsCapacityExhausted = 6313,
+    #[error("three distinct current council seats must sign the heads ruling")]
+    HeadsCouncilRequired = 6314,
+    #[error("invalid heads evidence object or commitment")]
+    InvalidHeadsEvidence = 6315,
+    #[error("not enough free AMBA stake")]
+    InsufficientHeadsStake = 6316,
 }
 
 impl From<OracleError> for ProgramError {

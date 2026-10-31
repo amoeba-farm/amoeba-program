@@ -104,8 +104,9 @@ fn load_council_month(
     Ok((anchor, Box::new(month)))
 }
 
-/// 0=open, 1=public ballot (and lazy current round), 2=apply, 3=stale update abort.
-/// Common accounts: payer, period, month, case, target, canonical controller Config,
+/// 0=open, 1=public ballot (and lazy current round), 2=apply, 3=stale update abort, or the end
+/// of a source case whose period Failed (`cancel_failed_source`): a Failed period's source cases
+/// take only 3. Common accounts: payer, period, month, case, target, canonical controller Config,
 /// current-epoch round, system. Ballot adds readonly seat signer; then target-specific accounts.
 #[inline(never)]
 pub(super) fn process(
@@ -150,7 +151,13 @@ pub(super) fn process(
         return Err(OracleError::GovernanceGateEpochMismatch.into());
     }
     let (anchor, mut month) = load_council_month(program, &accounts[1], &accounts[2])?;
-    if month.phase == OraclePhase::Closed {
+    // A Failed period's source case only ends (3): nothing rules on its challenge any more, and
+    // the no-vote fallback would pay the challenger's bond to the proposer. Every other kind
+    // resolves as ever (an Opening case of a month 79 failed at expiry settles its escrows).
+    let failed = anchor.period.status == PeriodStatus::Failed;
+    if month.phase == OraclePhase::Closed
+        || (failed && action.kind == OracleEmergencyDisputeKind::Source && action.operation != 3)
+    {
         return Err(OracleError::InvalidOraclePhase.into());
     }
     let start = if action.operation == 1 { 9 } else { 8 };
@@ -335,7 +342,7 @@ pub(super) fn process(
             // Spread's CFM council settlement timing; the price rule is unchanged.
             let launch = kind == OracleEmergencyDisputeKind::BucketMedian && remaining.len() == 1;
             if launch {
-                super::cfm_launch::validate_finished_launch(
+                super::cfm_receipt::validate_finished_launch(
                     program,
                     &accounts[1],
                     accounts[2].key,
@@ -406,6 +413,10 @@ pub(super) fn process(
             case.resolved_slot = slot;
             month.last_updated_slot = slot;
             store_oracle_month_state(&accounts[2], &month)?;
+        }
+        3 if kind == OracleEmergencyDisputeKind::Source && failed => {
+            cancel_failed_source(program, accounts, &mut month, &mut case, remaining, slot)?;
+            case.decision_epoch = view.epoch;
         }
         3 => {
             abort_stale_update(
@@ -516,6 +527,57 @@ fn abort_stale_update(
     store_state(&a[1], &claim)?;
     store_state(&a[2], &guard)?;
     store_state(&accounts[4], &challenge)?;
+    store_oracle_month_state(&accounts[2], month)
+}
+
+/// Operation 3 on a source case of a Failed period (30/25 kind 0 fails a month whose challenge
+/// the oracle authority sent to the council, 185): nothing rules on it any more, so the case
+/// ends on its fallback without applying it (reason 2), the challenge is Cancelled, both guards
+/// are released and the pending count drops; 194 (or 169) then returns the bond to its own
+/// challenger. Remaining accounts as for applying it: source, source guard[, comparison source,
+/// comparison guard].
+#[inline(never)]
+fn cancel_failed_source(
+    program: &Pubkey,
+    accounts: &[AccountInfo],
+    month: &mut OracleMonthState,
+    case: &mut CouncilCase,
+    a: &[AccountInfo],
+    slot: u64,
+) -> ProgramResult {
+    let kind = OracleEmergencyDisputeKind::Source;
+    let (month_key, target) = (accounts[2].key, &accounts[4]);
+    validate_cash_emergency_target(
+        program,
+        month_key,
+        month,
+        kind,
+        &case.target_id,
+        target,
+        a,
+        None,
+        Some(accounts[3].key),
+    )?;
+    set_cash_emergency_guard_dispute_binding(
+        program,
+        kind,
+        month_key,
+        target,
+        a,
+        accounts[3].key,
+        &Pubkey::default(),
+        slot,
+    )?;
+    let mut challenge = load_valid_oracle_source_challenge(program, month_key, target)?;
+    challenge.status = OracleChallengeStatus::Cancelled;
+    decrement_pending_oracle_resolution(month)?;
+    month.last_updated_slot = slot;
+    case.finalized = true;
+    case.outcome = case.fallback;
+    case.reason = 2;
+    case.seat_mask = 0;
+    case.resolved_slot = slot;
+    store_state(target, &challenge)?;
     store_oracle_month_state(&accounts[2], month)
 }
 

@@ -4,6 +4,8 @@
 //! bond vault. The reward vault is a separate program-owned USDC account.
 
 use super::*;
+// The formation modules read these too (`v1-formation`).
+#[cfg_attr(not(feature = "v1-formation"), allow(unused_imports))]
 use crate::{
     constants::{
         MAX_ORACLE_USDC_MERGE_DEPTH, ORACLE_USDC_REWARD_SCHEDULE_PDA_SEED,
@@ -26,14 +28,18 @@ use crate::{
 };
 
 mod accounting;
+#[cfg(feature = "v1-formation")]
 mod opening;
+#[cfg(feature = "v1-formation")]
 mod schedule;
 mod sources;
 mod update_claims;
 mod update_settlement;
 
 pub(super) use accounting::*;
+#[cfg(feature = "v1-formation")]
 pub(super) use opening::*;
+#[cfg(feature = "v1-formation")]
 pub(super) use schedule::*;
 pub(super) use sources::*;
 pub(super) use update_claims::*;

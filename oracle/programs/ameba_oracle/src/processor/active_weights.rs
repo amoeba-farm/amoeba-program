@@ -109,8 +109,9 @@ pub(super) fn process_begin_oracle_active_weights(
     validate_system_program(system_program_info)?;
     let config = load_active_oracle_vault_config(program_id, config_info)?;
     validate_oracle_recipe_weight_actor(&config, actor_info.key)?;
-    let (_anchor, mut month) =
+    let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_opening_sources_terminal(&month)?;
     if params.expected_source_count == 0
         || params.expected_source_count != month.frozen_source_count
@@ -200,8 +201,9 @@ pub(super) fn process_accumulate_oracle_active_weight_group(
     let bucket_info = &accounts[6];
     let source_end = accounts.len() - 4;
     validate_system_program(system_program_info)?;
-    let (_anchor, mut month) =
+    let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_opening_sources_terminal(&month)?;
     let mut manifest =
         load_valid_oracle_active_weight_manifest(program_id, month_info.key, manifest_info)?;
@@ -466,8 +468,9 @@ pub(super) fn process_finalize_oracle_active_weights(
     let month_info = &accounts[2];
     let recipe_manifest_info = &accounts[3];
     let manifest_info = &accounts[4];
-    let (_anchor, mut month) =
+    let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     ensure_oracle_opening_sources_terminal(&month)?;
     let recipe =
         load_valid_oracle_recipe_weight_manifest(program_id, month_info.key, recipe_manifest_info)?;

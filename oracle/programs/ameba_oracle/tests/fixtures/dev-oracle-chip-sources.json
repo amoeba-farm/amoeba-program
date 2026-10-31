@@ -1,5 +1,5 @@
 {
-  "note": "Dev oracle sources for the RAMX and NANDX chip-bucket months (expiry after 2026-11-01) and the BATX months (from its first, expiry 2026-12-01), for the localnet dev bootstrap and the dev oracle feed only. One source per bucket (the dev path's shape), weights the products' (RAMX 40/20/25/15, the user's of 2026-10-21; NANDX the spec's; BATX 40/30/20/10, governance/batx_basket_spec.v1.json). BATX's rows avoid TrendForce, whose terms forbid prediction-market use (governance/batx_source_manifest.v1.json). Each row names a real public page and its row label as of 2026-10-20 and that day's value as the baseline; the dev feed's later values are synthetic. These are not settlement sources and carry no claim about a page's price basis.",
+  "note": "Dev oracle sources for the RAMX and NANDX chip-bucket months (expiry after 2026-11-01) and the BATX months (from its first, expiry 2026-12-01), for the localnet dev bootstrap and the dev oracle feed only. One source per bucket (the dev path's shape), weights the products' (RAMX 40/20/25/15, the user's of 2026-10-21; NANDX 40/30/20/10, governance/commodity_submission_spec.v2.json; BATX 40/30/20/10, governance/batx_basket_spec.v1.json). BATX's and NANDX's rows avoid TrendForce, whose terms forbid prediction-market use (governance/batx_source_manifest.v1.json). RAMX's and BATX's rows name a real public page and its row label as of 2026-10-20 and that day's value as the baseline. NANDX's rows (2026-10-22, when the user made its buckets packaged single-die NAND chips; until then they were memorymarket.com's flash-wafer rows) name a Micron single-die part's distributor page, its part number as the row and that day's list price as the baseline; no public page prices a single-die 256Gb TLC chip, so that row is a placeholder (its note says so). The dev feed's later values are synthetic. These are not settlement sources and carry no claim about a page's price basis.",
   "afterExpiry": 1793491200,
   "products": [
     {
@@ -57,48 +57,52 @@
       "phase": "Game",
       "sources": [
         {
-          "sourceId": "ffb8c6fe637b966ebbce35c79bd950e654a830ddd18ec22cf85db015f6d53874",
+          "sourceId": "0f04f9a041633bcbf5130eb079076fa666af6a4ce46648c4a57c5404c2e20560",
           "bucketId": "746c635f31746200000000000000000000000000000000000000000000000000",
           "bucketLabel": "tlc_1tb",
-          "url": "https://www.memorymarket.com/price/in/100242",
-          "locatorHash": "d05cec5a2ee188ec73110a5c703b5937909dbfa95f9efb0af8374f5a0f1ff283",
-          "row": "1Tb TLC",
+          "url": "https://www.digikey.com/en/products/detail/micron-technology-inc/MT29F1T08EBLEHD4-ITF-E/29306353",
+          "locatorHash": "7f5c17d0ef8df72e9ebfabe2624d02a533ba55d8649ef86b60ffa6214fa7dc82",
+          "row": "MT29F1T08EBLEHD4-ITF:E",
           "status": "Active",
           "bucketWeightBps": 4000,
-          "baselineStateAtomic": "29000000"
+          "baselineStateAtomic": "101717000",
+          "note": "Micron, \"TLC 1TBIT 8 154/195 VFBGA 1 IT\" (TLC, 1 die, VFBGA, industrial temperature), Active. DigiKey's list price, USD 101.71700 each at 1,360 (box), 2026-10-22; DigiKey files it under Memory - Modules though it is a BGA chip."
         },
         {
-          "sourceId": "df428c81154dd15a8700346ef1fd4e1fd76257b97e15fa8f83778b8113320c6e",
+          "sourceId": "9150baad02e0dc5dc6a25c277439f6584a55b1ca7f5a0abe237d18180983d908",
           "bucketId": "716c635f31746200000000000000000000000000000000000000000000000000",
           "bucketLabel": "qlc_1tb",
-          "url": "https://www.memorymarket.com/price/in/100257",
-          "locatorHash": "4c2fd211f98e7994efea14202046ce12bc36b19c867506de927c80db0df5943e",
-          "row": "1Tb QLC",
+          "url": "https://www.digikey.com/en/products/detail/micron-technology-inc/MT29F1T08GBLCEJ4-M-C/17632390",
+          "locatorHash": "ecf7618ef21e0dd65166872ad79fb062112c914e5056d6d7b428890ce162d179",
+          "row": "MT29F1T08GBLCEJ4-M:C",
           "status": "Active",
           "bucketWeightBps": 3000,
-          "baselineStateAtomic": "25000000"
+          "baselineStateAtomic": "47108600",
+          "note": "Micron, \"IC FLASH 1TBIT VBGA\", Not For New Designs; QLC and one die per Avnet's and Newark's descriptions (\"Qlc 1Tbit 8 132/187 Vbga 1 Ct\"). DigiKey's list price, USD 47.10860 each at 1,120 (box), 2026-10-22."
         },
         {
-          "sourceId": "eba0cca4f235d62ab6ea495867629d0ca7435da76d10e2c5feb773a7fa370cf0",
+          "sourceId": "5ad719e37e78dafcbeac5682e506b3b19402456b364d8c6e0ba778b30f4ef05a",
           "bucketId": "746c635f35313267620000000000000000000000000000000000000000000000",
           "bucketLabel": "tlc_512gb",
-          "url": "https://www.memorymarket.com/price/in/100170",
-          "locatorHash": "e18670ebb2f3af2ca065701566a35584d3fad73b999bac64516cfa10d817f946",
-          "row": "512Gb TLC",
+          "url": "https://www.digikey.com/en/products/detail/micron-technology-inc/MT29F512G08EBLKEJ4-ITF-K/22041408",
+          "locatorHash": "d6de44f99d5db964ddf3d574fc66aadcaed14f843030014d6493f6260989aa51",
+          "row": "MT29F512G08EBLKEJ4-ITF:K",
           "status": "Active",
           "bucketWeightBps": 2000,
-          "baselineStateAtomic": "21000000"
+          "baselineStateAtomic": "64633800",
+          "note": "Micron, \"IC FLASH 512GBIT PAR 132VBGA\", Active; TLC and one die per Newark's description (\"Tlc 512Gbit 8 132/187 Vbga 1 It\"). DigiKey's list price, USD 64.63380 each at 1,120 (tray), 2026-10-22."
         },
         {
-          "sourceId": "c364a3c1d30d5c54dfb9e692127dc13465c180dceddb6bcf603872b6f5b9ef2e",
+          "sourceId": "62f493820f6f2e4c319cbb8317875a88e538d0bdc67fdfc0dd78961cc4801952",
           "bucketId": "746c635f32353667620000000000000000000000000000000000000000000000",
           "bucketLabel": "tlc_256gb",
-          "url": "https://www.memorymarket.com/price/in/100164",
-          "locatorHash": "bfd312027471c05c0d7e849dbfd5a78ae6a9b61d73f0045054e5f3d8d7b71893",
-          "row": "256Gb TLC",
+          "url": "https://www.digikey.com/en/products/result?keywords=MT29F256G08EBHAFJ4-3R",
+          "locatorHash": "e6ca44a70b00b7e1315e9aa24cca2a82b576e780b194c8a69656ec722381757b",
+          "row": "MT29F256G08EBHAFJ4-3R:A",
           "status": "Active",
           "bucketWeightBps": 1000,
-          "baselineStateAtomic": "11000000"
+          "baselineStateAtomic": "32000000",
+          "note": "No public page priced a single-die 256Gb TLC chip on 2026-10-22: this Micron part (NAND (TLC) 256Gbit, 132-VBGA) is obsolete and DigiKey shows no price, and the priced 256Gb parts are multi-die. Dev placeholder locator; the baseline is a synthetic dev value, not a price."
         }
       ]
     },

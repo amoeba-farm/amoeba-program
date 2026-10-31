@@ -3,6 +3,21 @@ use super::*;
 use crate::instruction::OracleSponsoredActionV1 as Action;
 use crate::sponsorship::*;
 mod custody;
+
+/// Whether `source`'s sponsorship (its proposer is the agreement PDA `info`) has reconciled
+/// (30/22): its refunded bond went on to its funder. A failed month's source closes only then
+/// (30/25), since reconciliation reads the source.
+pub(in crate::processor) fn reconciled(
+    program: &Pubkey,
+    info: &AccountInfo,
+    source: &Pubkey,
+) -> Result<bool, ProgramError> {
+    let agreement = custody::load_agreement(program, info)?;
+    if agreement.source != *source {
+        return Err(OracleError::InvalidAccountList.into());
+    }
+    Ok(agreement.outcome != 0)
+}
 mod settlement;
 use custody::*;
 
@@ -21,6 +36,13 @@ pub(in crate::processor) fn process(
     a: &[AccountInfo],
     action: Action,
 ) -> ProgramResult {
+    // Activate proposes the underwritten source (as tag 182 does): v1 formation only, so without
+    // it Activate rejects like an unassigned selector. Agreements that exist still reconcile, pay
+    // their bounty and release their reserves.
+    #[cfg(not(feature = "v1-formation"))]
+    if matches!(action, Action::Activate { .. }) {
+        return Err(OracleError::InvalidInstructionData.into());
+    }
     if a.len() != account_count(&action) {
         return Err(OracleError::InvalidAccountList.into());
     }
@@ -28,7 +50,11 @@ pub(in crate::processor) fn process(
         return Err(ProgramError::MissingRequiredSignature);
     }
     match action {
+        #[cfg(feature = "v1-formation")]
         Action::Activate { terms, source } => activate(program, a, terms, source),
+        // Refused above.
+        #[cfg(not(feature = "v1-formation"))]
+        Action::Activate { .. } => Err(OracleError::InvalidInstructionData.into()),
         Action::Reconcile => settlement::reconcile(program, a),
         Action::ClaimBounty => settlement::claim(program, a),
         Action::WithdrawReserve { amount } => {

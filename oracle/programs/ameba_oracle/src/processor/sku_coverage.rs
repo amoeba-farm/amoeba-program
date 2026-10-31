@@ -100,6 +100,10 @@ pub(super) fn ensure_oracle_coverage_source_submission_window(
     {
         return Err(OracleError::InvalidOracleSkuCoverageManifest.into());
     }
+    // A failed period takes no new source or support (tag 30 selector 25 can fail one early).
+    if anchor.period.status != PeriodStatus::Forming {
+        return Err(OracleError::InvalidPeriodTransition.into());
+    }
     match month.phase {
         OraclePhase::SourceSubmission => {
             if coverage.coverage_finalized {
@@ -178,6 +182,7 @@ pub(super) fn process_finalize_oracle_sku_coverage(
     let coverage_info = &accounts[3];
     let (anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
+    ensure_period_not_failed(&anchor)?;
     let mut coverage =
         load_valid_oracle_sku_coverage_manifest(program_id, month_info.key, coverage_info)?;
     if month.phase != OraclePhase::SourceSubmission
@@ -224,6 +229,11 @@ pub(super) fn process_reopen_oracle_sku_coverage(
     let period_info = &accounts[1];
     let month_info = &accounts[2];
     let coverage_info = &accounts[3];
+    // A Failed period's stalled coverage reopens too: it is the one way back to source
+    // submission, where the failure lanes (191, 194, 195) release its escrows and reward
+    // reservation (a month whose sources were all rejected fails at expiry in Scramble). Nothing
+    // forms after: proposals and supports need a Forming period, and 184 and the funding steps
+    // refuse a Failed one (independent review of e25cd610, finding 1).
     let (_anchor, mut month) =
         load_valid_period_and_oracle_month(program_id, period_info, month_info)?;
     let mut coverage =
@@ -496,7 +506,7 @@ pub(super) fn process_expire_unlistable_oracle_source_v2(
         &mut source,
         record_context.as_mut().map(|(record, _)| record),
         anchor.expiry_ts,
-        now,
+        super::period::failure_lane_now(&anchor, now),
         slot,
     )?;
     if let Some((record, info)) = record_context.as_ref() {

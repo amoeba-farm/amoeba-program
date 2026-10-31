@@ -1,11 +1,21 @@
+// Without `v1-formation` (the production artifact) the formation handlers are unrouted
+// (`governance_manifest::V1_FORMATION_INSTRUCTION_TAGS`), and so is the code only they use: the
+// modules that hold nothing else are compiled out below, and the formation code inside modules the
+// kept instructions share is dropped by the link (fat LTO). Builds with the feature (the dev
+// profiles, the tests, the chain) lint dead code as usual.
+#![cfg_attr(not(feature = "v1-formation"), allow(dead_code))]
+
 mod account_addresses;
 mod account_io;
 mod account_io_tokens;
+#[cfg(feature = "v1-formation")]
 mod active_weights;
 mod adapters;
 mod bucket_medians;
 mod carry;
+#[cfg(feature = "v1-formation")]
 mod cfm_launch;
+mod cfm_receipt;
 pub use carry::{
     history_median_address, history_median_cursor, read_source_checkpoint, read_source_journal,
     CheckpointView, JournalView,
@@ -20,6 +30,9 @@ mod dev_formation;
 #[cfg(any(feature = "localnet-dev-authority", feature = "localnet-governance"))]
 mod dev_reset;
 mod dispatch;
+mod failed_month;
+#[cfg(feature = "heads")]
+mod heads;
 mod median;
 mod month_terminal;
 mod oracle_core;
@@ -31,6 +44,7 @@ mod oracle_schedule_validation;
 mod oracle_state_validation;
 mod oracle_validation;
 mod period;
+#[cfg(feature = "v1-formation")]
 mod recipe_weights;
 mod rewards;
 mod schedule;
@@ -39,7 +53,9 @@ mod settlement_signers;
 mod settlement_sources;
 mod settlement_validation;
 mod sku_coverage;
+#[cfg(feature = "v1-formation")]
 mod sku_coverage_resolution;
+#[cfg(feature = "v1-formation")]
 mod sku_manifest;
 mod sponsorship;
 mod terminal_cleanup;
@@ -48,6 +64,7 @@ mod usdc;
 use account_addresses::*;
 use account_io::*;
 use account_io_tokens::*;
+#[cfg(feature = "v1-formation")]
 use active_weights::*;
 use adapters::*;
 use bucket_medians::*;
@@ -79,6 +96,8 @@ pub use oracle_rules::{
     validate_oracle_active_manifest_begin_membership, validate_oracle_active_manifest_completion,
     validate_oracle_update_claim_v2_commit_bond, validate_oracle_update_claim_v2_reveal,
 };
+// The formation modules read these too (`v1-formation`).
+#[cfg_attr(not(feature = "v1-formation"), allow(unused_imports))]
 use oracle_rules::{
     apply_oracle_source_merge, ensure_live_revealed_oracle_update_claim,
     oracle_emergency_fallback_choice, oracle_opening_start_ts,
@@ -89,18 +108,23 @@ use oracle_schedule_validation::*;
 use oracle_state_validation::*;
 use oracle_validation::*;
 use period::*;
+#[cfg(feature = "v1-formation")]
 use recipe_weights::*;
 use schedule::*;
 use settlement_signers::*;
 use settlement_sources::*;
 use settlement_validation::*;
 use sku_coverage::*;
+#[cfg(feature = "v1-formation")]
 use sku_coverage_resolution::*;
+#[cfg(feature = "v1-formation")]
 use sku_manifest::*;
 
 use crate::compact_error::cpi::{invoke, invoke_signed};
 use crate::ProgramError;
 use crate::ProgramResult;
+// The formation modules read these too (`v1-formation`).
+#[cfg_attr(not(feature = "v1-formation"), allow(unused_imports))]
 use crate::{
     constants::{
         COLLATERAL_MINT_DECIMALS, CURRENT_STATE_NAMESPACE_SEED,

@@ -6,6 +6,12 @@
 
 pub mod cfm;
 pub mod cohort;
+#[cfg(all(
+    feature = "test-sbf",
+    not(feature = "localnet-dev-authority"),
+    not(feature = "localnet-governance")
+))]
+pub mod production;
 pub mod settle;
 pub mod updates;
 
@@ -65,36 +71,42 @@ pub fn program_test() -> ProgramTest {
         solana_program_test::processor!(ameba_oracle::process_instruction),
     );
     #[cfg(not(feature = "localnet-dev-authority"))]
-    {
-        use ameba_oracle::governance_gate::*;
-        let controller = PINNED_CONTROLLER_PROGRAM_ID;
-        let (key, bump) = derive_protocol_gate_pda(&controller, &program());
-        let mut data = vec![0u8; PROTOCOL_GATE_LEN];
-        data[..8].copy_from_slice(&PROTOCOL_GATE_DISCRIMINATOR);
-        data[8] = PROTOCOL_GATE_VERSION_V1;
-        data[9] = bump;
-        data[10] = 1;
-        data[12..44].copy_from_slice(
-            derive_controller_config_pda(&controller, &program())
-                .0
-                .as_ref(),
-        );
-        data[44..76].copy_from_slice(program().as_ref());
-        data[76..108].copy_from_slice(derive_target_programdata_pda(&program()).as_ref());
-        data[108..116].copy_from_slice(&1u64.to_le_bytes());
-        test.add_account(
-            key,
-            Account {
-                lamports: 1_000_000,
-                data,
-                owner: controller,
-                executable: false,
-                rent_epoch: 0,
-            },
-        );
-    }
+    add_protocol_gate(&mut test);
     test.prefer_bpf(cfg!(feature = "test-sbf"));
     test
+}
+
+/// The controller's protocol gate for this program at epoch 1, as the governed builds require
+/// (the harness appends the matching tail and gate account to every oracle instruction; a dev
+/// build ignores it, and the heads benchmarks need it once they upgrade to the production
+/// artifact).
+pub fn add_protocol_gate(test: &mut ProgramTest) {
+    use ameba_oracle::governance_gate::*;
+    let controller = PINNED_CONTROLLER_PROGRAM_ID;
+    let (key, bump) = derive_protocol_gate_pda(&controller, &program());
+    let mut data = vec![0u8; PROTOCOL_GATE_LEN];
+    data[..8].copy_from_slice(&PROTOCOL_GATE_DISCRIMINATOR);
+    data[8] = PROTOCOL_GATE_VERSION_V1;
+    data[9] = bump;
+    data[10] = 1;
+    data[12..44].copy_from_slice(
+        derive_controller_config_pda(&controller, &program())
+            .0
+            .as_ref(),
+    );
+    data[44..76].copy_from_slice(program().as_ref());
+    data[76..108].copy_from_slice(derive_target_programdata_pda(&program()).as_ref());
+    data[108..116].copy_from_slice(&1u64.to_le_bytes());
+    test.add_account(
+        key,
+        Account {
+            lamports: 1_000_000,
+            data,
+            owner: controller,
+            executable: false,
+            rent_epoch: 0,
+        },
+    );
 }
 
 /// Loader-v3 ProgramData metadata; the test program itself loads through the non-upgradeable
@@ -127,6 +139,11 @@ pub struct Harness {
     /// The version-1 settlement signers (sorted by key) once `activate` created the registry.
     pub settlement_signers: Vec<Keypair>,
     pub recovery_authority: Keypair,
+    /// The code `upgrade_oracle` installed. This harness runs the code the program started with
+    /// again after any later warp (seen 2026-10-30: a v1 formation byte answered by its handler
+    /// on the production artifact one `advance_slot` after the upgrade), so every warp
+    /// installs it again (`reinstall`).
+    pub upgraded: Option<Vec<u8>>,
 }
 
 pub async fn start_with(
@@ -144,6 +161,54 @@ pub async fn start_with(
     for (key, account) in extra {
         test.add_account(key, account);
     }
+    harness(test, upgrade_authority).await
+}
+
+/// The oracle as an upgradeable (loader-v3) program running `elf`, its ProgramData sized for
+/// `capacity` bytes of code and recording a fresh upgrade authority, as mainnet's is. A test can
+/// then upgrade it in place (`Harness::upgrade_oracle`) between instructions, so accounts the
+/// first build made meet the second build as they would after a mainnet upgrade.
+pub async fn start_upgradeable(elf: &[u8], capacity: usize) -> Harness {
+    let upgrade_authority = Keypair::new();
+    let mut test = ProgramTest::default();
+    add_protocol_gate(&mut test);
+    let rent = solana_sdk::rent::Rent::default();
+    let (program_data_key, _) =
+        Pubkey::find_program_address(&[program().as_ref()], &bpf_loader_upgradeable::id());
+    // UpgradeableLoaderState::ProgramData { slot: 0, upgrade_authority_address }, then the code.
+    let mut data = vec![0u8; 45 + capacity.max(elf.len())];
+    data[0..4].copy_from_slice(&3u32.to_le_bytes());
+    data[12] = 1;
+    data[13..45].copy_from_slice(upgrade_authority.pubkey().as_ref());
+    data[45..45 + elf.len()].copy_from_slice(elf);
+    test.add_account(
+        program_data_key,
+        Account {
+            lamports: rent.minimum_balance(data.len()),
+            data,
+            owner: bpf_loader_upgradeable::id(),
+            executable: false,
+            rent_epoch: 0,
+        },
+    );
+    // UpgradeableLoaderState::Program { programdata_address }.
+    let mut data = vec![0u8; 36];
+    data[0..4].copy_from_slice(&2u32.to_le_bytes());
+    data[4..36].copy_from_slice(program_data_key.as_ref());
+    test.add_account(
+        program(),
+        Account {
+            lamports: rent.minimum_balance(data.len()),
+            data,
+            owner: bpf_loader_upgradeable::id(),
+            executable: true,
+            rent_epoch: 0,
+        },
+    );
+    harness(test, upgrade_authority).await
+}
+
+async fn harness(test: ProgramTest, upgrade_authority: Keypair) -> Harness {
     let ctx = test.start_with_context().await;
     set_unix_timestamp(&ctx, NOW).await;
     let admin = Keypair::new();
@@ -156,6 +221,7 @@ pub async fn start_with(
         usdc_mint_authority: Keypair::new(),
         settlement_signers: Vec::new(),
         recovery_authority: Keypair::new(),
+        upgraded: None,
     };
     let mint_authority = harness.usdc_mint_authority.pubkey();
     harness.usdc_mint = harness.create_mint(&mint_authority, 6, None).await;
@@ -238,7 +304,10 @@ impl Harness {
             }
         }
         let tx = Transaction::new_signed_with_payer(&ixs, Some(&payer.pubkey()), &all, blockhash);
-        self.ctx.banks_client.process_transaction(tx).await
+        process_now(&self.ctx.banks_client, tx)
+            .await
+            .0
+            .map_err(BanksClientError::TransactionError)
     }
 
     pub async fn fund(&mut self, recipient: &Pubkey, lamports: u64) {
@@ -472,9 +541,59 @@ impl Harness {
     }
 
     pub async fn advance_slot(&mut self) {
+        self.warp(1).await;
+    }
+
+    /// Warp `slots` ahead, keeping the harness' wall clock and the upgraded code (`upgraded`).
+    pub async fn warp(&mut self, slots: u64) {
+        let clock: Clock = self.ctx.banks_client.get_sysvar().await.unwrap();
+        self.ctx
+            .warp_to_slot(clock.slot.saturating_add(slots))
+            .unwrap();
+        // Warping resets the clock sysvar; keep the harness' wall clock.
+        set_unix_timestamp(&self.ctx, clock.unix_timestamp as u64).await;
+        if let Some(elf) = self.upgraded.clone() {
+            self.reinstall(&elf).await;
+        }
+    }
+
+    /// Upgrade an oracle started with `start_upgradeable` to `elf` through the loader's own
+    /// Upgrade instruction (a buffer holding `elf`, the recorded authority signing), as a
+    /// mainnet upgrade does; the new code runs from the next slot.
+    pub async fn upgrade_oracle(&mut self, elf: &[u8]) {
+        self.reinstall(elf).await;
+        self.upgraded = Some(elf.to_vec());
+    }
+
+    /// The loader's Upgrade to `elf`, then one slot so that it runs (`upgrade_oracle`).
+    async fn reinstall(&mut self, elf: &[u8]) {
+        let buffer = Pubkey::new_unique();
+        // UpgradeableLoaderState::Buffer { authority_address }, then the code.
+        let mut data = vec![0u8; 37 + elf.len()];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes());
+        data[4] = 1;
+        data[5..37].copy_from_slice(self.upgrade_authority.pubkey().as_ref());
+        data[37..].copy_from_slice(elf);
+        let rent = self.ctx.banks_client.get_rent().await.unwrap();
+        let mut account = AccountSharedData::new(
+            rent.minimum_balance(data.len()),
+            data.len(),
+            &bpf_loader_upgradeable::id(),
+        );
+        account.set_data_from_slice(&data);
+        self.set_account_preserving_capitalization(buffer, account)
+            .await;
+        #[allow(deprecated)]
+        let upgrade = solana_sdk::bpf_loader_upgradeable::upgrade(
+            &program(),
+            &buffer,
+            &self.upgrade_authority.pubkey(),
+            &self.ctx.payer.pubkey(),
+        );
+        let authority = self.upgrade_authority.insecure_clone();
+        self.send(upgrade, &[&authority]).await.unwrap();
         let clock: Clock = self.ctx.banks_client.get_sysvar().await.unwrap();
         self.ctx.warp_to_slot(clock.slot.saturating_add(1)).unwrap();
-        // Warping resets the clock sysvar; keep the harness' wall clock.
         set_unix_timestamp(&self.ctx, clock.unix_timestamp as u64).await;
     }
 }
@@ -759,5 +878,31 @@ pub fn ed25519_verify_instruction(signer: &Keypair, message: &[u8]) -> Instructi
         program_id: solana_sdk_ids::ed25519_program::id(),
         accounts: vec![],
         data,
+    }
+}
+
+/// Processes `tx` on the working bank at once (`process_transaction_with_metadata`): its result
+/// and compute units (natively zero). It has finished, its account locks released, before this
+/// returns; the queued `process_transaction` returned once its signature showed, while the bank's
+/// background thread could still hold them, so the next transaction sometimes found its accounts
+/// in use under load (round 16, the full oracle check). Every sender here goes through this one
+/// path; a refusal for an account lock (nothing ran) still goes again after a short wait.
+pub async fn process_now(
+    banks: &solana_program_test::BanksClient,
+    tx: Transaction,
+) -> (Result<(), TransactionError>, u64) {
+    let mut tries = 0u32;
+    loop {
+        let result = banks
+            .process_transaction_with_metadata(tx.clone())
+            .await
+            .unwrap();
+        if tries < 6 && result.result == Err(TransactionError::AccountInUse) {
+            tokio::time::sleep(std::time::Duration::from_millis(10 << tries)).await;
+            tries += 1;
+            continue;
+        }
+        let units = result.metadata.map_or(0, |m| m.compute_units_consumed);
+        return (result.result, units);
     }
 }

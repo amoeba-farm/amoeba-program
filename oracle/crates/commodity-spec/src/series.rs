@@ -101,7 +101,8 @@ pub struct DramScope {
     pub qualification: Option<ScopeValue>,
 }
 
-/// NAND technical scope (`hard_fields` and `nand_scope` of `NANDX_WAFER_CONTRACT_ASSESSMENT`).
+/// NAND technical scope (`hard_fields` and `nand_scope` of `NANDX_PACKAGED_CONTRACT`): a packaged
+/// NAND chip's identity, as [`DramScope`] is a DRAM chip's.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NandScope {
@@ -111,15 +112,35 @@ pub struct NandScope {
     /// `SLC`, `MLC`, `TLC`, `QLC`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cell_type: Option<String>,
-    /// Nominal per-die density: `256Gb`, `512Gb`, `1Tb`.
+    /// Nominal monolithic die density: `256Gb`, `512Gb`, `1Tb`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub die_density: Option<String>,
-    /// The assessment's quality, testing and yield treatment.
+    /// Dies in the package; the initial profile admits 1 only.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub testing_scope: Option<ScopeValue>,
+    pub die_count: Option<u8>,
+    /// `new_unused`, `reclaimed`, `desoldered`, `refurbished`, `engineering_sample`, `unknown`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
+    /// `standard_production`, `downgrade`, `ink_die`, `white_label`, `untested`, `specialty`,
+    /// `unknown`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grade: Option<String>,
+    /// Interface and I/O speed (ONFI or Toggle, MT/s), or a documented interface mix.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interface: Option<ScopeValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub package_construction: Option<ScopeValue>,
+    /// Qualification or temperature grade scope.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qualification: Option<ScopeValue>,
     /// Layer or process-generation scope; a documented mix is fine.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layer_scope: Option<ScopeValue>,
+    /// A wafer assessment's quality, testing and yield treatment: NANDX's definition before
+    /// 2026-10-22, still read so such a series routes (as the wrong product). A chip series
+    /// states its `grade` instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub testing_scope: Option<ScopeValue>,
 }
 
 /// A battery cell's identity and commercial basis (BATX brief §2, "Product identity" and
@@ -221,7 +242,7 @@ pub struct SeriesDefinition {
     /// `storage_system`, `cathode_material`, `lithium_carbonate`, `retail_bundle`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub physical_scope: Option<String>,
-    /// The documented native unit, e.g. "USD per chip", "USD per wafer-equivalent unit".
+    /// The documented native unit, e.g. "USD per chip", "USD per GB".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub native_unit: Option<String>,
     /// The fixed price statistic: "average", "mainstream", "high", "low", "latest", …
@@ -388,14 +409,19 @@ pub fn series_template(bucket: &Bucket, direct: bool) -> Value {
             );
         }
         Product::Nandx => {
-            object.insert("physicalScope".into(), json!("fabricated_wafer"));
+            object.insert("physicalScope".into(), json!("packaged_ic"));
             object.insert(
                 "nand".into(),
                 json!({
                     "architecture": "3D",
                     "cellType": bucket.cell_type,
                     "dieDensity": bucket.die_density,
-                    "testingScope": scope(),
+                    "dieCount": null,
+                    "condition": null,
+                    "grade": null,
+                    "interface": scope(),
+                    "packageConstruction": scope(),
+                    "qualification": scope(),
                     "layerScope": scope(),
                 }),
             );

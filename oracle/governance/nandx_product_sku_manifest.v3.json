@@ -1,0 +1,71 @@
+{
+  "schema": "amoeba.oracle-product-sku-manifest",
+  "schemaVersion": 1,
+  "manifestVersion": 3,
+  "product": {
+    "marketId": "nandx",
+    "symbol": "NANDX",
+    "underlyingId": "nand-standardized-baskets"
+  },
+  "provenance": {
+    "sourceDescription": "commodity-submission-spec-v2 NANDX commodity buckets (single-die packaged 3D NAND flash, contract basis), which replace manifest v2's fabricated-wafer assessments under the same labels (the user, 2026-10-22)",
+    "sourceSha256": "68b0c58d33cb37788c92818332f323266961216999b3473c5dab17f5b601423e"
+  },
+  "canonicalLabelEncoding": {
+    "name": "printable-ascii-utf8-right-zero-padded-bytes32-v1",
+    "minimumBytes": 1,
+    "maximumBytes": 32,
+    "sort": "ascending-encoded-bytes"
+  },
+  "tag190Plan": {
+    "instructionTag": 190,
+    "maximumChunkSkuIds": 16,
+    "chunkSkuCounts": [
+      4
+    ]
+  },
+  "requiredSkuCount": 4,
+  "requiredSkuRootHex": "918d65590251611af7e03014ed3f2ede200d644006d7d71f30a41fa702829cbc",
+  "groups": [
+    {
+      "name": "TLC",
+      "skuCount": 3,
+      "subgroups": [
+        {
+          "name": "1Tb",
+          "skuCount": 1,
+          "skuLabels": [
+            "tlc_1tb"
+          ]
+        },
+        {
+          "name": "512Gb",
+          "skuCount": 1,
+          "skuLabels": [
+            "tlc_512gb"
+          ]
+        },
+        {
+          "name": "256Gb",
+          "skuCount": 1,
+          "skuLabels": [
+            "tlc_256gb"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "QLC",
+      "skuCount": 1,
+      "subgroups": [
+        {
+          "name": "1Tb",
+          "skuCount": 1,
+          "skuLabels": [
+            "qlc_1tb"
+          ]
+        }
+      ]
+    }
+  ]
+}

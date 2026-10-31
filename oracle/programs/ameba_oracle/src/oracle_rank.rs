@@ -18,6 +18,7 @@ crate::fixed_codec::compact_borsh_struct! {
 }
 
 impl MedianRank {
+    #[cfg_attr(not(feature = "v1-formation"), allow(dead_code))] // Formation only.
     pub fn observe(&mut self, value: u64) -> Result<(), ProgramError> {
         self.count = self
             .count
@@ -73,6 +74,7 @@ impl MedianRank {
     }
 }
 
+#[cfg_attr(not(feature = "v1-formation"), allow(dead_code))] // Formation only.
 pub fn encode_signed(value: i64) -> u64 {
     (value as u64) ^ (1u64 << 63)
 }

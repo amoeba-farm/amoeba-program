@@ -1,0 +1,8 @@
+[package]
+name = "ameba-oracle-heads"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+description = "Oracle v2 (heads on pikes): the weighted median, joint source and address caps, thresholds, escrow and challenge accounting shared by the oracle program, the chain, the API and petri"
+
+[dependencies]

@@ -731,8 +731,6 @@ impl Harness {
     }
 
     pub async fn advance_slots(&mut self, slots: u64) {
-        let clock: solana_sdk::clock::Clock = self.ctx.banks_client.get_sysvar().await.unwrap();
-        self.ctx.warp_to_slot(clock.slot + slots).unwrap();
-        set_unix_timestamp(&self.ctx, clock.unix_timestamp as u64).await;
+        self.warp(slots).await;
     }
 }
