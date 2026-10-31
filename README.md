@@ -24,8 +24,11 @@ state preservation and refunded buffer deposit. API configuration is a separate 
 
 The [2026-10-30 oracle heads upgrade](contracts/2026-10-30-oracle-heads) adds Oracle v2
 "heads" and is installed at finalized slot **463788239**: the exact 726,200-byte
-program followed by 1,704 loader-required zero bytes. Its source is in [oracle](oracle);
-updated hosted verification is pending. The 2026-10-22 record above remains historical.
+program followed by 1,704 loader-required zero bytes. Its source is in [oracle](oracle).
+It is Active at gate epoch **8**, and hosted Solana verification passed for source
+`a1eeaa019e34653d6d1319cef5631655cffd10c0`. [Installation and verification evidence](deployment-evidence/mainnet-oracle-heads-20261031.json)
+records the exact binary, loader-required zero padding, finalized council transactions
+and refunded buffer deposit. The 2026-10-22 record above remains historical.
 
 The [operator-assessed Futures credit upgrade](contracts/2026-10-28-private-credit) is prepared.
 Its source and artifact records are published separately from the installed program;

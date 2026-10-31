@@ -24,7 +24,11 @@ with the hosted verifier's recipe, which reproduced the exact ELF byte for byte.
 Installed at finalized slot **463788239**. Mainnet's loader requires at least 10,240
 additional bytes per extension, so the allocation is 727,904 bytes: the exact ELF followed
 by 1,704 zero bytes. The normalized verification hash is unchanged by that padding.
-Updated hosted verification is pending.
+Activated at gate epoch **8**. Updated hosted verification passed for public
+source `a1eeaa019e34653d6d1319cef5631655cffd10c0`, with both canonical and
+authority-specific hashes matching the installed program.
+The 3.6899342 SOL buffer deposit was refunded; the extension used 0.0520192 SOL.
+See [finalized installation and verification evidence](../../deployment-evidence/mainnet-oracle-heads-20261031.json).
 
 From the repository root, using solana-verify 0.5.2:
 

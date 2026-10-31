@@ -1,0 +1,166 @@
+{
+  "schema": "amoeba.oracle-mainnet-installation.v1",
+  "status": "COMPLETED",
+  "assembledAt": "2026-10-31T19:04:43.782Z",
+  "cluster": "mainnet-beta",
+  "releaseTag": "release/2026-10-30-oracle-heads",
+  "privateSourceCommit": "2af39bf9f69f783bacf929daf9b1baa103ade351",
+  "packageSourceCommit": "179864284b5ca09e2ce0bfdb94a05884d2e6f1ee",
+  "publicSourceCommit": "a1eeaa019e34653d6d1319cef5631655cffd10c0",
+  "oracle": {
+    "observedAt": "2026-10-31T18:25:50.130Z",
+    "slot": 463788676,
+    "target": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+    "sourceCommit": "179864284b5ca09e2ce0bfdb94a05884d2e6f1ee",
+    "artifactSha256": "a634450ad1f671cfd5745d3a99cda389fbee5c73dd5f1d4ff55c363047a349d3",
+    "payloadSha256": "d1887cb748990cf979f4b2e1df7a244dec7a67a89628324f655c4fcbda09c70d",
+    "mandatoryZeroPaddingBytes": 1704,
+    "deployedSlot": "463788239",
+    "capacity": 727904,
+    "authority": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+    "gate": {
+      "bump": 255,
+      "status": 0,
+      "config": "Ec5H8jsGvaLU3T3gp6qTayPjY2qF3geBbVKWz4rsaEHB",
+      "targetProgram": "45YCerssGjg2M29RFc9D4fAJh7dfFpMJ3ZcZtaTnRXRS",
+      "programdata": "DyDtjYRs7sZbJyLEsq1sT4ynzS2ob3zrZMS3dLBuiGq1",
+      "epoch": "8",
+      "activeProposal": "11111111111111111111111111111111",
+      "freezeSlot": "0",
+      "reason": 0,
+      "lastCompletedProposal": "6FvP3g8hKiy5KBio8AKyNdk3e9zbpFfkNuUKqxnWA9DZ"
+    },
+    "bufferClosed": true,
+    "bufferRefundLamports": 3689934200,
+    "upgradeSignature": "4eLJtNyETY6UK5PR8JNf1uxHu5QSEQSj1YTaR77k7VEW4gup8S6sU6tEJtCSugp5etz8qL4t8c2VRgwmQBhoxwc9",
+    "activationSignature": "2KnsLeo2hkVUHBgsDpRQv4JBGzdj7ZrdUKABMTBpvfWeTMNSnPhyMqFTmVHyKxoBSwRmsg9ibH6of63LryFuet3R",
+    "extensionSignature": "2kz97ANUbfQ38217MzEonm1NyxwUPTVk3C5FSxgzrwu1LF7x8wSQsz9d4RSPhFYoJqqGQzW1N5XWXt8Ww86yMjWD",
+    "extensionLamports": 52019200,
+    "artifactBytes": 726200,
+    "normalizedSha256": "86a6f3a8ccff422804a19eedd2e438842dd42c45c511b70e064bf0b28e4abde3",
+    "extensionBytes": 10240,
+    "allocationReason": "Extension finalized at slot 463766943 before this coordinator run; no further extension.",
+    "upgradeProposalId": "89",
+    "freezeProposalId": "90",
+    "activationProposalId": "91",
+    "verifiedArtifactChunks": 45,
+    "transactions": {
+      "freeze": {
+        "name": "freeze-execute",
+        "signature": "2YYmAMbSeSnDe2wL728jJaiiBzYU9Mni1BcKfBUFgzaGrsmnbHe5bUebR1jZSEqg2kHhYCVEVSXgJ3r3u9VYRgBQ",
+        "slot": 463787963,
+        "err": null,
+        "messageSha256": "a2243a1580fde9c498a9cb6811ece888d779ab5ea803a596a7a0c40b60435c1f"
+      },
+      "upgrade": {
+        "name": "upgrade-execute",
+        "signature": "4eLJtNyETY6UK5PR8JNf1uxHu5QSEQSj1YTaR77k7VEW4gup8S6sU6tEJtCSugp5etz8qL4t8c2VRgwmQBhoxwc9",
+        "slot": 463788239,
+        "err": null,
+        "messageSha256": "42ba349badc3808d533de82b6e405b42997eb8fd4a620d4d1974a233c7f714e0"
+      },
+      "activation": {
+        "name": "activate-execute",
+        "signature": "2KnsLeo2hkVUHBgsDpRQv4JBGzdj7ZrdUKABMTBpvfWeTMNSnPhyMqFTmVHyKxoBSwRmsg9ibH6of63LryFuet3R",
+        "slot": 463788469,
+        "err": null,
+        "messageSha256": "09424f6631541ad4ed1141218325dfbb1313aaea77118b14b3486268ba596ddd"
+      },
+      "verificationMetadata": {
+        "name": "metadata-oracle-execute",
+        "signature": "U1WwycmoUVLv2A9juRsv82qvG3pU3icRYVuoKjtU9A5sh4m7jbBwoLwVc5pibRVDMcpaKrLz63E3rtFrEL7J4Nt",
+        "slot": 463798707,
+        "err": null,
+        "messageSha256": "df368c9230107a4f69c0febcbc664db84bf4885102706d1606cb7e53eced2b12"
+      }
+    }
+  },
+  "controller": {
+    "program": "8fhNi6QHU5TYNhoPDM4vs89ZBztnpxp3LnBXRgkBVKtx",
+    "installedRelease": 6
+  },
+  "preservation": {
+    "controllerAfterMetadata": {
+      "ownProposalIds": [
+        "89",
+        "90",
+        "91",
+        "92"
+      ],
+      "proposalAddresses": [
+        "8LF6KNdyJUiD3ZDHi7UoFCKfie39C6nxfJsvE3AZNXbZ",
+        "C88zbVKpHkqSwDuq6VWJiLxThip4uorKaYJnWmQCw6Ey",
+        "6FvP3g8hKiy5KBio8AKyNdk3e9zbpFfkNuUKqxnWA9DZ",
+        "5a7JNDF8rybTkyxm4X1xXt88pkUYxwuE3kuXRnuCkK4M"
+      ],
+      "configComparedExceptNextId": true,
+      "oracleGate": {
+        "status": 0,
+        "epoch": "8"
+      },
+      "preservedUnrelatedAccounts": 37
+    }
+  },
+  "verification": {
+    "metadata": "FQbSSZeS3tiRweHeni4qcteqTBgtQkSz3rbsnM1rrqUn",
+    "authority": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+    "proposalId": "92",
+    "recordSha256": "bbafebff04f2a56f912e3d61b4081d9c3db4a68cf505b9943a3ce985a43159b6",
+    "recipe": {
+      "version": "0.5.2",
+      "repository": "https://github.com/amoeba-farm/amoeba-program",
+      "commit": "a1eeaa019e34653d6d1319cef5631655cffd10c0",
+      "args": [
+        "--workspace-path",
+        "oracle",
+        "--library-name",
+        "ameba_oracle",
+        "--base-image",
+        "us-central1-docker.pkg.dev/amoeba-hm0q2k/solana-verifiable-builds/gate-final@sha256:7ad1e567f19831e658f5b892a7269d23d7f1826438e025b5d9d2e385240a4d67",
+        "--arch",
+        "v1",
+        "--cargo-build-sbf-args",
+        "--tools-version v1.53"
+      ],
+      "deployedSlot": "463788239"
+    },
+    "finalizedObservationSlot": 463798991,
+    "hosted": {
+      "target": "oracle",
+      "observedAt": "2026-10-31T19:04:43.782Z",
+      "jobStatus": "completed",
+      "canonicalVerified": true,
+      "authorityVerified": true,
+      "exactExpectedCommit": "a1eeaa019e34653d6d1319cef5631655cffd10c0",
+      "exactExpectedHash": "86a6f3a8ccff422804a19eedd2e438842dd42c45c511b70e064bf0b28e4abde3",
+      "status": "verified",
+      "requestId": "a1a1cae3-8b45-48d2-8192-4acc0e158eab",
+      "canonical": {
+        "is_verified": true,
+        "message": "On chain program verified",
+        "on_chain_hash": "86a6f3a8ccff422804a19eedd2e438842dd42c45c511b70e064bf0b28e4abde3",
+        "executable_hash": "86a6f3a8ccff422804a19eedd2e438842dd42c45c511b70e064bf0b28e4abde3",
+        "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/a1eeaa019e34653d6d1319cef5631655cffd10c0",
+        "commit": "a1eeaa019e34653d6d1319cef5631655cffd10c0",
+        "last_verified_at": "2026-10-31T19:03:54.479438",
+        "is_frozen": false,
+        "is_closed": false
+      },
+      "authoritySpecific": {
+        "signer": "BMdUFjhudpgUNjRK8jiCpezcDxxCkaAP7bFsMJd5RPn7",
+        "is_verified": true,
+        "on_chain_hash": "86a6f3a8ccff422804a19eedd2e438842dd42c45c511b70e064bf0b28e4abde3",
+        "executable_hash": "86a6f3a8ccff422804a19eedd2e438842dd42c45c511b70e064bf0b28e4abde3",
+        "repo_url": "https://github.com/amoeba-farm/amoeba-program/tree/a1eeaa019e34653d6d1319cef5631655cffd10c0",
+        "commit": "a1eeaa019e34653d6d1319cef5631655cffd10c0",
+        "last_verified_at": "2026-10-31T19:03:54.479438",
+        "is_frozen": false,
+        "is_closed": false
+      }
+    }
+  },
+  "build": {
+    "receiptSha256": "8c69336ccf03b181d98368ff4445f6dfef8d7d266624d04faf87d1e0aa91013e"
+  },
+  "apiHandoff": "Production API, keeper and maker run release 2af39bf9. The BATX Dec 1 cleanup and the RAMX and NANDX heads boards and Q4 26 periods completed in 137 finalized production-operations transactions, none failed. BATX lookup-table deactivation and closure were separate finalized transactions."
+}

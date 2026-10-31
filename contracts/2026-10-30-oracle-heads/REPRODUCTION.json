@@ -25,6 +25,7 @@
   "buildStackErrorLines": [],
   "publicSourceReproduction": "byte-identical",
   "onChainInstallation": "finalized at slot 463788239",
-  "hostedVerification": "pending",
-  "publicBuildLogSha256": "e589c6d5afaf12289188c5ca0f63a3f7a35d8349922af87e01b4ba31da77c638"
+  "hostedVerification": "verified",
+  "publicBuildLogSha256": "e589c6d5afaf12289188c5ca0f63a3f7a35d8349922af87e01b4ba31da77c638",
+  "hostedVerificationEvidence": "../../deployment-evidence/mainnet-oracle-heads-20261031.json"
 }
